@@ -1,118 +1,127 @@
-export default function Home() {
+import Link from 'next/link';
+
+const steps = [
+  { title: 'Enter Your Brand', desc: 'Input your brand name, keywords, and competitor list.' },
+  { title: 'AI Engine Scanning', desc: 'Percepta queries AI engines with hundreds of prompts to analyze mentions.' },
+  { title: 'Score Calculation', desc: 'Our algorithm computes your GEO Score based on visibility, sentiment, and positioning.' },
+  { title: 'Actionable Insights', desc: 'Receive detailed reports with specific recommendations.' },
+];
+
+const bands = [
+  { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
+  { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70–79', label: 'Good', desc: 'Minor improvements recommended' },
+  { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45–69', label: 'Needs Work', desc: 'Several issues to address' },
+  { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
+];
+
+export default function Overview() {
   return (
-    <main className="min-h-screen bg-[#f7f8fa] text-slate-900">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="text-xl font-semibold tracking-tight">Percepta</div>
-          <nav className="flex items-center gap-6 text-sm text-slate-600">
-            <a href="#">Overview</a>
-            <a href="#">Insights</a>
-            <a href="#">Maps</a>
-            <a href="#">Contact</a>
-          </nav>
+    <main>
+      {/* HERO */}
+      <div style={{ background: 'linear-gradient(170deg,#fff 55%,#F3EEFF 100%)', padding: '52px 40px 40px', textAlign: 'center' }}>
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          border: '1px solid #DDD6FE', borderRadius: 50, padding: '8px 22px',
+          fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.1em',
+          color: '#7C3AED', textTransform: 'uppercase', marginBottom: 44,
+          background: 'rgba(255,255,255,0.9)',
+        }}>
+          ✦ &nbsp;AI-Powered Brand Intelligence &nbsp;·&nbsp; Powered by Accenture
         </div>
-      </header>
+        <div style={{ fontSize: '4.6rem', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-3px', marginBottom: 28 }}>
+          <span style={{ color: '#111827' }}>Your Brand&apos;s </span>
+          <span style={{ color: '#7C3AED' }}>GEO</span>
+          <span style={{ color: '#111827' }}> Score</span>
+        </div>
+        <p style={{ fontSize: '1.05rem', color: '#6B7280', maxWidth: 860, margin: '0 auto 36px', lineHeight: 1.7 }}>
+          The Percepta GEO Score measures how often and favorably your brand is cited in AI-generated responses.
+        </p>
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <Link href="/geo-hub" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: '#7C3AED', color: 'white', border: 'none',
+            borderRadius: 50, padding: '18px 36px', fontSize: '1.05rem',
+            fontWeight: 700, textDecoration: 'none',
+          }}>
+            Get Your GEO Score &nbsp;→
+          </Link>
+          <a href="#how" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            background: 'white', color: '#111827', border: '1.5px solid #D1D5DB',
+            borderRadius: 50, padding: '18px 36px', fontSize: '1.05rem',
+            fontWeight: 600, textDecoration: 'none',
+          }}>
+            See How It Works
+          </a>
+        </div>
+      </div>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Filters
-          </h2>
-
-          <div className="space-y-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Region
-              </label>
-              <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-500">
-                Select region
-              </div>
+      {/* HOW IT WORKS */}
+      <div id="how" style={{ background: '#F9F9FC', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ textAlign: 'center', marginBottom: 64 }}>
+          <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Process</div>
+          <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#111827', margin: '10px 0 14px' }}>How Percepta Works</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 40, position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 22, left: 'calc(25% + 20px)', width: 'calc(75% - 40px)', height: 1, background: '#E5E7EB', zIndex: 0 }} />
+          {steps.map((s, i) => (
+            <div key={i} style={{ position: 'relative', zIndex: 1 }}>
+              <div style={{ fontSize: '3.2rem', fontWeight: 900, color: '#EDE9FE', lineHeight: 1, marginBottom: 24 }}>0{i + 1}</div>
+              <div style={{ fontSize: '1rem', fontWeight: 800, color: '#111827', marginBottom: 8 }}>{s.title}</div>
+              <div style={{ fontSize: '0.84rem', color: '#6B7280', lineHeight: 1.7 }}>{s.desc}</div>
             </div>
+          ))}
+        </div>
+      </div>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Time Range
-              </label>
-              <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-500">
-                Last 30 days
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Layer
-              </label>
-              <div className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-500">
-                Population density
-              </div>
-            </div>
-
-            <button className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white">
-              Apply Filters
-            </button>
+      {/* GEO SCORE SECTION */}
+      <div style={{ background: 'white', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center', marginBottom: 56 }}>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 14 }}>The GEO Score</div>
+            <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 20px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
+            <p style={{ fontSize: '0.95rem', color: '#6B7280', lineHeight: 1.8, margin: 0 }}>Your GEO Score distills complex AI citation data into a single, actionable metric.</p>
           </div>
-        </aside>
-
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
-              Geospatial Intelligence
-            </p>
-            <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
-              Explore location data with a cleaner, faster Percepta experience.
-            </h1>
-            <p className="mt-4 max-w-2xl text-base text-slate-600">
-              Analyze regions, compare signals, and turn spatial data into
-              actionable insights through a modern geospatial interface.
-            </p>
-
-            <div className="mt-6 flex gap-3">
-              <button className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-medium text-white">
-                Request Demo
-              </button>
-              <button className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-900">
-                Learn More
-              </button>
+          <div style={{ background: 'white', borderRadius: 20, padding: '44px 40px', boxShadow: '0 8px 40px rgba(124,58,237,0.13)', border: '1px solid #F0EBFF', textAlign: 'center' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.14em', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 18 }}>GEO SCORE</div>
+            <div style={{ fontSize: '5.5rem', fontWeight: 900, color: '#7C3AED', lineHeight: 1, marginBottom: 20 }}>78</div>
+            <div style={{ background: '#F3F4F6', borderRadius: 50, height: 6, width: '100%', marginBottom: 10, overflow: 'hidden' }}>
+              <div style={{ background: '#7C3AED', height: 6, borderRadius: 50, width: '78%' }} />
             </div>
-          </section>
-
-          <section className="grid gap-6 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Coverage</p>
-              <h3 className="mt-2 text-3xl font-bold">128</h3>
-              <p className="mt-1 text-sm text-slate-600">Mapped regions</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Signals</p>
-              <h3 className="mt-2 text-3xl font-bold">42K</h3>
-              <p className="mt-1 text-sm text-slate-600">Location records</p>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Accuracy</p>
-              <h3 className="mt-2 text-3xl font-bold">94%</h3>
-              <p className="mt-1 text-sm text-slate-600">Validated insight match</p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 shadow-sm">
-            <div className="flex h-[420px] items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#dbeafe,#e2e8f0,#f8fafc)] text-center">
-              <div>
-                <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
-                  Map Area
-                </p>
-                <h3 className="mt-3 text-2xl font-semibold">
-                  Your map or geospatial visualization goes here
-                </h3>
-                <p className="mt-2 text-slate-600">
-                  We can replace this with your real layout next.
-                </p>
-              </div>
-            </div>
-          </section>
+            <div style={{ fontSize: '0.82rem', color: '#9CA3AF', marginBottom: 20 }}>out of 100</div>
+            <span style={{ background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '6px 22px', fontSize: '0.84rem', fontWeight: 700 }}>Good</span>
+          </div>
         </div>
-      </section>
+
+        {/* Score Bands */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
+          {bands.map((b, i) => (
+            <div key={i} style={{ background: b.bg, borderRadius: 14, padding: '28px 24px', textAlign: 'center', border: `1.5px solid ${b.border}` }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: b.color, marginBottom: 4 }}>{b.range}</div>
+              <div style={{ fontSize: '1.3rem', fontWeight: 900, color: b.color, marginBottom: 4 }}>{b.label}</div>
+              <div style={{ fontSize: '0.78rem', color: b.color }}>{b.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{ background: 'white', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '52px 60px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 4px', lineHeight: 1.1 }}>Ready to Discover Your</h2>
+          <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 28px', lineHeight: 1.1 }}>GEO Score?</h2>
+          <div style={{ marginTop: 40 }}>
+            <Link href="/geo-hub" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              background: '#7C3AED', color: 'white', border: 'none',
+              borderRadius: 50, padding: '18px 44px', fontSize: '1.05rem',
+              fontWeight: 700, textDecoration: 'none', marginTop: 36,
+            }}>
+              Launch Percepta &nbsp;→
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }
