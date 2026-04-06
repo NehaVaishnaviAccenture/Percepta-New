@@ -28,7 +28,7 @@ async function fetchPageContent(url: string) {
     const title = $('title').text().trim();
     const metaDesc = $('meta[name="description"]').attr('content') || '';
     const headings: string[] = [];
-    $('h1,h2,h3').slice(0, 20).each((_, el) => headings.push($(el).text().trim()));
+    $('h1,h2,h3').slice(0, 20).each((_, el) => { headings.push($(el).text().trim()); });
     const hasSchema = $('script[type="application/ld+json"]').length > 0;
     const hasAuthor = $('[class*="author"],[class*="byline"]').length > 0;
     const hasTable = $('table').length > 0;
