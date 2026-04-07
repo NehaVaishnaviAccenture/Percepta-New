@@ -41,24 +41,6 @@ const perceptaFeatures = [
   'Accenture team to implement and drive results',
 ];
 
-const whyDifferent = [
-  {
-    icon: '↗',
-    title: 'Score + Diagnosis',
-    desc: 'One unified GEO score across visibility, citations, sentiment — not scattered metrics.',
-  },
-  {
-    icon: '⚡',
-    title: 'Strategy + Action',
-    desc: 'We don\'t just show data. We tell you what to fix, how to fix it, and why it matters.',
-  },
-  {
-    icon: '👥',
-    title: 'Team + Execution',
-    desc: 'Backed by Accenture consultants who implement the recommendations for you.',
-  },
-];
-
 export default function Overview() {
   return (
     <main>
@@ -78,7 +60,7 @@ export default function Overview() {
           <span style={{ color: '#7C3AED' }}>GEO</span>
           <span style={{ color: '#111827' }}> Score</span>
         </div>
-        <p style={{ fontSize: '1.1rem', color: '#374151', maxWidth: 760, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 500 }}>
+        <p style={{ fontSize: '1.1rem', color: '#9CA3AF', maxWidth: 760, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 500 }}>
           The Percepta GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, and other major AI engines.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -106,7 +88,7 @@ export default function Overview() {
         <div style={{ textAlign: 'center', marginBottom: 64 }}>
           <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Process</div>
           <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#111827', margin: '10px 0 10px' }}>How Percepta Works</h2>
-          <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 560, margin: '0 auto', lineHeight: 1.7 }}>
+          <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 560, margin: '0 auto', lineHeight: 1.7 }}>
             From brand input to actionable GEO insights — in four simple steps.
           </p>
         </div>
@@ -128,7 +110,7 @@ export default function Overview() {
           <div>
             <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 14 }}>The GEO Score</div>
             <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
-            <p style={{ fontSize: '1rem', color: '#374151', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 500 }}>
+            <p style={{ fontSize: '1rem', color: '#9CA3AF', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 500 }}>
               Understand how frequently and positively your brand appears in AI-generated answers, and get clear next steps to improve.
             </p>
           </div>
@@ -154,7 +136,7 @@ export default function Overview() {
           ))}
         </div>
 
-        {/* OTHERS GIVE DATA / WE GIVE SOLUTION — Image 4 */}
+        {/* OTHERS GIVE DATA / WE GIVE SOLUTION */}
         <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 64 }}>
           <div style={{ textAlign: 'center', marginBottom: 48 }}>
             <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 16 }}>What You Gain</div>
@@ -166,14 +148,14 @@ export default function Overview() {
             </p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900, margin: '0 auto' }}>
-            {/* Competitors card */}
+            {/* Competitors card — no strikethrough */}
             <div style={{ background: '#F9FAFB', borderRadius: 16, border: '1px solid #E5E7EB', padding: '36px 32px' }}>
               <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.12em', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 24 }}>Competitors</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {competitors.map((item, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <span style={{ color: '#9CA3AF', fontSize: '1.1rem', flexShrink: 0 }}>—</span>
-                    <span style={{ fontSize: '0.88rem', color: '#9CA3AF', textDecoration: 'line-through' }}>{item}</span>
+                    <span style={{ fontSize: '0.88rem', color: '#9CA3AF' }}>{item}</span>
                   </div>
                 ))}
               </div>
@@ -200,7 +182,7 @@ export default function Overview() {
         <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '52px 60px', textAlign: 'center' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 4px', lineHeight: 1.1 }}>Ready to Discover Your</h2>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 20px', lineHeight: 1.1 }}>GEO Score?</h2>
-          <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 560, margin: '0 auto 8px', lineHeight: 1.7 }}>
+          <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 560, margin: '0 auto 8px', lineHeight: 1.7 }}>
             Join forward-thinking brands that are optimizing for the new era of generative search.
           </p>
           <p style={{ fontSize: '0.9rem', color: '#9CA3AF', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
