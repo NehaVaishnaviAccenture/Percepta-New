@@ -510,18 +510,14 @@ Return ONLY a valid JSON array with no markdown, no backticks, no preamble. Each
 
 Order by priority (High first). Make actions specific to this brand's actual gaps and competitors.`;
 
-    fetch('https://api.anthropic.com/v1/messages', {
+    fetch('/api/geo-actions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+      body: JSON.stringify({ prompt }),
     })
       .then(r => r.json())
       .then(data => {
-        const text = (data.content||[]).map((b:any) => b.text||'').join('');
+        const text = data.response || '';
         const clean = text.replace(/```json|```/g, '').trim();
         const parsed = JSON.parse(clean);
         setActions(parsed);
