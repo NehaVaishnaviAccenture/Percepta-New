@@ -477,6 +477,118 @@ function CitationPie({ sources }: { sources:any[] }) {
   );
 }
 
+function PriorityActionsTable({ result }: { result: any }) {
+  const [actions, setActions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [fetched, setFetched] = useState(false);
+
+  useEffect(() => {
+    if (fetched) return;
+    setFetched(true);
+    setLoading(true);
+    const prompt = `You are a GEO (Generative Engine Optimization) strategist. Based on the following brand analysis data, generate a JSON array of 5-7 specific, implementable priority actions.
+
+Brand: ${result.brand_name}
+Industry: ${result.ind_label}
+GEO Score: ${result.overall_geo_score}
+Visibility: ${result.visibility}
+Sentiment: ${result.sentiment}
+Citation Share: ${result.citation_share}
+Share of Voice: ${result.share_of_voice}
+Prominence: ${result.prominence}
+Avg Rank: ${result.avg_rank}
+Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
+Strengths: ${(result.strengths_list||[]).join('; ')}
+Improvements needed: ${(result.improvements_list||[]).join('; ')}
+
+Return ONLY a valid JSON array with no markdown, no backticks, no preamble. Each object must have exactly these fields:
+- priority: "High", "Medium", or "Low"
+- segment: the audience segment this targets (e.g. "Travelers", "First-Time Users", "General Consumers")
+- type: one of "Content Page", "Comparison Page", "FAQ Build", "Structured Content", "Citation Push", "PR / Earned Media"
+- action: a specific, concrete 1-3 sentence action description referencing the actual brand and real competitors
+- deliverable: one of "Workstream 01 — ARD", "Workstream 02 — AOP", "Workstream 03 — DT1"
+
+Order by priority (High first). Make actions specific to this brand's actual gaps and competitors.`;
+
+    fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const text = (data.content||[]).map((b:any) => b.text||'').join('');
+        const clean = text.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        setActions(parsed);
+      })
+      .catch(() => setActions([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const priorityStyle = (p: string) =>
+    p === 'High' ? { color: '#EF4444', bg: '#FEE2E2' } :
+    p === 'Medium' ? { color: '#92400E', bg: '#FEF3C7' } :
+    { color: '#065F46', bg: '#D1FAE5' };
+
+  return (
+    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+        <span style={{color:'#F59E0B',fontSize:'1.1rem'}}>⚡</span>
+        <span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions — Implementable</span>
+      </div>
+      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:24}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
+      {loading ? (
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'24px 0',color:'#9CA3AF',fontSize:'0.85rem'}}>
+          <div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
+          Generating priority actions for {result.brand_name}…
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      ) : actions.length === 0 ? (
+        <div style={{fontSize:'0.84rem',color:'#9CA3AF'}}>No actions generated.</div>
+      ) : (
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead>
+            <tr>
+              {['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=>(
+                <th key={h} style={{padding:'8px 16px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.08em',borderBottom:'1px solid #F3F4F6'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {actions.map((a,i)=>{
+              const ps = priorityStyle(a.priority);
+              return (
+                <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'#FAFAFA':'white'}}>
+                  <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
+                    <span style={{background:ps.bg,color:ps.color,borderRadius:50,padding:'3px 12px',fontSize:'0.75rem',fontWeight:700}}>{a.priority}</span>
+                  </td>
+                  <td style={{padding:'18px 16px',verticalAlign:'top'}}>
+                    <span style={{fontSize:'0.84rem',fontWeight:600,color:'#7C3AED'}}>{a.segment}</span>
+                  </td>
+                  <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
+                    <span style={{fontSize:'0.82rem',color:'#374151'}}>{a.type}</span>
+                  </td>
+                  <td style={{padding:'18px 16px',verticalAlign:'top',maxWidth:420}}>
+                    <span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.65}}>{a.action}</span>
+                  </td>
+                  <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
+                    <span style={{fontSize:'0.84rem',fontWeight:700,color:'#7C3AED'}}>{a.deliverable}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 export default function GeoHub() {
   const [url,setUrl] = useState('');
   const [loading,setLoading] = useState(false);
@@ -1168,63 +1280,7 @@ export default function GeoHub() {
                   </div>
                   {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,marginBottom:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
 
-                  {/* PRIORITY ACTIONS TABLE */}
-                  {(()=>{
-                    const fin=result.ind_key==='fin';
-                    const geo=result.overall_geo_score??0;
-                    const actions=fin?[
-                      {priority:'High',priorityColor:'#EF4444',priorityBg:'#FEE2E2',segment:'Travelers',type:'Content Page',action:"Build 'Best for Travelers' landing page with explicit comparison vs. Chase Sapphire Reserve and Amex Gold. Include structured FAQ targeting: 'Which card is best for travel rewards?'",deliverable:'Workstream 01 — ARD'},
-                      {priority:'High',priorityColor:'#EF4444',priorityBg:'#FEE2E2',segment:'First-Time Users',type:'Comparison Page',action:"Create 'Best for First-Time Credit Card Users' narrative page with comparison language vs. Discover It. Target prompts: 'Which bank is best for first-time card applicants?'",deliverable:'Workstream 01 — ARD'},
-                      {priority:'High',priorityColor:'#EF4444',priorityBg:'#FEE2E2',segment:'All Segments',type:'FAQ Build',action:'Build FAQs for 6 audience segments — General, Traveler, Affluent, First-Time, Cashback, Small Business. Each FAQ should answer 5 high-intent AI queries per segment.',deliverable:'Workstream 02 — AOP'},
-                      {priority:'Medium',priorityColor:'#92400E',priorityBg:'#FEF3C7',segment:'Cashback Seekers',type:'Content Page',action:'Create \'Best for Cashback\' content positioning Quicksilver against Citi Double Cash and Wells Fargo Active Cash. Focus on simplicity and no-annual-fee angles.',deliverable:'Workstream 02 — AOP'},
-                      {priority:'Medium',priorityColor:'#92400E',priorityBg:'#FEF3C7',segment:'General Consumers',type:'Structured Content',action:"Strengthen 'best overall card' narratives by building concise evidence around value, simplicity, travel flexibility, and service that AI models can cite directly.",deliverable:'Workstream 02 — AOP'},
-                      {priority:'Low',priorityColor:'#065F46',priorityBg:'#D1FAE5',segment:'Affluent / HNW',type:'Comparison Page',action:'Expand coverage in affluent/HNW segment. Build Venture X vs. Amex Centurion vs. Chase Sapphire Reserve comparison page targeting invite-only and luxury travel prompts.',deliverable:'Workstream 03 — DT1'},
-                    ]:[
-                      {priority:'High',priorityColor:'#EF4444',priorityBg:'#FEE2E2',segment:'General Consumers',type:'Content Page',action:"Build a 'Best for Everyday Use' landing page with explicit competitor comparisons. Include structured FAQ targeting top consumer queries.",deliverable:'Workstream 01 — ARD'},
-                      {priority:'High',priorityColor:'#EF4444',priorityBg:'#FEE2E2',segment:'Expert Seekers',type:'Comparison Page',action:"Create authority-driven comparison content targeting 'best in class' prompts. Use structured data to improve AI citation likelihood.",deliverable:'Workstream 01 — ARD'},
-                      {priority:'Medium',priorityColor:'#92400E',priorityBg:'#FEF3C7',segment:'All Segments',type:'FAQ Build',action:'Build FAQs covering top AI queries per audience segment. Each FAQ should directly answer 5 high-intent prompts per segment.',deliverable:'Workstream 02 — AOP'},
-                      {priority:'Low',priorityColor:'#065F46',priorityBg:'#D1FAE5',segment:'Premium Segment',type:'Comparison Page',action:'Expand premium segment coverage with comparison content targeting high-value audience prompts.',deliverable:'Workstream 03 — DT1'},
-                    ];
-                    return (
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                          <span style={{color:'#F59E0B',fontSize:'1.1rem'}}>⚡</span>
-                          <span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions — Implementable</span>
-                        </div>
-                        <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:24}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
-                        <table style={{width:'100%',borderCollapse:'collapse'}}>
-                          <thead>
-                            <tr>
-                              {['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=>(
-                                <th key={h} style={{padding:'8px 16px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.08em',borderBottom:'1px solid #F3F4F6'}}>{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {actions.map((a,i)=>(
-                              <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'#FAFAFA':'white'}}>
-                                <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
-                                  <span style={{background:a.priorityBg,color:a.priorityColor,borderRadius:50,padding:'3px 12px',fontSize:'0.75rem',fontWeight:700}}>{a.priority}</span>
-                                </td>
-                                <td style={{padding:'18px 16px',verticalAlign:'top'}}>
-                                  <span style={{fontSize:'0.84rem',fontWeight:600,color:'#7C3AED'}}>{a.segment}</span>
-                                </td>
-                                <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
-                                  <span style={{fontSize:'0.82rem',color:'#374151'}}>{a.type}</span>
-                                </td>
-                                <td style={{padding:'18px 16px',verticalAlign:'top',maxWidth:420}}>
-                                  <span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.65}}>{a.action}</span>
-                                </td>
-                                <td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}>
-                                  <span style={{fontSize:'0.84rem',fontWeight:700,color:'#7C3AED'}}>{a.deliverable}</span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    );
-                  })()}
+                  <PriorityActionsTable result={result}/>
                 </div>
               );
             })()}
