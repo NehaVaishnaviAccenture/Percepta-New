@@ -369,6 +369,22 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
         ))}
         <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>Your brand</span></div>
       </div>
+      {(()=>{
+        const yourRow=rows[0];
+        const compRows=rows.slice(1);
+        const dimWins=dims.map((d,di)=>{
+          const yourScore=yourRow.scores[di];
+          const beaten=compRows.filter(r=>yourScore>r.scores[di]).length;
+          return {dim:d.key,score:yourScore,beaten};
+        });
+        const strongest=dimWins.sort((a,b)=>b.score-a.score)[0];
+        const weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
+        return (
+          <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>
+            💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) — ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}) — improvement here would have the highest GEO impact.
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -790,11 +806,13 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'start'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
-                      <RadarChart sent={sent} prom={prom} vis={vis}/>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
+                      <div style={{transform:'scale(0.82)',transformOrigin:'top center',marginBottom:-60}}>
+                        <RadarChart sent={sent} prom={prom} vis={vis}/>
+                      </div>
                     </div>
                     <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
                   </div>
