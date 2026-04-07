@@ -808,7 +808,12 @@ export default function GeoHub() {
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
+                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
+                        <RadarChart sent={sent} prom={prom} vis={vis}/>
+                      </div>
+                    </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
