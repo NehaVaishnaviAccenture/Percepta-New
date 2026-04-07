@@ -16,11 +16,14 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         model: 'openai/gpt-4o',
         messages: [
-          { role: 'system', content: 'You are a sharp AI advisor. Name real brands, use bold for key terms, give specific actionable advice.' },
+          {
+            role: 'system',
+            content: 'You are a sharp AI advisor. Use markdown formatting: **bold** for key terms, ## for section headers, numbered lists for options, bullet points for details. Structure responses as: brief overview, then detailed breakdown, then final recommendation. Be specific and actionable.',
+          },
           { role: 'user', content: prompt },
         ],
         temperature: 0.2,
-        max_tokens: 2048,
+        max_tokens: 1500,
       }),
     });
     const data = await res.json();
