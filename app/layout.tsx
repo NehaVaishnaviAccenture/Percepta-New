@@ -1,18 +1,14 @@
 'use client';
-
 import './globals.css';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-
   const navItems = [
     { label: 'Overview', href: '/' },
     { label: 'GEO Hub', href: '/geo-hub' },
     { label: 'Get Support', href: '/get-support' },
   ];
-
   return (
     <html lang="en">
       <body>
@@ -45,7 +41,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Percepta
             </span>
           </div>
-
           {/* Nav Links */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             {navItems.map(({ label, href }) => {
@@ -58,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   borderRadius: 8,
                   fontWeight: active ? 700 : 500,
                   fontSize: '0.88rem',
-                  padding: '8px 20px',
+                  padding: '8px 48px',
                   textDecoration: 'none',
                   transition: 'all 0.15s',
                   display: 'inline-block',
@@ -69,7 +64,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             })}
           </div>
         </nav>
-
         {children}
       </body>
     </html>
