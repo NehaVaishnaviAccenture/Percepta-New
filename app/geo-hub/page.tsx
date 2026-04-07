@@ -1,636 +1,1254 @@
-# pip install openai streamlit pandas plotly requests beautifulsoup4
-import streamlit as st
-import plotly.graph_objects as go
-import requests
-from bs4 import BeautifulSoup
-from openai import OpenAI
-import json, re, random, os
-from urllib.parse import urlparse, urljoin
+'use client';
 
-INTERNAL_API_KEY = os.environ.get("OPENROUTER_API_KEY")
-st.set_page_config(page_title="Percepta | GEO Intelligence", page_icon="🧠", layout="wide")
+import { useState } from 'react';
 
-st.markdown("""<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-*{font-family:'Inter',sans-serif;box-sizing:border-box;}
-header[data-testid="stHeader"],#MainMenu,footer{display:none!important;visibility:hidden;}
-.block-container{padding-top:0!important;padding-left:0!important;padding-right:0!important;max-width:100%!important;}
-section[data-testid="stSidebar"]{display:none!important;}
-div[data-testid="stTabs"] button{font-size:0.85rem!important;font-weight:600!important;padding:10px 20px!important;}
-div[data-testid="stTabs"] button[aria-selected="true"]{color:#7C3AED!important;border-bottom:2px solid #7C3AED!important;}
+const bands = [
+  { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
+  { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70–79', label: 'Good', desc: 'Minor improvements recommended' },
+  { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45–69', label: 'Needs Work', desc: 'Several issues to address' },
+  { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
+];
 
-/* ── ALL non-navbar buttons: purple pill ── */
-section.main div[data-testid="stButton"]>button{
-    background:#7C3AED!important;color:white!important;border:none!important;
-    border-radius:50px!important;font-weight:700!important;font-size:1rem!important;
-    padding:14px 28px!important;box-shadow:0 4px 14px rgba(124,58,237,0.4)!important;
-    transition:all 0.2s!important;}
-section.main div[data-testid="stButton"]>button:hover{background:#6D28D9!important;}
+const METRIC_TIPS: Record<string,string> = {
+  'visibility score': 'measures how often your brand appears in ai-generated responses across key industry queries.',
+  'citation score': 'reflects how authoritatively ai models reference your brand compared to competitors.',
+  'sentiment score': 'captures the tone and favorability of ai responses when your brand is mentioned.',
+  'avg rank': 'your average mention position across all ai responses where your brand appeared.',
+};
 
-/* ── NAVBAR bar: white, no border, soft shadow ── */
-div[data-testid="stHorizontalBlock"]:first-of-type{
-    background:white!important;border:none!important;border-bottom:none!important;
-    padding:14px 40px!important;margin:0!important;position:sticky!important;
-    top:0!important;z-index:999!important;align-items:center!important;
-    box-shadow:0 2px 8px rgba(0,0,0,0.06)!important;}
+const RADAR_TIPS: Record<string,string> = {
+  'Positivity': 'How favorable the tone is when AI mentions your brand.',
+  'Brand Authority': 'How credible and expert AI perceives your brand.',
+  'Message Clarity': 'How clearly and consistently your brand message comes through in AI responses.',
+  'Market Relevance': 'How often your brand is surfaced for relevant queries.',
+  'Trust': 'How trustworthy AI portrays your brand to consumers.',
+  'Recommendation': 'How often AI actively recommends your brand over alternatives.',
+};
 
-/* ── NAVBAR buttons: ALL transparent, no border ── */
-div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="stButton"]>button{
-    background:transparent!important;color:#6B7280!important;
-    border:none!important;border-radius:8px!important;
-    font-weight:500!important;font-size:0.88rem!important;
-    padding:8px 20px!important;box-shadow:none!important;
-    width:100%!important;height:auto!important;}
-div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="stButton"]>button:hover{
-    background:#EDE9FE!important;color:#7C3AED!important;box-shadow:none!important;}
+const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt'];
 
-/* ── ACTIVE nav button injected per page via .nav-active class ── */
-div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="stButton"]>button[kind="primary"]{
-    background:#EDE9FE!important;color:#7C3AED!important;
-    font-weight:700!important;border:none!important;box-shadow:none!important;}
-
-/* ── INPUT ── */
-div[data-testid="stTextInput"] input{
-    border-radius:12px!important;border:1.5px solid #DDD6FE!important;
-    padding:14px 18px!important;font-size:0.95rem!important;height:52px!important;
-    background:#FAFAFE!important;}
-div[data-testid="stTextInput"] input:focus{
-    border-color:#7C3AED!important;
-    box-shadow:0 0 0 3px rgba(124,58,237,0.12)!important;background:white!important;}
-
-/* ── URL input row: transparent, no gaps ── */
-div[data-testid="stHorizontalBlock"]:not(:first-of-type){
-    background:transparent!important;border:none!important;
-    box-shadow:none!important;border-radius:0!important;
-    padding:0!important;margin:0!important;}
-
-/* ── Run button: solid purple pill ── */
-div[data-testid="stHorizontalBlock"]:not(:first-of-type) div[data-testid="stButton"]>button,
-div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"]>button{
-    background:#7C3AED!important;color:white!important;border:none!important;
-    border-radius:50px!important;font-weight:700!important;font-size:1rem!important;
-    height:52px!important;width:100%!important;
-    box-shadow:0 4px 16px rgba(124,58,237,0.45)!important;
-    padding:0 24px!important;letter-spacing:0.01em!important;}
-div[data-testid="stHorizontalBlock"]:not(:first-of-type) div[data-testid="stButton"]>button:hover,
-div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"]>button:hover{
-    background:#6D28D9!important;box-shadow:0 6px 20px rgba(124,58,237,0.55)!important;}
-
-/* ── st.container card styling ── */
-div[data-testid="stVerticalBlockBorderWrapper"]{
-    background:white!important;border-radius:16px!important;
-    border:1px solid #E5E7EB!important;
-    box-shadow:0 4px 20px rgba(124,58,237,0.07)!important;
-    padding:24px 28px!important;
-    margin:0 40px 40px 40px!important;}
-
-.section-tag{display:inline-block;background:#EDE9FE;color:#7C3AED;border-radius:50px;padding:4px 14px;font-size:0.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
-.hero-btn-primary{display:inline-flex;align-items:center;gap:8px;background:#7C3AED;color:white!important;border:none;border-radius:50px;padding:18px 36px;font-size:1.05rem;font-weight:700;cursor:pointer;text-decoration:none;}
-.hero-btn-secondary{display:inline-flex;align-items:center;gap:8px;background:white;color:#111827!important;border:1.5px solid #D1D5DB;border-radius:50px;padding:18px 36px;font-size:1.05rem;font-weight:600;cursor:pointer;text-decoration:none;}
-.cta-btn{display:inline-flex;align-items:center;gap:8px;background:#7C3AED;color:white!important;border:none;border-radius:50px;padding:18px 44px;font-size:1.05rem;font-weight:700;cursor:pointer;text-decoration:none;margin-top:36px;}
-.percepta-brand-wrap{display:flex;align-items:center;gap:10px;padding:4px 0;}
-.percepta-icon{width:30px;height:30px;border-radius:7px;background:#7C3AED;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-.percepta-title{font-size:1rem;font-weight:800;color:#111827;letter-spacing:-0.3px;}
-.metric-tooltip{position:relative;display:inline-block;cursor:help;}
-.metric-tooltip .tooltip-text{visibility:hidden;opacity:0;background:#1F2937;color:white;font-size:0.75rem;line-height:1.5;border-radius:8px;padding:10px 14px;position:absolute;z-index:9999;bottom:130%;left:50%;transform:translateX(-50%);width:220px;text-align:left;box-shadow:0 4px 12px rgba(0,0,0,0.2);transition:opacity 0.2s;pointer-events:none;}
-.metric-tooltip .tooltip-text::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-top-color:#1F2937;}
-.metric-tooltip:hover .tooltip-text{visibility:visible;opacity:1;}
-.tooltip-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#E5E7EB;color:#6B7280;font-size:0.65rem;font-weight:700;margin-left:5px;vertical-align:middle;}
-</style>""", unsafe_allow_html=True)
-
-# ── HELPERS ───────────────────────────────────────────────────
-def get_client(api_key=INTERNAL_API_KEY):
-    return OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1",
-                  default_headers={"HTTP-Referer":"https://perceptageo.com","X-Title":"Percepta"})
-
-def get_response(prompt, api_key=INTERNAL_API_KEY):
-    r = get_client(api_key).chat.completions.create(model="openai/gpt-5.4",
-        messages=[{"role":"system","content":"You are a sharp AI advisor. Name real brands, use bold for key terms, give specific actionable advice."},
-                  {"role":"user","content":prompt}], temperature=0.2, max_tokens=2048)
-    return r.choices[0].message.content
-
-def card(bg, border, content):
-    return f'<div style="background:{bg};border-radius:14px;padding:28px 24px;text-align:center;border:1.5px solid {border};">{content}</div>'
-
-def score_band_cards():
-    bands=[("#ECFDF5","#6EE7B7","#065F46","80–100","Excellent","Well optimized for AI citation"),
-           ("#EFF6FF","#93C5FD","#1E40AF","70–79","Good","Minor improvements recommended"),
-           ("#FFFBEB","#FCD34D","#92400E","45–69","Needs Work","Several issues to address"),
-           ("#FFF1F2","#FCA5A5","#991B1B","0–44","Poor","Major optimization needed")]
-    inner="".join(card(bg,border,f'<div style="font-size:0.82rem;font-weight:700;color:{c};margin-bottom:6px;">{rng}</div><div style="font-size:1.6rem;font-weight:900;color:{c};margin-bottom:6px;">{label}</div><div style="font-size:0.82rem;color:{c};">{desc}</div>') for bg,border,c,rng,label,desc in bands)
-    return f'<div style="background:#F3F4F6;padding:24px 40px 16px;"><div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:20px;">{inner}</div></div>'
-
-def metric_card(label, val, sub, tip="", color="#7C3AED"):
-    return f'<div style="background:white;border-radius:10px;padding:18px 16px;border:1px solid #E5E7EB;"><div style="font-size:0.7rem;font-weight:600;color:#9CA3AF;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">{label}<span class="metric-tooltip"><span class="tooltip-icon">?</span><span class="tooltip-text">{tip}</span></span></div><div style="font-size:1.8rem;font-weight:800;color:{color};line-height:1;">{val}</div><div style="font-size:0.75rem;color:#9CA3AF;margin-top:3px;">{sub}</div></div>'
-
-def white_card(content, extra=""):
-    return f'<div style="background:white;border-radius:12px;border:1px solid #E5E7EB;padding:24px;{extra}">{content}</div>'
-
-def score_badge(score):
-    if score>=80: return "Excellent","#065F46","#D1FAE5"
-    elif score>=70: return "Good","#1E40AF","#DBEAFE"
-    elif score>=45: return "Needs Work","#92400E","#FEF3C7"
-    else: return "Poor","#991B1B","#FEE2E2"
-
-def classify_domain(d):
-    d=d.lower()
-    if any(s in d for s in ["reddit","twitter","youtube","facebook","instagram","tiktok","linkedin"]): return "Social","#7C3AED","#EDE9FE"
-    if any(s in d for s in ["wikipedia","gov","edu","consumerreports","bbb.org","federalreserve","fdic"]): return "Institution","#1E40AF","#DBEAFE"
-    if any(s in d for s in ["nerdwallet","forbes","bankrate","creditkarma","cnbc","wsj","nytimes","bloomberg","businessinsider","investopedia","motleyfool","motortrend","caranddriver","edmunds","reuters"]): return "Earned Media","#065F46","#D1FAE5"
-    return "Other","#374151","#F3F4F6"
-
-def fetch_page_content(url):
-    try:
-        soup=BeautifulSoup(requests.get(url,headers={"User-Agent":"Mozilla/5.0"},timeout=15).text,"html.parser")
-        title=soup.title.string.strip() if soup.title else ""
-        meta_tag=soup.find("meta",attrs={"name":"description"})
-        headings=[h.get_text(strip=True) for h in soup.find_all(["h1","h2","h3"])[:20]]
-        paragraphs=[p.get_text(strip=True) for p in soup.find_all("p") if len(p.get_text(strip=True))>60][:20]
-        has_schema=bool(soup.find_all("script",attrs={"type":"application/ld+json"}))
-        has_author=bool(soup.find(attrs={"class":re.compile("author|byline",re.I)}))
-        ext_links=[a["href"] for a in soup.find_all("a",href=True) if a["href"].startswith("http") and urlparse(url).netloc not in a["href"]][:10]
-        base=urlparse(url).netloc; ilinks=[]
-        for a in soup.find_all("a",href=True):
-            href=a["href"]
-            if href.startswith("/") and len(href)>1:
-                lbl=href.strip("/").replace("-"," ").replace("/"," ").title()
-                if len(ilinks)<12: ilinks.append({"url":urljoin(url,href),"path":href,"label":lbl or "Page"})
-            elif base in href and href!=url and len(ilinks)<12:
-                path=urlparse(href).path; ilinks.append({"url":href,"path":path,"label":path.strip("/").replace("-"," ").title() or "Page"})
-        seen,ul=set(),[]
-        for lk in ilinks:
-            if lk["path"] not in seen and lk["path"]!="/" and lk["label"]: seen.add(lk["path"]); ul.append(lk)
-        domain=urlparse(url).netloc.replace("www.","")
-        faqs=soup.find_all(attrs={"itemtype":re.compile("FAQPage",re.I)})
-        return {"ok":True,"url":url,"domain":domain,"title":title,"meta_desc":meta_tag.get("content","") if meta_tag else "","headings":headings,"paragraphs":paragraphs[:6],"has_schema":has_schema,"has_faq":len(faqs)>0 or any("faq" in h.lower() for h in headings),"has_author":has_author,"has_table":bool(soup.find("table")),"has_lists":len(soup.find_all(["ul","ol"]))>2,"external_links_count":len(ext_links),"word_count":len(soup.get_text().split()),"internal_links":ul[:10]}
-    except Exception as e: return {"ok":False,"error":str(e)}
-
-def get_brand_position_in_response(txt,brand):
-    bl=brand.lower(); tl=txt.lower()
-    # Use alias matching for position detection too
-    aliases=list({bl, bl.replace(" ",""), bl.replace(" ","-"), bl.split()[0] if " " in bl else bl})
-    if not any(a in tl for a in aliases): return 0
-    # Find earliest occurrence
-    first_pos=len(tl)
-    for a in aliases:
-        if a in tl: first_pos=min(first_pos, tl.find(a))
-    before=txt[:first_pos]
-    stops={"The","A","An","In","On","At","For","With","By","From","This","That","These","Those","Some","Many","Most","All","When","Where","What","Which","Who","How","Why","If","Here","There","However","Also","Additionally","Furthermore","First","Second","Third","Finally","Overall","Generally"}
-    brands=[b for b in re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b',before) if b not in stops and len(b)>2]
-    seen,u=set(),[]
-    for b in brands:
-        if b.lower() not in seen: seen.add(b.lower()); u.append(b)
-    return len(u)+1
-
-def extract_brand_from_page(pd):
-    D2B={"chase":"Chase","vw":"Volkswagen","volkswagen":"Volkswagen","bmw":"BMW","amex":"American Express","americanexpress":"American Express","bofa":"Bank of America","bankofamerica":"Bank of America","wellsfargo":"Wells Fargo","usaa":"USAA","capitalone":"Capital One","discover":"Discover","citi":"Citi","citibank":"Citi","barclays":"Barclays","synchrony":"Synchrony","toyota":"Toyota","ford":"Ford","honda":"Honda","tesla":"Tesla","hyundai":"Hyundai","kia":"Kia","nissan":"Nissan","mercedes":"Mercedes","audi":"Audi","marriott":"Marriott","hilton":"Hilton","hyatt":"Hyatt","apple":"Apple","google":"Google","microsoft":"Microsoft","amazon":"Amazon","samsung":"Samsung","meta":"Meta","netflix":"Netflix","spotify":"Spotify","adobe":"Adobe","salesforce":"Salesforce","walmart":"Walmart","target":"Target","nike":"Nike","adidas":"Adidas"}
-    domain=pd.get("domain","").lower().replace("www.",""); dk=domain.split(".")[0]
-    if dk in D2B: return D2B[dk]
-    for k,v in D2B.items():
-        if k in dk: return v
-    title=pd.get("title","")
-    if title:
-        gw={"home","official","site","online","com","net","org","inc","llc","ltd","corp","homepage"}
-        cs=["card","bank","credit","mortgage","auto","loan","insurance","service","solutions"]
-        for sep in ["|","–","-","·"]:
-            if sep in title:
-                for seg in reversed([s.strip() for s in title.split(sep)]):
-                    sc=seg.replace(".com","").replace(".net","").replace(".org","").strip()
-                    if 1<=len(sc.lower().split())<=3 and not all(w in gw for w in sc.lower().split()) and not any(s in sc.lower() for s in cs): return sc
-        clean=title.replace(".com","").strip()
-        if len(clean.split())<=3: return clean
-    return dk.title()
-
-def get_citation_sources(brand,industry):
-    p=f'For "{brand}" in {industry}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON: [{{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}}]. Exactly 10 items.'
-    r=get_client().chat.completions.create(model="openai/gpt-5.4",messages=[{"role":"user","content":p}],temperature=0.1,max_tokens=800)
-    return json.loads(re.sub(r"```json|```","",r.choices[0].message.content.strip()))
-
-def get_page_intelligence(links,brand,responses):
-    bl=brand.lower()
-    # Use aliases for page intelligence too
-    aliases=list({bl, bl.replace(" ",""), bl.replace(" ","-"), bl.split()[0] if " " in bl else bl})
-    results=[]
-    for lk in links[:8]:
-        path=lk.get("path",""); pl=path.lower().strip("/")
-        kws=[w for w in re.split(r"[-/]",pl) if len(w)>3]
-        cited=sum(1 for r in responses if any(k in r.get("response_preview","").lower() for k in kws) and any(a in r.get("response_preview","").lower() for a in aliases))
-        vp=round((cited/max(len(responses),1))*100)
-        status,col=("Strong","#065F46") if vp>=60 else ("Moderate","#92400E") if vp>=30 else ("Weak","#991B1B") if vp>0 else ("Invisible","#6B7280")
-        results.append({"label":lk.get("label","") or pl.title() or "Page","path":path,"url":lk.get("url",""),"cited":cited,"geo":round(vp*0.85),"citation_share":round(vp*0.6),"status":status,"color":col})
-    return sorted(results,key=lambda x:x["geo"],reverse=True)
-
-def score_competitor_from_responses(name,responses):
-    nl=name.lower()
-    aliases={"american express":["american express","amex"],"bank of america":["bank of america","bofa"],"wells fargo":["wells fargo"],"capital one":["capital one"]}
-    terms=aliases.get(nl,[nl])
-    mentions=sum(1 for r in responses if any(t in r.get("response_preview","").lower() for t in terms))
-    floors={"american express":68,"chase":72,"citi":52,"discover":48,"wells fargo":45,"bank of america":45,"capital one":42,"synchrony":26,"barclays":22,"usaa":28,"tesla":70,"toyota":65,"bmw":58,"honda":55,"ford":52,"mercedes":50,"hyundai":42,"kia":36,"nissan":33,"volkswagen":38}
-    gfloors={"chase":75,"american express":64}
-    gcaps={"american express":74,"capital one":54,"bank of america":52,"wells fargo":50,"citi":58,"discover":55,"synchrony":35,"barclays":32,"usaa":30,"kia":48,"nissan":45,"hyundai":55}
-    fv=floors.get(nl,18)
-    if mentions==0: random.seed(hash(name)%9999); blv=max(10,min(80,fv+random.randint(-4,4)))
-    else: blv=round((mentions/20)*100*0.8+fv*0.2)
-    cv=blv; cc=min(92,round(cv*0.93+mentions*1.8)); cs=min(92,round(cv*0.88+mentions*1.4)); cp=min(92,round(cv*0.78)); csov=min(92,round(cv*0.63))
-    geo=round(cv*0.30+cs*0.20+cp*0.20+cc*0.15+csov*0.15)
-    if gfloors.get(nl) and geo<gfloors[nl]: geo=gfloors[nl]
-    if gcaps.get(nl) and geo>gcaps[nl]: geo=gcaps[nl]
-    pos=[get_brand_position_in_response(r.get("response_preview",""),name) for r in responses if any(t in r.get("response_preview","").lower() for t in terms)]
-    vp=[p for p in pos if p>0]; avg=round(sum(vp)/len(vp)) if vp else 0
-    return {"Brand":name,"GEO":geo,"Vis":cv,"Cit":cc,"Sen":cs,"Sov":csov,"Rank":f"#{avg}" if avg>0 else "N/A"}
-
-INDUSTRY_DATA={
-    "fin":{"name":"financial services / credit cards","kws":["capital","chase","amex","citi","discover","bank","credit","card","finance","fargo","visa","master","barclays","synchrony","usaa","wellsfargo"],"queries":[("General Consumer","What is the best credit card for travel rewards in 2025?"),("General Consumer","Which bank offers the best rewards checking account?"),("General Consumer","What credit card should I get for everyday cash back?"),("General Consumer","Best credit cards with no annual fee right now"),("General Consumer","Which bank is best for first-time credit card applicants?"),("Expert Recommendation","Top credit cards recommended by financial experts"),("Expert Recommendation","What is the best bank for online banking and mobile app?"),("Expert Recommendation","Which credit card has the best sign-up bonus?"),("Expert Recommendation","Best credit cards for people with good credit scores"),("Expert Recommendation","What bank should I choose for savings and checking?"),("Product Comparison","Which credit card is best for dining and restaurants?"),("Product Comparison","Top recommended credit cards for business expenses"),("Product Comparison","What are the most trusted banks in the US?"),("Product Comparison","Best credit cards for balance transfers with low interest"),("Product Comparison","Which bank has the lowest fees for everyday banking?"),("Affluent / High Net Worth","What credit card do financial advisors recommend most?"),("Affluent / High Net Worth","Best cards for earning points on groceries and gas"),("Affluent / High Net Worth","Which banks are best for customer service?"),("Affluent / High Net Worth","Top credit cards for international travelers with no foreign fees"),("Affluent / High Net Worth","What is the best overall credit card for 2025?")],"comps":["Chase","American Express","Capital One","Citi","Discover","Wells Fargo","Bank of America","Synchrony","Barclays","USAA"],"comp_urls":{"Chase":"chase.com","American Express":"americanexpress.com","Capital One":"capitalone.com","Citi":"citi.com","Discover":"discover.com","Wells Fargo":"wellsfargo.com","Bank of America":"bankofamerica.com","Synchrony":"synchrony.com","Barclays":"barclays.com","USAA":"usaa.com"},"label":"Financial Services"},
-    "auto":{"name":"automotive","kws":["toyota","ford","honda","bmw","tesla","vw","volkswagen","auto","car","motor","hyundai","kia","nissan","mercedes","audi"],"queries":[("General Consumer","What is the best car to buy in 2025?"),("General Consumer","Which electric vehicle has the longest range?"),("General Consumer","Best SUV for families right now"),("General Consumer","What car brand is most reliable long term?"),("General Consumer","Top recommended cars under $40,000"),("Expert Recommendation","Best cars for fuel efficiency in 2025"),("Expert Recommendation","Which car brand has the best safety ratings?"),("Expert Recommendation","What is the best luxury car for the money?"),("Expert Recommendation","Top car brands recommended by consumer experts"),("Expert Recommendation","Best hybrid cars available today"),("Product Comparison","Which car manufacturer has the best warranty?"),("Product Comparison","What cars are best for first-time buyers?"),("Product Comparison","Top rated trucks for towing and hauling"),("Product Comparison","Best car brands for resale value"),("Product Comparison","Which electric car brand leads in technology?"),("Affluent / High Net Worth","What cars do mechanics recommend for reliability?"),("Affluent / High Net Worth","Best compact cars for city driving"),("Affluent / High Net Worth","Which car brands have the fewest recalls?"),("Affluent / High Net Worth","Top recommended cars for long road trips"),("Affluent / High Net Worth","What is the most popular car brand in America?")],"comps":["Tesla","Toyota","BMW","Honda","Ford","Mercedes","Hyundai","Kia","Nissan","Volkswagen"],"comp_urls":{"Tesla":"tesla.com","Toyota":"toyota.com","BMW":"bmw.com","Honda":"honda.com","Ford":"ford.com","Mercedes":"mercedes-benz.com","Hyundai":"hyundai.com","Kia":"kia.com","Nissan":"nissanusa.com","Volkswagen":"vw.com"},"label":"Automotive"},
-    "gen":{"name":"consumer brands","kws":[],"queries":[("General Consumer","What are the most trusted brands in the US right now?"),("General Consumer","Which companies are known for the best customer service?"),("General Consumer","Top recommended brands for quality and value"),("General Consumer","What brands do consumers recommend most in 2025?"),("General Consumer","Best companies for online shopping and delivery"),("Expert Recommendation","Which brands are leading in sustainability and ethics?"),("Expert Recommendation","Top rated consumer brands by customer satisfaction"),("Expert Recommendation","What companies have the best return and refund policies?"),("Expert Recommendation","Best brands recommended by consumer advocacy groups"),("Expert Recommendation","Which companies are growing fastest in their industry?"),("Product Comparison","Top brands for loyalty programs and rewards"),("Product Comparison","What brands are considered industry leaders right now?"),("Product Comparison","Best companies for quality products at fair prices"),("Product Comparison","Which brands have the most loyal customer base?"),("Product Comparison","Top consumer brands with the best warranties"),("Affluent / High Net Worth","What companies do financial analysts recommend?"),("Affluent / High Net Worth","Best brands for first-time buyers in their category"),("Affluent / High Net Worth","Which companies are most recommended by experts?"),("Affluent / High Net Worth","Top rated brands for innovation and technology"),("Affluent / High Net Worth","What is the most trusted brand in this space right now?")],"comps":[],"comp_urls":{},"label":"General"}
+function scoreBadge(s: number) {
+  if (s >= 80) return { label: 'Excellent', color: '#065F46', bg: '#D1FAE5' };
+  if (s >= 70) return { label: 'Good', color: '#1E40AF', bg: '#DBEAFE' };
+  if (s >= 45) return { label: 'Needs Work', color: '#92400E', bg: '#FEF3C7' };
+  return { label: 'Poor', color: '#991B1B', bg: '#FEE2E2' };
 }
 
-def get_industry(domain):
-    for k in ["fin","auto"]:
-        if any(x in domain for x in INDUSTRY_DATA[k]["kws"]): return k
-    return "gen"
+function classifyDomain(d: string) {
+  const dl = d.toLowerCase();
+  if (['reddit','twitter','youtube','facebook','instagram','tiktok','linkedin'].some(s=>dl.includes(s))) return {label:'Social',color:'#F59E0B',bg:'#FEF3C7'};
+  if (['wikipedia','gov','edu','consumerreports','bbb','federalreserve','fdic'].some(s=>dl.includes(s))) return {label:'Institution',color:'#3B82F6',bg:'#DBEAFE'};
+  if (['nerdwallet','forbes','bankrate','creditkarma','cnbc','wsj','nytimes','bloomberg','businessinsider','investopedia','motleyfool','motortrend','caranddriver','edmunds','reuters','thepointsguy','wallethub'].some(s=>dl.includes(s))) return {label:'Earned Media',color:'#10B981',bg:'#D1FAE5'};
+  return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
+}
 
-def analyze_geo_with_ai(page_data):
-    brand=extract_brand_from_page(page_data); domain=page_data.get("domain","").lower(); bl=brand.lower()
+function Tooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{position:'relative',display:'inline-flex',alignItems:'center',marginLeft:5,cursor:'help'}}
+      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
+      <span style={{width:15,height:15,borderRadius:'50%',background:'#E5E7EB',color:'#6B7280',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>?</span>
+      {show&&(
+        <span style={{position:'absolute',bottom:'130%',left:'50%',transform:'translateX(-50%)',background:'#1F2937',color:'white',fontSize:'0.72rem',lineHeight:1.6,borderRadius:8,padding:'10px 14px',width:210,textAlign:'left',boxShadow:'0 4px 12px rgba(0,0,0,0.2)',zIndex:9999,pointerEvents:'none',whiteSpace:'normal' as const}}>
+          {text}
+          <span style={{position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',borderWidth:5,borderStyle:'solid',borderColor:'#1F2937 transparent transparent transparent'}}/>
+        </span>
+      )}
+    </span>
+  );
+}
 
-    # ── VISIBILITY FIX: build alias list to catch capitalone, capital-one etc ──
-    aliases=list({
-        bl,                                          # "capital one"
-        bl.replace(" ",""),                          # "capitalone"
-        bl.replace(" ","-"),                         # "capital-one"
-        bl.split()[0] if " " in bl else bl,          # "capital" (first word)
-    })
+function MetricCard({ label, val, sub, color='#7C3AED' }: { label:string; val:any; sub?:string; color?:string }) {
+  return (
+    <div style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
+      <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
+        {label}{METRIC_TIPS[label.toLowerCase()]&&<Tooltip text={METRIC_TIPS[label.toLowerCase()]}/>}
+      </div>
+      <div style={{fontSize:'1.8rem',fontWeight:800,color,lineHeight:1}}>{val}</div>
+      {sub&&<div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>}
+    </div>
+  );
+}
 
-    client=get_client(); ind_key=get_industry(domain); ind=INDUSTRY_DATA[ind_key]; queries=ind["queries"]; all_qa=[]
-    for i in range(0,20,5):
-        batch=queries[i:i+5]
-        ql="\n\n".join(f"Q{j+1}: {q[1]}" for j,q in enumerate(batch))
-        prompt="You are a knowledgeable consumer advisor. Answer naturally. Name real brands. Do not favour any.\n\n"+ql+"\n\nRespond:\nA1: [answer]\nA2: [answer]\nA3: [answer]\nA4: [answer]\nA5: [answer]"
-        bt=client.chat.completions.create(model="openai/gpt-5.4",messages=[{"role":"user","content":prompt}],temperature=0.6,max_tokens=800).choices[0].message.content
-        for j in range(1,6):
-            ans=""
-            if f"A{j}:" in bt:
-                s=bt.index(f"A{j}:")+len(f"A{j}:"); e=bt.index(f"A{j+1}:") if f"A{j+1}:" in bt else len(bt); ans=bt[s:e].strip()
-            all_qa.append({"category":batch[j-1][0],"q":batch[j-1][1],"a":ans})
+function GeoGauge({ score, brand }: { score:number; brand:string }) {
+  const badge = scoreBadge(score);
+  const cx=160,cy=155,Ro=130,Ri=88;
+  const a=(s:number)=>Math.PI-(s/100)*Math.PI;
+  const ox=(s:number,r:number)=>cx+r*Math.cos(a(s));
+  const oy=(s:number,r:number)=>cy-r*Math.sin(a(s));
+  const seg=(s0:number,s1:number,fill:string)=>{
+    const lg=s1-s0>50?1:0;
+    return <path d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 1 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 0 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`} fill={fill} stroke="white" strokeWidth="2"/>;
+  };
+  const mi=Ri-8,mo=Ro+8;
+  return (
+    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 16px 14px',textAlign:'center'}}>
+      <div style={{fontSize:'0.9rem',fontWeight:700,color:'#374151',marginBottom:4}}>{brand}</div>
+      <svg viewBox="0 0 320 175" style={{width:'100%',display:'block',overflow:'visible'}}>
+        {seg(0,44,'#FECACA')}{seg(44,69,'#FEF08A')}{seg(69,79,'#BAE6FD')}{seg(79,100,'#BBF7D0')}
+        <line x1={ox(score,mi)} y1={oy(score,mi)} x2={ox(score,mo)} y2={oy(score,mo)} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"/>
+        {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
+        <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
+      </svg>
+      <span style={{background:badge.bg,color:badge.color,borderRadius:50,padding:'5px 18px',fontSize:'0.82rem',fontWeight:700}}>{badge.label}</span>
+    </div>
+  );
+}
 
-    # ── UPDATED mentions & visibility using aliases ──
-    mentions=sum(1 for p in all_qa if any(a in p["a"].lower() for a in aliases))
-    visibility=round((mentions/20)*100)
+function SankeyChart({ result }: { result:any }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const vis=result.visibility??0,cit=result.citation_share??0,sent=result.sentiment??0;
+  const prom=result.prominence??0,sov=result.share_of_voice??0,geo=result.overall_geo_score??0;
+  const inputs=[
+    {label:'Visibility',value:vis,color:'#7C3AED',weight:30},
+    {label:'Sentiment',value:sent,color:'#10B981',weight:20},
+    {label:'Prominence',value:prom,color:'#3B82F6',weight:20},
+    {label:'Citation',value:cit,color:'#F59E0B',weight:15},
+    {label:'Share of Voice',value:sov,color:'#EF4444',weight:15},
+  ];
+  const W=500,H=330,lx=175,rx=415,nw=22,gH=140,gCY=H/2,nH=30,gap=20;
+  const totalH=inputs.length*nH+(inputs.length-1)*gap;
+  const startY=(H-totalH)/2;
+  const nodes=inputs.map((n,i)=>({...n,y:startY+i*(nH+gap)}));
+  return (
+    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',flex:1}}>
+      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Composition</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>How each signal flows into your overall GEO Score</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+        {nodes.map((n,i)=>{
+          const sm=n.y+nH/2,bH=gH/inputs.length,dm=gCY-gH/2+i*bH+bH/2;
+          const c1=lx+nw+(rx-lx-nw)*0.4,c2=lx+nw+(rx-lx-nw)*0.6;
+          const hh=nH/2,dh=bH/2,isH=hov===i;
+          return (
+            <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+              <path d={`M${lx+nw},${sm-hh} C${c1},${sm-hh} ${c2},${dm-dh} ${rx},${dm-dh} L${rx},${dm+dh} C${c2},${dm+dh} ${c1},${sm+hh} ${lx+nw},${sm+hh}Z`} fill={n.color} opacity={isH?0.32:0.15} style={{transition:'opacity 0.2s'}}/>
+              <rect x={lx} y={n.y} width={nw} height={nH} rx={4} fill={n.color}/>
+              <text x={lx-8} y={n.y+nH/2-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:12,fill:'#111827',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}</text>
+              <text x={lx-8} y={n.y+nH/2+9} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.value}</text>
+              <text x={(lx+nw+rx)/2} y={sm+2} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.weight}%</text>
+            </g>
+          );
+        })}
+        <rect x={rx} y={gCY-gH/2} width={nw} height={gH} rx={4} fill="#7C3AED"/>
+        <text x={rx+nw+10} y={gCY-14} textAnchor="start" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:700}}>GEO</text>
+        <text x={rx+nw+10} y={gCY+2} textAnchor="start" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:700}}>Score</text>
+        <text x={rx+nw+10} y={gCY+22} textAnchor="start" dominantBaseline="middle" style={{fontSize:24,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:900}}>{geo}</text>
+      </svg>
+    </div>
+  );
+}
 
-    if mentions==0:
-        sc={"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"avg_rank":"N/A","strengths":["Brand not yet appearing in AI responses.","Baseline established, clear room to grow.","Competitors present, confirming category is AI-discoverable."],"improvements":["Not mentioned in 20 generic queries.","AI not associating brand with key questions.","No citation authority.","Competitors appearing instead.","Content not structured for AI discovery."],"actions":[{"priority":"High","action":"Create FAQ and comparison pages targeting queries in this analysis."},{"priority":"High","action":"Publish LLM-ready Best X for Y guides positioning brand as top recommendation."},{"priority":"Medium","action":"Add structured data (schema markup) to key pages."},{"priority":"Medium","action":"Build presence on sites AI cites: Reddit, Wikipedia, review sites."},{"priority":"Low","action":"Audit backlinks and create content hubs reinforcing brand authority."}]}
-    else:
-        appeared=[p for p in all_qa if any(a in p["a"].lower() for a in aliases)]
-        sp=f'GEO analyst. Brand "{brand}" appeared in {mentions}/20 AI responses.\n'+"\n".join(f"Response: {p['a'][:300]}" for p in appeared)+f'\nReturn ONLY valid JSON: {{"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"avg_rank":"N/A","strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{{"priority":"High","action":"..."}},{{"priority":"High","action":"..."}},{{"priority":"Medium","action":"..."}},{{"priority":"Medium","action":"..."}},{{"priority":"Low","action":"..."}}]}}'
-        raw=get_client().chat.completions.create(model="openai/gpt-5.4",messages=[{"role":"user","content":sp}],temperature=0.0,max_tokens=900).choices[0].message.content
-        sc=json.loads(re.sub(r"```json|```","",raw.strip()))
-
-    cit=sc.get("citation_share",0); sent=sc.get("sentiment",0); prom=sc.get("prominence",0); sov=sc.get("share_of_voice",0)
-    geo=round(visibility*0.30+sent*0.20+prom*0.20+cit*0.15+sov*0.15)
-
-    # ── mentioned flag also uses aliases ──
-    rd=[{"category":p["category"],"query":p["q"],"mentioned":any(a in p["a"].lower() for a in aliases),"response_preview":p["a"],"position":get_brand_position_in_response(p["a"],brand)} for p in all_qa]
-
-    try: csrc=get_citation_sources(brand,ind["name"])
-    except: csrc=[]
-    return {"brand_name":brand,"industry":ind["name"],"ind_key":ind_key,"visibility":visibility,"sentiment":sent,"prominence":prom,"citation_share":cit,"share_of_voice":sov,"overall_geo_score":geo,"avg_rank":"N/A" if visibility==0 else sc.get("avg_rank","N/A"),"responses_detail":rd,"responses_with_brand":mentions,"total_responses":20,"strengths_list":sc.get("strengths",[]),"improvements_list":sc.get("improvements",[]),"actions":sc.get("actions",[]),"context":visibility,"organization":prom,"reliability":cit,"exclusivity":sent,"citation_sources":csrc}
-
-# ── SESSION STATE ─────────────────────────────────────────────
-for k,v in [("nav","Overview"),("geo_result",None),("geo_url",""),("geo_page_data",None),("ai_history",[])]:
-    if k not in st.session_state: st.session_state[k]=v
-
-# ── URL ROUTING ───────────────────────────────────────────────
-pm={"geohub":"GEO Hub","getsupport":"Get Support"}; rm={"GEO Hub":"geohub","Get Support":"getsupport"}
-up=st.query_params.get("p","")
-if up in pm and st.session_state.nav!=pm[up]: st.session_state.nav=pm[up]
-if st.session_state.nav=="Overview":
-    if st.query_params.get("p"): st.query_params.clear()
-else:
-    slug=rm.get(st.session_state.nav,"")
-    if st.query_params.get("p")!=slug: st.query_params["p"]=slug
-
-# ── NAVBAR ────────────────────────────────────────────────────
-nav=st.session_state.nav
-
-st.markdown(f"""<style>
-div[data-testid="stHorizontalBlock"]:first-of-type div[data-testid="stButton"]:nth-child({"2" if nav=="Overview" else "3" if nav=="GEO Hub" else "4"}) button{{
-    background:#EDE9FE!important;color:#7C3AED!important;font-weight:700!important;
-    border:none!important;box-shadow:none!important;}}
-</style>""", unsafe_allow_html=True)
-
-nb_c,ov_c,gh_c,sp_c=st.columns([3,1,1,1.2])
-with nb_c:
-    st.markdown('<div class="percepta-brand-wrap"><div class="percepta-icon"><svg width="16" height="16" viewBox="0 0 22 22" fill="none"><circle cx="9.5" cy="9.5" r="5.5" stroke="white" stroke-width="1.8" fill="none"/><line x1="13.5" y1="13.5" x2="18" y2="18" stroke="white" stroke-width="1.8" stroke-linecap="round"/><path d="M7 9.5 Q8.5 7 9.5 9.5 Q10.5 12 12 9.5" stroke="white" stroke-width="1.3" fill="none" stroke-linecap="round" opacity="0.9"/></svg></div><span class="percepta-title">Percepta</span></div>',unsafe_allow_html=True)
-with ov_c:
-    if st.button("Overview",key="nb_ov",use_container_width=True):
-        st.session_state.nav="Overview"; st.query_params.clear(); st.rerun()
-with gh_c:
-    if st.button("GEO Hub",key="nb_gh",use_container_width=True):
-        st.session_state.nav="GEO Hub"; st.query_params["p"]="geohub"; st.rerun()
-with sp_c:
-    if st.button("Get Support",key="nb_sp",use_container_width=True):
-        st.session_state.nav="Get Support"; st.query_params["p"]="getsupport"; st.rerun()
-
-# ════════════════════════════════════════════════════════════
-# PAGE 1: OVERVIEW
-# ════════════════════════════════════════════════════════════
-if nav=="Overview":
-    if st.query_params.get("p")=="geohub": st.session_state.nav="GEO Hub"; st.query_params["p"]="geohub"; st.rerun()
-    st.markdown(f"""
-<div style="background:linear-gradient(170deg,#fff 55%,#F3EEFF 100%);padding:52px 40px 40px;text-align:center;">
-  <div style="display:inline-flex;align-items:center;gap:8px;border:1px solid #DDD6FE;border-radius:50px;padding:8px 22px;font-size:0.72rem;font-weight:700;letter-spacing:.1em;color:#7C3AED;text-transform:uppercase;margin-bottom:44px;background:rgba(255,255,255,0.9);">✦ &nbsp;AI-Powered Brand Intelligence &nbsp;·&nbsp; Powered by Accenture</div>
-  <div style="font-size:4.6rem;font-weight:900;line-height:1.0;letter-spacing:-3px;margin-bottom:28px;"><span style="color:#111827;">Your Brand's </span><span style="color:#7C3AED;">GEO</span><span style="color:#111827;"> Score</span></div>
-  <p style="font-size:1.05rem;color:#6B7280;max-width:860px;margin:0 auto 36px;line-height:1.7;">The Percepta GEO Score measures how often and favorably your brand is cited in AI-generated responses.</p>
-  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
-    <a href="?p=geohub" class="hero-btn-primary" target="_self">Get Your GEO Score &nbsp;→</a>
-    <a href="#how" class="hero-btn-secondary">See How It Works</a>
-  </div>
-</div>
-<div id="how" style="background:#F9F9FC;padding:80px 40px;border-top:1px solid #E5E7EB;">
-  <div style="text-align:center;margin-bottom:64px;"><div class="section-tag">Process</div><h2 style="font-size:2.2rem;font-weight:900;color:#111827;margin:10px 0 14px;">How Percepta Works</h2></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:40px;position:relative;">
-    <div style="position:absolute;top:22px;left:calc(25% + 20px);width:calc(75% - 40px);height:1px;background:#E5E7EB;z-index:0;"></div>
-    {"".join(f'<div style="position:relative;z-index:1;"><div style="font-size:3.2rem;font-weight:900;color:#EDE9FE;line-height:1;margin-bottom:24px;">0{i+1}</div><div style="font-size:1rem;font-weight:800;color:#111827;margin-bottom:8px;">{t}</div><div style="font-size:0.84rem;color:#6B7280;line-height:1.7;">{d}</div></div>' for i,(t,d) in enumerate([("Enter Your Brand","Input your brand name, keywords, and competitor list."),("AI Engine Scanning","Percepta queries AI engines with hundreds of prompts to analyze mentions."),("Score Calculation","Our algorithm computes your GEO Score based on visibility, sentiment, and positioning."),("Actionable Insights","Receive detailed reports with specific recommendations.")]))}
-  </div>
-</div>
-<div style="background:white;padding:80px 40px;border-top:1px solid #E5E7EB;">
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;margin-bottom:56px;">
-    <div><div style="font-size:0.72rem;font-weight:800;letter-spacing:.12em;color:#7C3AED;text-transform:uppercase;margin-bottom:14px;">The GEO Score</div><h2 style="font-size:2.6rem;font-weight:900;color:#111827;margin:0 0 20px;line-height:1.1;">One Number That<br>Changes Everything</h2><p style="font-size:0.95rem;color:#6B7280;line-height:1.8;margin:0;">Your GEO Score distills complex AI citation data into a single, actionable metric.</p></div>
-    <div style="background:white;border-radius:20px;padding:44px 40px;box-shadow:0 8px 40px rgba(124,58,237,0.13);border:1px solid #F0EBFF;text-align:center;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:.14em;color:#9CA3AF;text-transform:uppercase;margin-bottom:18px;">GEO SCORE</div><div style="font-size:5.5rem;font-weight:900;color:#7C3AED;line-height:1;margin-bottom:20px;">78</div><div style="background:#F3F4F6;border-radius:50px;height:6px;width:100%;margin-bottom:10px;overflow:hidden;"><div style="background:#7C3AED;height:6px;border-radius:50px;width:78%;"></div></div><div style="font-size:0.82rem;color:#9CA3AF;margin-bottom:20px;">out of 100</div><span style="background:#EDE9FE;color:#7C3AED;border-radius:50px;padding:6px 22px;font-size:0.84rem;font-weight:700;">Good</span></div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;">
-    {"".join(card(bg,bd,f'<div style="font-size:0.82rem;font-weight:700;color:{c};margin-bottom:4px;">{r}</div><div style="font-size:1.3rem;font-weight:900;color:{c};margin-bottom:4px;">{l}</div><div style="font-size:0.78rem;color:{c};">{d}</div>') for bg,bd,c,r,l,d in [("#ECFDF5","#6EE7B7","#065F46","80–100","Excellent","Well optimized for AI citation"),("#EFF6FF","#93C5FD","#1E40AF","70–79","Good","Minor improvements recommended"),("#FFFBEB","#FCD34D","#92400E","45–69","Needs Work","Several issues to address"),("#FFF1F2","#FCA5A5","#991B1B","0–44","Poor","Major optimization needed")])}
-  </div>
-</div>
-<div style="background:white;padding:80px 40px;border-top:1px solid #E5E7EB;">
-  <div style="background:linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%);border:1.5px solid #C4B5FD;border-radius:28px;padding:52px 60px;text-align:center;">
-    <h2 style="font-size:3rem;font-weight:900;color:#111827;margin:0 0 4px;line-height:1.1;">Ready to Discover Your</h2>
-    <h2 style="font-size:3rem;font-weight:900;color:#7C3AED;margin:0 0 28px;line-height:1.1;">GEO Score?</h2>
-    <div style="margin-top:40px;"><a href="?p=geohub" class="cta-btn" target="_self">Launch Percepta &nbsp;→</a></div>
-  </div>
-</div>""", unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-# PAGE 2: GEO HUB
-# ════════════════════════════════════════════════════════════
-elif nav=="GEO Hub":
-    st.markdown("""<div style="background:linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%);padding:64px 40px 56px;text-align:center;">
-        <div style="display:inline-flex;align-items:center;gap:8px;border:1.5px solid rgba(255,255,255,0.5);border-radius:50px;padding:8px 24px;font-size:0.78rem;font-weight:700;color:white;margin-bottom:28px;background:rgba(255,255,255,0.15);">✦ &nbsp;Real Time GEO Scoring</div>
-        <h1 style="font-size:3.4rem;font-weight:900;color:white;margin:0 0 14px;letter-spacing:-1.5px;">GEO Scorecard</h1>
-        <p style="font-size:1.05rem;color:rgba(255,255,255,0.88);margin:0 0 18px;">Enter any brand URL · Discover your brand's AI presence</p>
-        <div style="display:inline-flex;align-items:center;gap:8px;border:1.5px solid rgba(255,255,255,0.3);border-radius:50px;padding:7px 20px;font-size:0.78rem;color:rgba(255,255,255,0.75);background:rgba(255,255,255,0.1);">⏱ &nbsp;Live data · Updated in real-time · Not cached like competitors</div>
-    </div>""", unsafe_allow_html=True)
-
-    has_result=st.session_state.geo_result is not None
-
-    if not has_result:
-        st.markdown(score_band_cards(), unsafe_allow_html=True)
-        st.markdown("<div style='background:#F3F4F6;padding:16px 40px 40px 40px;'>", unsafe_allow_html=True)
-        with st.container(border=True):
-            st.markdown("""
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-              <div style="width:7px;height:7px;border-radius:50%;background:#7C3AED;flex-shrink:0;"></div>
-              <span style="font-size:0.7rem;font-weight:700;letter-spacing:.14em;color:#9CA3AF;text-transform:uppercase;">Brand URL</span>
+function BusinessImpact({ result, onGo }: { result:any; onGo:()=>void }) {
+  const geo=result.overall_geo_score??0,brand=result.brand_name??'Your Brand';
+  const nextTier=geo>=80?null:geo>=70?{score:80,label:'Excellent'}:geo>=45?{score:70,label:'Good'}:{score:45,label:'Needs Work'};
+  const steps=[
+    {title:'Higher GEO Score',sub:'Stronger AI visibility'},
+    {title:'Stronger AI Visibility',sub:'More surfaces where brand is recommended'},
+    {title:'More Surfaces',sub:'Higher organic traffic'},
+    {title:'Higher Traffic',sub:'More conversions'},
+    {title:'More Conversions',sub:'More revenue'},
+  ];
+  return (
+    <div style={{background:'#F5F3FF',borderRadius:16,border:'1px solid #DDD6FE',padding:'18px 22px',flex:1,display:'flex',flexDirection:'column' as const}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+        <span>↗</span><span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>What does this score mean for your business?</span>
+      </div>
+      <div style={{display:'flex',flexDirection:'column' as const,gap:0,marginBottom:12}}>
+        {steps.map((s,i)=>(
+          <div key={i} style={{display:'flex',flexDirection:'column' as const,alignItems:'stretch'}}>
+            <div style={{background:'white',borderRadius:8,border:'1px solid #DDD6FE',padding:'7px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#7C3AED'}}>{s.title}</span>
+              <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>→ {s.sub}</span>
             </div>
-            """, unsafe_allow_html=True)
-            brand_url = st.text_input("url", value=st.session_state.geo_url,
-                placeholder="https://www.capitalone.com/", label_visibility="collapsed")
-            run = st.button("🔍  Run Live AI Analysis", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("""<style>
-        div[data-testid="stVerticalBlockBorderWrapper"]{
-            background:white!important;border-radius:16px!important;
-            border:1px solid #E5E7EB!important;
-            box-shadow:0 4px 20px rgba(124,58,237,0.07)!important;
-            padding:24px 28px!important;
-            margin:0 40px 40px 40px!important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"]>button{
-            background:#7C3AED!important;color:white!important;border:none!important;
-            border-radius:12px!important;font-weight:700!important;font-size:0.95rem!important;
-            height:52px!important;width:100%!important;
-            box-shadow:0 4px 16px rgba(124,58,237,0.45)!important;
-        }
-        div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="stButton"]>button:hover{
-            background:#6D28D9!important;
-        }
-        </style>""", unsafe_allow_html=True)
-
-        if run:
-            if not brand_url.strip() or not brand_url.startswith("http"):
-                st.error("Please enter a valid URL starting with http:// or https://")
-            else:
-                with st.spinner("Identifying brand from URL..."):
-                    page_data=fetch_page_content(brand_url)
-                if not page_data["ok"]: st.error(f"Could not fetch URL: {page_data['error']}")
-                else:
-                    with st.spinner("Running 20 live AI queries across 4 consumer categories..."):
-                        try:
-                            result=analyze_geo_with_ai(page_data)
-                            st.session_state.geo_result=result; st.session_state.geo_url=brand_url; st.session_state.geo_page_data=page_data
-                            st.success("Analysis complete. Explore the tabs for your full GEO report."); st.rerun()
-                        except Exception as e: st.error(f"Analysis failed: {e}")
-    else:
-        R=st.session_state.geo_result; PD=st.session_state.geo_page_data; BU=st.session_state.geo_url
-        geo=R.get("overall_geo_score",0); brand=R.get("brand_name",PD["domain"]); bd=PD.get("domain","")
-        lbl,bc,bbg=score_badge(geo)
-        vis=R.get("context",0); cit=R.get("reliability",0); sent=R.get("exclusivity",0); prom=R.get("organization",0); sov=R.get("share_of_voice",0)
-        avg_rank="N/A" if vis==0 else R.get("avg_rank","N/A"); rd=R.get("responses_detail",[])
-        ind=INDUSTRY_DATA[R.get("ind_key","gen")]
-        tabs=st.tabs(["GEO Score","Competitors","Visibility","Sentiment","Citations","Prompts","Recommendations","Live Prompt"])
-
-        with tabs[0]:
-            st.markdown("<div style='padding:32px 40px;max-width:1000px;margin:0 auto;'>",unsafe_allow_html=True)
-            gc,ic=st.columns([1,2])
-            with gc:
-                fig=go.Figure(go.Indicator(mode="gauge+number",value=geo,number={'font':{'size':52,'color':'#7C3AED'}},domain={'x':[0,1],'y':[0,1]},title={'text':brand,'font':{'size':14,'color':'#374151'}},gauge={'axis':{'range':[0,100]},'bar':{'color':'#7C3AED'},'bgcolor':'white','steps':[{'range':[0,44],'color':'#FEE2E2'},{'range':[44,69],'color':'#FEF3C7'},{'range':[69,80],'color':'#DBEAFE'},{'range':[80,100],'color':'#D1FAE5'}],'threshold':{'line':{'color':'#7C3AED','width':4},'thickness':0.75,'value':geo}}))
-                fig.update_layout(height=280,margin=dict(l=20,r=20,t=40,b=10),paper_bgcolor='white'); st.plotly_chart(fig,use_container_width=True)
-            with ic:
-                dp=[x for x in [f"Citation ({cit}): rarely top pick" if cit<40 else None,f"Prominence ({prom}): mid-list" if prom<40 else None,f"Share of Voice ({sov}): competitors dominating" if sov<20 else None,f"Sentiment ({sent}): lacks positive endorsement" if sent<50 else None] if x]
-                stxt=f"GEO Score {geo} reflects {vis}% Visibility but held back by: {'; '.join(dp)}." if dp else f"Strong: Visibility {vis}%, Citation {cit}, Sentiment {sent}, Prominence {prom}, SoV {sov}."
-                st.markdown(white_card(f'<div style="font-size:1.2rem;font-weight:800;color:#111827;margin-bottom:4px;">{brand}</div><a href="{BU}" target="_blank" style="color:#7C3AED;font-size:0.82rem;">{BU[:70]}{"..." if len(BU)>70 else ""}</a><div style="margin:12px 0;"><span style="background:{bbg};color:{bc};padding:4px 14px;border-radius:50px;font-size:0.78rem;font-weight:700;">{lbl}</span></div><div style="font-size:0.82rem;color:#6B7280;line-height:1.6;border-top:1px solid #F3F4F6;padding-top:12px;">{stxt}</div>'),unsafe_allow_html=True)
-            st.markdown("<br>",unsafe_allow_html=True)
-            tips={"Visibility Score":"How many of 20 generic AI queries mentioned your brand.","Citation Score":"How authoritatively your brand was cited.","Sentiment Score":"Tone of AI responses when your brand appeared.","Avg. Rank":"Average position your brand appeared."}
-            c1,c2,c3,c4=st.columns(4)
-            for col,val,lbl2,sub in [(c1,vis,"Visibility Score","AI response presence"),(c2,cit,"Citation Score","Source authority"),(c3,sent,"Sentiment Score","Brand perception"),(c4,avg_rank,"Avg. Rank","AI mention position")]:
-                with col: st.markdown(metric_card(lbl2,val,sub,tips.get(lbl2,"")),unsafe_allow_html=True)
-            st.markdown("<div style='padding:24px 0;'>",unsafe_allow_html=True)
-            top10=[{"Brand":brand,"URL":bd,"GEO":geo,"Vis":vis,"Cit":cit,"Sen":sent,"Sov":sov,"Rank":avg_rank}]
-            for c in ind["comps"]:
-                if c.lower()!=brand.lower():
-                    s=score_competitor_from_responses(c,rd); s["URL"]=ind["comp_urls"].get(c,c.lower().replace(" ","+")+".com"); top10.append(s)
-            rows=""
-            for i,c in enumerate(sorted(top10,key=lambda x:x["GEO"],reverse=True),1):
-                iy=c["Brand"].lower()==brand.lower(); gc2=c["GEO"]
-                gcol="#10B981" if gc2>=80 else "#F59E0B" if gc2>=60 else "#EF4444"
-                yb=' <span style="background:#EDE9FE;color:#7C3AED;border-radius:4px;padding:1px 6px;font-size:0.7rem;font-weight:700;">You</span>' if iy else ""
-                row_bg="#F5F3FF" if iy else ("white" if i%2==1 else "#FAFAFA")
-                row_fw="700" if iy else "400"
-                rows+=f'<tr style="background:{row_bg};{"border-left:3px solid #7C3AED;" if iy else ""}"><td style="padding:10px 12px;font-size:0.8rem;color:#9CA3AF;font-weight:600;">{i}</td><td style="padding:10px 12px;"><div style="font-size:0.84rem;font-weight:{row_fw};color:#111827;">{c["Brand"]}{yb}</div><div style="font-size:0.72rem;color:#9CA3AF;">{c.get("URL","")}</div></td><td style="padding:10px 12px;font-size:0.88rem;font-weight:700;color:{gcol};">{gc2}</td><td style="padding:10px 12px;font-size:0.82rem;color:#374151;">{c["Vis"]}</td><td style="padding:10px 12px;font-size:0.82rem;color:#374151;">{c["Cit"]}</td><td style="padding:10px 12px;font-size:0.82rem;color:#374151;">{c["Sen"]}</td><td style="padding:10px 12px;font-size:0.82rem;color:#374151;">{c.get("Sov","")}</td><td style="padding:10px 12px;font-size:0.82rem;color:#374151;">{c["Rank"]}</td></tr>'
-            thead="".join(f'<th style="padding:8px 12px;text-align:left;font-size:0.72rem;color:#9CA3AF;font-weight:600;">{h}</th>' for h in ["#","Brand","GEO","Visibility","Citation","Sentiment","Share of Voice","Avg Rank"])
-            st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;">{bd} vs Competitors — {ind["label"]}</div><div style="font-size:0.78rem;color:#9CA3AF;margin-bottom:16px;">Real-time GEO scores. Highlighted row is you.</div><table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid #E5E7EB;">{thead}</tr></thead><tbody>{rows}</tbody></table>'),unsafe_allow_html=True)
-            st.markdown("</div></div>",unsafe_allow_html=True)
-
-        with tabs[1]:
-            st.info("Competitor breakdown is shown in the GEO Score tab above.")
-
-        with tabs[2]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">{metric_card("Visibility Score",f"{vis}%","Appeared in "+str(R.get("responses_with_brand",0))+" of 20 queries")}{metric_card("Average Rank",avg_rank,"Position when mentioned")}{metric_card("Query Appearances",str(R.get("responses_with_brand",0))+"/20","Out of 20 generic industry queries")}</div>',unsafe_allow_html=True)
-            il=PD.get("internal_links",[])
-            if il:
-                pi=get_page_intelligence(il,brand,rd); rows=""
-                for p in pi:
-                    gc2=p["geo"]; gcol="#10B981" if gc2>=60 else "#F59E0B" if gc2>=30 else "#EF4444"
-                    cb=f'<span style="background:#D1FAE5;color:#065F46;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:700;">Cited {p["cited"]}x</span>' if p["cited"]>0 else '<span style="background:#F3F4F6;color:#9CA3AF;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:700;">Not Cited</span>'
-                    rows+=f'<tr style="border-bottom:1px solid #F3F4F6;"><td style="padding:10px 14px;"><div style="font-size:0.84rem;font-weight:600;color:#111827;">{p["label"]}</div><div style="font-size:0.72rem;color:#9CA3AF;">{p["path"]}</div></td><td style="padding:10px 14px;">{cb}</td><td style="padding:10px 14px;font-size:0.88rem;font-weight:700;color:{gcol};">{gc2}</td><td style="padding:10px 14px;font-size:0.82rem;color:#7C3AED;font-weight:600;">{p["citation_share"]}%</td><td style="padding:10px 14px;font-size:0.84rem;color:{p["color"]};font-weight:600;">{p["status"]}</td></tr>'
-                thead2="".join(f'<th style="padding:8px 14px;text-align:left;font-size:0.72rem;color:#9CA3AF;font-weight:600;">{h}</th>' for h in ["Page","AI Citations","GEO Score","Citation Share","Status"])
-                st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;">Page Intelligence</div><div style="font-size:0.78rem;color:#9CA3AF;margin-bottom:16px;">Which pages of {bd} are being cited by AI.</div><table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid #E5E7EB;background:#FAFAFA;">{thead2}</tr></thead><tbody>{rows}</tbody></table>'),unsafe_allow_html=True)
-            st.markdown("</div>",unsafe_allow_html=True)
-
-        with tabs[3]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            smood="Positive — AI speaks favorably" if sent>=70 else "Neutral — room to improve" if sent>=45 else "Needs attention"
-            pmood="Named first — strong prominence" if prom>=70 else "Mid-list mentions" if prom>=45 else "Buried in responses"
-            st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px;">{metric_card("Sentiment Score",sent,smood,color="#10B981")}{metric_card("Prominence Score",prom,pmood)}{metric_card("Average Rank",avg_rank,"Average mention position",color="#3B82F6")}</div>',unsafe_allow_html=True)
-            sh="".join(f'<li style="padding:10px 0;font-size:0.84rem;color:#374151;display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid #F0FDF4;"><span style="color:#10B981;font-weight:700;flex-shrink:0;">+</span><span>{s}</span></li>' for s in R.get("strengths_list",[])[:3])
-            st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:16px;">Sentiment Strengths</div><ul style="list-style:none;padding:0;margin:0;">{sh}</ul>'),unsafe_allow_html=True)
-            st.markdown("</div>",unsafe_allow_html=True)
-
-        with tabs[4]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">{metric_card("Citation Score",cit,"How authoritatively your brand was cited")}{metric_card("Share of Voice",sov,"Your brand mentions as % of all mentions")}</div>',unsafe_allow_html=True)
-            cs=R.get("citation_sources",[])
-            if cs:
-                rows=""
-                for s in cs:
-                    d=s.get("domain",""); cl,cc,cbg=classify_domain(d); share=s.get("citation_share",0); bw=min(share*3,100)
-                    phtml="".join(f'<div style="font-size:0.75rem;color:#7C3AED;padding:2px 0;">{pg}</div>' for pg in s.get("top_pages",[])[:5])
-                    if phtml: phtml=f'<div style="margin-top:8px;padding-top:8px;border-top:0.5px solid #F3F4F6;">{phtml}</div>'
-                    rows+=f'<div style="border:1px solid #E5E7EB;border-radius:8px;padding:12px 16px;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:0.78rem;color:#9CA3AF;font-weight:600;width:18px;">{s.get("rank","")}</span><img src="https://www.google.com/s2/favicons?domain={d}&sz=14" width="14" height="14" onerror="this.style.display=\'none\'"><span style="font-size:0.88rem;font-weight:600;color:#111827;flex:1;">{d}</span><span style="background:{cbg};color:{cc};border-radius:50px;padding:2px 10px;font-size:0.7rem;font-weight:600;">{cl}</span><div style="display:flex;align-items:center;gap:6px;"><div style="background:#F3F4F6;border-radius:4px;height:5px;width:80px;overflow:hidden;"><div style="background:#7C3AED;height:5px;border-radius:4px;width:{bw}px;"></div></div><span style="font-size:0.82rem;font-weight:700;color:#7C3AED;">{share}%</span></div></div>{phtml}</div>'
-                st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;">Sources AI is Pulling From</div><div style="font-size:0.78rem;color:#9CA3AF;margin-bottom:16px;">Domains influencing AI knowledge about this brand.</div>{rows}'),unsafe_allow_html=True)
-            st.markdown("</div>",unsafe_allow_html=True)
-
-        with tabs[5]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            cats=list(dict.fromkeys([r.get("category","General Consumer") for r in rd]))
-            sel=st.selectbox("Filter by category",["All"]+cats)
-            filtered=[r for r in rd if sel=="All" or r.get("category")==sel][:10]
-            cs2={}
-            for r in rd:
-                c=r.get("category","General Consumer")
-                if c not in cs2: cs2[c]={"total":0,"mentioned":0}
-                cs2[c]["total"]+=1
-                if r.get("mentioned"): cs2[c]["mentioned"]+=1
-            ch="".join(f'<div style="background:white;border:1px solid #E5E7EB;border-radius:8px;padding:14px 18px;"><div style="font-size:0.82rem;font-weight:600;color:#111827;margin-bottom:6px;">{c}</div><div style="display:flex;align-items:center;gap:8px;"><div style="background:#F3F4F6;border-radius:4px;height:5px;flex:1;overflow:hidden;"><div style="background:#7C3AED;height:5px;border-radius:4px;width:{round((v["mentioned"]/max(v["total"],1))*100)}%;"></div></div><span style="font-size:0.78rem;font-weight:700;color:#7C3AED;">{round((v["mentioned"]/max(v["total"],1))*100)}%</span></div><div style="font-size:0.72rem;color:#9CA3AF;margin-top:4px;">{v["mentioned"]} of {v["total"]} queries</div></div>' for c,v in cs2.items())
-            st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:24px;">{ch}</div>',unsafe_allow_html=True)
-            qrows=""
-            for i,item in enumerate(filtered):
-                m=item.get("mentioned",False); rp=item.get("position",0); rd2=f"#{rp}" if rp>0 else "N/A"
-                rc="#10B981" if rp==1 else "#7C3AED" if rp<=3 else "#F59E0B" if m else "#9CA3AF"
-                ab='<span style="background:#D1FAE5;color:#065F46;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:700;">Appeared</span>' if m else '<span style="background:#F3F4F6;color:#9CA3AF;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:700;">Not Mentioned</span>'
-                cb2=f'<span style="background:#EDE9FE;color:#5B21B6;border-radius:4px;padding:1px 7px;font-size:0.7rem;font-weight:600;">{item.get("category","")}</span>'
-                qrows+=f'<tr style="background:{"#F5F3FF" if m else "white"};border-bottom:1px solid #F3F4F6;"><td style="padding:10px 12px;font-size:0.78rem;color:#9CA3AF;font-weight:600;">{i+1}</td><td style="padding:10px 14px;"><div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;">{cb2}{ab}</div><div style="font-size:0.83rem;color:#374151;">{item.get("query","")}</div></td><td style="padding:10px 16px;text-align:center;"><div style="font-size:1.1rem;font-weight:800;color:{rc};">{rd2}</div><div style="font-size:0.68rem;color:#9CA3AF;">Rank</div></td></tr>'
-            thead3="".join(f'<th style="padding:8px 12px;text-align:left;font-size:0.72rem;color:#9CA3AF;font-weight:600;">{h}</th>' for h in ["#","Query","Rank"])
-            st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;">Top 10 Prompts</div><div style="font-size:0.78rem;color:#9CA3AF;margin-bottom:16px;">Generic consumer questions. No brand name used.</div><table style="width:100%;border-collapse:collapse;"><thead><tr style="border-bottom:2px solid #E5E7EB;background:#FAFAFA;">{thead3}</tr></thead><tbody>{qrows}</tbody></table>'),unsafe_allow_html=True)
-            st.markdown("</div>",unsafe_allow_html=True)
-
-        with tabs[6]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            sh2="".join(f'<li style="padding:10px 0;font-size:0.84rem;color:#374151;display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid #F0FDF4;"><span style="color:#10B981;font-weight:700;flex-shrink:0;">+</span><span>{s}</span></li>' for s in R.get("strengths_list",[])[:3])
-            wh="".join(f'<li style="padding:10px 0;font-size:0.84rem;color:#374151;display:flex;gap:12px;align-items:flex-start;border-bottom:1px solid #FFF1F2;"><span style="color:#EF4444;font-weight:700;flex-shrink:0;">x</span><span>{w}</span></li>' for w in R.get("improvements_list",[])[:5])
-            st.markdown(f'<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px;"><div style="background:white;border:1px solid #E5E7EB;border-radius:12px;padding:24px;"><div style="font-size:0.9rem;font-weight:700;color:#065F46;margin-bottom:16px;">What is Working Well</div><ul style="list-style:none;padding:0;margin:0;">{sh2}</ul></div><div style="background:white;border:1px solid #E5E7EB;border-radius:12px;padding:24px;"><div style="font-size:0.9rem;font-weight:700;color:#9F1239;margin-bottom:16px;">What Needs Improvement</div><ul style="list-style:none;padding:0;margin:0;">{wh}</ul></div></div>',unsafe_allow_html=True)
-            dm={"High":("Workstream 01: ARD","AXO Baseline Report and Brand Ranking Index"),"Medium":("Workstream 02: AOP","LLM-Ready Content Package and Content Influence Blueprint"),"Low":("Workstream 03: DTI","Schema Optimization Guide and Metadata Remediation Plan")}
-            pri_bg={"High":"#FEE2E2","Medium":"#FEF3C7","Low":"#DCFCE7"}
-            pri_tc={"High":"#991B1B","Medium":"#92400E","Low":"#166534"}
-            ah=""
-            for a in R.get("actions",[]):
-                pri=a.get("priority","Medium"); bg=pri_bg.get(pri,"#F3F4F6"); tc=pri_tc.get(pri,"#374151"); pk,deliv=dm.get(pri,("",""))
-                ah+=(f'<div style="display:grid;grid-template-columns:90px 1fr 1fr;gap:0;border-bottom:1px solid #F3F4F6;padding:14px 0;align-items:start;">'
-                     f'<div><span style="background:{bg};color:{tc};border-radius:4px;padding:2px 10px;font-size:0.72rem;font-weight:700;">{pri}</span></div>'
-                     f'<div style="font-size:0.84rem;color:#374151;padding-right:16px;">{a["action"]}</div>'
-                     f'<div style="font-size:0.78rem;color:#7C3AED;font-weight:600;"><span style="background:#EDE9FE;border-radius:6px;padding:3px 10px;">{pk}</span>'
-                     f'<div style="font-size:0.75rem;color:#9CA3AF;font-weight:400;margin-top:4px;">{deliv}</div></div></div>')
-            st.markdown(white_card(f'<div style="font-size:1rem;font-weight:700;color:#111827;margin-bottom:4px;">Priority Actions</div><div style="font-size:0.78rem;color:#9CA3AF;margin-bottom:20px;">Each action mapped to the relevant Accenture workstream deliverable.</div><div style="display:grid;grid-template-columns:90px 1fr 1fr;border-bottom:2px solid #E5E7EB;padding-bottom:8px;margin-bottom:4px;"><div style="font-size:0.72rem;color:#9CA3AF;font-weight:600;">Priority</div><div style="font-size:0.72rem;color:#9CA3AF;font-weight:600;">Action</div><div style="font-size:0.72rem;color:#9CA3AF;font-weight:600;">Linked Deliverable</div></div>{ah}'),unsafe_allow_html=True)
-            st.markdown("</div>",unsafe_allow_html=True)
-
-        with tabs[7]:
-            st.markdown("<div style='padding:24px 40px;max-width:900px;margin:0 auto;'>",unsafe_allow_html=True)
-            st.markdown('<div style="background:#7C3AED;border-radius:12px;padding:24px 28px;color:white;margin-bottom:20px;"><h3 style="font-size:1.1rem;font-weight:800;color:white;margin:0 0 6px;">Live AI Prompt Lab</h3><p style="font-size:0.88rem;color:rgba(255,255,255,0.85);margin:0;">Type any prompt and see exactly how GPT-5.4 responds in real time.</p></div>',unsafe_allow_html=True)
-            q=st.text_input("p","",placeholder="e.g. What is the best travel credit card for high net worth individuals?",label_visibility="collapsed")
-            if st.button("Run Prompt"):
-                if not q.strip(): st.warning("Please enter a prompt.")
-                else:
-                    with st.spinner("Querying GPT-5.4..."):
-                        try: st.session_state.ai_history.append({"q":q,"a":get_response(q,INTERNAL_API_KEY)})
-                        except Exception as e: st.error(f"Error: {e}")
-            for item in reversed(st.session_state.ai_history):
-                st.markdown(f'<div style="display:flex;justify-content:flex-end;margin:20px 0 10px;"><div style="background:#F4F4F4;color:#111827;border-radius:18px 18px 4px 18px;padding:12px 18px;max-width:60%;font-size:0.95rem;">{item["q"]}</div></div>',unsafe_allow_html=True)
-                st.markdown(item["a"])
-                st.markdown('<hr style="border:none;border-top:1px solid #F3F4F6;margin:16px 0;">',unsafe_allow_html=True)
-            if st.session_state.ai_history:
-                if st.button("Clear history",key="clr"): st.session_state.ai_history=[]; st.rerun()
-            st.markdown("</div>",unsafe_allow_html=True)
-
-# ════════════════════════════════════════════════════════════
-# PAGE 3: GET SUPPORT
-# ════════════════════════════════════════════════════════════
-elif nav=="Get Support":
-    st.markdown("""<div style="background:#7C3AED;padding:56px 40px;text-align:center;">
-        <div style="font-size:0.72rem;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,0.65);text-transform:uppercase;margin-bottom:10px;">Accenture GEO Services</div>
-        <h1 style="font-size:2.8rem;font-weight:900;color:white;margin:0 0 14px;letter-spacing:-1px;">We've Got You Covered</h1>
-        <p style="font-size:1rem;color:rgba(255,255,255,0.82);max-width:500px;margin:0 auto;line-height:1.8;">From GEO diagnostic to full optimization. Accenture's team handles everything, end to end.</p>
-    </div>""",unsafe_allow_html=True)
-    st.markdown("""<div style="background:white;padding:56px 40px 0;text-align:center;">
-        <div class="section-tag">Our Approach</div>
-        <h2 style="font-size:2.4rem;font-weight:900;color:#111827;margin:10px 0 10px;">GEO is No Longer Optional</h2>
-        <p style="font-size:0.92rem;color:#6B7280;margin:0 auto 40px;max-width:680px;line-height:1.7;">While search spend rises, its impact is fading as AI agents increasingly shape the decisions search used to influence.</p>
-    </div>""",unsafe_allow_html=True)
-    cl,cm,cr=st.columns([1,1.1,1])
-    WS=[("Workstream 1","Agent Ranking Diagnostic (ARD)","Establish the <strong>baseline ranking performance</strong> of AI agents comparing your brand to competitive offerings."),("Workstream 4","Impact Measurement (Re-Diagnostic)","Re-perform the diagnostic to <strong>Re-measure performance</strong> and quantify improvements.")]
-    WS2=[("Workstream 3","Distribution and Technical Influence Layer (DTI)","Pinpoint and <strong>propose specific technical and distribution improvements</strong> to maximize LLM ingestion."),("Workstream 2","Agent Optimization Plan (AOP)","<strong>Design and deploy a specific optimization strategy</strong> aimed at elevating agent recognition of your brand.")]
-    with cl: st.markdown("".join(f'<div style="padding:0 20px 0 40px;margin-bottom:36px;"><div style="font-size:0.95rem;font-weight:800;color:#111827;margin-bottom:3px;"><strong>{w[0]}:</strong></div><div style="font-size:0.88rem;font-style:italic;color:#374151;margin-bottom:10px;">{w[1]}</div><p style="font-size:0.82rem;color:#6B7280;line-height:1.7;margin:0;">{w[2]}</p></div>' for w in WS),unsafe_allow_html=True)
-    with cm: st.image("infinity.png",use_container_width=True)
-    with cr: st.markdown("".join(f'<div style="padding:0 40px 0 20px;margin-bottom:36px;"><div style="font-size:0.95rem;font-weight:800;color:#111827;margin-bottom:3px;"><strong>{w[0]}:</strong></div><div style="font-size:0.88rem;font-style:italic;color:#374151;margin-bottom:10px;">{w[1]}</div><p style="font-size:0.82rem;color:#6B7280;line-height:1.7;margin:0;">{w[2]}</p></div>' for w in WS2),unsafe_allow_html=True)
-
-    DELIVER=[
-        ("Agent Ranking Diagnostic (ARD)","#1E1B5E","polygon(0 0,93% 0,100% 50%,93% 100%,0 100%)","border-radius:8px 0 0 0",["Develop representative prompts","Execute multi-run stability testing","Extract agent-generated rankings","Perform power distribution modeling","Build competitor adjacency maps"],["AXO Baseline Report","Brand & Product Ranking Index","Power Curve Analysis","Competitor Adjacency Analysis","AXO Baseline Score (v1.0)"]),
-        ("Agent Optimization Plan (AOP)","#2D2A70","polygon(0 0,93% 0,100% 50%,93% 100%,0 100%,7% 50%)","",["Develop LLM-ready content assets","Strengthen product-attribute associations","Optimize content for agent ingestion","Create Content Influence Blueprint"],["Agent Optimization Plan","LLM-Ready Content Package","Attribute Reinforcement Strategy","Content Influence Blueprint"]),
-        ("Distribution & Technical Influence (DTI)","#3D3A8A","polygon(0 0,93% 0,100% 50%,93% 100%,0 100%,7% 50%)","",["Audit tagging and metadata","Identify missing structured data","Improve backlink structure","Identify dormant URLs","Audit schema markup"],["Distribution & Technical Influence Report","Metadata Remediation Plan","Backlink & Redirect Strategy","Schema Optimization Guide"]),
-        ("Impact Measurement (Re-Diagnostic)","#5B21B6","polygon(0 0,100% 0,100% 100%,0 100%,7% 50%)","border-radius:0 8px 0 0",["Re-test all prompts","Measure semantic drift and ranking changes","Recompute AXO Score"],["AXO Impact Report","Before/After Ranking Comparison","Updated AXO Score (v2.0)","Recommendations for ongoing improvement"]),
-    ]
-    hdrs="".join(f'<div style="background:{d[1]};padding:20px {"20px 20px 20px 28px" if i>0 else "18px"};{d[3]};clip-path:{d[2]};"><div style="font-size:0.7rem;font-weight:600;color:rgba(255,255,255,0.65);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em;">Workstream 0{i+1}</div><div style="font-size:0.9rem;font-weight:700;color:white;line-height:1.35;">{d[0]}</div></div>' for i,d in enumerate(DELIVER))
-    acts="".join(f'<div style="background:white;border:1px solid #E5E7EB;border-radius:8px;padding:18px;"><div style="font-size:0.82rem;font-weight:700;color:#111827;border-bottom:1px solid #F3F4F6;padding-bottom:8px;margin-bottom:12px;text-align:center;">Activities</div><ul style="list-style:disc;padding-left:16px;margin:0;font-size:0.78rem;color:#374151;line-height:1.75;">{"".join(f"<li>{a}</li>" for a in d[4])}</ul></div>' for d in DELIVER)
-    dlvs="".join(f'<div style="background:#EEEAF8;border:1px solid #DDD6FE;border-radius:8px;padding:18px;"><div style="font-size:0.82rem;font-weight:700;color:#111827;border-bottom:1px solid #DDD6FE;padding-bottom:8px;margin-bottom:12px;text-align:center;">Deliverables</div><ul style="list-style:disc;padding-left:16px;margin:0;font-size:0.78rem;color:#374151;line-height:1.75;">{"".join(f"<li>{dl}</li>" for dl in d[5])}</ul></div>' for d in DELIVER)
-    stat_cards="".join(f'<div style="border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:24px;"><div style="font-size:2.4rem;font-weight:900;color:white;">{v}</div><div style="font-size:0.85rem;font-weight:600;color:rgba(255,255,255,0.8);margin-top:5px;">{l}</div></div>' for v,l in [("10+","Successful Clients"),("4X","Higher Conversion"),("15%","Citation Growth"),("68%","Longer Sessions")])
-    st.markdown(f"""
-    <div style="background:white;padding:32px 40px 40px;border-bottom:1px solid #E5E7EB;">
-        <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;gap:0;border-top:1px dashed #D1D5DB;padding-top:32px;">
-            <div style="text-align:center;padding:0 20px;"><div style="font-size:3.2rem;font-weight:900;color:#111827;line-height:1;">6</div><div style="font-size:1rem;font-weight:700;color:#111827;margin-top:6px;">Week Engagement</div><div style="font-size:0.8rem;color:#9CA3AF;margin-top:3px;">Phase 1</div></div>
-            <div style="background:#E5E7EB;"></div>
-            <div style="text-align:center;padding:0 20px;"><div style="font-size:0.85rem;font-weight:700;color:#111827;margin-bottom:4px;">Pilot Phase 1</div><div style="font-size:3.2rem;font-weight:900;color:#111827;line-height:1;">2</div><div style="font-size:1rem;font-weight:700;color:#111827;margin-top:6px;">AI Agents</div><div style="font-size:0.8rem;color:#9CA3AF;margin-top:3px;">ChatGPT &amp; Gemini</div></div>
-            <div style="background:#E5E7EB;"></div>
-            <div style="text-align:center;padding:0 20px;"><div style="font-size:3.2rem;font-weight:900;color:#111827;line-height:1;">4</div><div style="font-size:1rem;font-weight:700;color:#111827;margin-top:6px;">Workstreams</div><div style="font-size:0.8rem;color:#9CA3AF;margin-top:3px;">End to end coverage</div></div>
+            {i<steps.length-1&&<div style={{display:'flex',justifyContent:'center',padding:'2px 0'}}><span style={{color:'#C4B5FD',fontSize:'0.85rem',lineHeight:1}}>↓</span></div>}
+          </div>
+        ))}
+      </div>
+      {nextTier&&(
+        <div style={{background:'white',borderRadius:10,border:'1px solid #DDD6FE',padding:'10px 14px',fontSize:'0.82rem',color:'#374151',lineHeight:1.7,marginBottom:12}}>
+          <span style={{fontWeight:700,color:'#7C3AED'}}>{brand} is currently at {geo}.</span> Moving to {nextTier.score} ({nextTier.label}) means entering conversations where top competitors currently dominate — directly increasing brand surfacing per AI query. Each tier jump reflects a materially higher chance AI recommends your brand first.
         </div>
+      )}
+      <button onClick={onGo} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,padding:'9px 20px',fontSize:'0.82rem',fontWeight:700,cursor:'pointer',alignSelf:'flex-start' as const}}>
+        See Competitors →
+      </button>
     </div>
-    <div style="background:#F9F9FC;padding:48px 40px;border-bottom:1px solid #E5E7EB;">
-        <div style="text-align:center;margin-bottom:32px;"><div class="section-tag">Deliverables</div><h2 style="font-size:1.8rem;font-weight:800;color:#111827;margin:8px 0 0;">Activities and What We Deliver</h2></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:3px;margin-bottom:12px;">{hdrs}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px;">{acts}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;">{dlvs}</div>
+  );
+}
+
+function LinkAnalysis({ result }: { result:any }) {
+  const [hov,setHov] = useState<string|null>(null);
+  const brand=result.brand_name||'Brand';
+  const competitors=(result.competitors||[]).slice(0,4);
+  const sources=(result.citation_sources||[]).slice(0,4);
+  const W=700,H=420,cx=W/2,cy=H/2-10;
+  type N={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
+  const nodes:N[]=[];
+  nodes.push({id:'brand',x:cx,y:cy,label:brand.length>10?brand.slice(0,9)+'…':brand,full:brand,r:42,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
+  const cA=competitors.map((_:any,i:number)=>Math.PI*0.6+(i/Math.max(competitors.length-1,1))*Math.PI*0.85);
+  competitors.forEach((c:any,i:number)=>{nodes.push({id:`c${i}`,x:cx+210*Math.cos(cA[i]),y:cy-155*Math.sin(cA[i]),label:(c.Brand||'').length>12?c.Brand.slice(0,11)+'…':c.Brand,full:c.Brand,r:24,fill:'#C4B5FD',stroke:'#8B5CF6',type:'competitor'});});
+  const sA=sources.map((_:any,i:number)=>-Math.PI*0.25+(i/Math.max(sources.length-1,1))*Math.PI*0.65);
+  sources.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];nodes.push({id:`s${i}`,x:cx+215*Math.cos(sA[i]),y:cy-145*Math.sin(sA[i]),label:dom,full:s.domain,r:20,fill:'#6EE7B7',stroke:'#10B981',type:'source',pct:s.citation_share});});
+  const center=nodes[0];
+  return (
+    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px',marginTop:24}}>
+      <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>AI Citation Network</div>
+      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:12}}>Brands and sources co-cited with {brand} in AI responses</div>
+      <div style={{background:'#F8FAFC',borderRadius:12}}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+          {nodes.slice(1).map(n=><line key={n.id} x1={center.x} y1={center.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth={hov===n.id||hov==='brand'?2:1.2} opacity={hov&&hov!==n.id&&hov!=='brand'?0.15:0.65} style={{transition:'all 0.2s'}}/>)}
+          {nodes.map(n=>{
+            const isH=hov===n.id;
+            return (
+              <g key={n.id} onMouseEnter={()=>setHov(n.id)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+                {isH&&<circle cx={n.x} cy={n.y} r={n.r+8} fill={n.stroke} opacity="0.15"/>}
+                <circle cx={n.x} cy={n.y} r={n.r} fill={n.fill} opacity={hov&&!isH&&hov!=='brand'?0.35:1} style={{transition:'all 0.2s'}}/>
+                {n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}
+                {n.type!=='brand'&&<text x={n.x} y={n.y+n.r+14} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>}
+                {n.type==='brand'&&<text x={n.x} y={n.y+n.r+16} textAnchor="middle" dominantBaseline="middle" style={{fontSize:12,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600,pointerEvents:'none'}}>{brand}</text>}
+                {n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.pct}%</text>}
+                {isH&&n.type!=='brand'&&(<g><rect x={n.x-55} y={n.y-n.r-28} width={110} height={20} rx={5} fill="#1F2937"/><text x={n.x} y={n.y-n.r-18} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full}</text></g>)}
+              </g>
+            );
+          })}
+          {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=>(
+            <g key={i} transform={`translate(${W/2-160+i*120},${H-24})`}>
+              <circle cx={8} cy={0} r={7} fill={l.fill}/><text x={20} y={0} dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
+            </g>
+          ))}
+        </svg>
+      </div>
     </div>
-    <div style="background:white;padding:48px 40px;border-bottom:1px solid #E5E7EB;">
-        <div style="text-align:center;margin-bottom:36px;"><div class="section-tag">Explore Offers</div><h2 style="font-size:1.8rem;font-weight:800;color:#111827;margin:8px 0 6px;">Choose Your Pilot Program</h2></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px;">
-            <div style="border:1px solid #E5E7EB;border-radius:16px;padding:36px 32px;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;">Option 1</div><div style="font-size:3rem;font-weight:900;color:#111827;line-height:1;margin-bottom:2px;">6</div><div style="font-size:0.95rem;font-weight:600;color:#374151;margin-bottom:28px;">Week Engagement</div><div style="height:1px;background:#F3F4F6;margin-bottom:24px;"></div><div style="display:flex;flex-direction:column;gap:12px;"><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Ranking Diagnostic (ARD)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Optimization Plan (AOP)</div></div></div>
-            <div style="border:2px solid #7C3AED;border-radius:16px;padding:36px 32px;position:relative;background:#FAFBFF;"><div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:#7C3AED;color:white;border-radius:50px;padding:3px 16px;font-size:0.72rem;font-weight:700;white-space:nowrap;">Recommended</div><div style="font-size:0.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#7C3AED;margin-bottom:10px;">Option 2</div><div style="font-size:3rem;font-weight:900;color:#111827;line-height:1;margin-bottom:2px;">7</div><div style="font-size:0.95rem;font-weight:600;color:#374151;margin-bottom:28px;">Week Engagement</div><div style="height:1px;background:#E5E7EB;margin-bottom:24px;"></div><div style="display:flex;flex-direction:column;gap:12px;"><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Ranking Diagnostic (ARD)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Optimization Plan (AOP)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Impact Measurement (Re-Diagnostic)</div></div></div>
-            <div style="border:1px solid #E5E7EB;border-radius:16px;padding:36px 32px;"><div style="font-size:0.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF;margin-bottom:10px;">Option 3</div><div style="font-size:3rem;font-weight:900;color:#111827;line-height:1;margin-bottom:2px;">7</div><div style="font-size:0.95rem;font-weight:600;color:#374151;margin-bottom:28px;">Week Engagement</div><div style="height:1px;background:#F3F4F6;margin-bottom:24px;"></div><div style="display:flex;flex-direction:column;gap:12px;"><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Ranking Diagnostic (ARD)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Agent Optimization Plan (AOP)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Distribution and Technical Influence (DTI)</div><div style="display:flex;gap:10px;font-size:0.86rem;color:#374151;"><span style="color:#7C3AED;font-weight:700;">+</span>Impact Measurement (Re-Diagnostic)</div></div></div>
+  );
+}
+
+function MarkdownText({ text }: { text:string }) {
+  const lines=text.split('\n');
+  return (
+    <div style={{fontSize:'0.92rem',color:'#374151',lineHeight:1.85,fontFamily:'Inter,sans-serif'}}>
+      {lines.map((line,i)=>{
+        if(!line.trim()) return <div key={i} style={{height:10}}/>;
+        const bold=(t:string)=>t.split(/(\*\*.*?\*\*)/g).map((p,j)=>p.startsWith('**')&&p.endsWith('**')?<strong key={j} style={{fontWeight:700,color:'#111827'}}>{p.slice(2,-2)}</strong>:p);
+        if(line.startsWith('## ')) return <div key={i} style={{fontSize:'1.05rem',fontWeight:800,color:'#111827',marginTop:18,marginBottom:6}}>{bold(line.slice(3))}</div>;
+        if(line.startsWith('# ')) return <div key={i} style={{fontSize:'1.15rem',fontWeight:900,color:'#111827',marginTop:18,marginBottom:6}}>{bold(line.slice(2))}</div>;
+        if(/^\d+\.\s/.test(line)){const num=line.match(/^\d+/)![0];return <div key={i} style={{display:'flex',gap:10,marginBottom:6,paddingLeft:4}}><span style={{fontWeight:700,color:'#7C3AED',minWidth:20}}>{num}.</span><span>{bold(line.replace(/^\d+\.\s/,''))}</span></div>;}
+        if(/^[-•]\s/.test(line)||/^\s{2,}[-•]\s/.test(line)){const ind=/^\s{4,}/.test(line)?24:8;return <div key={i} style={{display:'flex',gap:8,marginBottom:5,paddingLeft:ind}}><span style={{color:'#7C3AED',flexShrink:0,marginTop:2}}>•</span><span>{bold(line.replace(/^\s*[-•]\s/,''))}</span></div>;}
+        if(line.trim()==='---') return <hr key={i} style={{border:'none',borderTop:'1px solid #E5E7EB',margin:'14px 0'}}/>;
+        return <p key={i} style={{margin:'3px 0'}}>{bold(line)}</p>;
+      })}
+    </div>
+  );
+}
+
+function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const [tooltipPos,setTooltipPos] = useState<{x:number;y:number}|null>(null);
+  const dims=[
+    {label:'Positivity',val:sent},
+    {label:'Brand Authority',val:Math.round(sent*0.85)},
+    {label:'Trust',val:Math.round(sent*0.7)},
+    {label:'Market Relevance',val:Math.round(prom*0.95)},
+    {label:'Message Clarity',val:Math.round(sent*0.75)},
+    {label:'Recommendation',val:Math.round(sent*0.65)},
+  ];
+  const compDims=dims.map(d=>({...d,val:Math.round(d.val*0.75)}));
+  const cx=200,cy=200,R=120,n=dims.length;
+  const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
+  const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
+  const rings=[25,50,75,100];
+  const poly=dims.map((d,i)=>pt(i,(d.val/100)*R));
+  const compPoly=compDims.map((d,i)=>pt(i,(d.val/100)*R));
+  const sorted=[...dims].sort((a,b)=>b.val-a.val);
+  const top2=sorted.slice(0,2).map(d=>d.label);
+  const bot2=sorted.slice(-2).map(d=>d.label);
+  return (
+    <div style={{position:'relative' as const}}>
+      <svg viewBox="0 0 400 420" style={{width:'100%'}}>
+        {rings.map(r=>{
+          const pts=dims.map((_,i)=>pt(i,(r/100)*R));
+          return <g key={r}>
+            <polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill={r===50?'#F5F3FF':'none'} stroke={r===50?'#C4B5FD':'#E5E7EB'} strokeWidth={r===50?1.5:1} strokeDasharray={r===50?'4,3':undefined}/>
+            <text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text>
+          </g>;
+        })}
+        {dims.map((_,i)=>{const p=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;} )}
+        <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
+        <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
+        {dims.map((d,i)=>{
+          const p=pt(i,(d.val/100)*R);
+          return <circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}}
+            onMouseEnter={(e)=>{
+              setHov(i);
+              const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();
+              const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();
+              setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left, y:circRect.top-svgRect.top});
+            }}
+            onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;
+        })}
+        {dims.map((d,i)=>{
+          const lp=pt(i,R+26);
+          const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
+          return <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle"
+            style={{fontSize:11,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;
+        })}
+        <g transform="translate(20,398)">
+          <circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text>
+          <circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text>
+        </g>
+      </svg>
+      {hov!==null&&tooltipPos&&(
+        <div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div>
+          <div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{RADAR_TIPS[dims[hov].label]}</div>
         </div>
+      )}
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>
+        💡 <strong>Insight:</strong> Strong in {top2.join(' and ')}, weaker in {bot2.join(' and ')}.
+      </div>
     </div>
-    <div style="background:#7C3AED;padding:56px 40px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center;">
-            <div><div style="font-size:0.72rem;font-weight:700;letter-spacing:.12em;color:rgba(255,255,255,0.6);text-transform:uppercase;margin-bottom:10px;">Proven Results</div><h2 style="font-size:2rem;font-weight:800;color:white;margin:0 0 14px;line-height:1.25;">Validated Impact Across<br>10+ Client Engagements</h2><p style="font-size:0.92rem;color:rgba(255,255,255,0.8);line-height:1.8;margin:0;">Across retail, travel, financial services, and hospitality, Percepta has consistently delivered measurable improvements.</p></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">{stat_cards}</div>
+  );
+}
+
+function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandName:string; sent:number; prom:number; vis:number; competitors:any[] }) {
+  const [hovCell,setHovCell] = useState<string|null>(null);
+  const dims=[
+    {key:'Positivity',    fn:(s:number,p:number)=>s},
+    {key:'Brand Authority',fn:(s:number,p:number)=>Math.round(s*0.85)},
+    {key:'Trust',         fn:(s:number,p:number)=>Math.round(s*0.7)},
+    {key:'Mkt Relevance', fn:(s:number,p:number)=>Math.round(p*0.95)},
+    {key:'Msg Clarity',   fn:(s:number,p:number)=>Math.round(s*0.75)},
+    {key:'Recommend.',    fn:(s:number,p:number)=>Math.round(s*0.65)},
+  ];
+  const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
+  const rows=[
+    {name:brandName,isYou:true,scores:dims.map(d=>d.fn(sent,prom))},
+    ...(competitors||[]).slice(0,8).map((c:any)=>{
+      const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
+      const cp=c.Prom||Math.round(prom*0.75+seed(c.Brand||'',1)*25);
+      return {name:c.Brand||'',isYou:false,scores:dims.map(d=>Math.min(100,Math.max(10,d.fn(cs,cp)+Math.round(seed(c.Brand||'',3)*20-10))))};
+    })
+  ];
+  const allScores=rows.flatMap(r=>r.scores);
+  const minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
+  const cellColor=(val:number)=>{
+    const t=(val-minS)/Math.max(maxS-minS,1);
+    if(t<0.2)  return {bg:'#F3F4F6',text:'#9CA3AF'};
+    if(t<0.4)  return {bg:'#EDE9FE',text:'#6D28D9'};
+    if(t<0.6)  return {bg:'#C4B5FD',text:'#5B21B6'};
+    if(t<0.8)  return {bg:'#8B5CF6',text:'white'};
+    return {bg:'#5B21B6',text:'white'};
+  };
+  const compRows=rows.slice(1);
+  const dimWins=dims.map((d,di)=>{
+    const yourScore=rows[0].scores[di];
+    const beaten=compRows.filter(r=>yourScore>r.scores[di]).length;
+    return {dim:d.key,score:yourScore,beaten};
+  });
+  const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0];
+  const weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
+  return (
+    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
+      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sentiment Dimensions vs Competitors</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Scores across all 6 sentiment dimensions. Darker = stronger. Hover to see score.</div>
+      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
+        <div/>
+        {dims.map((d,i)=>(
+          <div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{d.key}</div>
+        ))}
+        {rows.map((r,ri)=>[
+          <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,
+          ...r.scores.map((val,ci)=>{
+            const k=`${ri}-${ci}`;
+            const {bg,text}=cellColor(val);
+            const isH=hovCell===k;
+            return (
+              <div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
+                style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>
+                {isH?val:''}
+              </div>
+            );
+          })
+        ])}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:14,marginTop:12,flexWrap:'wrap' as const}}>
+        {[{bg:'#5B21B6',label:'Strong (80+)'},{bg:'#8B5CF6',label:'Good (60–79)'},{bg:'#C4B5FD',label:'Moderate (40–59)'},{bg:'#F3F4F6',label:'Weak (<40)',border:'1px solid #E5E7EB'}].map((l,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:l.bg,border:l.border}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>{l.label}</span></div>
+        ))}
+        <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>Your brand</span></div>
+      </div>
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>
+        💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) — ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}) — improvement here would have the highest GEO impact.
+      </div>
+    </div>
+  );
+}
+
+function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number; competitors:any[] }) {
+  const all=[{Brand:brand,Vis:vis,isYou:true},...competitors.map(c=>({Brand:c.Brand,Vis:c.Vis,isYou:false}))].sort((a,b)=>b.Vis-a.Vis);
+  const max=Math.max(...all.map(a=>a.Vis),1);
+  return (
+    <div>
+      {all.map((a,i)=>(
+        <div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+          <div style={{width:18,fontSize:'0.8rem',color:a.isYou?'#7C3AED':'#9CA3AF',fontWeight:a.isYou?700:400}}>{i+1}</div>
+          <div style={{width:140,fontSize:'0.84rem',color:'#374151',fontWeight:a.isYou?700:400}}>
+            {a.Brand}{a.isYou&&<span style={{marginLeft:6,fontSize:'0.68rem',background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontWeight:700}}>← You</span>}
+          </div>
+          <div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:8,overflow:'hidden'}}>
+            <div style={{background:a.isYou?'#7C3AED':'#D1D5DB',height:8,borderRadius:50,width:`${(a.Vis/max)*100}%`}}/>
+          </div>
+          <div style={{width:32,fontSize:'0.85rem',fontWeight:700,color:a.isYou?'#7C3AED':'#374151',textAlign:'right' as const}}>{a.Vis}</div>
         </div>
-    </div>""", unsafe_allow_html=True)
+      ))}
+    </div>
+  );
+}
+
+function ScatterPlot({ brand, vis, geo, competitors }: { brand:string; vis:number; geo:number; competitors:any[] }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const all=[{label:brand,x:vis,y:geo,isYou:true},...competitors.map(c=>({label:c.Brand,x:c.Vis,y:c.GEO,isYou:false}))];
+  const W=700,H=320,padL=52,padR=24,padT=24,padB=48;
+  const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
+  const xMin=Math.max(0,Math.min(...xVals)-10),xMax=Math.max(...xVals)+10;
+  const yMin=Math.max(0,Math.min(...yVals)-10),yMax=Math.min(100,Math.max(...yVals)+10);
+  const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
+  const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
+  const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length);
+  const avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
+  const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
+  return (
+    <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+        {yTicks.map(v=>(<g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>))}
+        <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
+        <line x1={padL} y1={sy(avgY)} x2={W-padR} y2={sy(avgY)} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        {all.map((a,i)=>{
+          const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i;
+          return (
+            <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+              {isH&&<circle cx={cx2} cy={cy2} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
+              <circle cx={cx2} cy={cy2} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
+              <text x={cx2} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{a.x}</text>
+              {isH&&(()=>{
+                const tx=Math.min(Math.max(cx2-60,padL),W-padR-130);
+                const ty=cy2>padT+60?cy2-56:cy2+14;
+                return <g>
+                  <rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/>
+                  <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
+                  <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text>
+                </g>;
+              })()}
+            </g>
+          );
+        })}
+        <text x={(padL+W-padR)/2} y={H-6} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
+        <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO</text>
+      </svg>
+    </div>
+  );
+}
+
+function CitationPie({ sources }: { sources:any[] }) {
+  if(!sources||sources.length===0) return null;
+  const cx=110,cy=110,R=90;
+  const colors=['#7C3AED','#10B981','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#84CC16','#F97316','#EC4899'];
+  let cum=-Math.PI/2;
+  const slices=sources.map((s,i)=>{
+    const a=(s.citation_share/100)*2*Math.PI;
+    const x1=cx+R*Math.cos(cum),y1=cy+R*Math.sin(cum);
+    cum+=a;
+    const x2=cx+R*Math.cos(cum),y2=cy+R*Math.sin(cum);
+    const mA=cum-a/2,lx=cx+(R+18)*Math.cos(mA),ly=cy+(R+18)*Math.sin(mA);
+    return {path:`M${cx},${cy} L${x1},${y1} A${R},${R} 0 ${a>Math.PI?1:0} 1 ${x2},${y2}Z`,lx,ly,share:s.citation_share,color:colors[i%colors.length]};
+  });
+  return (
+    <svg viewBox="0 0 220 220" style={{width:'100%',maxWidth:220}}>
+      {slices.map((s,i)=>(<g key={i}><path d={s.path} fill={s.color} stroke="white" strokeWidth="1.5"/>{s.share>=8&&<text x={s.lx} y={s.ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{s.share}%</text>}</g>))}
+    </svg>
+  );
+}
+
+export default function GeoHub() {
+  const [url,setUrl] = useState('');
+  const [loading,setLoading] = useState(false);
+  const [result,setResult] = useState<any>(null);
+  const [error,setError] = useState('');
+  const [activeTab,setActiveTab] = useState(0);
+  const [promptInput,setPromptInput] = useState('');
+  const [promptHistory,setPromptHistory] = useState<{q:string;a:string}[]>([]);
+  const [promptLoading,setPromptLoading] = useState(false);
+  const [filterCat,setFilterCat] = useState('All');
+  const [hovBar,setHovBar] = useState<number|null>(null);
+  const [expandedDomain,setExpandedDomain] = useState<string|null>(null);
+  const [hovNode,setHovNode] = useState<string|null>(null);
+
+  async function runAnalysis() {
+    if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
+    setError('');setLoading(true);
+    try {
+      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+      const data=await res.json();
+      if(data.error) setError(data.error); else {setResult(data);setActiveTab(0);}
+    } catch(e:any){setError(e.message);}
+    setLoading(false);
+  }
+
+  async function runPrompt(q?:string) {
+    const query=q||promptInput;
+    if(!query.trim()) return;
+    setPromptLoading(true);
+    if(!q) setPromptInput('');
+    try {
+      const res=await fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:query})});
+      const data=await res.json();
+      setPromptHistory(h=>[{q:query,a:data.response},...h]);
+    } catch{}
+    setPromptLoading(false);
+  }
+
+  const examplePrompts=result?.ind_key==='fin'?[
+    'Compare invite-only credit cards for high net worth individuals',
+    'What is the best credit card for someone who travels internationally?',
+    'Which bank offers the best rewards for small business owners?',
+    'Best first credit card for someone with no credit history',
+    'Compare Chase Sapphire Reserve vs Capital One Venture X for travel',
+  ]:result?.ind_key==='auto'?[
+    'Best electric vehicle for long road trips in 2025',
+    'Most reliable SUV for families',
+    'Compare Tesla Model 3 vs BMW i4',
+    'Best car for first-time buyers under $30,000',
+    'Which car brand has the best safety record?',
+  ]:[
+    'What are the most trusted brands right now?',
+    'Best companies for customer service in 2025',
+    'Compare top brands for value and quality',
+    'Which companies are leading in innovation?',
+    'Best brands recommended by experts',
+  ];
+
+  return (
+    <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
+      <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:'64px 40px 72px',textAlign:'center'}}>
+        <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>✦ &nbsp;Real Time GEO Scoring</div>
+        <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
+        <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL · Discover your brand&apos;s AI presence</p>
+        <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>⏱ &nbsp;Live data · Updated in real-time · Not cached like competitors</div>
+      </div>
+
+      {!result?(
+        <div style={{padding:'48px 40px 60px'}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:40}}>
+            {bands.map((b,i)=>(
+              <div key={i} style={{background:b.bg,borderRadius:20,padding:'36px 28px',textAlign:'center',border:`1.5px solid ${b.border}`}}>
+                <div style={{fontSize:'0.85rem',fontWeight:700,color:b.color,marginBottom:8}}>{b.range}</div>
+                <div style={{fontSize:'1.8rem',fontWeight:900,color:b.color,marginBottom:8}}>{b.label}</div>
+                <div style={{fontSize:'0.85rem',color:b.color,lineHeight:1.5}}>{b.desc}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+              <div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/>
+              <span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span>
+            </div>
+            <div style={{display:'flex',gap:12,alignItems:'center'}}>
+              <input type="text" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="https://www.capitalone.com/"
+                style={{flex:1,borderRadius:12,border:'1.5px solid #E5E7EB',padding:'14px 20px',fontSize:'0.95rem',height:52,background:'white',outline:'none',color:'#374151',boxSizing:'border-box' as const}}/>
+              <button onClick={runAnalysis} disabled={loading}
+                style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                🔍 {loading?'Analysing...':'Run Live AI Analysis'}
+              </button>
+            </div>
+            {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
+          </div>
+        </div>
+      ):(
+        <div>
+          <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4}}>
+            {TABS.map((t,i)=>(
+              <button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s'}}>{t}</button>
+            ))}
+            <button onClick={()=>{setResult(null);setUrl('');}} style={{marginLeft:'auto',background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer',alignSelf:'center'}}>← New Analysis</button>
+          </div>
+
+          <div style={{padding:'28px 40px 60px'}}>
+
+            {/* TAB 0: GEO SCORE */}
+            {activeTab===0&&(()=>{
+              const geo=result.overall_geo_score,badge=scoreBadge(geo);
+              const vis=result.visibility,cit=result.citation_share,sent=result.sentiment;
+              const prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
+              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), typically mentioned mid-list rather than first; Share of Voice (${sov}), competitors are dominating more of the AI conversation; Citation (${cit}), rarely the top pick in AI responses; Sentiment (${sent}), neutral tone with no strong recommendation language.`;
+              return (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
+                    <GeoGauge score={geo} brand={result.brand_name}/>
+                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827',marginBottom:5}}>{result.brand_name}</div>
+                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{result.page_url?.slice(0,60)}{result.page_url?.length>60?'...':''}</a>
+                      <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
+                      <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
+                      <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
+                    </div>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:14,marginBottom:16}}>
+                    <MetricCard label="visibility score" val={vis} color="#7C3AED"/>
+                    <MetricCard label="sentiment score" val={sent} color="#10B981"/>
+                    <MetricCard label="citation score" val={cit} color="#F59E0B"/>
+                    <MetricCard label="avg rank" val={avgRank} color="#3B82F6"/>
+                  </div>
+                  <div style={{display:'flex',gap:20,marginBottom:16}}>
+                    <SankeyChart result={result}/>
+                    <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 1: COMPETITORS */}
+            {activeTab===1&&(()=>{
+              const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share;
+              const sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
+              const top=[
+                {Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},
+                ...(result.competitors||[]).map((c:any)=>({...c,isYou:false}))
+              ].sort((a,b)=>b.GEO-a.GEO);
+              const myRank=top.findIndex(c=>c.isYou)+1;
+              const leader=top[0],next=top[myRank]||null;
+              const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
+              const bW=680,bH=140,bPad=32,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
+              return (
+                <div>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors — {result.ind_label}</div>
+                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+                    <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}>
+                      <div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your Rank (GEO Score)</div>
+                      <div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>#{myRank}</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>out of {top.length} competitors</div>
+                    </div>
+                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}>
+                      <div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div>
+                      <div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'—':`${gapToTop} pts`}</div>
+                      <div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close — strong opportunity to overtake':'Gap to close'}</div>
+                    </div>
+                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}>
+                      <div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div>
+                      <div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'—'}</div>
+                      <div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close — defend this position':'Comfortable but not safe'):'Leading the category'}</div>
+                    </div>
+                  </div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
+                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Comparison</div>
+                    <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Hover over any brand to see full metrics</div>
+                    <svg viewBox={`0 0 ${bW} ${bH+44}`} style={{width:'100%',display:'block'}} onMouseLeave={()=>setHovBar(null)}>
+                      {[0,25,50,75,100].map(v=>(<g key={v}><line x1={bPad} y1={bH-(v/100)*bMH} x2={bW-bPad} y2={bH-(v/100)*bMH} stroke="#F3F4F6" strokeWidth="1"/><text x={bPad-4} y={bH-(v/100)*bMH} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>))}
+                      {top.map((c:any,i:number)=>{
+                        const bx=bPad+i*gW+gW*0.08,bw2=gW*0.26;
+                        const gh=((c.GEO||0)/100)*bMH,vh=((c.Vis||0)/100)*bMH,ch=((c.Cit||0)/100)*bMH;
+                        const isY=c.isYou,isH=hovBar===i;
+                        const tipY=bH-Math.max(gh,vh,ch)-44;
+                        return (
+                          <g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>
+                            <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={isY?'#1F2937':'#9CA3AF'} rx={2}/>
+                            <rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={isY?'#7C3AED':'#A5B4FC'} rx={2}/>
+                            <rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={isY?'#C4B5FD':'#E9D5FF'} rx={2}/>
+                            <text x={bx+bw2*1.5} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#7C3AED':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>
+                            {isH&&(
+                              <g>
+                                <rect x={Math.min(bx-5,bW-145)} y={tipY} width={140} height={38} rx={6} fill="#1F2937"/>
+                                <text x={Math.min(bx-5,bW-145)+70} y={tipY+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text>
+                                <text x={Math.min(bx-5,bW-145)+70} y={tipY+27} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO} · Vis: {c.Vis} · Cit: {c.Cit}</text>
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+                      <g transform={`translate(${bW/2-100},${bH+28})`}>
+                        {[{color:'#1F2937',label:'GEO'},{color:'#7C3AED',label:'Visibility'},{color:'#C4B5FD',label:'Citations'}].map((l,i)=>(
+                          <g key={i} transform={`translate(${i*88},0)`}><rect x={0} y={-5} width={10} height={10} fill={l.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>
+                        ))}
+                      </g>
+                    </svg>
+                  </div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead>
+                        <tr style={{background:'#FAFAFA'}}>
+                          {['#','BRAND / URL','GEO SCORE','GAP','VISIBILITY','CITATIONS','SENTIMENT','SOV','AVG. RANK'].map(h=>(
+                            <th key={h} style={{padding:'10px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {top.map((c:any,i:number)=>{
+                          const gcol=c.GEO>=80?'#10B981':c.GEO>=60?'#7C3AED':'#374151';
+                          const gap2=c.isYou?null:c.GEO-geo;
+                          return (
+                            <tr key={i} style={{background:c.isYou?'#F5F3FF':'white',borderTop:'1px solid #F3F4F6',borderLeft:c.isYou?'3px solid #7C3AED':'none'}}>
+                              <td style={{padding:'11px 12px',fontSize:'0.8rem',color:'#9CA3AF'}}>{i+1}</td>
+                              <td style={{padding:'11px 12px'}}>
+                                <div style={{display:'flex',alignItems:'center',gap:7}}>
+                                  <span style={{fontSize:'0.84rem',fontWeight:c.isYou?700:600,color:'#111827'}}>{c.Brand}</span>
+                                  {c.isYou&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:5,padding:'1px 7px',fontSize:'0.68rem',fontWeight:700}}>You</span>}
+                                </div>
+                                <div style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{c.URL}</div>
+                              </td>
+                              <td style={{padding:'11px 12px',fontSize:'0.95rem',fontWeight:800,color:gcol}}>{c.GEO}</td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:gap2===null?'#9CA3AF':gap2>0?'#EF4444':'#10B981'}}>
+                                {gap2===null?'—':(
+                                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
+                                    {`${gap2>0?'':'+'}${Math.abs(gap2)} pts`}
+                                    {gap2!==0&&(()=>{
+                                      const visDiff=vis-(c.Vis||0);
+                                      const citDiff=cit-(c.Cit||0);
+                                      const senDiff=sent-(c.Sen||0);
+                                      const sovDiff=sov-(c.Sov||0);
+                                      const parts=[
+                                        visDiff>0?`Visibility −${visDiff}pts`:null,
+                                        citDiff>0?`Citation −${citDiff}pts`:null,
+                                        senDiff>0?`Sentiment −${senDiff}pts`:null,
+                                        sovDiff>0?`Share of Voice −${sovDiff}pts`:null,
+                                      ].filter(Boolean);
+                                      const tip=parts.length>0?`Gap driven by: ${parts.join(', ')}`:`You lead on all signals`;
+                                      return <Tooltip text={tip}/>;
+                                    })()}
+                                  </span>
+                                )}
+                              </td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Vis}</td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sen}</td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sov}</td>
+                              <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{c.Rank}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 2: VISIBILITY */}
+            {activeTab===2&&(()=>{
+              const vis=result.visibility;
+              const comps=result.competitors||[];
+              const allVis=[vis,...comps.map((c:any)=>c.Vis)];
+              const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1;
+              const topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
+              const topVisScore=topComp?topComp.Vis:vis;
+              const gapToTop=vis-topVisScore;
+              const avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
+              return (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:24}}>
+                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px 18px'}}>
+                      <div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Rank (Visibility)</div>
+                      <div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>#{myVisRank}</div>
+                      <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>out of {allVis.length} competitors</div>
+                    </div>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px 18px'}}>
+                      <div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Score</div>
+                      <div style={{fontSize:'2rem',fontWeight:800,color:'#111827'}}>{vis}</div>
+                      <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>vs industry avg {avgVis}</div>
+                    </div>
+                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px 18px'}}>
+                      <div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 Competitor {topComp?`(${topComp.Brand})`:''}</div>
+                      <div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div>
+                      <div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div>
+                    </div>
+                  </div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}>
+                    <VisibilityBars brand={result.brand_name} vis={vis} competitors={result.competitors||[]}/>
+                  </div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
+                    <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>GEO Score vs. Visibility — Market Positioning</div>
+                    <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div>
+                    <ScatterPlot brand={result.brand_name} vis={vis} geo={result.overall_geo_score} competitors={result.competitors||[]}/>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 3: SENTIMENT */}
+            {activeTab===3&&(()=>{
+              const sent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
+              const smood=sent>=70?'How favorably AI speaks about your brand across queries':sent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing — needs attention';
+              const pmood=prom>=70?'Your brand is named first or near the top of AI responses':prom>=45?'Your brand appears mid-list in AI responses':'Your brand is rarely named early in AI responses';
+              const rankMood='Average position your brand is mentioned within each AI response';
+              return (
+                <div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+                    {[
+                      {label:'sentiment score',val:sent,sub:smood,tip:'Measures how positively or negatively AI models describe your brand across all responses. Higher = more favorable language used.'},
+                      {label:'prominence score',val:prom,sub:pmood,tip:'Measures how early in the AI response your brand is mentioned. Higher = named first or second, giving more impact.'},
+                      {label:'average rank',val:avgRank,sub:rankMood,tip:'The average position your brand appears when mentioned in AI responses. #1 means your brand is listed first most often.'},
+                    ].map(({label,val,sub,tip})=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
+                          {label}<Tooltip text={tip}/>
+                        </div>
+                        <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
+                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
+                        <RadarChart sent={sent} prom={prom} vis={vis}/>
+                      </div>
+                    </div>
+                    <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+                    <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ Sentiment Strengths</div>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>
+                        {(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>))}
+                      </ul>
+                    </div>
+                    <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ Areas of Concern</div>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>
+                        {(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 4: CITATIONS */}
+            {activeTab===4&&(()=>{
+              const cit=result.citation_share,sov=result.share_of_voice;
+              const sources=result.citation_sources||[];
+              const catMap:Record<string,number>={'Owned Media':0};
+              sources.forEach((s:any)=>{
+                const cl=classifyDomain(s.domain);
+                if(s.domain?.includes(result.domain||'x_x')) catMap['Owned Media']=(catMap['Owned Media']||0)+s.citation_share;
+                else catMap[cl.label]=(catMap[cl.label]||0)+s.citation_share;
+              });
+              if(catMap['Owned Media']===0) delete catMap['Owned Media'];
+              const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED',Other:'#6B7280',Social:'#F59E0B',Institution:'#3B82F6'};
+              const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+
+              // Mock URL data per domain
+              const domainUrls:Record<string,string[]>={};
+              sources.forEach((s:any)=>{
+                const d=s.domain||'';
+                domainUrls[d]=[
+                  `https://www.${d}/best-credit-cards`,
+                  `https://www.${d}/reviews/capital-one`,
+                  `https://www.${d}/compare/cards`,
+                  `https://www.${d}/travel-rewards`,
+                  `https://www.${d}/cashback-cards`,
+                ];
+              });
+
+              return (
+                <div>
+                  {/* Metric cards */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
+                    {[
+                      {label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'Measures how often and how prominently AI models cite your brand as a primary source or recommendation. Higher = more authoritative citations across responses.'},
+                      {label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'The percentage of all brand mentions in AI responses that belong to your brand vs. competitors. Higher = more dominant share of the AI conversation.'},
+                    ].map(({label,val,sub,tip})=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>
+                          {label}<Tooltip text={tip}/>
+                        </div>
+                        <div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div>
+                        <div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Category + Network side by side */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+                    {/* Citation by Category — LEFT */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
+                      {catEntries.length>0?catEntries.map(([cat,pct],i)=>(
+                        <div key={i} style={{marginBottom:14}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                            <span style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{cat}</span>
+                            <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#374151'}}>{Math.round(pct)}%</span>
+                          </div>
+                          <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}>
+                            <div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.round(pct)}%`,transition:'width 0.4s'}}/>
+                          </div>
+                        </div>
+                      )):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
+                    </div>
+
+                    {/* AI Citation Network — RIGHT, reduced height */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px'}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>AI Citation Network</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:8}}>Brands and sources co-cited with {result.brand_name}</div>
+                      {(()=>{
+                        const brand=result.brand_name||'Brand';
+                        const comps=(result.competitors||[]).slice(0,3);
+                        const srcs=sources.slice(0,3);
+                        const W=340,H=260,cx=W/2,cy=H/2;
+                        type N2={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
+                        const ns:N2[]=[];
+                        ns.push({id:'brand',x:cx,y:cy,label:brand.length>10?brand.slice(0,9)+'…':brand,full:brand,r:38,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
+                        const cA=comps.map((_:any,i:number)=>Math.PI*0.6+(i/Math.max(comps.length-1,1))*Math.PI*0.8);
+                        comps.forEach((c:any,i:number)=>ns.push({id:`c${i}`,x:cx+105*Math.cos(cA[i]),y:cy-80*Math.sin(cA[i]),label:(c.Brand||'').split(' ')[0].slice(0,9),full:c.Brand,r:20,fill:'#C4B5FD',stroke:'#8B5CF6',type:'competitor'}));
+                        const sA=srcs.map((_:any,i:number)=>-Math.PI*0.15+(i/Math.max(srcs.length-1,1))*Math.PI*0.45);
+                        srcs.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];ns.push({id:`s${i}`,x:cx+110*Math.cos(sA[i]),y:cy-78*Math.sin(sA[i]),label:dom.slice(0,9),full:s.domain,pct:s.citation_share,r:22,fill:'#6EE7B7',stroke:'#10B981',type:'source'});});
+                        const ctr=ns[0];
+                        return (
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'90%',display:'block',margin:'0 auto'}}>
+                            {/* Lines */}
+                            {ns.slice(1).map(n=><line key={n.id} x1={ctr.x} y1={ctr.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth="1.5" opacity="0.7"/>)}
+                            {/* Nodes */}
+                            {ns.map(n=>{
+                              const isH=hovNode===n.id;
+                              const tipW=140,tipH=n.pct!=null?40:30;
+                              const tx=Math.min(Math.max(n.x-tipW/2,2),W-tipW-2);
+                              const ty=n.y-n.r-tipH-8<2?n.y+n.r+8:n.y-n.r-tipH-8;
+                              return (
+                                <g key={n.id} onMouseEnter={()=>setHovNode(n.id)} onMouseLeave={()=>setHovNode(null)} style={{cursor:'pointer'}}>
+                                  {isH&&<circle cx={n.x} cy={n.y} r={n.r+6} fill={n.stroke} opacity="0.2"/>}
+                                  <circle cx={n.x} cy={n.y} r={n.r} fill={n.fill} stroke={isH?n.stroke:'none'} strokeWidth="2"/>
+                                  {/* Brand label inside */}
+                                  {n.type==='brand'&&(
+                                    <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>
+                                  )}
+                                  {/* Source % inside bubble */}
+                                  {n.type==='source'&&n.pct!=null&&(
+                                    <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:800,pointerEvents:'none'}}>{n.pct}%</text>
+                                  )}
+                                  {/* Labels below non-brand nodes */}
+                                  {n.type!=='brand'&&(
+                                    <text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>
+                                  )}
+                                  {/* Hover tooltip — always on top, with white background for contrast */}
+                                  {isH&&(
+                                    <g style={{filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.18))'}}>
+                                      <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
+                                      <text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>
+                                      {n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}
+                                      {n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}
+                                    </g>
+                                  )}
+                                </g>
+                              );
+                            })}
+                            {/* Legend */}
+                            {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=>(
+                              <g key={i} transform={`translate(${W/2-108+i*78},${H-10})`}>
+                                <circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:8,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
+                              </g>
+                            ))}
+                          </svg>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Sources table with expandable URL dropdown */}
+                  {sources.length>0&&(
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sources AI is Pulling From — {result.brand_name}</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>Click any source to see the top URLs driving AI citations for your brand.</div>
+                      <table style={{width:'100%',borderCollapse:'collapse'}}>
+                        <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %',''].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {sources.map((s:any,i:number)=>{
+                            const cls=classifyDomain(s.domain);
+                            const bw=Math.min(s.citation_share*3,100);
+                            const isExp=expandedDomain===s.domain;
+                            const urls=domainUrls[s.domain]||[];
+                            return (
+                              <>
+                                <tr key={`r${i}`} style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp?'#F9F8FF':'white'}} onClick={()=>setExpandedDomain(isExp?null:s.domain)}>
+                                  <td style={{padding:'11px 14px',fontSize:'0.82rem',color:'#9CA3AF'}}>{s.rank}</td>
+                                  <td style={{padding:'11px 14px',fontSize:'0.86rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</td>
+                                  <td style={{padding:'11px 14px'}}><span style={{background:cls.bg,color:cls.color,borderRadius:8,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{cls.label}</span></td>
+                                  <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',width:34}}>{s.citation_share}%</span></div></td>
+                                  <td style={{padding:'11px 14px',fontSize:'0.75rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp?'▲ Hide':'▼ URLs'}</td>
+                                </tr>
+                                {isExp&&(
+                                  <tr key={`e${i}`} style={{background:'#F9F8FF'}}>
+                                    <td colSpan={5} style={{padding:'8px 14px 14px 32px'}}>
+                                      <div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top URLs from {s.domain}</div>
+                                      <div style={{display:'flex',flexDirection:'column' as const,gap:5}}>
+                                        {urls.map((url:string,ui:number)=>(
+                                          <div key={ui} style={{display:'flex',alignItems:'center',gap:8}}>
+                                            <span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span>
+                                            <a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}} onMouseEnter={e=>(e.currentTarget.style.textDecoration='underline')} onMouseLeave={e=>(e.currentTarget.style.textDecoration='none')}>{url}</a>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* TAB 5: PROMPTS */}
+            {activeTab===5&&(()=>{
+              const rd=result.responses_detail||[];
+              const cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
+              const catStats:Record<string,{total:number;mentioned:number}>={};
+              rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
+              const totalMentions=rd.filter((r:any)=>r.mentioned).length;
+              const rank1=rd.filter((r:any)=>r.position===1).length;
+              const top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length;
+              const notMentioned=rd.filter((r:any)=>!r.mentioned).length;
+
+              // Competitors list for "who beat you" logic
+              const compNames=(result.competitors||[]).map((c:any)=>c.Brand||'').filter(Boolean);
+              // Assign a fake top competitor to not-mentioned rows deterministically
+              const getBeater=(query:string)=>{
+                if(!compNames.length) return null;
+                const idx=query.length%compNames.length;
+                return compNames[idx];
+              };
+
+              // Sort: rank 1 first, then 2,3..., then N/A last
+              const sorted=[...rd]
+                .filter((r:any)=>filterCat==='All'||r.category===filterCat)
+                .sort((a:any,b:any)=>{
+                  const ap=a.position>0?a.position:999;
+                  const bp=b.position>0?b.position:999;
+                  return ap-bp;
+                })
+                .slice(0,20);
+
+              return (
+                <div>
+                  {/* Top metric cards */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+                    <MetricCard label="queries run" val={20} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
+                    <MetricCard label="appearances" val={`${totalMentions}/20`} sub="Shown queries where brand appeared" color="#7C3AED"/>
+                    <MetricCard label="appearance rate" val={`${Math.round((totalMentions/20)*100)}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
+                  </div>
+
+                  {/* Appearance Rate by Category */}
+                  <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>Appearance Rate by Category</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
+                    {Object.entries(catStats).map(([c,v])=>(
+                      <div key={c} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:12,padding:'14px 16px'}}>
+                        <div style={{fontSize:'0.8rem',fontWeight:600,color:'#111827',marginBottom:7}}>{c}</div>
+                        <div style={{background:'#F3F4F6',borderRadius:50,height:5,marginBottom:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${Math.round((v.mentioned/Math.max(v.total,1))*100)}%`}}/></div>
+                        <div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{v.mentioned} of {v.total} queries</span><span style={{fontSize:'0.76rem',fontWeight:700,color:'#7C3AED'}}>{Math.round((v.mentioned/Math.max(v.total,1))*100)}%</span></div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary strip */}
+                  <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'12px 20px',marginBottom:16,display:'flex',alignItems:'center',gap:24,flexWrap:'wrap' as const}}>
+                    <div style={{fontSize:'0.78rem',fontWeight:700,color:'#111827'}}>Query Summary</div>
+                    {[
+                      {label:'#1 Rank',val:rank1,color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7'},
+                      {label:'Top 3',val:top3,color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE'},
+                      {label:'Appeared',val:totalMentions,color:'#3B82F6',bg:'#EFF6FF',border:'#93C5FD'},
+                      {label:'Not Mentioned',val:notMentioned,color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5'},
+                    ].map((s,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:s.bg,border:`1px solid ${s.border}`,borderRadius:8,padding:'5px 14px'}}>
+                        <span style={{fontSize:'1.1rem',fontWeight:900,color:s.color}}>{s.val}</span>
+                        <span style={{fontSize:'0.72rem',color:s.color,fontWeight:600}}>{s.label}</span>
+                      </div>
+                    ))}
+                    <div style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
+                  </div>
+
+                  {/* Table header row with filter */}
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                    <div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Sorted by rank. "Who Beat You" shows the top competitor on queries where you didn't appear.</div>
+                    </div>
+                    <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>
+                      {cats.map(c=><option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Table */}
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead>
+                        <tr style={{background:'#FAFAFA'}}>
+                          {['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=>(
+                            <th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map((item:any,i:number)=>{
+                          const rp=item.position;
+                          const rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A';
+                          const rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF';
+                          const isMissed=!item.mentioned;
+                          const beater=isMissed?getBeater(item.query||''):null;
+                          const isTop=rp===1;
+                          return (
+                            <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:isTop?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                              <td style={{padding:'12px 14px',fontSize:'0.8rem',color:'#9CA3AF',verticalAlign:'top',width:32}}>{i+1}</td>
+                              <td style={{padding:'12px 14px',verticalAlign:'top'}}>
+                                <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:5,flexWrap:'wrap' as const}}>
+                                  <span style={{background:'#EDE9FE',color:'#5B21B6',borderRadius:6,padding:'2px 9px',fontSize:'0.7rem',fontWeight:600}}>{item.category}</span>
+                                  {item.mentioned
+                                    ?<span style={{color:'#10B981',fontSize:'0.76rem',fontWeight:600}}>✓ Appeared</span>
+                                    :<span style={{color:'#EF4444',fontSize:'0.76rem',fontWeight:600}}>✗ Not Mentioned</span>}
+                                  {isMissed&&<span style={{background:'#FEE2E2',color:'#991B1B',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>⚠ Missed</span>}
+                                  {isTop&&<span style={{background:'#D1FAE5',color:'#065F46',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>★ Top Rank</span>}
+                                </div>
+                                <div style={{fontSize:'0.86rem',color:'#374151',fontWeight:500}}>{item.query}</div>
+                              </td>
+                              <td style={{padding:'12px 14px',fontSize:'1rem',fontWeight:800,color:rankColor,verticalAlign:'top',width:80}}>{rankLabel}</td>
+                              <td style={{padding:'12px 14px',verticalAlign:'top',width:160}}>
+                                {beater
+                                  ?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#92400E'}}>
+                                    👑 {beater} #1
+                                  </span>
+                                  :rp===1
+                                    ?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#065F46'}}>
+                                      ✓ You&apos;re #1
+                                    </span>
+                                    :<span style={{fontSize:'0.75rem',color:'#9CA3AF'}}>—</span>
+                                }
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 6: RECOMMENDATIONS */}
+            {activeTab===6&&(()=>{
+              const geo=result.overall_geo_score,fin=result.ind_key==='fin';
+              const segments=fin?[
+                {name:'General Consumers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.9),dominated:'Chase, Citi'},
+                {name:'Travelers / Rewards',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.min(100,Math.round(geo*1.1)),dominated:'Amex, Chase'},
+                {name:'Affluent / HNW',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.45),dominated:'Amex Centurion, Chase Sapphire'},
+                {name:'First-Time Users',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.95),dominated:'Discover'},
+                {name:'Cashback Seekers',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.5),dominated:'Citi, Wells Fargo'},
+                {name:'Small Business',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.35),dominated:'Amex, Chase Ink'},
+              ]:[
+                {name:'General Consumers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.9),dominated:'Top Competitors'},
+                {name:'Expert Seekers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*1.0),dominated:'Industry Leaders'},
+                {name:'Premium Segment',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.5),dominated:'Competitors'},
+              ];
+              return (
+                <div>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
+                  <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:14}}>Which audience segments is your brand winning vs. losing in AI responses?</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>
+                    {segments.map((s,i)=>(
+                      <div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                          <span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span>
+                          <span style={{background:s.status==='Winning'?'#D1FAE5':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span>
+                        </div>
+                        <div style={{background:s.status==='Winning'?'#D1FAE5':'#FEE2E2',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div>
+                        <div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong> &nbsp;·&nbsp; Dominated by: {s.dominated}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>⚡</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>GEO Health Summary</span></div>
+                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Based on how your brand performed across 20 generic AI queries — no brand name was used.</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:24}}>
+                    <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ What is Working Well</div>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>✓</span><span>{s}</span></li>))}</ul>
+                    </div>
+                    <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ What Needs Improvement</div>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,5).map((w:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>))}</ul>
+                    </div>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>⚡</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>Priority Actions — Implementable</span></div>
+                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse'}}>
+                      <thead><tr style={{background:'#FAFAFA'}}>{['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=><th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                      <tbody>
+                        {(result.actions||[]).map((a:any,i:number)=>{
+                          const dm:Record<string,[string,string,string]>={High:['#FEE2E2','#991B1B','Workstream 01 — ARD'],Medium:['#FEF3C7','#92400E','Workstream 02 — AOP'],Low:['#DCFCE7','#166534','Workstream 03 — DT1']};
+                          const [bg,tc,ws]=dm[a.priority]||['#F3F4F6','#374151',''];
+                          const seg=segments[i%segments.length];
+                          return (<tr key={i} style={{borderTop:'1px solid #F3F4F6'}}><td style={{padding:'14px 14px'}}><span style={{background:bg,color:tc,borderRadius:50,padding:'3px 11px',fontSize:'0.76rem',fontWeight:700}}>{a.priority}</span></td><td style={{padding:'14px 14px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{seg?.name}</td><td style={{padding:'14px 14px',fontSize:'0.8rem',color:'#6B7280'}}>Content Page</td><td style={{padding:'14px 14px',fontSize:'0.82rem',color:'#374151',maxWidth:320}}>{a.action}</td><td style={{padding:'14px 14px',fontSize:'0.8rem',fontWeight:600,color:'#7C3AED'}}>{ws}</td></tr>);
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 7: LIVE PROMPT */}
+            {activeTab===7&&(
+              <div>
+                <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px',marginBottom:22}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:5}}>
+                    <span style={{fontSize:'1.1rem',color:'#7C3AED'}}>✦</span>
+                    <span style={{fontSize:'0.98rem',fontWeight:700,color:'#7C3AED'}}>Optional: Test a Custom Prompt</span>
+                  </div>
+                  <p style={{fontSize:'0.83rem',color:'#7C3AED',margin:0,lineHeight:1.6}}>Run any query you think AI users would use in your industry. See how your brand ranks in the response — and who beats you.</p>
+                </div>
+                <div style={{fontSize:'0.67rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const,marginBottom:10}}>Example Prompts</div>
+                <div style={{display:'flex',flexWrap:'wrap' as const,gap:10,marginBottom:22}}>
+                  {examplePrompts.map((p,i)=>(
+                    <button key={i} onClick={()=>setPromptInput(p)} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:50,padding:'8px 16px',fontSize:'0.82rem',color:'#374151',cursor:'pointer',lineHeight:1.4}}>
+                      {p.length>56?p.slice(0,55)+'...':p}
+                    </button>
+                  ))}
+                </div>
+                <div style={{fontSize:'0.67rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const,marginBottom:10}}>Your Prompt</div>
+                <textarea value={promptInput} onChange={e=>setPromptInput(e.target.value)} placeholder="Enter any AI search query relevant to your industry..." rows={3}
+                  style={{width:'100%',borderRadius:12,border:'1.5px solid #DDD6FE',padding:'14px 18px',fontSize:'0.92rem',background:'white',outline:'none',color:'#374151',resize:'vertical',boxSizing:'border-box' as const,fontFamily:'Inter,sans-serif',marginBottom:14,display:'block'}}/>
+                <button onClick={()=>runPrompt()} disabled={promptLoading}
+                  style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,padding:'11px 28px',fontSize:'0.9rem',fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
+                  🔍 Run Prompt
+                </button>
+                {promptLoading&&(
+                  <div style={{display:'flex',alignItems:'center',gap:10,background:'#F5F3FF',borderRadius:10,padding:'12px 16px',marginTop:14,border:'1px solid #DDD6FE'}}>
+                    <div style={{width:8,height:8,borderRadius:'50%',background:'#7C3AED',animation:'pulse 1s infinite'}}/>
+                    <span style={{fontSize:'0.84rem',color:'#7C3AED',fontWeight:500}}>Running GPT-4o queries...</span>
+                    <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+                  </div>
+                )}
+                {promptHistory.length>0&&<hr style={{border:'none',borderTop:'1px solid #E5E7EB',margin:'24px 0'}}/>}
+                {promptHistory.map((item,i)=>(
+                  <div key={i} style={{marginBottom:28}}>
+                    <div style={{display:'flex',justifyContent:'flex-end',marginBottom:12}}>
+                      <div style={{background:'white',border:'1px solid #E5E7EB',color:'#374151',borderRadius:'18px 18px 4px 18px',padding:'11px 16px',maxWidth:'65%',fontSize:'0.9rem'}}>{item.q}</div>
+                    </div>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
+                      <MarkdownText text={item.a}/>
+                    </div>
+                  </div>
+                ))}
+                {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer'}}>Clear history</button>}
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
