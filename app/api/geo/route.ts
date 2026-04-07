@@ -195,6 +195,7 @@ function getBrandPosition(text: string, brand: string): number {
   return brands.length + 1;
 }
 
+// ── Competitor scoring — mirrors original Streamlit logic exactly ──
 function scoreCompetitor(name: string, responses: any[]): any {
   const nl = name.toLowerCase();
   const aliases: Record<string, string[]> = {
@@ -205,21 +206,45 @@ function scoreCompetitor(name: string, responses: any[]): any {
   };
   const terms = aliases[nl] || [nl];
   const mentions = responses.filter(r => terms.some(t => r.response_preview?.toLowerCase().includes(t))).length;
-  const floors: Record<string, number> = { 'american express': 68, chase: 72, citi: 52, discover: 48, 'wells fargo': 45, 'bank of america': 45, 'capital one': 42, synchrony: 26, barclays: 22, usaa: 28, tesla: 70, toyota: 65, bmw: 58, honda: 55, ford: 52, mercedes: 50, hyundai: 42, kia: 36, nissan: 33, volkswagen: 38 };
+
+  // Floor scores per brand (from original)
+  const floors: Record<string, number> = {
+    'american express': 68, chase: 72, citi: 52, discover: 48,
+    'wells fargo': 45, 'bank of america': 45, 'capital one': 42,
+    synchrony: 26, barclays: 22, usaa: 28, tesla: 70, toyota: 65,
+    bmw: 58, honda: 55, ford: 52, mercedes: 50, hyundai: 42,
+    kia: 36, nissan: 33, volkswagen: 38,
+  };
   const gfloors: Record<string, number> = { chase: 75, 'american express': 64 };
-  const gcaps: Record<string, number> = { 'american express': 74, 'capital one': 54, 'bank of america': 52, 'wells fargo': 50, citi: 58, discover: 55, synchrony: 35, barclays: 32, usaa: 30, kia: 48, nissan: 45, hyundai: 55 };
+  const gcaps: Record<string, number> = {
+    'american express': 74, 'capital one': 54, 'bank of america': 52,
+    'wells fargo': 50, citi: 58, discover: 55, synchrony: 35,
+    barclays: 32, usaa: 30, kia: 48, nissan: 45, hyundai: 55,
+  };
+
   const fv = floors[nl] || 18;
-  let blv = mentions === 0 ? Math.max(10, Math.min(80, fv + (Math.abs(name.charCodeAt(0) % 9) - 4))) : Math.round((mentions / 20) * 100 * 0.8 + fv * 0.2);
-  const cv = blv;
-  const cc = Math.min(92, Math.round(cv * 0.93 + mentions * 1.8));
-  const cs = Math.min(92, Math.round(cv * 0.88 + mentions * 1.4));
-  const cp = Math.min(92, Math.round(cv * 0.78));
-  const csov = Math.min(92, Math.round(cv * 0.63));
+  // visibility (cv) — same formula as original
+  let cv = mentions === 0
+    ? Math.max(10, Math.min(80, fv + (Math.abs(name.charCodeAt(0) % 9) - 4)))
+    : Math.round((mentions / 20) * 100 * 0.8 + fv * 0.2);
+
+  // sub-scores — same as original
+  const cc = Math.min(92, Math.round(cv * 0.93 + mentions * 1.8));  // citation
+  const cs = Math.min(92, Math.round(cv * 0.88 + mentions * 1.4));  // sentiment
+  const cp = Math.min(92, Math.round(cv * 0.78));                   // prominence
+  const csov = Math.min(92, Math.round(cv * 0.63));                 // share of voice
+
+  // GEO formula — same as original: vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15
   let geo = Math.round(cv * 0.30 + cs * 0.20 + cp * 0.20 + cc * 0.15 + csov * 0.15);
   if (gfloors[nl] && geo < gfloors[nl]) geo = gfloors[nl];
   if (gcaps[nl] && geo > gcaps[nl]) geo = gcaps[nl];
-  const pos = responses.filter(r => terms.some(t => r.response_preview?.toLowerCase().includes(t))).map(r => getBrandPosition(r.response_preview || '', name)).filter(p => p > 0);
+
+  const pos = responses
+    .filter(r => terms.some(t => r.response_preview?.toLowerCase().includes(t)))
+    .map(r => getBrandPosition(r.response_preview || '', name))
+    .filter(p => p > 0);
   const avg = pos.length ? Math.round(pos.reduce((a, b) => a + b, 0) / pos.length) : 0;
+
   return { Brand: name, GEO: geo, Vis: cv, Cit: cc, Sen: cs, Sov: csov, Rank: avg > 0 ? `#${avg}` : 'N/A' };
 }
 
@@ -227,7 +252,7 @@ export async function POST(req: NextRequest) {
   try {
     const { url } = await req.json();
     const pageData = await fetchPageContent(url);
-    if (!pageData.ok) return NextResponse.json({ error: pageData.error }, { status: 400 });
+    if (!pageData.ok) return NextResponse.json({ error: (pageData as any).error }, { status: 400 });
 
     const brand = extractBrand(pageData);
     const bl = brand.toLowerCase();
@@ -236,6 +261,7 @@ export async function POST(req: NextRequest) {
     const queries: string[][] = ind.queries;
     const allQA: any[] = [];
 
+    // Run 20 queries in batches of 5 — same as original
     for (let i = 0; i < 20; i += 5) {
       const batch = queries.slice(i, i + 5);
       const ql = batch.map((q, j) => `Q${j + 1}: ${q[1]}`).join('\n\n');
@@ -252,23 +278,70 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Visibility = % of 20 queries where brand was mentioned
     const mentions = allQA.filter(p => p.a.toLowerCase().includes(bl)).length;
     const visibility = Math.round((mentions / 20) * 100);
+
     let sc: any;
 
     if (mentions === 0) {
-      sc = { citation_share: 0, sentiment: 0, prominence: 0, share_of_voice: 0, avg_rank: 'N/A', strengths: ['Brand not yet appearing in AI responses.', 'Baseline established, clear room to grow.', 'Competitors present, confirming category is AI-discoverable.'], improvements: ['Not mentioned in 20 generic queries.', 'AI not associating brand with key questions.', 'No citation authority.', 'Competitors appearing instead.', 'Content not structured for AI discovery.'], actions: [{ priority: 'High', action: 'Create FAQ and comparison pages targeting queries in this analysis.' }, { priority: 'High', action: 'Publish LLM-ready Best X for Y guides positioning brand as top recommendation.' }, { priority: 'Medium', action: 'Add structured data (schema markup) to key pages.' }, { priority: 'Medium', action: 'Build presence on sites AI cites: Reddit, Wikipedia, review sites.' }, { priority: 'Low', action: 'Audit backlinks and create content hubs reinforcing brand authority.' }] };
+      // Brand not mentioned — same defaults as original
+      sc = {
+        citation_share: 0, sentiment: 0, prominence: 0, share_of_voice: 0, avg_rank: 'N/A',
+        strengths: [
+          'Brand not yet appearing in AI responses.',
+          'Baseline established, clear room to grow.',
+          'Competitors present, confirming category is AI-discoverable.',
+        ],
+        improvements: [
+          'Not mentioned in 20 generic queries.',
+          'AI not associating brand with key industry questions.',
+          'No citation authority established.',
+          'Competitors appearing instead of your brand.',
+          'Content not yet structured for AI discovery.',
+        ],
+        actions: [
+          { priority: 'High', action: 'Create FAQ and comparison pages targeting queries in this analysis.' },
+          { priority: 'High', action: 'Publish LLM-ready Best X for Y guides positioning brand as top recommendation.' },
+          { priority: 'Medium', action: 'Add structured data (schema markup) to key pages.' },
+          { priority: 'Medium', action: 'Build presence on sites AI cites: Reddit, Wikipedia, review sites.' },
+          { priority: 'Low', action: 'Audit backlinks and create content hubs reinforcing brand authority.' },
+        ],
+      };
     } else {
+      // Brand mentioned — ask AI to score it, all values 0–100
       const appeared = allQA.filter(p => p.a.toLowerCase().includes(bl));
-      const sp = `GEO analyst. Brand "${brand}" appeared in ${mentions}/20 AI responses.\n${appeared.map(p => `Response: ${p.a.slice(0, 300)}`).join('\n')}\nReturn ONLY valid JSON: {"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"avg_rank":"N/A","strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
+      const sp = `You are a GEO analyst. Brand "${brand}" appeared in ${mentions} out of 20 AI responses.
+
+Responses where brand appeared:
+${appeared.map(p => `- ${p.a.slice(0, 300)}`).join('\n')}
+
+Based on these responses, score the brand on each dimension from 0 to 100:
+- citation_share: how authoritatively and frequently the brand is cited (0-100)
+- sentiment: how positively the brand is described (0-100)  
+- prominence: how early/prominently the brand appears in responses (0-100)
+- share_of_voice: brand's share of mentions vs competitors in responses (0-100)
+- avg_rank: average position number when brand appears (e.g. "N/A", "#2", "#3")
+
+Also provide strengths (3 items), improvements (5 items), actions (5 items with priority High/Medium/Low).
+
+Return ONLY valid JSON, no markdown:
+{"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"avg_rank":"N/A","strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
+
       const raw = await callAI([{ role: 'user', content: sp }], 0.0, 900);
-      sc = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      try {
+        sc = JSON.parse(raw.replace(/```json|```/g, '').trim());
+      } catch {
+        sc = { citation_share: 0, sentiment: 0, prominence: 0, share_of_voice: 0, avg_rank: 'N/A', strengths: [], improvements: [], actions: [] };
+      }
     }
 
     const cit = sc.citation_share || 0;
     const sent = sc.sentiment || 0;
     const prom = sc.prominence || 0;
     const sov = sc.share_of_voice || 0;
+
+    // GEO formula — exactly matches original Streamlit code
     const geo = Math.round(visibility * 0.30 + sent * 0.20 + prom * 0.20 + cit * 0.15 + sov * 0.15);
 
     const responsesDetail = allQA.map(p => ({
@@ -282,12 +355,12 @@ export async function POST(req: NextRequest) {
     // Citation sources
     let citationSources: any[] = [];
     try {
-      const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
+      const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON array, no markdown: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
       const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
       citationSources = JSON.parse(cr.replace(/```json|```/g, '').trim());
     } catch {}
 
-    // Competitors
+    // Competitors — same floor/cap logic as original
     const competitors = ind.comps
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
@@ -300,10 +373,11 @@ export async function POST(req: NextRequest) {
       industry: ind.name,
       ind_key: indKey,
       ind_label: ind.label,
-      visibility,
-      sentiment: sent,
-      prominence: prom,
-      citation_share: cit,
+      // Main scores — using same field aliases as original
+      visibility,           // context in original
+      sentiment: sent,      // exclusivity in original
+      prominence: prom,     // organization in original
+      citation_share: cit,  // reliability in original
       share_of_voice: sov,
       overall_geo_score: geo,
       avg_rank: visibility === 0 ? 'N/A' : sc.avg_rank || 'N/A',
