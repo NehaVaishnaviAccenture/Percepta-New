@@ -73,7 +73,7 @@ function GeoGauge({ score, brand }: { score: number; brand: string }) {
     const lg = s1 - s0 > 50 ? 1 : 0;
     return (
       <path
-        d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 0 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 1 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`}
+        d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 1 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 0 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`}
         fill={fill} stroke="white" strokeWidth="2"
       />
     );
