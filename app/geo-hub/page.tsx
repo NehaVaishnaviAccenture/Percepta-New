@@ -63,11 +63,8 @@ function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val
 
 function GeoGauge({ score, brand }: { score: number; brand: string }) {
   const badge = scoreBadge(score);
-  const cx = 160, cy = 150, R = 120, thickness = 42;
-  const Ro = R, Ri = R - thickness;
+  const cx = 160, cy = 155, Ro = 130, Ri = 88;
 
-  // score 0 = 180deg left, score 100 = 0deg right
-  // angle in radians: score s → π - (s/100)*π
   const a = (s: number) => Math.PI - (s / 100) * Math.PI;
   const ox = (s: number, r: number) => cx + r * Math.cos(a(s));
   const oy = (s: number, r: number) => cy - r * Math.sin(a(s));
@@ -76,50 +73,37 @@ function GeoGauge({ score, brand }: { score: number; brand: string }) {
     const lg = s1 - s0 > 50 ? 1 : 0;
     return (
       <path
-        d={`M ${ox(s0,Ro)} ${oy(s0,Ro)}
-            A ${Ro} ${Ro} 0 ${lg} 0 ${ox(s1,Ro)} ${oy(s1,Ro)}
-            L ${ox(s1,Ri)} ${oy(s1,Ri)}
-            A ${Ri} ${Ri} 0 ${lg} 1 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`}
+        d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 0 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 1 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`}
         fill={fill} stroke="white" strokeWidth="2"
       />
     );
   };
 
-  // Needle
-  const needleX = ox(score, Ri - 6);
-  const needleY = oy(score, Ri - 6);
+  // Score marker: a short thick line at the score position
+  const markerInner = Ri - 8;
+  const markerOuter = Ro + 8;
 
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
-      <svg viewBox="0 0 320 170" style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {/* Clip to upper half only */}
-        <defs>
-          <clipPath id="halfClip">
-            <rect x="0" y="0" width="320" height={cy + 10} />
-          </clipPath>
-        </defs>
-        <g clipPath="url(#halfClip)">
-          {seg(0, 44, '#FECACA')}
-          {seg(44, 69, '#FEF08A')}
-          {seg(69, 79, '#BAE6FD')}
-          {seg(79, 100, '#BBF7D0')}
-          {score > 0 && seg(0, Math.min(score, 100), '#6D28D9')}
-        </g>
-        {/* Ticks */}
+      <svg viewBox="0 0 320 175" style={{ width: '100%', display: 'block', overflow: 'visible' }}>
+        {seg(0, 44, '#FECACA')}
+        {seg(44, 69, '#FEF08A')}
+        {seg(69, 79, '#BAE6FD')}
+        {seg(79, 100, '#BBF7D0')}
+        {/* Score marker line */}
+        <line
+          x1={ox(score, markerInner)} y1={oy(score, markerInner)}
+          x2={ox(score, markerOuter)} y2={oy(score, markerOuter)}
+          stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"
+        />
+        {/* Tick labels only */}
         {[0,20,40,60,80,100].map(t => (
-          <g key={t}>
-            <line x1={ox(t,Ri-4)} y1={oy(t,Ri-4)} x2={ox(t,Ro+4)} y2={oy(t,Ro+4)} stroke="#9CA3AF" strokeWidth="1"/>
-            <text x={ox(t,Ro+16)} y={oy(t,Ro+16)} textAnchor="middle" dominantBaseline="middle"
-              style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
-          </g>
+          <text key={t} x={ox(t, Ro+18)} y={oy(t, Ro+18)} textAnchor="middle" dominantBaseline="middle"
+            style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
         ))}
-        {/* Needle */}
-        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="#374151" strokeWidth="2.5" strokeLinecap="round"/>
-        <circle cx={cx} cy={cy} r={7} fill="#374151"/>
-        <circle cx={cx} cy={cy} r={4} fill="white"/>
-        {/* Score */}
-        <text x={cx} y={cy - 20} textAnchor="middle"
+        {/* Score number */}
+        <text x={cx} y={cy - 18} textAnchor="middle"
           style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
       <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
