@@ -484,13 +484,28 @@ export default function GeoHub() {
   const [expandedDomain,setExpandedDomain] = useState<string|null>(null);
   const [hovNode,setHovNode] = useState<string|null>(null);
 
+  // Persist analysis result across tab/page navigation using sessionStorage
+  // sessionStorage survives tab switches and page navigation but clears on browser close/reload
+  useState(()=>{
+    try {
+      const saved = sessionStorage.getItem('geo_result');
+      const savedUrl = sessionStorage.getItem('geo_url');
+      if(saved) { setResult(JSON.parse(saved)); }
+      if(savedUrl) { setUrl(savedUrl); }
+    } catch{}
+  });
+
   async function runAnalysis() {
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
     setError('');setLoading(true);
     try {
       const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
       const data=await res.json();
-      if(data.error) setError(data.error); else {setResult(data);setActiveTab(0);}
+      if(data.error) setError(data.error); else {
+        setResult(data);
+        setActiveTab(0);
+        try { sessionStorage.setItem('geo_result', JSON.stringify(data)); sessionStorage.setItem('geo_url', url); } catch{}
+      }
     } catch(e:any){setError(e.message);}
     setLoading(false);
   }
@@ -570,7 +585,7 @@ export default function GeoHub() {
             {TABS.map((t,i)=>(
               <button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s'}}>{t}</button>
             ))}
-            <button onClick={()=>{setResult(null);setUrl('');}} style={{marginLeft:'auto',background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer',alignSelf:'center'}}>← New Analysis</button>
+            <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{marginLeft:'auto',background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer',alignSelf:'center'}}>← New Analysis</button>
           </div>
 
           <div style={{padding:'28px 40px 60px'}}>
