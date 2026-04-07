@@ -503,7 +503,7 @@ export default function GeoHub() {
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}>
-                      <div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your Rank</div>
+                      <div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your Rank (GEO Score)</div>
                       <div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>#{myRank}</div>
                       <div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>out of {top.length} competitors</div>
                     </div>
@@ -527,27 +527,29 @@ export default function GeoHub() {
                         const bx=bPad+i*gW+gW*0.08,bw2=gW*0.26;
                         const gh=((c.GEO||0)/100)*bMH,vh=((c.Vis||0)/100)*bMH,ch=((c.Cit||0)/100)*bMH;
                         const isY=c.isYou,isH=hovBar===i;
-                        const tipY=bH-Math.max(gh,vh,ch)-58;
+                        const tipY=bH-Math.max(gh,vh,ch)-44;
+                        const geoCol=isY?'#1F2937':'#9CA3AF';
+                        const visCol=isY?'#7C3AED':'#A5B4FC';
+                        const citCol=isY?'#C4B5FD':'#E9D5FF';
                         return (
                           <g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>
-                            <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={isY?'#1F2937':'#D1D5DB'} rx={2}/>
-                            <rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={isY?'#7C3AED':'#A5B4FC'} rx={2}/>
-                            <rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={isY?'#C4B5FD':'#DDD6FE'} rx={2}/>
+                            <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={geoCol} rx={2}/>
+                            <rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={visCol} rx={2}/>
+                            <rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={citCol} rx={2}/>
                             <text x={bx+bw2*1.5} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#7C3AED':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>
                             {isH&&(
                               <g>
-                                <rect x={Math.min(bx-5,bW-145)} y={tipY} width={140} height={52} rx={6} fill="#1F2937"/>
+                                <rect x={Math.min(bx-5,bW-145)} y={tipY} width={140} height={38} rx={6} fill="#1F2937"/>
                                 <text x={Math.min(bx-5,bW-145)+70} y={tipY+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text>
-                                <text x={Math.min(bx-5,bW-145)+70} y={tipY+28} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO} · Vis: {c.Vis} · Cit: {c.Cit}</text>
-                                <text x={Math.min(bx-5,bW-145)+70} y={tipY+42} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Sen: {c.Sen} · SoV: {c.Sov} · Rank: {c.Rank}</text>
+                                <text x={Math.min(bx-5,bW-145)+70} y={tipY+27} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO} · Vis: {c.Vis} · Cit: {c.Cit}</text>
                               </g>
                             )}
                           </g>
                         );
                       })}
-                      <g transform={`translate(${bW/2-90},${bH+28})`}>
+                      <g transform={`translate(${bW/2-100},${bH+28})`}>
                         {[{color:'#1F2937',label:'GEO'},{color:'#7C3AED',label:'Visibility'},{color:'#C4B5FD',label:'Citations'}].map((l,i)=>(
-                          <g key={i} transform={`translate(${i*80},0)`}><rect x={0} y={-5} width={10} height={10} fill={l.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>
+                          <g key={i} transform={`translate(${i*88},0)`}><rect x={0} y={-5} width={10} height={10} fill={l.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>
                         ))}
                       </g>
                     </svg>
@@ -577,7 +579,25 @@ export default function GeoHub() {
                               </td>
                               <td style={{padding:'11px 12px',fontSize:'0.95rem',fontWeight:800,color:gcol}}>{c.GEO}</td>
                               <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:gap2===null?'#9CA3AF':gap2>0?'#EF4444':'#10B981'}}>
-                                {gap2===null?'—':`${gap2>0?'':'+'}${Math.abs(gap2)} pts`}
+                                {gap2===null?'—':(
+                                  <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
+                                    {`${gap2>0?'':'+'}${Math.abs(gap2)} pts`}
+                                    {gap2!==0&&(()=>{
+                                      const visDiff=vis-(c.Vis||0);
+                                      const citDiff=cit-(c.Cit||0);
+                                      const senDiff=sent-(c.Sen||0);
+                                      const sovDiff=sov-(c.Sov||0);
+                                      const parts=[
+                                        visDiff>0?`Visibility −${visDiff}pts`:null,
+                                        citDiff>0?`Citation −${citDiff}pts`:null,
+                                        senDiff>0?`Sentiment −${senDiff}pts`:null,
+                                        sovDiff>0?`Share of Voice −${sovDiff}pts`:null,
+                                      ].filter(Boolean);
+                                      const tip=parts.length>0?`Gap driven by: ${parts.join(', ')}`:`You lead on all signals`;
+                                      return <Tooltip text={tip}/>;
+                                    })()}
+                                  </span>
+                                )}
                               </td>
                               <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Vis}</td>
                               <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
