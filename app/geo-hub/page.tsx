@@ -63,42 +63,70 @@ function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val
 
 function GeoGauge({ score, brand }: { score: number; brand: string }) {
   const badge = scoreBadge(score);
-  const W = 340, H = 185, cx = 170, cy = 165, Ro = 140, Ri = 95;
+  const r = 80, cx = 110, cy = 110;
 
-  // score 0 → 180deg (left), score 100 → 0deg (right)
-  const angleRad = (s: number) => ((100 - s) / 100) * Math.PI;
-  const px = (s: number, r: number) => cx + r * Math.cos(angleRad(s));
-  const py = (s: number, r: number) => cy - r * Math.sin(angleRad(s));
+  // Simple: use strokeDasharray on a circle, rotated -180deg
+  const circumference = Math.PI * r; // half circle
+  const zoneColors = [
+    { from: 0, to: 44, color: '#FECACA' },
+    { from: 44, to: 69, color: '#FEF08A' },
+    { from: 69, to: 79, color: '#BAE6FD' },
+    { from: 79, to: 100, color: '#BBF7D0' },
+  ];
 
-  // Donut segment: s0 < s1, arc sweeps left→right
-  const donut = (s0: number, s1: number, fill: string) => {
-    const large = (s1 - s0) > 50 ? 1 : 0;
-    const d = [
-      `M ${px(s0, Ro)} ${py(s0, Ro)}`,
-      `A ${Ro} ${Ro} 0 ${large} 1 ${px(s1, Ro)} ${py(s1, Ro)}`,
-      `L ${px(s1, Ri)} ${py(s1, Ri)}`,
-      `A ${Ri} ${Ri} 0 ${large} 0 ${px(s0, Ri)} ${py(s0, Ri)}`,
-      'Z'
-    ].join(' ');
-    return <path d={d} fill={fill} stroke="white" strokeWidth="2" />;
-  };
+  // Needle angle: score 0 = -180deg (left), score 100 = 0deg (right)
+  const needleAngle = -180 + score * 1.8;
+  const needleRad = (needleAngle * Math.PI) / 180;
+  const nx = cx + (r - 10) * Math.cos(needleRad);
+  const ny = cy + (r - 10) * Math.sin(needleRad);
 
   return (
-    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px', textAlign: 'center' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {donut(0, 44, '#FECACA')}
-        {donut(44, 69, '#FEF08A')}
-        {donut(69, 79, '#BAE6FD')}
-        {donut(79, 100, '#BBF7D0')}
-        {score > 0 && donut(0, Math.min(score, 100), '#6D28D9')}
-        {[0,20,40,60,80,100].map(t => (
-          <g key={t}>
-            <line x1={px(t,Ri-5)} y1={py(t,Ri-5)} x2={px(t,Ro+5)} y2={py(t,Ro+5)} stroke="#9CA3AF" strokeWidth="1"/>
-            <text x={px(t,Ro+18)} y={py(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
-          </g>
-        ))}
-        <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:48,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
+      <svg viewBox="0 0 220 130" style={{ width: '100%', display: 'block' }}>
+        {/* Zone arcs using strokeDasharray */}
+        {zoneColors.map((z, i) => {
+          const len = ((z.to - z.from) / 100) * circumference;
+          const offset = ((z.from) / 100) * circumference;
+          return (
+            <circle
+              key={i}
+              cx={cx} cy={cy} r={r}
+              fill="none"
+              stroke={z.color}
+              strokeWidth="20"
+              strokeDasharray={`${len} ${circumference * 2}`}
+              strokeDashoffset={-offset}
+              transform={`rotate(-180 ${cx} ${cy})`}
+              style={{ transformOrigin: `${cx}px ${cy}px` }}
+            />
+          );
+        })}
+        {/* Purple progress */}
+        {score > 0 && (
+          <circle
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke="#6D28D9"
+            strokeWidth="20"
+            strokeDasharray={`${(score / 100) * circumference} ${circumference * 2}`}
+            strokeDashoffset={0}
+            transform={`rotate(-180 ${cx} ${cy})`}
+          />
+        )}
+        {/* Needle */}
+        <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#374151" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={5} fill="#374151" />
+        <circle cx={cx} cy={cy} r={3} fill="white" />
+        {/* Tick labels */}
+        {[0,20,40,60,80,100].map(t => {
+          const a = ((-180 + t * 1.8) * Math.PI) / 180;
+          const lx = cx + (r + 16) * Math.cos(a);
+          const ly = cy + (r + 16) * Math.sin(a);
+          return <text key={t} x={lx} y={ly} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{t}</text>;
+        })}
+        {/* Score */}
+        <text x={cx} y={cy - 16} textAnchor="middle" style={{ fontSize: 36, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter,sans-serif' }}>{score}</text>
       </svg>
       <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
     </div>
