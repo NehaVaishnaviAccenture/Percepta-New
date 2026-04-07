@@ -845,13 +845,21 @@ export default function GeoHub() {
                                       const citDiff=cit-(c.Cit||0);
                                       const senDiff=sent-(c.Sen||0);
                                       const sovDiff=sov-(c.Sov||0);
-                                      const parts=[
-                                        visDiff>0?`Visibility −${visDiff}pts`:null,
-                                        citDiff>0?`Citation −${citDiff}pts`:null,
-                                        senDiff>0?`Sentiment −${senDiff}pts`:null,
-                                        sovDiff>0?`Share of Voice −${sovDiff}pts`:null,
-                                      ].filter(Boolean);
-                                      const tip=parts.length>0?`Gap driven by: ${parts.join(', ')}`:`You lead on all signals`;
+                                      const losing=gap2>0; // gap2>0 means competitor has higher GEO = we're losing
+                                      const parts=losing?[
+                                        visDiff!==0?`${visDiff>0?'+':''}${-visDiff} Visibility`:null,
+                                        citDiff!==0?`${citDiff>0?'+':''}${-citDiff} Citation`:null,
+                                        senDiff!==0?`${senDiff>0?'+':''}${-senDiff} Sentiment`:null,
+                                        sovDiff!==0?`${sovDiff>0?'+':''}${-sovDiff} Share of Voice`:null,
+                                      ].filter(Boolean):[
+                                        visDiff!==0?`+${visDiff} Visibility`:null,
+                                        citDiff!==0?`+${citDiff} Citation`:null,
+                                        senDiff!==0?`+${senDiff} Sentiment`:null,
+                                        sovDiff!==0?`+${sovDiff} Share of Voice`:null,
+                                      ].filter((p:any)=>p&&p.startsWith('+'));
+                                      const tip=losing
+                                        ?`Behind by: ${parts.join(', ')}`
+                                        :`Ahead by: ${parts.join(', ')}`;
                                       return <Tooltip text={tip}/>;
                                     })()}
                                   </span>
