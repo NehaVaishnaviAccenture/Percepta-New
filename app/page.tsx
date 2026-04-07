@@ -78,11 +78,8 @@ export default function Overview() {
           <span style={{ color: '#7C3AED' }}>GEO</span>
           <span style={{ color: '#111827' }}> Score</span>
         </div>
-        <p style={{ fontSize: '1.1rem', color: '#374151', maxWidth: 760, margin: '0 auto 16px', lineHeight: 1.75, fontWeight: 500 }}>
+        <p style={{ fontSize: '1.1rem', color: '#374151', maxWidth: 760, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 500 }}>
           The Percepta GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, and other major AI engines.
-        </p>
-        <p style={{ fontSize: '0.95rem', color: '#6B7280', maxWidth: 640, margin: '0 auto 36px', lineHeight: 1.7 }}>
-          The Percepta GEO Score measures how often and favorably your brand is cited in AI-generated responses.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/geo-hub" style={{
@@ -132,9 +129,6 @@ export default function Overview() {
             <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 14 }}>The GEO Score</div>
             <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
             <p style={{ fontSize: '1rem', color: '#374151', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 500 }}>
-              Your GEO Score distills complex AI citation data into a single, actionable metric.
-            </p>
-            <p style={{ fontSize: '0.9rem', color: '#6B7280', lineHeight: 1.8, margin: 0 }}>
               Understand how frequently and positively your brand appears in AI-generated answers, and get clear next steps to improve.
             </p>
           </div>
