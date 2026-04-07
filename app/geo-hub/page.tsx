@@ -337,10 +337,10 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
     return {bg:'#5B21B6',text:'white'};
   };
   return (
-    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
+    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sentiment Dimensions vs Competitors</div>
       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Scores across all 6 sentiment dimensions. Darker = stronger. Hover to see score.</div>
-      <div style={{display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gap:4,alignItems:'center'}}>
+      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4,alignItems:'stretch'}}>
         {/* Header */}
         <div/>
         {dims.map((d,i)=>(
@@ -348,7 +348,7 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
         ))}
         {/* Rows */}
         {rows.map((r,ri)=>[
-          <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis'}}>{r.name}</div>,
+          <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,
           ...r.scores.map((val,ci)=>{
             const k=`${ri}-${ci}`;
             const {bg,text}=cellColor(val);
@@ -356,7 +356,7 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
             return (
               <div key={`c${k}`}
                 onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
-                style={{height:26,borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.06)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const}}>
+                style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>
                 {isH?val:''}
               </div>
             );
@@ -806,15 +806,9 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'start'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
-                      <div style={{transform:'scale(0.82)',transformOrigin:'top center',marginBottom:-60}}>
-                        <RadarChart sent={sent} prom={prom} vis={vis}/>
-                      </div>
-                    </div>
-                    <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
