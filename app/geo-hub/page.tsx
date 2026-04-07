@@ -841,25 +841,16 @@ export default function GeoHub() {
                                   <span style={{display:'inline-flex',alignItems:'center',gap:5}}>
                                     {`${gap2>0?'':'+'}${Math.abs(gap2)} pts`}
                                     {gap2!==0&&(()=>{
-                                      const visDiff=vis-(c.Vis||0);
-                                      const citDiff=cit-(c.Cit||0);
-                                      const senDiff=sent-(c.Sen||0);
-                                      const sovDiff=sov-(c.Sov||0);
-                                      const losing=gap2>0; // gap2>0 means competitor has higher GEO = we're losing
-                                      const parts=losing?[
-                                        visDiff!==0?`${visDiff>0?'+':''}${-visDiff} Visibility`:null,
-                                        citDiff!==0?`${citDiff>0?'+':''}${-citDiff} Citation`:null,
-                                        senDiff!==0?`${senDiff>0?'+':''}${-senDiff} Sentiment`:null,
-                                        sovDiff!==0?`${sovDiff>0?'+':''}${-sovDiff} Share of Voice`:null,
-                                      ].filter(Boolean):[
-                                        visDiff!==0?`+${visDiff} Visibility`:null,
-                                        citDiff!==0?`+${citDiff} Citation`:null,
-                                        senDiff!==0?`+${senDiff} Sentiment`:null,
-                                        sovDiff!==0?`+${sovDiff} Share of Voice`:null,
-                                      ].filter((p:any)=>p&&p.startsWith('+'));
+                                      const diffs=[
+                                        {label:'Visibility',val:(c.Vis||0)-vis},
+                                        {label:'Citation',val:(c.Cit||0)-cit},
+                                        {label:'Sentiment',val:(c.Sen||0)-sent},
+                                        {label:'Share of Voice',val:(c.Sov||0)-sov},
+                                      ].filter(d=>d.val!==0);
+                                      const losing=gap2>0;
                                       const tip=losing
-                                        ?`Behind by: ${parts.join(', ')}`
-                                        :`Ahead by: ${parts.join(', ')}`;
+                                        ?`Behind by: ${diffs.map(d=>`${d.val>0?'-':'+'}${Math.abs(d.val)} ${d.label}`).join(', ')}`
+                                        :`Ahead by: ${diffs.map(d=>`${d.val<0?'+':'-'}${Math.abs(d.val)} ${d.label}`).join(', ')}`;
                                       return <Tooltip text={tip}/>;
                                     })()}
                                   </span>
