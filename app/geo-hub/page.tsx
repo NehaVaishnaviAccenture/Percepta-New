@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 const bands = [
   { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
@@ -10,10 +10,10 @@ const bands = [
 ];
 
 const METRIC_TIPS: Record<string, string> = {
-  'visibility score': 'how many of 20 generic ai queries mentioned your brand.',
-  'citation score': 'how authoritatively your brand was cited across ai responses.',
-  'sentiment score': 'the tone and favorability of ai responses when your brand appeared.',
-  'avg rank': 'the average position your brand appeared across all ai responses.',
+  'visibility score': 'measures how often your brand appears in ai-generated responses across key industry queries.',
+  'citation score': 'reflects how authoritatively ai models reference your brand compared to competitors.',
+  'sentiment score': 'captures the tone and favorability of ai responses when your brand is mentioned.',
+  'avg rank': 'your average mention position across all ai responses where your brand appeared.',
 };
 
 function scoreBadge(score: number) {
@@ -40,7 +40,7 @@ function Tooltip({ text }: { text: string }) {
       onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#E5E7EB', color: '#6B7280', fontSize: '0.6rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>?</span>
       {show && (
-        <span style={{ position: 'absolute', bottom: '130%', left: '50%', transform: 'translateX(-50%)', background: '#1F2937', color: 'white', fontSize: '0.72rem', lineHeight: 1.5, borderRadius: 8, padding: '8px 12px', width: 200, textAlign: 'left', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'normal' as const }}>
+        <span style={{ position: 'absolute', bottom: '130%', left: '50%', transform: 'translateX(-50%)', background: '#1F2937', color: 'white', fontSize: '0.72rem', lineHeight: 1.6, borderRadius: 8, padding: '10px 14px', width: 210, textAlign: 'left', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'normal' as const }}>
           {text}
           <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', borderWidth: 5, borderStyle: 'solid', borderColor: '#1F2937 transparent transparent transparent' }} />
         </span>
@@ -50,107 +50,114 @@ function Tooltip({ text }: { text: string }) {
 }
 
 function MetricCard({ label, val, color = '#7C3AED' }: { label: string; val: any; color?: string }) {
-  const tipKey = label.toLowerCase();
   return (
     <div style={{ background: 'white', borderRadius: 12, padding: '20px 18px', border: '1px solid #E5E7EB' }}>
       <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.68rem', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
         {label}
-        {METRIC_TIPS[tipKey] && <Tooltip text={METRIC_TIPS[tipKey]} />}
+        {METRIC_TIPS[label.toLowerCase()] && <Tooltip text={METRIC_TIPS[label.toLowerCase()]} />}
       </div>
       <div style={{ fontSize: '2rem', fontWeight: 800, color, lineHeight: 1 }}>{val}</div>
     </div>
   );
 }
 
-// Full semicircle gauge like image 4
+// ── GAUGE — SVG semicircle like image 1 ──────────────────────
 function GeoGauge({ score, brand }: { score: number; brand: string }) {
   const badge = scoreBadge(score);
-  const W = 340, H = 200;
-  const cx = W / 2, cy = H - 20;
-  const R_outer = 150, R_inner = 105;
+  // SVG dimensions
+  const W = 400, H = 230;
+  const cx = W / 2, cy = H - 30;
+  const Ro = 160, Ri = 110; // outer/inner radius
 
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const polarToXY = (deg: number, r: number) => ({
-    x: cx + r * Math.cos(toRad(deg)),
-    y: cy + r * Math.sin(toRad(deg)),
+  // Convert value 0–100 to angle: 0=180°(left), 100=0°(right)
+  const valToAngle = (v: number) => Math.PI - (v / 100) * Math.PI;
+
+  const polar = (angle: number, r: number) => ({
+    x: cx + r * Math.cos(angle),
+    y: cy - r * Math.sin(angle),
   });
 
-  const arcPath = (startDeg: number, endDeg: number, rOuter: number, rInner: number) => {
-    const s1 = polarToXY(startDeg, rOuter);
-    const e1 = polarToXY(endDeg, rOuter);
-    const s2 = polarToXY(endDeg, rInner);
-    const e2 = polarToXY(startDeg, rInner);
-    const large = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
-    return `M ${s1.x} ${s1.y} A ${rOuter} ${rOuter} 0 ${large} 1 ${e1.x} ${e1.y} L ${s2.x} ${s2.y} A ${rInner} ${rInner} 0 ${large} 0 ${e2.x} ${e2.y} Z`;
+  // Donut arc segment path
+  const arcSegment = (v0: number, v1: number, color: string) => {
+    const a0 = valToAngle(v0), a1 = valToAngle(v1);
+    const p0o = polar(a0, Ro), p1o = polar(a1, Ro);
+    const p0i = polar(a0, Ri), p1i = polar(a1, Ri);
+    const large = Math.abs(v1 - v0) > 50 ? 1 : 0;
+    return (
+      <path
+        d={`M ${p0o.x} ${p0o.y} A ${Ro} ${Ro} 0 ${large} 0 ${p1o.x} ${p1o.y} L ${p1i.x} ${p1i.y} A ${Ri} ${Ri} 0 ${large} 1 ${p0i.x} ${p0i.y} Z`}
+        fill={color} stroke="white" strokeWidth="1.5"
+      />
+    );
   };
 
-  // 180 → 0 degrees (left to right = 0 to 100)
-  const zones = [
-    { from: 180, to: 136, color: '#FECACA', label: '0' },   // 0–44 poor
-    { from: 136, to: 92, color: '#FEF08A', label: '44' },   // 44–69 needs work
-    { from: 92, to: 72, color: '#BAE6FD', label: '69' },    // 69–79 good
-    { from: 72, to: 0, color: '#BBF7D0', label: '79' },     // 79–100 excellent
-  ];
+  // Filled progress arc (purple)
+  const progressArc = () => {
+    if (score <= 0) return null;
+    const a0 = valToAngle(0), a1 = valToAngle(score);
+    const p0o = polar(a0, Ro - 1), p1o = polar(a1, Ro - 1);
+    const p0i = polar(a0, Ri + 1), p1i = polar(a1, Ri + 1);
+    const large = score > 50 ? 1 : 0;
+    return (
+      <path
+        d={`M ${p0o.x} ${p0o.y} A ${Ro - 1} ${Ro - 1} 0 ${large} 0 ${p1o.x} ${p1o.y} L ${p1i.x} ${p1i.y} A ${Ri + 1} ${Ri + 1} 0 ${large} 1 ${p0i.x} ${p0i.y} Z`}
+        fill="#6D28D9" opacity={0.95}
+      />
+    );
+  };
 
-  // Needle angle: 180deg = score 0, 0deg = score 100
-  const needleAngle = 180 - (score / 100) * 180;
-  const needleLen = R_inner - 10;
-  const needleTip = polarToXY(needleAngle, needleLen);
+  // Needle
+  const needleAngle = valToAngle(score);
+  const needleTip = polar(needleAngle, Ri + 2);
 
   // Tick marks
   const ticks = [0, 20, 40, 60, 80, 100];
 
   return (
-    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '24px 24px 16px', textAlign: 'center' }}>
-      <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>{brand}</div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: 320, display: 'block', margin: '0 auto', overflow: 'visible' }}>
-        {/* Zone arcs */}
-        {zones.map((z, i) => (
-          <path key={i} d={arcPath(z.from, z.to, R_outer, R_inner)} fill={z.color} stroke="white" strokeWidth="1" />
-        ))}
-        {/* Filled progress arc */}
-        {score > 0 && (
-          <path d={arcPath(180, 180 - (score / 100) * 180, R_outer - 2, R_inner + 2)} fill="#7C3AED" opacity={0.9} />
-        )}
-        {/* Tick marks + labels */}
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '20px 16px 16px', textAlign: 'center' }}>
+      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
+        {/* Background zones */}
+        {arcSegment(0, 44, '#FECACA')}
+        {arcSegment(44, 69, '#FEF08A')}
+        {arcSegment(69, 79, '#BAE6FD')}
+        {arcSegment(79, 100, '#BBF7D0')}
+        {/* Purple progress fill */}
+        {progressArc()}
+        {/* Tick marks */}
         {ticks.map(t => {
-          const deg = 180 - (t / 100) * 180;
-          const inner = polarToXY(deg, R_inner - 4);
-          const outer = polarToXY(deg, R_outer + 4);
-          const lbl = polarToXY(deg, R_outer + 16);
+          const a = valToAngle(t);
+          const inner = polar(a, Ri - 6);
+          const outer = polar(a, Ro + 6);
+          const lbl = polar(a, Ro + 18);
           return (
             <g key={t}>
               <line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="#9CA3AF" strokeWidth="1" />
-              <text x={lbl.x} y={lbl.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{t}</text>
+              <text x={lbl.x} y={lbl.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 10, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{t}</text>
             </g>
           );
         })}
         {/* Needle */}
-        <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#374151" strokeWidth="2.5" strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r={7} fill="#374151" />
+        <line x1={cx} y1={cy} x2={needleTip.x} y2={needleTip.y} stroke="#111827" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={8} fill="#111827" />
         <circle cx={cx} cy={cy} r={4} fill="white" />
-        {/* Score */}
-        <text x={cx} y={cy - 28} textAnchor="middle" style={{ fontSize: 36, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter,sans-serif' }}>{score}</text>
+        {/* Score number */}
+        <text x={cx} y={cy - 32} textAnchor="middle" style={{ fontSize: 44, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter,sans-serif' }}>{score}</text>
       </svg>
-      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '4px 16px', fontSize: '0.78rem', fontWeight: 700 }}>{badge.label}</span>
+      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
     </div>
   );
 }
 
-// Sankey — clean, expanded, like image 2
+// ── SANKEY — SVG, interactive hover ─────────────────────────
 function SankeyChart({ result }: { result: any }) {
+  const [hovered, setHovered] = useState<number | null>(null);
   const vis = result.visibility ?? 0;
   const cit = result.citation_share ?? 0;
   const sent = result.sentiment ?? 0;
   const prom = result.prominence ?? 0;
   const sov = result.share_of_voice ?? 0;
   const geo = result.overall_geo_score ?? 0;
-
-  const W = 700, H = 360;
-  const leftX = 200, rightX = 560;
-  const nodeW = 22;
-  const geoNodeH = 140;
-  const geoCY = H / 2;
 
   const inputs = [
     { label: 'Visibility', value: vis, color: '#7C3AED', weight: 30 },
@@ -160,161 +167,159 @@ function SankeyChart({ result }: { result: any }) {
     { label: 'Share of Voice', value: sov, color: '#EF4444', weight: 15 },
   ];
 
-  const nodeH = 28;
-  const totalH = inputs.length * nodeH + (inputs.length - 1) * 24;
+  const W = 800, H = 400;
+  const leftX = 240, rightX = 620;
+  const nodeW = 28;
+  const geoH = 160, geoCY = H / 2;
+  const nodeH = 36, gap = 28;
+  const totalH = inputs.length * nodeH + (inputs.length - 1) * gap;
   const startY = (H - totalH) / 2;
 
-  const nodes = inputs.map((n, i) => ({
-    ...n,
-    y: startY + i * (nodeH + 24),
-  }));
+  const nodes = inputs.map((n, i) => ({ ...n, y: startY + i * (nodeH + gap) }));
 
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '28px 32px', marginTop: 24 }}>
       <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>GEO Score Composition</div>
-      <div style={{ fontSize: '0.82rem', color: '#9CA3AF', marginBottom: 24 }}>How each signal flows into your overall GEO Score</div>
+      <div style={{ fontSize: '0.82rem', color: '#9CA3AF', marginBottom: 20 }}>How each signal flows into your overall GEO Score</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
         {nodes.map((n, i) => {
           const srcMidY = n.y + nodeH / 2;
-          const dstTop = geoCY - geoNodeH / 2;
-          const dstBot = geoCY + geoNodeH / 2;
-          const bandH = geoNodeH / inputs.length;
-          const dstMidY = dstTop + i * bandH + bandH / 2;
+          const bandH = geoH / inputs.length;
+          const dstMidY = geoCY - geoH / 2 + i * bandH + bandH / 2;
           const halfSrc = nodeH / 2;
           const halfDst = bandH / 2;
-          const cp1x = leftX + nodeW + (rightX - leftX - nodeW) * 0.45;
-          const cp2x = leftX + nodeW + (rightX - leftX - nodeW) * 0.55;
+          const cp1x = leftX + nodeW + (rightX - leftX - nodeW) * 0.4;
+          const cp2x = leftX + nodeW + (rightX - leftX - nodeW) * 0.6;
+          const isHov = hovered === i;
 
           return (
-            <g key={i}>
-              {/* Flow band */}
+            <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'pointer' }}>
+              {/* Band */}
               <path
                 d={`M ${leftX + nodeW} ${srcMidY - halfSrc}
                     C ${cp1x} ${srcMidY - halfSrc}, ${cp2x} ${dstMidY - halfDst}, ${rightX} ${dstMidY - halfDst}
                     L ${rightX} ${dstMidY + halfDst}
                     C ${cp2x} ${dstMidY + halfDst}, ${cp1x} ${srcMidY + halfSrc}, ${leftX + nodeW} ${srcMidY + halfSrc} Z`}
-                fill={n.color} opacity={0.15}
+                fill={n.color} opacity={isHov ? 0.35 : 0.18}
+                style={{ transition: 'opacity 0.2s' }}
               />
               {/* Source node */}
-              <rect x={leftX} y={n.y} width={nodeW} height={nodeH} rx={5} fill={n.color} />
-              {/* Label left */}
-              <text x={leftX - 8} y={n.y + nodeH / 2} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 13, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}>{n.label}</text>
-              {/* Value below label */}
-              <text x={leftX - 8} y={n.y + nodeH / 2 + 14} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 11, fill: n.color, fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>{n.value}</text>
-              {/* Weight % in middle of band */}
-              <text x={(leftX + nodeW + rightX) / 2} y={srcMidY} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: n.color, fontFamily: 'Inter,sans-serif', fontWeight: 600, opacity: 0.9 }}>{n.weight}%</text>
+              <rect x={leftX} y={n.y} width={nodeW} height={nodeH} rx={6} fill={n.color} opacity={isHov ? 1 : 0.9} />
+              {/* Label */}
+              <text x={leftX - 10} y={n.y + nodeH / 2 - 6} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 14, fill: '#111827', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>{n.label}</text>
+              <text x={leftX - 10} y={n.y + nodeH / 2 + 10} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 12, fill: n.color, fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>{n.value}</text>
+              {/* Weight % */}
+              <text x={(leftX + nodeW + rightX) / 2} y={srcMidY + 2} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12, fill: n.color, fontFamily: 'Inter,sans-serif', fontWeight: 600, opacity: isHov ? 1 : 0.8 }}>{n.weight}%</text>
+              {/* Hover tooltip */}
+              {isHov && (
+                <g>
+                  <rect x={(leftX + nodeW + rightX) / 2 - 70} y={srcMidY - 32} width={140} height={26} rx={6} fill="#1F2937" />
+                  <text x={(leftX + nodeW + rightX) / 2} y={srcMidY - 19} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 11, fill: 'white', fontFamily: 'Inter,sans-serif' }}>
+                    {n.label}: {n.value} · weight {n.weight}%
+                  </text>
+                </g>
+              )}
             </g>
           );
         })}
-        {/* GEO destination node */}
-        <rect x={rightX} y={geoCY - geoNodeH / 2} width={nodeW} height={geoNodeH} rx={5} fill="#7C3AED" />
-        {/* GEO label */}
-        <text x={rightX + nodeW + 14} y={geoCY - 14} textAnchor="start" dominantBaseline="middle" style={{ fontSize: 13, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>GEO Score</text>
-        <text x={rightX + nodeW + 14} y={geoCY + 10} textAnchor="start" dominantBaseline="middle" style={{ fontSize: 28, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontWeight: 900 }}>{geo}</text>
+        {/* GEO node */}
+        <rect x={rightX} y={geoCY - geoH / 2} width={nodeW} height={geoH} rx={6} fill="#7C3AED" />
+        <text x={rightX + nodeW + 16} y={geoCY - 16} textAnchor="start" dominantBaseline="middle" style={{ fontSize: 14, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>GEO Score</text>
+        <text x={rightX + nodeW + 16} y={geoCY + 14} textAnchor="start" dominantBaseline="middle" style={{ fontSize: 32, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontWeight: 900 }}>{geo}</text>
       </svg>
     </div>
   );
 }
 
-// Link Analysis — clean like image 3
+// ── LINK ANALYSIS — pure SVG, crisp, interactive ─────────────
 function LinkAnalysis({ result }: { result: any }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
   const brand = result.brand_name || 'Brand';
   const competitors = (result.competitors || []).slice(0, 4);
-  const sources = (result.citation_sources || []).slice(0, 3);
+  const sources = (result.citation_sources || []).slice(0, 4);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
+  const W = 800, H = 480;
+  const cx = W / 2, cy = H / 2 - 10;
 
-    const cx = W / 2, cy = H / 2 - 20;
+  type NodeDef = { id: string; x: number; y: number; label: string; sublabel?: string; color: string; fillColor: string; r: number; type: string };
+  const nodes: NodeDef[] = [];
 
-    type Node = { x: number; y: number; label: string; color: string; r: number; type: string };
-    const nodes: Node[] = [];
-    nodes.push({ x: cx, y: cy, label: brand, color: '#7C3AED', r: 36, type: 'brand' });
+  nodes.push({ id: 'brand', x: cx, y: cy, label: brand.length > 10 ? brand.slice(0, 9) + '…' : brand, sublabel: brand, color: '#7C3AED', fillColor: '#7C3AED', r: 44, type: 'brand' });
 
-    // Competitors — left/top arc
-    competitors.forEach((c: any, i: number) => {
-      const angle = Math.PI + (i / Math.max(competitors.length, 1)) * Math.PI * 0.9 - Math.PI * 0.1;
-      nodes.push({ x: cx + 200 * Math.cos(angle), y: cy + 150 * Math.sin(angle), label: c.Brand, color: '#8B5CF6', r: 22, type: 'competitor' });
-    });
+  // Competitors on left arc
+  const compAngles = competitors.length === 1 ? [Math.PI] : competitors.map((_: any, i: number) => Math.PI * 0.55 + (i / (competitors.length - 1)) * Math.PI * 0.9);
+  competitors.forEach((c: any, i: number) => {
+    const a = compAngles[i];
+    nodes.push({ id: `comp-${i}`, x: cx + 210 * Math.cos(a), y: cy - 170 * Math.sin(a), label: c.Brand?.length > 12 ? c.Brand.slice(0, 11) + '…' : c.Brand, sublabel: c.Brand, color: '#8B5CF6', fillColor: '#C4B5FD', r: 26, type: 'competitor' });
+  });
 
-    // Sources — right arc
-    sources.forEach((s: any, i: number) => {
-      const angle = -Math.PI * 0.25 + (i / Math.max(sources.length, 1)) * Math.PI * 0.7;
-      nodes.push({ x: cx + 210 * Math.cos(angle), y: cy + 130 * Math.sin(angle), label: s.domain?.split('.')[0] || s.domain, color: '#10B981', r: 18, type: 'source' });
-    });
+  // Sources on right arc
+  const srcAngles = sources.length === 1 ? [0] : sources.map((_: any, i: number) => -Math.PI * 0.3 + (i / (sources.length - 1)) * Math.PI * 0.75);
+  sources.forEach((s: any, i: number) => {
+    const a = srcAngles[i];
+    const domain = (s.domain || '').split('.')[0];
+    nodes.push({ id: `src-${i}`, x: cx + 220 * Math.cos(a), y: cy - 150 * Math.sin(a), label: domain, sublabel: s.domain, color: '#10B981', fillColor: '#6EE7B7', r: 22, type: 'source' });
+  });
 
-    // Draw edges first
-    nodes.slice(1).forEach(n => {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(n.x, n.y);
-      ctx.strokeStyle = n.type === 'competitor' ? 'rgba(139,92,246,0.3)' : 'rgba(16,185,129,0.3)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    });
-
-    // Draw nodes
-    nodes.forEach(n => {
-      // Glow
-      ctx.shadowColor = n.color + '55';
-      ctx.shadowBlur = 16;
-      ctx.beginPath();
-      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = n.type === 'brand' ? n.color : (n.type === 'competitor' ? '#C4B5FD' : '#6EE7B7');
-      ctx.fill();
-      ctx.shadowBlur = 0;
-
-      // Label below node
-      ctx.fillStyle = '#374151';
-      ctx.font = `600 11px Inter, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText(n.label.length > 14 ? n.label.slice(0, 13) + '…' : n.label, n.x, n.y + n.r + 5);
-
-      // Brand label inside
-      if (n.type === 'brand') {
-        ctx.fillStyle = 'white';
-        ctx.font = `700 12px Inter, sans-serif`;
-        ctx.textBaseline = 'middle';
-        ctx.fillText(n.label.length > 10 ? n.label.slice(0, 9) + '…' : n.label, n.x, n.y);
-      }
-    });
-
-    // Legend at bottom
-    const legend = [
-      { color: '#7C3AED', dotColor: '#7C3AED', label: 'Your Brand' },
-      { color: '#8B5CF6', dotColor: '#C4B5FD', label: 'Competitors' },
-      { color: '#10B981', dotColor: '#6EE7B7', label: 'Sources' },
-    ];
-    const legendW = legend.length * 130;
-    const legendX = (W - legendW) / 2;
-    legend.forEach((l, i) => {
-      const x = legendX + i * 130;
-      const y = H - 28;
-      ctx.beginPath();
-      ctx.arc(x + 8, y, 7, 0, Math.PI * 2);
-      ctx.fillStyle = l.dotColor;
-      ctx.fill();
-      ctx.fillStyle = '#374151';
-      ctx.font = '500 11px Inter, sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(l.label, x + 20, y);
-    });
-  }, [result, brand, competitors, sources]);
+  const center = nodes[0];
 
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '28px 32px', marginTop: 24 }}>
       <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>AI Citation Network</div>
       <div style={{ fontSize: '0.82rem', color: '#9CA3AF', marginBottom: 16 }}>Brands and sources co-cited with {brand} in AI responses</div>
-      <div style={{ background: '#F8FAFC', borderRadius: 12, overflow: 'hidden' }}>
-        <canvas ref={canvasRef} width={700} height={420} style={{ width: '100%', display: 'block' }} />
+      <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+          {/* Edges */}
+          {nodes.slice(1).map(n => {
+            const isHov = hovered === n.id || hovered === 'brand';
+            return (
+              <line key={n.id}
+                x1={center.x} y1={center.y} x2={n.x} y2={n.y}
+                stroke={n.type === 'competitor' ? '#C4B5FD' : '#6EE7B7'}
+                strokeWidth={isHov ? 2 : 1.2}
+                opacity={hovered && !isHov ? 0.2 : 0.7}
+                style={{ transition: 'all 0.2s' }}
+              />
+            );
+          })}
+          {/* Nodes */}
+          {nodes.map(n => {
+            const isHov = hovered === n.id;
+            return (
+              <g key={n.id} onMouseEnter={() => setHovered(n.id)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'pointer' }}>
+                {/* Glow ring on hover */}
+                {isHov && <circle cx={n.x} cy={n.y} r={n.r + 8} fill={n.color} opacity={0.15} />}
+                <circle cx={n.x} cy={n.y} r={n.r} fill={n.fillColor} opacity={hovered && !isHov ? 0.4 : 1} style={{ transition: 'all 0.2s' }} />
+                {/* Label inside brand node */}
+                {n.type === 'brand' && (
+                  <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12, fill: 'white', fontFamily: 'Inter,sans-serif', fontWeight: 700, pointerEvents: 'none' }}>{n.label}</text>
+                )}
+                {/* Label below other nodes */}
+                {n.type !== 'brand' && (
+                  <text x={n.x} y={n.y + n.r + 14} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 500, pointerEvents: 'none' }}>{n.label}</text>
+                )}
+                {/* Brand name below brand node */}
+                {n.type === 'brand' && (
+                  <text x={n.x} y={n.y + n.r + 16} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 12, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 600, pointerEvents: 'none' }}>{brand}</text>
+                )}
+                {/* Hover tooltip */}
+                {isHov && n.type !== 'brand' && (
+                  <g>
+                    <rect x={n.x - 60} y={n.y - n.r - 30} width={120} height={22} rx={5} fill="#1F2937" />
+                    <text x={n.x} y={n.y - n.r - 19} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 10, fill: 'white', fontFamily: 'Inter,sans-serif' }}>{n.sublabel}</text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
+          {/* Legend */}
+          {[{ color: '#7C3AED', fill: '#7C3AED', label: 'Your Brand' }, { color: '#8B5CF6', fill: '#C4B5FD', label: 'Competitors' }, { color: '#10B981', fill: '#6EE7B7', label: 'Sources' }].map((l, i) => (
+            <g key={i} transform={`translate(${W / 2 - 180 + i * 130}, ${H - 28})`}>
+              <circle cx={8} cy={0} r={8} fill={l.fill} />
+              <text x={22} y={0} dominantBaseline="middle" style={{ fontSize: 12, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 500 }}>{l.label}</text>
+            </g>
+          ))}
+        </svg>
       </div>
     </div>
   );
@@ -397,7 +402,6 @@ export default function GeoHub() {
         </div>
       ) : (
         <div>
-          {/* Tabs */}
           <div style={{ borderBottom: '1px solid #E5E7EB', background: 'white', display: 'flex', padding: '0 40px', gap: 4 }}>
             {TABS.map((t, i) => (
               <button key={i} onClick={() => setActiveTab(i)} style={{ background: 'none', border: 'none', borderBottom: activeTab === i ? '2px solid #7C3AED' : '2px solid transparent', color: activeTab === i ? '#7C3AED' : '#6B7280', fontWeight: activeTab === i ? 700 : 500, fontSize: '0.85rem', padding: '12px 20px', cursor: 'pointer', transition: 'all 0.15s' }}>
@@ -411,7 +415,6 @@ export default function GeoHub() {
 
           <div style={{ padding: '32px 40px 60px' }}>
 
-            {/* TAB 0: GEO Score */}
             {activeTab === 0 && (() => {
               const geo = result.overall_geo_score;
               const badge = scoreBadge(geo);
@@ -421,11 +424,9 @@ export default function GeoHub() {
               const avgRank = result.avg_rank;
               const prom = result.prominence;
               const sov = result.share_of_voice;
-
               return (
                 <div>
-                  {/* Top row: gauge + summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 24, marginBottom: 24 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', gap: 24, marginBottom: 24 }}>
                     <GeoGauge score={geo} brand={result.brand_name} />
                     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '28px 32px' }}>
                       <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#111827', marginBottom: 6 }}>{result.brand_name}</div>
@@ -440,25 +441,18 @@ export default function GeoHub() {
                       </div>
                     </div>
                   </div>
-
-                  {/* Metrics row: visibility, sentiment, citation, avg rank */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
                     <MetricCard label="visibility score" val={vis} color="#7C3AED" />
                     <MetricCard label="sentiment score" val={sent} color="#10B981" />
                     <MetricCard label="citation score" val={cit} color="#F59E0B" />
                     <MetricCard label="avg rank" val={avgRank} color="#3B82F6" />
                   </div>
-
-                  {/* Sankey */}
                   <SankeyChart result={result} />
-
-                  {/* Link Analysis */}
                   <LinkAnalysis result={result} />
                 </div>
               );
             })()}
 
-            {/* TAB 1: Competitors */}
             {activeTab === 1 && (() => {
               const geo = result.overall_geo_score;
               const vis = result.visibility; const cit = result.citation_share;
@@ -507,7 +501,6 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 2: Visibility */}
             {activeTab === 2 && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -520,27 +513,14 @@ export default function GeoHub() {
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Page Intelligence</div>
                     <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Which pages of {result.domain} are being cited by AI.</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>
-                          {['Page', 'Path', 'Status'].map(h => <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(result.internal_links || []).slice(0, 8).map((lk: any, i: number) => (
-                          <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                            <td style={{ padding: '10px 14px', fontSize: '0.84rem', fontWeight: 600, color: '#111827' }}>{lk.label}</td>
-                            <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#9CA3AF' }}>{lk.path}</td>
-                            <td style={{ padding: '10px 14px' }}><span style={{ background: '#F3F4F6', color: '#9CA3AF', borderRadius: 4, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 700 }}>Detected</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
+                      <thead><tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>{['Page', 'Path', 'Status'].map(h => <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}</tr></thead>
+                      <tbody>{(result.internal_links || []).slice(0, 8).map((lk: any, i: number) => (<tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}><td style={{ padding: '10px 14px', fontSize: '0.84rem', fontWeight: 600, color: '#111827' }}>{lk.label}</td><td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#9CA3AF' }}>{lk.path}</td><td style={{ padding: '10px 14px' }}><span style={{ background: '#F3F4F6', color: '#9CA3AF', borderRadius: 4, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 700 }}>Detected</span></td></tr>))}</tbody>
                     </table>
                   </div>
                 )}
               </div>
             )}
 
-            {/* TAB 3: Sentiment */}
             {activeTab === 3 && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -561,7 +541,6 @@ export default function GeoHub() {
               </div>
             )}
 
-            {/* TAB 4: Citations */}
             {activeTab === 4 && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
@@ -573,8 +552,7 @@ export default function GeoHub() {
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Sources AI is Pulling From</div>
                     <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Domains influencing AI knowledge about this brand.</div>
                     {(result.citation_sources || []).map((s: any, i: number) => {
-                      const cls = classifyDomain(s.domain);
-                      const bw = Math.min(s.citation_share * 3, 100);
+                      const cls = classifyDomain(s.domain); const bw = Math.min(s.citation_share * 3, 100);
                       return (
                         <div key={i} style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -583,17 +561,11 @@ export default function GeoHub() {
                             <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#111827', flex: 1 }}>{s.domain}</span>
                             <span style={{ background: cls.bg, color: cls.color, borderRadius: 50, padding: '2px 10px', fontSize: '0.7rem', fontWeight: 600 }}>{cls.label}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, width: 80, overflow: 'hidden' }}>
-                                <div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: bw }} />
-                              </div>
+                              <div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, width: 80, overflow: 'hidden' }}><div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: bw }} /></div>
                               <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#7C3AED' }}>{s.citation_share}%</span>
                             </div>
                           </div>
-                          {s.top_pages?.length > 0 && (
-                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '0.5px solid #F3F4F6' }}>
-                              {s.top_pages.slice(0, 3).map((pg: string, j: number) => <div key={j} style={{ fontSize: '0.75rem', color: '#7C3AED', padding: '2px 0' }}>{pg}</div>)}
-                            </div>
-                          )}
+                          {s.top_pages?.length > 0 && (<div style={{ marginTop: 8, paddingTop: 8, borderTop: '0.5px solid #F3F4F6' }}>{s.top_pages.slice(0, 3).map((pg: string, j: number) => <div key={j} style={{ fontSize: '0.75rem', color: '#7C3AED', padding: '2px 0' }}>{pg}</div>)}</div>)}
                         </div>
                       );
                     })}
@@ -602,47 +574,29 @@ export default function GeoHub() {
               </div>
             )}
 
-            {/* TAB 5: Prompts */}
             {activeTab === 5 && (() => {
               const rd = result.responses_detail || [];
               const cats = ['All', ...Array.from(new Set(rd.map((r: any) => r.category))) as string[]];
               const filtered = rd.filter((r: any) => filterCat === 'All' || r.category === filterCat).slice(0, 10);
               const catStats: Record<string, { total: number; mentioned: number }> = {};
-              rd.forEach((r: any) => {
-                if (!catStats[r.category]) catStats[r.category] = { total: 0, mentioned: 0 };
-                catStats[r.category].total++;
-                if (r.mentioned) catStats[r.category].mentioned++;
-              });
+              rd.forEach((r: any) => { if (!catStats[r.category]) catStats[r.category] = { total: 0, mentioned: 0 }; catStats[r.category].total++; if (r.mentioned) catStats[r.category].mentioned++; });
               return (
                 <div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
                     {Object.entries(catStats).map(([c, v]) => (
                       <div key={c} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, padding: '14px 18px' }}>
                         <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827', marginBottom: 6 }}>{c}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, flex: 1, overflow: 'hidden' }}>
-                            <div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: `${Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%` }} />
-                          </div>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7C3AED' }}>{Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%</span>
-                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, flex: 1, overflow: 'hidden' }}><div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: `${Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%` }} /></div><span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7C3AED' }}>{Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%</span></div>
                         <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: 4 }}>{v.mentioned} of {v.total} queries</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginBottom: 16 }}>
-                    <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 14px', fontSize: '0.85rem', color: '#374151', background: 'white', outline: 'none' }}>
-                      {cats.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  </div>
+                  <div style={{ marginBottom: 16 }}><select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 14px', fontSize: '0.85rem', color: '#374151', background: 'white', outline: 'none' }}>{cats.map(c => <option key={c}>{c}</option>)}</select></div>
                   <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
                     <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Top 10 Prompts</div>
                     <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Generic consumer questions. No brand name used.</div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>
-                          {['#', 'Query', 'Rank'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}
-                        </tr>
-                      </thead>
+                      <thead><tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>{['#', 'Query', 'Rank'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}</tr></thead>
                       <tbody>
                         {filtered.map((item: any, i: number) => {
                           const rp = item.position; const rd2 = rp > 0 ? `#${rp}` : 'N/A';
@@ -657,10 +611,7 @@ export default function GeoHub() {
                                 </div>
                                 <div style={{ fontSize: '0.83rem', color: '#374151' }}>{item.query}</div>
                               </td>
-                              <td style={{ padding: '10px 16px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: rc }}>{rd2}</div>
-                                <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>Rank</div>
-                              </td>
+                              <td style={{ padding: '10px 16px', textAlign: 'center' }}><div style={{ fontSize: '1.1rem', fontWeight: 800, color: rc }}>{rd2}</div><div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>Rank</div></td>
                             </tr>
                           );
                         })}
@@ -671,37 +622,22 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 6: Recommendations */}
             {activeTab === 6 && (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
                   <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#065F46', marginBottom: 16 }}>What is Working Well</div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                      {(result.strengths_list || []).slice(0, 3).map((s: string, i: number) => (
-                        <li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #F0FDF4' }}>
-                          <span style={{ color: '#10B981', fontWeight: 700, flexShrink: 0 }}>+</span><span>{s}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>{(result.strengths_list || []).slice(0, 3).map((s: string, i: number) => (<li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #F0FDF4' }}><span style={{ color: '#10B981', fontWeight: 700, flexShrink: 0 }}>+</span><span>{s}</span></li>))}</ul>
                   </div>
                   <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
                     <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#9F1239', marginBottom: 16 }}>What Needs Improvement</div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                      {(result.improvements_list || []).slice(0, 5).map((w: string, i: number) => (
-                        <li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #FFF1F2' }}>
-                          <span style={{ color: '#EF4444', fontWeight: 700, flexShrink: 0 }}>x</span><span>{w}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>{(result.improvements_list || []).slice(0, 5).map((w: string, i: number) => (<li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #FFF1F2' }}><span style={{ color: '#EF4444', fontWeight: 700, flexShrink: 0 }}>x</span><span>{w}</span></li>))}</ul>
                   </div>
                 </div>
                 <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
                   <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Priority Actions</div>
                   <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 20 }}>Each action mapped to the relevant Accenture workstream deliverable.</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', borderBottom: '2px solid #E5E7EB', paddingBottom: 8, marginBottom: 4 }}>
-                    {['Priority', 'Action', 'Linked Deliverable'].map(h => <div key={h} style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</div>)}
-                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', borderBottom: '2px solid #E5E7EB', paddingBottom: 8, marginBottom: 4 }}>{['Priority', 'Action', 'Linked Deliverable'].map(h => <div key={h} style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</div>)}</div>
                   {(result.actions || []).map((a: any, i: number) => {
                     const dm: Record<string, [string, string]> = { High: ['Workstream 01: ARD', 'AXO Baseline Report and Brand Ranking Index'], Medium: ['Workstream 02: AOP', 'LLM-Ready Content Package and Content Influence Blueprint'], Low: ['Workstream 03: DTI', 'Schema Optimization Guide and Metadata Remediation Plan'] };
                     const priBg: Record<string, string> = { High: '#FEE2E2', Medium: '#FEF3C7', Low: '#DCFCE7' };
@@ -711,10 +647,7 @@ export default function GeoHub() {
                       <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', gap: 0, borderBottom: '1px solid #F3F4F6', padding: '14px 0', alignItems: 'start' }}>
                         <div><span style={{ background: priBg[a.priority], color: priTc[a.priority], borderRadius: 4, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{a.priority}</span></div>
                         <div style={{ fontSize: '0.84rem', color: '#374151', paddingRight: 16 }}>{a.action}</div>
-                        <div>
-                          <span style={{ background: '#EDE9FE', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', color: '#7C3AED', fontWeight: 600 }}>{pk}</span>
-                          <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{deliv}</div>
-                        </div>
+                        <div><span style={{ background: '#EDE9FE', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', color: '#7C3AED', fontWeight: 600 }}>{pk}</span><div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{deliv}</div></div>
                       </div>
                     );
                   })}
@@ -722,7 +655,6 @@ export default function GeoHub() {
               </div>
             )}
 
-            {/* TAB 7: Live Prompt */}
             {activeTab === 7 && (
               <div>
                 <div style={{ background: '#7C3AED', borderRadius: 12, padding: '24px 28px', color: 'white', marginBottom: 20 }}>
@@ -738,16 +670,12 @@ export default function GeoHub() {
                 </div>
                 {promptHistory.map((item, i) => (
                   <div key={i}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '20px 0 10px' }}>
-                      <div style={{ background: '#F4F4F4', color: '#111827', borderRadius: '18px 18px 4px 18px', padding: '12px 18px', maxWidth: '60%', fontSize: '0.95rem' }}>{item.q}</div>
-                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '20px 0 10px' }}><div style={{ background: '#F4F4F4', color: '#111827', borderRadius: '18px 18px 4px 18px', padding: '12px 18px', maxWidth: '60%', fontSize: '0.95rem' }}>{item.q}</div></div>
                     <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{item.a}</div>
                     <hr style={{ border: 'none', borderTop: '1px solid #F3F4F6', margin: '16px 0' }} />
                   </div>
                 ))}
-                {promptHistory.length > 0 && (
-                  <button onClick={() => setPromptHistory([])} style={{ background: 'none', border: '1px solid #E5E7EB', borderRadius: 8, color: '#6B7280', fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}>Clear history</button>
-                )}
+                {promptHistory.length > 0 && <button onClick={() => setPromptHistory([])} style={{ background: 'none', border: '1px solid #E5E7EB', borderRadius: 8, color: '#6B7280', fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}>Clear history</button>}
               </div>
             )}
           </div>
