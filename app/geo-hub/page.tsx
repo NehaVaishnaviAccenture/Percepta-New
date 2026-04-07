@@ -896,45 +896,57 @@ export default function GeoHub() {
                         const brand=result.brand_name||'Brand';
                         const comps=(result.competitors||[]).slice(0,3);
                         const srcs=sources.slice(0,3);
-                        const W=380,H=240,cx=W/2,cy=H/2-10;
+                        const W=340,H=260,cx=W/2,cy=H/2;
                         type N2={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
                         const ns:N2[]=[];
-                        ns.push({id:'brand',x:cx,y:cy,label:brand.length>8?brand.slice(0,7)+'…':brand,full:brand,r:32,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
-                        const cA=comps.map((_:any,i:number)=>Math.PI*0.55+(i/Math.max(comps.length-1,1))*Math.PI*0.85);
-                        comps.forEach((c:any,i:number)=>ns.push({id:`c${i}`,x:cx+118*Math.cos(cA[i]),y:cy-85*Math.sin(cA[i]),label:(c.Brand||'').split(' ')[0].slice(0,9),full:c.Brand,r:20,fill:'#C4B5FD',stroke:'#8B5CF6',type:'competitor'}));
-                        const sA=srcs.map((_:any,i:number)=>-Math.PI*0.18+(i/Math.max(srcs.length-1,1))*Math.PI*0.5);
-                        srcs.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];ns.push({id:`s${i}`,x:cx+122*Math.cos(sA[i]),y:cy-82*Math.sin(sA[i]),label:dom.slice(0,9),full:s.domain,r:18,fill:'#6EE7B7',stroke:'#10B981',type:'source',pct:s.citation_share});});
+                        ns.push({id:'brand',x:cx,y:cy,label:brand.length>10?brand.slice(0,9)+'…':brand,full:brand,r:38,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
+                        const cA=comps.map((_:any,i:number)=>Math.PI*0.6+(i/Math.max(comps.length-1,1))*Math.PI*0.8);
+                        comps.forEach((c:any,i:number)=>ns.push({id:`c${i}`,x:cx+105*Math.cos(cA[i]),y:cy-80*Math.sin(cA[i]),label:(c.Brand||'').split(' ')[0].slice(0,9),full:c.Brand,r:20,fill:'#C4B5FD',stroke:'#8B5CF6',type:'competitor'}));
+                        const sA=srcs.map((_:any,i:number)=>-Math.PI*0.15+(i/Math.max(srcs.length-1,1))*Math.PI*0.45);
+                        srcs.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];ns.push({id:`s${i}`,x:cx+110*Math.cos(sA[i]),y:cy-78*Math.sin(sA[i]),label:dom.slice(0,9),full:s.domain,pct:s.citation_share,r:22,fill:'#6EE7B7',stroke:'#10B981',type:'source'});});
                         const ctr=ns[0];
                         return (
-                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
-                            {ns.slice(1).map(n=><line key={n.id} x1={ctr.x} y1={ctr.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth="1.2" opacity="0.6"/>)}
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'90%',display:'block',margin:'0 auto'}}>
+                            {/* Lines */}
+                            {ns.slice(1).map(n=><line key={n.id} x1={ctr.x} y1={ctr.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth="1.5" opacity="0.7"/>)}
+                            {/* Nodes */}
                             {ns.map(n=>{
                               const isH=hovNode===n.id;
-                              // Clamp tooltip so it never goes off the viewBox
-                              const tipW=120,tipH=34;
-                              const tx=Math.min(Math.max(n.x-tipW/2,4),W-tipW-4);
-                              const ty=n.y-n.r-tipH-6<4?n.y+n.r+6:n.y-n.r-tipH-6;
+                              const tipW=140,tipH=n.pct!=null?40:30;
+                              const tx=Math.min(Math.max(n.x-tipW/2,2),W-tipW-2);
+                              const ty=n.y-n.r-tipH-8<2?n.y+n.r+8:n.y-n.r-tipH-8;
                               return (
                                 <g key={n.id} onMouseEnter={()=>setHovNode(n.id)} onMouseLeave={()=>setHovNode(null)} style={{cursor:'pointer'}}>
-                                  {isH&&<circle cx={n.x} cy={n.y} r={n.r+5} fill={n.stroke} opacity="0.15"/>}
-                                  <circle cx={n.x} cy={n.y} r={n.r} fill={n.fill}/>
-                                  {n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}
-                                  {n.type!=='brand'&&<text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{n.label}</text>}
-                                  {n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:8,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.pct}%</text>}
+                                  {isH&&<circle cx={n.x} cy={n.y} r={n.r+6} fill={n.stroke} opacity="0.2"/>}
+                                  <circle cx={n.x} cy={n.y} r={n.r} fill={n.fill} stroke={isH?n.stroke:'none'} strokeWidth="2"/>
+                                  {/* Brand label inside */}
+                                  {n.type==='brand'&&(
+                                    <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>
+                                  )}
+                                  {/* Source % inside bubble */}
+                                  {n.type==='source'&&n.pct!=null&&(
+                                    <text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:800,pointerEvents:'none'}}>{n.pct}%</text>
+                                  )}
+                                  {/* Labels below non-brand nodes */}
+                                  {n.type!=='brand'&&(
+                                    <text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>
+                                  )}
+                                  {/* Hover tooltip — always on top, with white background for contrast */}
                                   {isH&&(
-                                    <g>
+                                    <g style={{filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.18))'}}>
                                       <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
-                                      <text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full}</text>
-                                      {n.pct!=null&&<text x={tx+tipW/2} y={ty+26} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Citation share: {n.pct}%</text>}
-                                      {n.type==='competitor'&&<text x={tx+tipW/2} y={ty+26} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}
+                                      <text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>
+                                      {n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}
+                                      {n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}
                                     </g>
                                   )}
                                 </g>
                               );
                             })}
+                            {/* Legend */}
                             {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=>(
-                              <g key={i} transform={`translate(${W/2-118+i*86},${H-12})`}>
-                                <circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
+                              <g key={i} transform={`translate(${W/2-108+i*78},${H-10})`}>
+                                <circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:8,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
                               </g>
                             ))}
                           </svg>
