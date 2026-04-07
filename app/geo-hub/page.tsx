@@ -143,8 +143,9 @@ function SankeyChart({ result }: { result: any }) {
           );
         })}
         <rect x={rx} y={gCY-gH/2} width={nw} height={gH} rx={4} fill="#7C3AED"/>
-        <text x={rx+nw+10} y={gCY-10} textAnchor="start" dominantBaseline="middle" style={{fontSize:12,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:700}}>GEO Score</text>
-        <text x={rx+nw+10} y={gCY+12} textAnchor="start" dominantBaseline="middle" style={{fontSize:26,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:900}}>{geo}</text>
+        <text x={rx+nw+10} y={gCY-14} textAnchor="start" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:700}}>GEO</text>
+        <text x={rx+nw+10} y={gCY+2} textAnchor="start" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:700}}>Score</text>
+        <text x={rx+nw+10} y={gCY+22} textAnchor="start" dominantBaseline="middle" style={{fontSize:24,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:900}}>{geo}</text>
       </svg>
     </div>
   );
@@ -154,29 +155,40 @@ function SankeyChart({ result }: { result: any }) {
 function BusinessImpact({ result, onGo }: { result: any; onGo: () => void }) {
   const geo = result.overall_geo_score??0, brand = result.brand_name??'Your Brand';
   const nextTier = geo>=80?null:geo>=70?{score:80,label:'Excellent'}:geo>=45?{score:70,label:'Good'}:{score:45,label:'Needs Work'};
-  const steps = [{title:'Higher GEO Score',sub:'→ Stronger AI visibility'},{title:'Stronger AI Visibility',sub:'→ More surfaces where brand is recommended'},{title:'More Surfaces',sub:'→ Higher organic traffic'},{title:'Higher Traffic',sub:'→ More conversions'},{title:'More Conversions',sub:'→ More revenue'}];
+  const steps = [
+    {title:'Higher GEO Score',sub:'Stronger AI visibility'},
+    {title:'Stronger AI Visibility',sub:'More surfaces where brand is recommended'},
+    {title:'More Surfaces',sub:'Higher organic traffic'},
+    {title:'Higher Traffic',sub:'More conversions'},
+    {title:'More Conversions',sub:'More revenue'},
+  ];
   return (
-    <div style={{background:'#F5F3FF',borderRadius:16,border:'1px solid #DDD6FE',padding:'20px 22px',flex:1,display:'flex',flexDirection:'column' as const}}>
+    <div style={{background:'#F5F3FF',borderRadius:16,border:'1px solid #DDD6FE',padding:'18px 22px',flex:1,display:'flex',flexDirection:'column' as const}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
         <span>↗</span><span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>What does this score mean for your business?</span>
       </div>
-      <div style={{display:'flex',flexWrap:'wrap' as const,gap:6,marginBottom:12}}>
+      {/* Vertical flowchart */}
+      <div style={{display:'flex',flexDirection:'column' as const,gap:0,marginBottom:12}}>
         {steps.map((s,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:6}}>
-            <div style={{background:'white',borderRadius:8,border:'1px solid #DDD6FE',padding:'6px 10px'}}>
-              <div style={{fontSize:'0.75rem',fontWeight:700,color:'#7C3AED'}}>{s.title}</div>
-              <div style={{fontSize:'0.68rem',color:'#7C3AED'}}>{s.sub}</div>
+          <div key={i} style={{display:'flex',flexDirection:'column' as const,alignItems:'stretch'}}>
+            <div style={{background:'white',borderRadius:8,border:'1px solid #DDD6FE',padding:'7px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#7C3AED'}}>{s.title}</span>
+              <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>→ {s.sub}</span>
             </div>
-            {i<steps.length-1&&<span style={{color:'#9CA3AF',fontSize:'0.8rem'}}>→</span>}
+            {i<steps.length-1&&(
+              <div style={{display:'flex',justifyContent:'center',padding:'2px 0'}}>
+                <span style={{color:'#C4B5FD',fontSize:'0.85rem',lineHeight:1}}>↓</span>
+              </div>
+            )}
           </div>
         ))}
       </div>
       {nextTier&&(
-        <div style={{background:'white',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 14px',fontSize:'0.82rem',color:'#374151',lineHeight:1.7,marginBottom:12}}>
+        <div style={{background:'white',borderRadius:10,border:'1px solid #DDD6FE',padding:'10px 14px',fontSize:'0.82rem',color:'#374151',lineHeight:1.7,marginBottom:12}}>
           <span style={{fontWeight:700,color:'#7C3AED'}}>{brand} is currently at {geo}.</span> Moving to {nextTier.score} ({nextTier.label}) means entering conversations where top competitors currently dominate — directly increasing brand surfacing per AI query. Each tier jump reflects a materially higher chance AI recommends your brand first.
         </div>
       )}
-      <button onClick={onGo} style={{marginTop:'auto',background:'#7C3AED',color:'white',border:'none',borderRadius:50,padding:'9px 20px',fontSize:'0.82rem',fontWeight:700,cursor:'pointer',alignSelf:'flex-start' as const}}>
+      <button onClick={onGo} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,padding:'9px 20px',fontSize:'0.82rem',fontWeight:700,cursor:'pointer',alignSelf:'flex-start' as const}}>
         See Competitors →
       </button>
     </div>
@@ -467,11 +479,7 @@ export default function GeoHub() {
                     <SankeyChart result={result}/>
                     <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
                   </div>
-                  <div style={{textAlign:'center' as const}}>
-                    <button onClick={()=>setActiveTab(1)} style={{background:'white',border:'1.5px solid #7C3AED',color:'#7C3AED',borderRadius:50,padding:'10px 28px',fontSize:'0.88rem',fontWeight:700,cursor:'pointer'}}>
-                      See Competitors →
-                    </button>
-                  </div>
+
                 </div>
               );
             })()}
