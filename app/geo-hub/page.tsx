@@ -309,65 +309,60 @@ function RankHeatmap({ brandName, avgRank, competitors }: { brandName: string; a
   const [hovCell, setHovCell] = useState<string|null>(null);
   const rankCols = 6;
   const brandData = [
-    {name:brandName, avgR:Math.round(avgRank)||2, isYou:true},
-    ...(competitors||[]).slice(0,9).map((c:any)=>({name:c.Brand||'', avgR:Math.round(c.Rank)||3, isYou:false}))
+    {name:brandName, avgR:Math.max(1,Math.min(6,Math.round(avgRank)||2)), isYou:true},
+    ...(competitors||[]).slice(0,9).map((c:any)=>({name:c.Brand||'', avgR:Math.max(1,Math.min(6,Math.round(c.Rank)||3)), isYou:false}))
   ];
-  // For each brand, distribute ~20 total appearances across rank positions
-  // peaked around their avg rank — simulates real rank frequency distribution
-  const totalQ = 20;
-  const heatData = brandData.map((b)=>{
-    const raw = Array.from({length:rankCols},(_,ri)=>{
-      const dist = Math.abs(ri+1 - b.avgR);
-      return Math.max(0, totalQ * Math.exp(-0.7*dist));
-    });
+  // Distribute 100% across rank positions peaked at avgR
+  const makeRow = (avgR:number)=>{
+    const raw = Array.from({length:rankCols},(_,ri)=>Math.max(0, 100*Math.exp(-0.65*Math.abs(ri+1-avgR))));
     const sum = raw.reduce((a,v)=>a+v,0)||1;
-    return raw.map(v=>Math.round((v/sum)*totalQ));
-  });
-  const maxVal = Math.max(...heatData.flat(),1);
-  const purpleCell = (val:number)=>{
-    const t = val/maxVal;
-    if(t<0.05) return {bg:'#F5F3FF',text:'#C4B5FD'};
-    if(t<0.25) return {bg:'#DDD6FE',text:'#6D28D9'};
-    if(t<0.5)  return {bg:'#A78BFA',text:'white'};
-    if(t<0.75) return {bg:'#7C3AED',text:'white'};
-    return {bg:'#5B21B6',text:'white'};
+    const pcts = raw.map(v=>Math.round((v/sum)*100));
+    // Fix rounding so row sums exactly to 100
+    const diff = 100 - pcts.reduce((a,v)=>a+v,0);
+    pcts[avgR-1] = (pcts[avgR-1]||0) + diff;
+    return pcts;
   };
-  const greyCell = (val:number)=>{
-    const t = val/maxVal;
-    if(t<0.05) return {bg:'#F3F4F6',text:'#D1D5DB'};
-    if(t<0.25) return {bg:'#E5E7EB',text:'#9CA3AF'};
-    if(t<0.5)  return {bg:'#D1D5DB',text:'#6B7280'};
-    if(t<0.75) return {bg:'#9CA3AF',text:'white'};
-    return {bg:'#6B7280',text:'white'};
+  const heatData = brandData.map(b=>makeRow(b.avgR));
+  // One shared scale: 0–100 across all cells
+  const sharedMax = 100;
+  const cellStyle = (pct:number)=>{
+    const t = pct/sharedMax;
+    if(t<0.05) return {bg:'#F3F4F6',text:'#9CA3AF'};
+    if(t<0.15) return {bg:'#E5E7EB',text:'#6B7280'};
+    if(t<0.25) return {bg:'#C4B5FD',text:'#5B21B6'};
+    if(t<0.40) return {bg:'#8B5CF6',text:'white'};
+    return {bg:'#5B21B6',text:'white'};
   };
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Brand Rank Position</div>
-      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>How often each brand appears at each rank position across AI responses. Darker = more frequent.</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>% of AI responses each brand appeared at each rank. Darker = more frequent. Hover to see %.</div>
       <div style={{display:'grid',gridTemplateColumns:`140px repeat(${rankCols},1fr)`,gap:4,alignItems:'center'}}>
         <div/>
         {Array.from({length:rankCols},(_,i)=>(
-          <div key={i} style={{fontSize:'0.68rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6}}>Rank {i+1}</div>
+          <div key={i} style={{fontSize:'0.68rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6}}>R{i+1}</div>
         ))}
         {brandData.map((b,bi)=>[
           <div key={`l${bi}`} style={{fontSize:'0.75rem',color:b.isYou?'#7C3AED':'#374151',fontWeight:b.isYou?700:400,textAlign:'right' as const,paddingRight:10,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis'}}>{b.name}</div>,
-          ...heatData[bi].map((val,ri)=>{
+          ...heatData[bi].map((pct,ri)=>{
             const k=`${bi}-${ri}`;
-            const {bg,text}=b.isYou?purpleCell(val):greyCell(val);
+            const {bg,text}=cellStyle(pct);
+            const isH=hovCell===k;
             return (
-              <div key={`c${k}`} title={`${b.name} — Rank ${ri+1}: ${val} of ${totalQ} responses`}
+              <div key={`c${k}`}
                 onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
-                style={{height:28,borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:hovCell===k?'scale(1.06)':'scale(1)'}}>
-                {val>0?val:''}
+                style={{height:28,borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.06)':'scale(1)',border:b.isYou?`2px solid #7C3AED`:'2px solid transparent',boxSizing:'border-box' as const}}>
+                {isH?`${pct}%`:''}
               </div>
             );
           })
         ])}
       </div>
       <div style={{display:'flex',alignItems:'center',gap:16,marginTop:12}}>
-        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:2,background:'#5B21B6'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>You (high freq)</span></div>
-        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:2,background:'#9CA3AF'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>Competitors</span></div>
-        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:2,background:'#F3F4F6',border:'1px solid #E5E7EB'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>Low / none</span></div>
+        {[{bg:'#5B21B6',label:'High freq'},{bg:'#8B5CF6',label:'Medium'},{bg:'#C4B5FD',label:'Low'},{bg:'#E5E7EB',label:'Rare',border:'1px solid #D1D5DB'}].map((l,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:12,height:12,borderRadius:2,background:l.bg,border:l.border}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>{l.label}</span></div>
+        ))}
+        <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:12,height:12,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>Your brand</span></div>
       </div>
     </div>
   );
@@ -780,6 +775,7 @@ export default function GeoHub() {
                       {label:'sentiment score',val:sent,sub:smood,tip:'Measures how positively or negatively AI models describe your brand across all responses. Higher = more favorable language used.'},
                       {label:'prominence score',val:prom,sub:pmood,tip:'Measures how early in the AI response your brand is mentioned. Higher = named first or second, giving more impact.'},
                       {label:'average rank',val:`#${avgRank}`,sub:rankMood,tip:'The average position your brand appears when mentioned in AI responses. #1 means your brand is listed first most often.'},
+
                     ].map(({label,val,sub,tip})=>(
                       <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
                         <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
