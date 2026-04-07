@@ -1,25 +1,25 @@
-import Image from 'next/image';
+import Link from 'next/link';
 
 const deliver = [
   {
     title: 'Agent Ranking Diagnostic (ARD)', bg: '#1E1B5E',
-    activities: ['Develop representative prompts', 'Execute multi-run stability testing', 'Extract agent-generated rankings', 'Perform power distribution modeling', 'Build competitor adjacency maps'],
-    deliverables: ['AXO Baseline Report', 'Brand & Product Ranking Index', 'Power Curve Analysis', 'Competitor Adjacency Analysis', 'AXO Baseline Score (v1.0)'],
+    activities: ['Develop representative prompts','Execute multi-run stability testing','Extract agent-generated rankings','Perform power distribution modeling','Build competitor adjacency maps'],
+    deliverables: ['AXO Baseline Report','Brand & Product Ranking Index','Power Curve Analysis','Competitor Adjacency Analysis','AXO Baseline Score (v1.0)'],
   },
   {
     title: 'Agent Optimization Plan (AOP)', bg: '#2D2A70',
-    activities: ['Develop LLM-ready content assets', 'Strengthen product-attribute associations', 'Optimize content for agent ingestion', 'Create Content Influence Blueprint'],
-    deliverables: ['Agent Optimization Plan', 'LLM-Ready Content Package', 'Attribute Reinforcement Strategy', 'Content Influence Blueprint'],
+    activities: ['Develop LLM-ready content assets','Strengthen product-attribute associations','Optimize content for agent ingestion','Create Content Influence Blueprint'],
+    deliverables: ['Agent Optimization Plan','LLM-Ready Content Package','Attribute Reinforcement Strategy','Content Influence Blueprint'],
   },
   {
     title: 'Distribution & Technical Influence (DTI)', bg: '#3D3A8A',
-    activities: ['Audit tagging and metadata', 'Identify missing structured data', 'Improve backlink structure', 'Identify dormant URLs', 'Audit schema markup'],
-    deliverables: ['Distribution & Technical Influence Report', 'Metadata Remediation Plan', 'Backlink & Redirect Strategy', 'Schema Optimization Guide'],
+    activities: ['Audit tagging and metadata','Identify missing structured data','Improve backlink structure','Identify dormant URLs','Audit schema markup'],
+    deliverables: ['Distribution & Technical Influence Report','Metadata Remediation Plan','Backlink & Redirect Strategy','Schema Optimization Guide'],
   },
   {
     title: 'Impact Measurement (Re-Diagnostic)', bg: '#5B21B6',
-    activities: ['Re-test all prompts', 'Measure semantic drift and ranking changes', 'Recompute AXO Score'],
-    deliverables: ['AXO Impact Report', 'Before/After Ranking Comparison', 'Updated AXO Score (v2.0)', 'Recommendations for ongoing improvement'],
+    activities: ['Re-test all prompts','Measure semantic drift and ranking changes','Recompute AXO Score'],
+    deliverables: ['AXO Impact Report','Before/After Ranking Comparison','Updated AXO Score (v2.0)','Recommendations for ongoing improvement'],
   },
 ];
 
@@ -41,9 +41,9 @@ const stats = [
 ];
 
 const options = [
-  { num: 'Option 1', weeks: 6, recommended: false, items: ['Agent Ranking Diagnostic (ARD)', 'Agent Optimization Plan (AOP)'] },
-  { num: 'Option 2', weeks: 7, recommended: true, items: ['Agent Ranking Diagnostic (ARD)', 'Agent Optimization Plan (AOP)', 'Impact Measurement (Re-Diagnostic)'] },
-  { num: 'Option 3', weeks: 7, recommended: false, items: ['Agent Ranking Diagnostic (ARD)', 'Agent Optimization Plan (AOP)', 'Distribution and Technical Influence (DTI)', 'Impact Measurement (Re-Diagnostic)'] },
+  { num: 'Option 1', weeks: 6, recommended: false, items: ['Agent Ranking Diagnostic (ARD)','Agent Optimization Plan (AOP)'] },
+  { num: 'Option 2', weeks: 7, recommended: true, items: ['Agent Ranking Diagnostic (ARD)','Agent Optimization Plan (AOP)','Impact Measurement (Re-Diagnostic)'] },
+  { num: 'Option 3', weeks: 7, recommended: false, items: ['Agent Ranking Diagnostic (ARD)','Agent Optimization Plan (AOP)','Distribution and Technical Influence (DTI)','Impact Measurement (Re-Diagnostic)'] },
 ];
 
 export default function GetSupport() {
@@ -63,7 +63,7 @@ export default function GetSupport() {
         <p style={{ fontSize: '0.92rem', color: '#6B7280', margin: '0 auto 40px', maxWidth: 680, lineHeight: 1.7 }}>While search spend rises, its impact is fading as AI agents increasingly shape the decisions search used to influence.</p>
       </div>
 
-      {/* INFINITY + WORKSTREAMS */}
+      {/* INFINITY + WORKSTREAMS — fixed with <img> tag instead of next/image */}
       <div style={{ background: 'white', padding: '0 40px 40px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1fr', gap: 40, alignItems: 'center' }}>
           <div>
@@ -75,8 +75,14 @@ export default function GetSupport() {
               </div>
             ))}
           </div>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <Image src="/infinity.png" alt="Infinity" width={400} height={300} style={{ width: '100%', height: 'auto' }} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <img
+              src="/infinity.png"
+              alt="Infinity diagram showing the four workstreams"
+              style={{ width: '100%', maxWidth: 400, height: 'auto', display: 'block' }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
           </div>
           <div>
             {WS_RIGHT.map((w, i) => (
@@ -120,16 +126,14 @@ export default function GetSupport() {
           <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Deliverables</div>
           <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#111827', margin: '8px 0 0' }}>Activities and What We Deliver</h2>
         </div>
-        {/* Headers */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 12 }}>
           {deliver.map((d, i) => (
-            <div key={i} style={{ background: d.bg, padding: '18px 20px', borderRadius: i === 0 ? '8px 0 0 0' : i === 3 ? '0 8px 0 0' : 0 }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.07em' }}>Workstream 0{i + 1}</div>
+            <div key={i} style={{ background: d.bg, padding: '18px 20px', borderRadius: i===0?'8px 0 0 0':i===3?'0 8px 0 0':0 }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.07em' }}>Workstream 0{i+1}</div>
               <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', lineHeight: 1.35 }}>{d.title}</div>
             </div>
           ))}
         </div>
-        {/* Activities */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
           {deliver.map((d, i) => (
             <div key={i} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, padding: 18 }}>
@@ -140,7 +144,6 @@ export default function GetSupport() {
             </div>
           ))}
         </div>
-        {/* Deliverables */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
           {deliver.map((d, i) => (
             <div key={i} style={{ background: '#EEEAF8', border: '1px solid #DDD6FE', borderRadius: 8, padding: 18 }}>
@@ -161,14 +164,14 @@ export default function GetSupport() {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 28 }}>
           {options.map((opt, i) => (
-            <div key={i} style={{ border: opt.recommended ? '2px solid #7C3AED' : '1px solid #E5E7EB', borderRadius: 16, padding: '36px 32px', position: 'relative', background: opt.recommended ? '#FAFBFF' : 'white' }}>
+            <div key={i} style={{ border: opt.recommended?'2px solid #7C3AED':'1px solid #E5E7EB', borderRadius: 16, padding: '36px 32px', position: 'relative', background: opt.recommended?'#FAFBFF':'white' }}>
               {opt.recommended && (
                 <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#7C3AED', color: 'white', borderRadius: 50, padding: '3px 16px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Recommended</div>
               )}
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: opt.recommended ? '#7C3AED' : '#9CA3AF', marginBottom: 10 }}>{opt.num}</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: opt.recommended?'#7C3AED':'#9CA3AF', marginBottom: 10 }}>{opt.num}</div>
               <div style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', lineHeight: 1, marginBottom: 2 }}>{opt.weeks}</div>
               <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: 28 }}>Week Engagement</div>
-              <div style={{ height: 1, background: opt.recommended ? '#E5E7EB' : '#F3F4F6', marginBottom: 24 }} />
+              <div style={{ height: 1, background: opt.recommended?'#E5E7EB':'#F3F4F6', marginBottom: 24 }} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {opt.items.map((item, j) => (
                   <div key={j} style={{ display: 'flex', gap: 10, fontSize: '0.86rem', color: '#374151' }}>
