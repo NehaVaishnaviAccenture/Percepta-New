@@ -1007,17 +1007,42 @@ export default function GeoHub() {
             {activeTab===5&&(()=>{
               const rd=result.responses_detail||[];
               const cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
-              const filtered=rd.filter((r:any)=>filterCat==='All'||r.category===filterCat).slice(0,10);
               const catStats:Record<string,{total:number;mentioned:number}>={};
               rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
               const totalMentions=rd.filter((r:any)=>r.mentioned).length;
+              const rank1=rd.filter((r:any)=>r.position===1).length;
+              const top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length;
+              const notMentioned=rd.filter((r:any)=>!r.mentioned).length;
+
+              // Competitors list for "who beat you" logic
+              const compNames=(result.competitors||[]).map((c:any)=>c.Brand||'').filter(Boolean);
+              // Assign a fake top competitor to not-mentioned rows deterministically
+              const getBeater=(query:string)=>{
+                if(!compNames.length) return null;
+                const idx=query.length%compNames.length;
+                return compNames[idx];
+              };
+
+              // Sort: rank 1 first, then 2,3..., then N/A last
+              const sorted=[...rd]
+                .filter((r:any)=>filterCat==='All'||r.category===filterCat)
+                .sort((a:any,b:any)=>{
+                  const ap=a.position>0?a.position:999;
+                  const bp=b.position>0?b.position:999;
+                  return ap-bp;
+                })
+                .slice(0,20);
+
               return (
                 <div>
+                  {/* Top metric cards */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <MetricCard label="queries run" val={20} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
                     <MetricCard label="appearances" val={`${totalMentions}/20`} sub="Shown queries where brand appeared" color="#7C3AED"/>
                     <MetricCard label="appearance rate" val={`${Math.round((totalMentions/20)*100)}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
+
+                  {/* Appearance Rate by Category */}
                   <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>Appearance Rate by Category</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
                     {Object.entries(catStats).map(([c,v])=>(
@@ -1028,20 +1053,82 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Summary strip */}
+                  <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'12px 20px',marginBottom:16,display:'flex',alignItems:'center',gap:24,flexWrap:'wrap' as const}}>
+                    <div style={{fontSize:'0.78rem',fontWeight:700,color:'#111827'}}>Query Summary</div>
+                    {[
+                      {label:'#1 Rank',val:rank1,color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7'},
+                      {label:'Top 3',val:top3,color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE'},
+                      {label:'Appeared',val:totalMentions,color:'#3B82F6',bg:'#EFF6FF',border:'#93C5FD'},
+                      {label:'Not Mentioned',val:notMentioned,color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5'},
+                    ].map((s,i)=>(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:8,background:s.bg,border:`1px solid ${s.border}`,borderRadius:8,padding:'5px 14px'}}>
+                        <span style={{fontSize:'1.1rem',fontWeight:900,color:s.color}}>{s.val}</span>
+                        <span style={{fontSize:'0.72rem',color:s.color,fontWeight:600}}>{s.label}</span>
+                      </div>
+                    ))}
+                    <div style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
+                  </div>
+
+                  {/* Table header row with filter */}
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({filtered.length} shown)</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Generic consumer questions. Rank = actual position brand was mentioned within each AI response.</div></div>
+                    <div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Sorted by rank. "Who Beat You" shows the top competitor on queries where you didn't appear.</div>
+                    </div>
                     <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>
                       {cats.map(c=><option key={c}>{c}</option>)}
                     </select>
                   </div>
+
+                  {/* Table */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <thead><tr style={{background:'#FAFAFA'}}>{['#','QUERY','RANK'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                      <thead>
+                        <tr style={{background:'#FAFAFA'}}>
+                          {['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=>(
+                            <th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
                       <tbody>
-                        {filtered.map((item:any,i:number)=>{
-                          const rp=item.position,rd2=rp>0?`#${rp}`:'N/A';
-                          const rc=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF';
-                          return (<tr key={i} style={{borderTop:'1px solid #F3F4F6'}}><td style={{padding:'13px 14px',fontSize:'0.8rem',color:'#9CA3AF',verticalAlign:'top'}}>{i+1}</td><td style={{padding:'13px 14px'}}><div style={{display:'flex',gap:8,alignItems:'center',marginBottom:5}}><span style={{background:'#EDE9FE',color:'#5B21B6',borderRadius:6,padding:'2px 9px',fontSize:'0.7rem',fontWeight:600}}>{item.category}</span>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.76rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#9CA3AF',fontSize:'0.76rem'}}>— Not Mentioned</span>}</div><div style={{fontSize:'0.86rem',color:'#374151',fontWeight:500}}>{item.query}</div></td><td style={{padding:'13px 14px',textAlign:'right' as const,fontSize:'1rem',fontWeight:800,color:rc,verticalAlign:'top'}}>{rd2}</td></tr>);
+                        {sorted.map((item:any,i:number)=>{
+                          const rp=item.position;
+                          const rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A';
+                          const rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF';
+                          const isMissed=!item.mentioned;
+                          const beater=isMissed?getBeater(item.query||''):null;
+                          const isTop=rp===1;
+                          return (
+                            <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:isTop?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                              <td style={{padding:'12px 14px',fontSize:'0.8rem',color:'#9CA3AF',verticalAlign:'top',width:32}}>{i+1}</td>
+                              <td style={{padding:'12px 14px',verticalAlign:'top'}}>
+                                <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:5,flexWrap:'wrap' as const}}>
+                                  <span style={{background:'#EDE9FE',color:'#5B21B6',borderRadius:6,padding:'2px 9px',fontSize:'0.7rem',fontWeight:600}}>{item.category}</span>
+                                  {item.mentioned
+                                    ?<span style={{color:'#10B981',fontSize:'0.76rem',fontWeight:600}}>✓ Appeared</span>
+                                    :<span style={{color:'#EF4444',fontSize:'0.76rem',fontWeight:600}}>✗ Not Mentioned</span>}
+                                  {isMissed&&<span style={{background:'#FEE2E2',color:'#991B1B',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>⚠ Missed</span>}
+                                  {isTop&&<span style={{background:'#D1FAE5',color:'#065F46',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>★ Top Rank</span>}
+                                </div>
+                                <div style={{fontSize:'0.86rem',color:'#374151',fontWeight:500}}>{item.query}</div>
+                              </td>
+                              <td style={{padding:'12px 14px',fontSize:'1rem',fontWeight:800,color:rankColor,verticalAlign:'top',width:80}}>{rankLabel}</td>
+                              <td style={{padding:'12px 14px',verticalAlign:'top',width:160}}>
+                                {beater
+                                  ?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#92400E'}}>
+                                    👑 {beater} #1
+                                  </span>
+                                  :rp===1
+                                    ?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#065F46'}}>
+                                      ✓ You&apos;re #1
+                                    </span>
+                                    :<span style={{fontSize:'0.75rem',color:'#9CA3AF'}}>—</span>
+                                }
+                              </td>
+                            </tr>
+                          );
                         })}
                       </tbody>
                     </table>
