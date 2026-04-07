@@ -79,7 +79,6 @@ function GeoGauge({ score, brand }: { score: number; brand: string }) {
     );
   };
 
-  // Score marker: a short thick line at the score position
   const markerInner = Ri - 8;
   const markerOuter = Ro + 8;
 
@@ -91,18 +90,15 @@ function GeoGauge({ score, brand }: { score: number; brand: string }) {
         {seg(44, 69, '#FEF08A')}
         {seg(69, 79, '#BAE6FD')}
         {seg(79, 100, '#BBF7D0')}
-        {/* Score marker line */}
         <line
           x1={ox(score, markerInner)} y1={oy(score, markerInner)}
           x2={ox(score, markerOuter)} y2={oy(score, markerOuter)}
           stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"
         />
-        {/* Tick labels only */}
         {[0,20,40,60,80,100].map(t => (
           <text key={t} x={ox(t, Ro+18)} y={oy(t, Ro+18)} textAnchor="middle" dominantBaseline="middle"
             style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
         ))}
-        {/* Score number */}
         <text x={cx} y={cy - 18} textAnchor="middle"
           style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
@@ -444,15 +440,11 @@ export default function GeoHub() {
               const geo=result.overall_geo_score,badge=scoreBadge(geo);
               const vis=result.visibility,cit=result.citation_share,sent=result.sentiment;
               const prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
-              const issues=[
-                prom<40?`Prominence (${prom}), typically mentioned mid-list rather than first`:null,
-                sov<20?`Share of Voice (${sov}), competitors are dominating more of the AI conversation`:null,
-                cit<40?`Citation (${cit}), rarely the top pick in AI responses`:null,
-                sent<40?`Sentiment (${sent}), lacks positive endorsement`:null,
-              ].filter(Boolean);
-              const summaryText=issues.length>0
-                ?`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by ${issues.join('; ')}.`
-                :`GEO Score of ${geo} reflects ${vis}% Visibility with strong performance across all metrics.`;
+
+              // ── UPDATED SUMMARY TEXT ──────────────────────────────
+              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), typically mentioned mid-list rather than first; Share of Voice (${sov}), competitors are dominating more of the AI conversation; Citation (${cit}), rarely the top pick in AI responses; Sentiment (${sent}), neutral tone with no strong recommendation language.`;
+              // ─────────────────────────────────────────────────────
+
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
@@ -518,7 +510,6 @@ export default function GeoHub() {
                       <div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close — defend this position':'Comfortable but not safe'):'Leading the category'}</div>
                     </div>
                   </div>
-                  {/* Bar chart */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                     <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Comparison</div>
                     <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Hover over any brand to see full metrics</div>
@@ -553,7 +544,6 @@ export default function GeoHub() {
                       </g>
                     </svg>
                   </div>
-                  {/* Table */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead>
