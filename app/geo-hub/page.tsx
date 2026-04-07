@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const bands = [
   { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
@@ -484,16 +484,15 @@ export default function GeoHub() {
   const [expandedDomain,setExpandedDomain] = useState<string|null>(null);
   const [hovNode,setHovNode] = useState<string|null>(null);
 
-  // Persist analysis result across tab/page navigation using sessionStorage
-  // sessionStorage survives tab switches and page navigation but clears on browser close/reload
-  useState(()=>{
+  // Restore analysis from sessionStorage on mount (survives tab/page navigation)
+  useEffect(()=>{
     try {
       const saved = sessionStorage.getItem('geo_result');
       const savedUrl = sessionStorage.getItem('geo_url');
-      if(saved) { setResult(JSON.parse(saved)); }
-      if(savedUrl) { setUrl(savedUrl); }
+      if(saved) setResult(JSON.parse(saved));
+      if(savedUrl) setUrl(savedUrl);
     } catch{}
-  });
+  },[]);
 
   // Alias-based visibility recalculation on the frontend
   // Mirrors the Python backend fix: catches "capitalone", "capital-one" etc.
