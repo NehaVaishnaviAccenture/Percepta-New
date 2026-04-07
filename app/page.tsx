@@ -60,7 +60,7 @@ export default function Overview() {
           <span style={{ color: '#7C3AED' }}>GEO</span>
           <span style={{ color: '#111827' }}> Score</span>
         </div>
-        <p style={{ fontSize: '1.1rem', color: '#9CA3AF', maxWidth: 760, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 500 }}>
+        <p style={{ fontSize: '1.1rem', color: '#9CA3AF', maxWidth: 620, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 400 }}>
           The Percepta GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, and other major AI engines.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -110,7 +110,7 @@ export default function Overview() {
           <div>
             <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 14 }}>The GEO Score</div>
             <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
-            <p style={{ fontSize: '1rem', color: '#9CA3AF', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 500 }}>
+            <p style={{ fontSize: '1rem', color: '#9CA3AF', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 400 }}>
               Understand how frequently and positively your brand appears in AI-generated answers, and get clear next steps to improve.
             </p>
           </div>
@@ -143,7 +143,7 @@ export default function Overview() {
             <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.15 }}>
               Others Give You Data.<br />We Give You a Solution.
             </h2>
-            <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 600, margin: '0 auto', lineHeight: 1.7 }}>
+            <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 520, margin: '0 auto', lineHeight: 1.7, fontWeight: 400 }}>
               Every other GEO tool stops at the dashboard. Percepta combines measurement, strategy, and execution in one place.
             </p>
           </div>
@@ -182,11 +182,8 @@ export default function Overview() {
         <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '52px 60px', textAlign: 'center' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 4px', lineHeight: 1.1 }}>Ready to Discover Your</h2>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 20px', lineHeight: 1.1 }}>GEO Score?</h2>
-          <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 560, margin: '0 auto 8px', lineHeight: 1.7 }}>
-            Join forward-thinking brands that are optimizing for the new era of generative search.
-          </p>
-          <p style={{ fontSize: '0.9rem', color: '#9CA3AF', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
-            Get your Percepta GEO Score today — backed by Accenture.
+          <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 480, margin: '0 auto 4px', lineHeight: 1.7, fontWeight: 400 }}>
+            Join forward-thinking brands optimizing for the new era of generative search — backed by Accenture.
           </p>
           <div style={{ marginTop: 40 }}>
             <Link href="/geo-hub" style={{
