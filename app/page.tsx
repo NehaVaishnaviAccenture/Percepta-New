@@ -1,10 +1,22 @@
 import Link from 'next/link';
 
 const steps = [
-  { title: 'Enter Your Brand', desc: 'Input your brand name, keywords, and competitor list.' },
-  { title: 'AI Engine Scanning', desc: 'Percepta queries AI engines with hundreds of prompts to analyze mentions.' },
-  { title: 'Score Calculation', desc: 'Our algorithm computes your GEO Score based on visibility, sentiment, and positioning.' },
-  { title: 'Actionable Insights', desc: 'Receive detailed reports with specific recommendations.' },
+  {
+    title: 'Enter Your Brand',
+    desc: 'Input your brand name, target keywords, and competitor list into the Percepta platform.',
+  },
+  {
+    title: 'AI Engine Scanning',
+    desc: 'Percepta queries major AI engines with hundreds of relevant prompts to analyze brand mentions and sentiment.',
+  },
+  {
+    title: 'Score Calculation',
+    desc: 'Our proprietary algorithm computes your GEO Score (0–100) based on visibility frequency, sentiment, and positioning.',
+  },
+  {
+    title: 'Actionable Insights',
+    desc: 'Receive detailed reports with specific recommendations on how to improve your brand\'s AI visibility.',
+  },
 ];
 
 const bands = [
@@ -12,6 +24,39 @@ const bands = [
   { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70–79', label: 'Good', desc: 'Minor improvements recommended' },
   { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45–69', label: 'Needs Work', desc: 'Several issues to address' },
   { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
+];
+
+const competitors = [
+  'Fragmented metrics with no clear direction',
+  'Surface-level visibility tracking',
+  'Dashboards that stop at \'what,\' not \'what next\'',
+];
+
+const perceptaFeatures = [
+  'Unified GEO Score (0–100) to track performance',
+  'Competitive benchmarking across key players',
+  'Clear attribution of where and why you appear',
+  'Pinpoint what\'s limiting your visibility',
+  'Actionable recommendations tied to execution',
+  'Accenture team to implement and drive results',
+];
+
+const whyDifferent = [
+  {
+    icon: '↗',
+    title: 'Score + Diagnosis',
+    desc: 'One unified GEO score across visibility, citations, sentiment — not scattered metrics.',
+  },
+  {
+    icon: '⚡',
+    title: 'Strategy + Action',
+    desc: 'We don\'t just show data. We tell you what to fix, how to fix it, and why it matters.',
+  },
+  {
+    icon: '👥',
+    title: 'Team + Execution',
+    desc: 'Backed by Accenture consultants who implement the recommendations for you.',
+  },
 ];
 
 export default function Overview() {
@@ -28,12 +73,15 @@ export default function Overview() {
         }}>
           ✦ &nbsp;AI-Powered Brand Intelligence &nbsp;·&nbsp; Powered by Accenture
         </div>
-        <div style={{ fontSize: '4.6rem', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-3px', marginBottom: 28 }}>
+        <div style={{ fontSize: '4.6rem', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-3px', marginBottom: 20 }}>
           <span style={{ color: '#111827' }}>Your Brand&apos;s </span>
           <span style={{ color: '#7C3AED' }}>GEO</span>
           <span style={{ color: '#111827' }}> Score</span>
         </div>
-        <p style={{ fontSize: '1.05rem', color: '#6B7280', maxWidth: 860, margin: '0 auto 36px', lineHeight: 1.7 }}>
+        <p style={{ fontSize: '1.1rem', color: '#374151', maxWidth: 760, margin: '0 auto 16px', lineHeight: 1.75, fontWeight: 500 }}>
+          The Percepta GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, and other major AI engines.
+        </p>
+        <p style={{ fontSize: '0.95rem', color: '#6B7280', maxWidth: 640, margin: '0 auto 36px', lineHeight: 1.7 }}>
           The Percepta GEO Score measures how often and favorably your brand is cited in AI-generated responses.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -60,7 +108,10 @@ export default function Overview() {
       <div id="how" style={{ background: '#F9F9FC', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
         <div style={{ textAlign: 'center', marginBottom: 64 }}>
           <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Process</div>
-          <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#111827', margin: '10px 0 14px' }}>How Percepta Works</h2>
+          <h2 style={{ fontSize: '2.2rem', fontWeight: 900, color: '#111827', margin: '10px 0 10px' }}>How Percepta Works</h2>
+          <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 560, margin: '0 auto', lineHeight: 1.7 }}>
+            From brand input to actionable GEO insights — in four simple steps.
+          </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 40, position: 'relative' }}>
           <div style={{ position: 'absolute', top: 22, left: 'calc(25% + 20px)', width: 'calc(75% - 40px)', height: 1, background: '#E5E7EB', zIndex: 0 }} />
@@ -79,8 +130,13 @@ export default function Overview() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center', marginBottom: 56 }}>
           <div>
             <div style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 14 }}>The GEO Score</div>
-            <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 20px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
-            <p style={{ fontSize: '0.95rem', color: '#6B7280', lineHeight: 1.8, margin: 0 }}>Your GEO Score distills complex AI citation data into a single, actionable metric.</p>
+            <h2 style={{ fontSize: '2.6rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.1 }}>One Number That<br />Changes Everything</h2>
+            <p style={{ fontSize: '1rem', color: '#374151', lineHeight: 1.8, margin: '0 0 12px', fontWeight: 500 }}>
+              Your GEO Score distills complex AI citation data into a single, actionable metric.
+            </p>
+            <p style={{ fontSize: '0.9rem', color: '#6B7280', lineHeight: 1.8, margin: 0 }}>
+              Understand how frequently and positively your brand appears in AI-generated answers, and get clear next steps to improve.
+            </p>
           </div>
           <div style={{ background: 'white', borderRadius: 20, padding: '44px 40px', boxShadow: '0 8px 40px rgba(124,58,237,0.13)', border: '1px solid #F0EBFF', textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.14em', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 18 }}>GEO SCORE</div>
@@ -94,7 +150,7 @@ export default function Overview() {
         </div>
 
         {/* Score Bands */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16, marginBottom: 64 }}>
           {bands.map((b, i) => (
             <div key={i} style={{ background: b.bg, borderRadius: 14, padding: '28px 24px', textAlign: 'center', border: `1.5px solid ${b.border}` }}>
               <div style={{ fontSize: '0.82rem', fontWeight: 700, color: b.color, marginBottom: 4 }}>{b.range}</div>
@@ -103,13 +159,59 @@ export default function Overview() {
             </div>
           ))}
         </div>
+
+        {/* OTHERS GIVE DATA / WE GIVE SOLUTION — Image 4 */}
+        <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 64 }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 16 }}>What You Gain</div>
+            <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.15 }}>
+              Others Give You Data.<br />We Give You a Solution.
+            </h2>
+            <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 600, margin: '0 auto', lineHeight: 1.7 }}>
+              Every other GEO tool stops at the dashboard. Percepta combines measurement, strategy, and execution in one place.
+            </p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, maxWidth: 900, margin: '0 auto' }}>
+            {/* Competitors card */}
+            <div style={{ background: '#F9FAFB', borderRadius: 16, border: '1px solid #E5E7EB', padding: '36px 32px' }}>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.12em', color: '#9CA3AF', textTransform: 'uppercase', marginBottom: 24 }}>Competitors</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {competitors.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ color: '#9CA3AF', fontSize: '1.1rem', flexShrink: 0 }}>—</span>
+                    <span style={{ fontSize: '0.88rem', color: '#9CA3AF', textDecoration: 'line-through' }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Percepta card */}
+            <div style={{ background: 'white', borderRadius: 16, border: '2px solid #7C3AED', padding: '36px 32px', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: -14, left: 24, background: '#7C3AED', color: 'white', borderRadius: 50, padding: '4px 18px', fontSize: '0.75rem', fontWeight: 700 }}>Percepta by Accenture</div>
+              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.12em', color: '#7C3AED', textTransform: 'uppercase', marginBottom: 24, marginTop: 8 }}>Your All-In-One GEO Solution</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {perceptaFeatures.map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                    <span style={{ color: '#7C3AED', fontSize: '1.1rem', fontWeight: 700, flexShrink: 0, lineHeight: 1.4 }}>+</span>
+                    <span style={{ fontSize: '0.88rem', color: '#111827', lineHeight: 1.5, fontWeight: i === perceptaFeatures.length - 1 ? 700 : 400 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* CTA */}
       <div style={{ background: 'white', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
         <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '52px 60px', textAlign: 'center' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 4px', lineHeight: 1.1 }}>Ready to Discover Your</h2>
-          <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 28px', lineHeight: 1.1 }}>GEO Score?</h2>
+          <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 20px', lineHeight: 1.1 }}>GEO Score?</h2>
+          <p style={{ fontSize: '1rem', color: '#6B7280', maxWidth: 560, margin: '0 auto 8px', lineHeight: 1.7 }}>
+            Join forward-thinking brands that are optimizing for the new era of generative search.
+          </p>
+          <p style={{ fontSize: '0.9rem', color: '#9CA3AF', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
+            Get your Percepta GEO Score today — backed by Accenture.
+          </p>
           <div style={{ marginTop: 40 }}>
             <Link href="/geo-hub" style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
