@@ -61,63 +61,46 @@ function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val
   );
 }
 
-// ── GAUGE ─────────────────────────────────────────────────────
 function GeoGauge({ score, brand }: { score: number; brand: string }) {
   const badge = scoreBadge(score);
-  const W = 340, H = 190;
-  const cx = W / 2, cy = H - 15;
-  const Ro = 145, Ri = 100;
+  const W = 340, H = 185, cx = 170, cy = 165, Ro = 140, Ri = 95;
 
-  // score 0 = angle 180deg (left), score 100 = angle 0deg (right)
-  // In SVG: x = cx + r*cos(deg), y = cy - r*sin(deg)
-  const deg = (s: number) => 180 - s * 1.8; // 0→180, 100→0
-  const rad = (s: number) => (deg(s) * Math.PI) / 180;
-  const x = (s: number, r: number) => cx + r * Math.cos(rad(s));
-  const y = (s: number, r: number) => cy - r * Math.sin(rad(s));
+  // score 0 → 180deg (left), score 100 → 0deg (right)
+  const angleRad = (s: number) => ((100 - s) / 100) * Math.PI;
+  const px = (s: number, r: number) => cx + r * Math.cos(angleRad(s));
+  const py = (s: number, r: number) => cy - r * Math.sin(angleRad(s));
 
-  const arc = (s0: number, s1: number, fill: string) => {
-    const large = s1 - s0 > 50 ? 1 : 0;
-    return (
-      <path
-        d={`M ${x(s0, Ro)} ${y(s0, Ro)}
-            A ${Ro} ${Ro} 0 ${large} 0 ${x(s1, Ro)} ${y(s1, Ro)}
-            L ${x(s1, Ri)} ${y(s1, Ri)}
-            A ${Ri} ${Ri} 0 ${large} 1 ${x(s0, Ri)} ${y(s0, Ri)} Z`}
-        fill={fill}
-        stroke="white"
-        strokeWidth="2"
-      />
-    );
+  // Donut segment: s0 < s1, arc sweeps left→right
+  const donut = (s0: number, s1: number, fill: string) => {
+    const large = (s1 - s0) > 50 ? 1 : 0;
+    const d = [
+      `M ${px(s0, Ro)} ${py(s0, Ro)}`,
+      `A ${Ro} ${Ro} 0 ${large} 1 ${px(s1, Ro)} ${py(s1, Ro)}`,
+      `L ${px(s1, Ri)} ${py(s1, Ri)}`,
+      `A ${Ri} ${Ri} 0 ${large} 0 ${px(s0, Ri)} ${py(s0, Ri)}`,
+      'Z'
+    ].join(' ');
+    return <path d={d} fill={fill} stroke="white" strokeWidth="2" />;
   };
-
-  const ticks = [0, 20, 40, 60, 80, 100];
 
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {/* Zone background arcs */}
-        {arc(0, 44, '#FECACA')}
-        {arc(44, 69, '#FEF08A')}
-        {arc(69, 79, '#BAE6FD')}
-        {arc(79, 100, '#BBF7D0')}
-        {/* Purple fill from 0 up to score */}
-        {score > 0 && arc(0, score, '#6D28D9')}
-        {/* Tick marks */}
-        {ticks.map(t => (
+        {donut(0, 44, '#FECACA')}
+        {donut(44, 69, '#FEF08A')}
+        {donut(69, 79, '#BAE6FD')}
+        {donut(79, 100, '#BBF7D0')}
+        {score > 0 && donut(0, Math.min(score, 100), '#6D28D9')}
+        {[0,20,40,60,80,100].map(t => (
           <g key={t}>
-            <line x1={x(t, Ri - 5)} y1={y(t, Ri - 5)} x2={x(t, Ro + 5)} y2={y(t, Ro + 5)} stroke="#9CA3AF" strokeWidth="1" />
-            <text x={x(t, Ro + 18)} y={y(t, Ro + 18)} textAnchor="middle" dominantBaseline="middle"
-              style={{ fontSize: 10, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{t}</text>
+            <line x1={px(t,Ri-5)} y1={py(t,Ri-5)} x2={px(t,Ro+5)} y2={py(t,Ro+5)} stroke="#9CA3AF" strokeWidth="1"/>
+            <text x={px(t,Ro+18)} y={py(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
           </g>
         ))}
-        {/* Score number */}
-        <text x={cx} y={cy - 20} textAnchor="middle"
-          style={{ fontSize: 48, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter,sans-serif' }}>{score}</text>
+        <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:48,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
-      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>
-        {badge.label}
-      </span>
+      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
     </div>
   );
 }
