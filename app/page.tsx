@@ -45,7 +45,7 @@ export default function Overview() {
   return (
     <main>
       {/* HERO */}
-      <div style={{ background: 'linear-gradient(170deg,#F0EAFA 0%,#EAE4F7 55%,#E8E0F5 100%)', padding: '52px 40px 40px', textAlign: 'center' }}>
+      <div style={{ background: 'linear-gradient(170deg,#fff 55%,#F3EEFF 100%)', padding: '52px 40px 40px', textAlign: 'center' }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           border: '1px solid #DDD6FE', borderRadius: 50, padding: '8px 22px',
