@@ -571,26 +571,6 @@ export default function GeoHub() {
             ))}
           </div>
 
-          {/* WHY PERCEPTA GEO IS DIFFERENT */}
-          <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'32px 36px',marginBottom:24}}>
-            <div style={{fontSize:'1.1rem',fontWeight:800,color:'#111827',marginBottom:28}}>Why Percepta GEO is different</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:32}}>
-              {[
-                {icon:'↗',title:'Score + Diagnosis',desc:'One unified GEO score across visibility, citations, sentiment — not scattered metrics.'},
-                {icon:'⚡',title:'Strategy + Action',desc:"We don't just show data. We tell you what to fix, how to fix it, and why it matters."},
-                {icon:'👥',title:'Team + Execution',desc:'Backed by Accenture consultants who implement the recommendations for you.'},
-              ].map((item,i)=>(
-                <div key={i} style={{display:'flex',gap:16,alignItems:'flex-start'}}>
-                  <div style={{width:40,height:40,borderRadius:10,background:'#F5F3FF',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0,color:'#7C3AED'}}>{item.icon}</div>
-                  <div>
-                    <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:6}}>{item.title}</div>
-                    <div style={{fontSize:'0.83rem',color:'#6B7280',lineHeight:1.6}}>{item.desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* URL INPUT */}
           <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
@@ -1175,14 +1155,15 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:24}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
                       <div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ What is Working Well</div>
-                      <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>✓</span><span
-
-                                                                                                                                                                                                                                                                                                               >{s}</span></li>))}
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>
+                        {(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>✓</span><span>{s}</span></li>))}
                       </ul>
                     </div>
                     <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}>
                       <div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ What Needs Improvement</div>
-                      <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>))}</ul>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>
+                        {(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>))}
+                      </ul>
                     </div>
                   </div>
                   {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
