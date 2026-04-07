@@ -64,32 +64,80 @@ function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val
 // ── GAUGE ─────────────────────────────────────────────────────
 function GeoGauge({ score, brand }: { score: number; brand: string }) {
   const badge = scoreBadge(score);
-  const W = 340, H = 195, cx = W / 2, cy = H - 10, Ro = 148, Ri = 98;
-  const toRad = (s: number) => Math.PI * (1 - s / 100);
-  const px = (s: number, r: number) => cx + r * Math.cos(toRad(s));
-  const py = (s: number, r: number) => cy - r * Math.sin(toRad(s));
-  const seg = (s0: number, s1: number, fill: string) => {
-    const lg = (s1 - s0) > 50 ? 1 : 0;
-    return <path d={`M${px(s0,Ro)},${py(s0,Ro)} A${Ro},${Ro} 0 ${lg} 0 ${px(s1,Ro)},${py(s1,Ro)} L${px(s1,Ri)},${py(s1,Ri)} A${Ri},${Ri} 0 ${lg} 1 ${px(s0,Ri)},${py(s0,Ri)} Z`} fill={fill} stroke="white" strokeWidth="1.5" />;
+  const W = 340, H = 200, cx = W / 2, cy = H - 20, Ro = 140, Ri = 95;
+
+  // Convert a score (0-100) to SVG angle in radians
+  // score=0 → left (π), score=100 → right (0)
+  const toRad = (s: number) => Math.PI - (s / 100) * Math.PI;
+
+  // Point on circle at angle for score s, radius r
+  const ptX = (s: number, r: number) => cx + r * Math.cos(toRad(s));
+  const ptY = (s: number, r: number) => cy - r * Math.sin(toRad(s));
+
+  // Draw a donut segment from score s0 to s1
+  const donut = (s0: number, s1: number, fill: string, key: string) => {
+    const a0 = toRad(s0), a1 = toRad(s1);
+    // outer arc goes from a0 to a1: since toRad is decreasing, a0 > a1
+    // so we go clockwise → sweep-flag = 0 in standard SVG coords (y flipped)
+    const x0o = cx + Ro * Math.cos(a0), y0o = cy - Ro * Math.sin(a0);
+    const x1o = cx + Ro * Math.cos(a1), y1o = cy - Ro * Math.sin(a1);
+    const x0i = cx + Ri * Math.cos(a0), y0i = cy - Ri * Math.sin(a0);
+    const x1i = cx + Ri * Math.cos(a1), y1i = cy - Ri * Math.sin(a1);
+    const large = (s1 - s0) > 50 ? 1 : 0;
+    return (
+      <path
+        key={key}
+        d={`M ${x0o} ${y0o} A ${Ro} ${Ro} 0 ${large} 0 ${x1o} ${y1o} L ${x1i} ${y1i} A ${Ri} ${Ri} 0 ${large} 1 ${x0i} ${y0i} Z`}
+        fill={fill}
+        stroke="white"
+        strokeWidth="1.5"
+      />
+    );
   };
-  const ticks = [0,20,40,60,80,100];
+
+  const ticks = [0, 20, 40, 60, 80, 100];
+  const needleX = ptX(score, Ri - 8);
+  const needleY = ptY(score, Ri - 8);
+
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
       <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {seg(0,44,'#FECACA')}{seg(44,69,'#FEF08A')}{seg(69,79,'#BAE6FD')}{seg(79,100,'#BBF7D0')}
-        {score > 0 && seg(0, score, '#6D28D9')}
+        {/* Background zone arcs */}
+        {donut(0, 44, '#FECACA', 'z1')}
+        {donut(44, 69, '#FEF08A', 'z2')}
+        {donut(69, 79, '#BAE6FD', 'z3')}
+        {donut(79, 100, '#BBF7D0', 'z4')}
+        {/* Purple progress */}
+        {score > 0 && donut(0, score, '#6D28D9', 'prog')}
+        {/* Ticks */}
         {ticks.map(t => (
           <g key={t}>
-            <line x1={px(t,Ri-6)} y1={py(t,Ri-6)} x2={px(t,Ro+6)} y2={py(t,Ro+6)} stroke="#9CA3AF" strokeWidth="1"/>
-            <text x={px(t,Ro+18)} y={py(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>
+            <line
+              x1={ptX(t, Ri - 6)} y1={ptY(t, Ri - 6)}
+              x2={ptX(t, Ro + 6)} y2={ptY(t, Ro + 6)}
+              stroke="#9CA3AF" strokeWidth="1"
+            />
+            <text
+              x={ptX(t, Ro + 18)} y={ptY(t, Ro + 18)}
+              textAnchor="middle" dominantBaseline="middle"
+              style={{ fontSize: 10, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}
+            >{t}</text>
           </g>
         ))}
-        <line x1={cx} y1={cy} x2={px(score,Ri-6)} y2={py(score,Ri-6)} stroke="#111827" strokeWidth="2.5" strokeLinecap="round"/>
-        <circle cx={cx} cy={cy} r={8} fill="#111827"/><circle cx={cx} cy={cy} r={4} fill="white"/>
-        <text x={cx} y={cy-26} textAnchor="middle" style={{fontSize:44,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
+        {/* Needle */}
+        <line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="#111827" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx={cx} cy={cy} r={8} fill="#111827" />
+        <circle cx={cx} cy={cy} r={4} fill="white" />
+        {/* Score */}
+        <text x={cx} y={cy - 24} textAnchor="middle"
+          style={{ fontSize: 44, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter,sans-serif' }}>
+          {score}
+        </text>
       </svg>
-      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
+      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>
+        {badge.label}
+      </span>
     </div>
   );
 }
