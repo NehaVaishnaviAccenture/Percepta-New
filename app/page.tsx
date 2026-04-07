@@ -45,7 +45,7 @@ export default function Overview() {
   return (
     <main>
       {/* HERO */}
-      <div style={{ background: 'linear-gradient(170deg,#fff 55%,#F3EEFF 100%)', padding: '52px 40px 40px', textAlign: 'center' }}>
+      <div style={{ background: 'linear-gradient(170deg,#F0EAFA 0%,#EAE4F7 55%,#E8E0F5 100%)', padding: '52px 40px 40px', textAlign: 'center' }}>
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
           border: '1px solid #DDD6FE', borderRadius: 50, padding: '8px 22px',
@@ -137,8 +137,8 @@ export default function Overview() {
         </div>
 
         {/* OTHERS GIVE DATA / WE GIVE SOLUTION */}
-        <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 64 }}>
-          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+        <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: 40 }}>
+                      <div style={{ textAlign: 'center', marginBottom: 36 }}>
             <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 16 }}>What You Gain</div>
             <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 16px', lineHeight: 1.15 }}>
               Others Give You Data.<br />We Give You a Solution.
@@ -178,19 +178,19 @@ export default function Overview() {
       </div>
 
       {/* CTA */}
-      <div style={{ background: 'white', padding: '80px 40px', borderTop: '1px solid #E5E7EB' }}>
-        <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '52px 60px', textAlign: 'center' }}>
+      <div style={{ background: 'white', padding: '40px 40px', borderTop: '1px solid #E5E7EB' }}>
+        <div style={{ background: 'linear-gradient(135deg,#F8F5FF 0%,#EDE9FE 45%,#F3EEFF 100%)', border: '1.5px solid #C4B5FD', borderRadius: 28, padding: '36px 60px', textAlign: 'center' }}>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', margin: '0 0 4px', lineHeight: 1.1 }}>Ready to Discover Your</h2>
           <h2 style={{ fontSize: '3rem', fontWeight: 900, color: '#7C3AED', margin: '0 0 20px', lineHeight: 1.1 }}>GEO Score?</h2>
           <p style={{ fontSize: '1rem', color: '#9CA3AF', maxWidth: 480, margin: '0 auto 4px', lineHeight: 1.7, fontWeight: 400 }}>
             Join forward-thinking brands optimizing for the new era of generative search — backed by Accenture.
           </p>
-          <div style={{ marginTop: 40 }}>
+          <div style={{ marginTop: 24 }}>
             <Link href="/geo-hub" style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               background: '#7C3AED', color: 'white', border: 'none',
               borderRadius: 50, padding: '18px 44px', fontSize: '1.05rem',
-              fontWeight: 700, textDecoration: 'none', marginTop: 36,
+              fontWeight: 700, textDecoration: 'none', marginTop: 16,
             }}>
               Launch Percepta &nbsp;→
             </Link>
