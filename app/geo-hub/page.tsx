@@ -304,22 +304,57 @@ function VisibilityBars({ brand, vis, competitors }: { brand: string; vis: numbe
 }
 
 function ScatterPlot({ brand, vis, geo, competitors }: { brand: string; vis: number; geo: number; competitors: any[] }) {
+  const [hov, setHov] = useState<number|null>(null);
   const all=[{label:brand,x:vis,y:geo,isYou:true},...competitors.map(c=>({label:c.Brand,x:c.Vis,y:c.GEO,isYou:false}))];
-  const W=400,H=230,pad=40,xMax=Math.max(...all.map(a=>a.x),100);
-  const sx=(v:number)=>pad+(v/xMax)*(W-pad*2);
-  const sy=(v:number)=>H-pad-(v/100)*(H-pad*2);
+  const W=700,H=320,padL=52,padR=24,padT=24,padB=48;
+  const xVals=all.map(a=>a.x), yVals=all.map(a=>a.y);
+  const xMin=Math.max(0,Math.min(...xVals)-10), xMax=Math.max(...xVals)+10;
+  const yMin=Math.max(0,Math.min(...yVals)-10), yMax=Math.min(100,Math.max(...yVals)+10);
+  const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
+  const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
   const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length);
+  const avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
+  const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
-      <line x1={pad} y1={H-pad} x2={W-pad} y2={H-pad} stroke="#E5E7EB" strokeWidth="1"/>
-      <line x1={pad} y1={pad} x2={pad} y2={H-pad} stroke="#E5E7EB" strokeWidth="1"/>
-      {[0,25,50,75,100].map(v=>(<g key={v}><line x1={pad} y1={sy(v)} x2={W-pad} y2={sy(v)} stroke="#F3F4F6" strokeWidth="1"/><text x={pad-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>))}
-      <line x1={sx(avgX)} y1={pad} x2={sx(avgX)} y2={H-pad} stroke="#9CA3AF" strokeWidth="1" strokeDasharray="4,4"/>
-      <text x={sx(avgX)+4} y={pad+10} style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>avg {avgX}</text>
-      {all.map((a,i)=><circle key={i} cx={sx(a.x)} cy={sy(a.y)} r={a.isYou?7:5} fill={a.isYou?'#7C3AED':'#D1D5DB'}/>)}
-      <text x={W/2} y={H-5} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
-      <text x={10} y={H/2} textAnchor="middle" transform={`rotate(-90,10,${H/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO</text>
-    </svg>
+    <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+        {/* Grid */}
+        {yTicks.map(v=>(<g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>))}
+        {/* Avg crosshairs */}
+        <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
+        <line x1={padL} y1={sy(avgY)} x2={W-padR} y2={sy(avgY)} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
+        {/* Axes */}
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        {/* Dots */}
+        {all.map((a,i)=>{
+          const cx=sx(a.x),cy=sy(a.y),isH=hov===i;
+          return (
+            <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+              {isH&&<circle cx={cx} cy={cy} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
+              <circle cx={cx} cy={cy} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
+              {/* x-axis label */}
+              <text x={cx} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{a.x}</text>
+              {/* Hover tooltip */}
+              {isH&&(()=>{
+                const tx=Math.min(Math.max(cx-60,padL),W-padR-130);
+                const ty=cy>padT+60?cy-56:cy+14;
+                return (
+                  <g>
+                    <rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1" filter="drop-shadow(0 2px 6px rgba(0,0,0,0.10))"/>
+                    <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
+                    <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text>
+                  </g>
+                );
+              })()}
+            </g>
+          );
+        })}
+        {/* Axis labels */}
+        <text x={(padL+W-padR)/2} y={H-6} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
+        <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO</text>
+      </svg>
+    </div>
   );
 }
 
@@ -619,25 +654,28 @@ export default function GeoHub() {
               const vis=result.visibility;
               const comps=result.competitors||[];
               const allVis=[vis,...comps.map((c:any)=>c.Vis)];
-              const avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1;
+              const topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
+              const topVisScore=topComp?topComp.Vis:vis;
+              const gapToTop=vis-topVisScore;
+              const avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:24}}>
                     <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px 18px'}}>
                       <div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Rank (Visibility)</div>
                       <div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>#{myVisRank}</div>
-                      <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>out of {allVis.length} institutions</div>
+                      <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>out of {allVis.length} competitors</div>
                     </div>
                     <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px 18px'}}>
                       <div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Score</div>
                       <div style={{fontSize:'2rem',fontWeight:800,color:'#111827'}}>{vis}</div>
                       <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>vs industry avg {avgVis}</div>
                     </div>
-                    <div style={{background:'#ECFDF5',borderRadius:12,border:'1px solid #6EE7B7',padding:'18px 18px'}}>
-                      <div style={{fontSize:'0.65rem',fontWeight:600,color:'#065F46',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. Industry Average</div>
-                      <div style={{fontSize:'2rem',fontWeight:800,color:'#065F46'}}>{vis>avgVis?'+':''}{vis-avgVis} pts</div>
-                      <div style={{fontSize:'0.72rem',color:'#065F46'}}>{vis>avgVis?'Above average':'Below average'}</div>
+                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px 18px'}}>
+                      <div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #{1} Competitor {topComp?`(${topComp.Brand})`:''}</div>
+                      <div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div>
+                      <div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div>
                     </div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}>
