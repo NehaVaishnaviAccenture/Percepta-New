@@ -431,13 +431,17 @@ function ScatterPlot({ brand, vis, geo, competitors }: { brand:string; vis:numbe
         <line x1={padL} y1={sy(avgY)} x2={W-padR} y2={sy(avgY)} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        {[...Array(11)].map((_,i)=>{
+          const v=i*10;
+          if(v<xMin||v>xMax) return null;
+          return <text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;
+        })}
         {all.map((a,i)=>{
           const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i;
           return (
             <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
               {isH&&<circle cx={cx2} cy={cy2} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
               <circle cx={cx2} cy={cy2} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
-              <text x={cx2} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{a.x}</text>
               {isH&&(()=>{
                 const tx=Math.min(Math.max(cx2-60,padL),W-padR-130);
                 const ty=cy2>padT+60?cy2-56:cy2+14;
@@ -510,7 +514,7 @@ Return ONLY a valid JSON array with no markdown, no backticks, no preamble. Each
 
 Order by priority (High first). Make actions specific to this brand's actual gaps and competitors.`;
 
-    fetch('/api/geo-actions', {
+    fetch('/api/prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt }),
