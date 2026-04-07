@@ -9,14 +9,14 @@ const bands = [
   { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
 ];
 
-const METRIC_TIPS: Record<string, string> = {
+const METRIC_TIPS: Record<string,string> = {
   'visibility score': 'measures how often your brand appears in ai-generated responses across key industry queries.',
   'citation score': 'reflects how authoritatively ai models reference your brand compared to competitors.',
   'sentiment score': 'captures the tone and favorability of ai responses when your brand is mentioned.',
   'avg rank': 'your average mention position across all ai responses where your brand appeared.',
 };
 
-const RADAR_TIPS: Record<string, string> = {
+const RADAR_TIPS: Record<string,string> = {
   'Positivity': 'How favorable the tone is when AI mentions your brand.',
   'Brand Authority': 'How credible and expert AI perceives your brand.',
   'Message Clarity': 'How clearly and consistently your brand message comes through in AI responses.',
@@ -25,7 +25,7 @@ const RADAR_TIPS: Record<string, string> = {
   'Recommendation': 'How often AI actively recommends your brand over alternatives.',
 };
 
-const TABS = ['GEO Score', 'Competitors', 'Visibility', 'Sentiment', 'Citations', 'Prompts', 'Recommendations', 'Live Prompt'];
+const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt'];
 
 function scoreBadge(s: number) {
   if (s >= 80) return { label: 'Excellent', color: '#065F46', bg: '#D1FAE5' };
@@ -36,70 +36,70 @@ function scoreBadge(s: number) {
 
 function classifyDomain(d: string) {
   const dl = d.toLowerCase();
-  if (['reddit','twitter','youtube','facebook','instagram','tiktok','linkedin'].some(s => dl.includes(s))) return { label: 'Social', color: '#F59E0B', bg: '#FEF3C7' };
-  if (['wikipedia','gov','edu','consumerreports','bbb','federalreserve','fdic'].some(s => dl.includes(s))) return { label: 'Institution', color: '#3B82F6', bg: '#DBEAFE' };
-  if (['nerdwallet','forbes','bankrate','creditkarma','cnbc','wsj','nytimes','bloomberg','businessinsider','investopedia','motleyfool','motortrend','caranddriver','edmunds','reuters','thepointsguy','wallethub'].some(s => dl.includes(s))) return { label: 'Earned Media', color: '#10B981', bg: '#D1FAE5' };
-  return { label: 'Other', color: '#6B7280', bg: '#F3F4F6' };
+  if (['reddit','twitter','youtube','facebook','instagram','tiktok','linkedin'].some(s=>dl.includes(s))) return {label:'Social',color:'#F59E0B',bg:'#FEF3C7'};
+  if (['wikipedia','gov','edu','consumerreports','bbb','federalreserve','fdic'].some(s=>dl.includes(s))) return {label:'Institution',color:'#3B82F6',bg:'#DBEAFE'};
+  if (['nerdwallet','forbes','bankrate','creditkarma','cnbc','wsj','nytimes','bloomberg','businessinsider','investopedia','motleyfool','motortrend','caranddriver','edmunds','reuters','thepointsguy','wallethub'].some(s=>dl.includes(s))) return {label:'Earned Media',color:'#10B981',bg:'#D1FAE5'};
+  return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
 function Tooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 5, cursor: 'help' }}
-      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-      <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#E5E7EB', color: '#6B7280', fontSize: '0.6rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>?</span>
-      {show && (
-        <span style={{ position: 'absolute', bottom: '130%', left: '50%', transform: 'translateX(-50%)', background: '#1F2937', color: 'white', fontSize: '0.72rem', lineHeight: 1.6, borderRadius: 8, padding: '10px 14px', width: 210, textAlign: 'left', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 9999, pointerEvents: 'none', whiteSpace: 'normal' as const }}>
+    <span style={{position:'relative',display:'inline-flex',alignItems:'center',marginLeft:5,cursor:'help'}}
+      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
+      <span style={{width:15,height:15,borderRadius:'50%',background:'#E5E7EB',color:'#6B7280',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>?</span>
+      {show&&(
+        <span style={{position:'absolute',bottom:'130%',left:'50%',transform:'translateX(-50%)',background:'#1F2937',color:'white',fontSize:'0.72rem',lineHeight:1.6,borderRadius:8,padding:'10px 14px',width:210,textAlign:'left',boxShadow:'0 4px 12px rgba(0,0,0,0.2)',zIndex:9999,pointerEvents:'none',whiteSpace:'normal' as const}}>
           {text}
-          <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', borderWidth: 5, borderStyle: 'solid', borderColor: '#1F2937 transparent transparent transparent' }} />
+          <span style={{position:'absolute',top:'100%',left:'50%',transform:'translateX(-50%)',borderWidth:5,borderStyle:'solid',borderColor:'#1F2937 transparent transparent transparent'}}/>
         </span>
       )}
     </span>
   );
 }
 
-function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val: any; sub?: string; color?: string }) {
+function MetricCard({ label, val, sub, color='#7C3AED' }: { label:string; val:any; sub?:string; color?:string }) {
   return (
-    <div style={{ background: 'white', borderRadius: 12, padding: '18px 16px', border: '1px solid #E5E7EB' }}>
-      <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.65rem', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.06em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
-        {label}{METRIC_TIPS[label.toLowerCase()] && <Tooltip text={METRIC_TIPS[label.toLowerCase()]} />}
+    <div style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
+      <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
+        {label}{METRIC_TIPS[label.toLowerCase()]&&<Tooltip text={METRIC_TIPS[label.toLowerCase()]}/>}
       </div>
-      <div style={{ fontSize: '1.8rem', fontWeight: 800, color, lineHeight: 1 }}>{val}</div>
-      {sub && <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: 3 }}>{sub}</div>}
+      <div style={{fontSize:'1.8rem',fontWeight:800,color,lineHeight:1}}>{val}</div>
+      {sub&&<div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>}
     </div>
   );
 }
 
-function GeoGauge({ score, brand }: { score: number; brand: string }) {
+function GeoGauge({ score, brand }: { score:number; brand:string }) {
   const badge = scoreBadge(score);
-  const cx = 160, cy = 155, Ro = 130, Ri = 88;
-  const a = (s: number) => Math.PI - (s / 100) * Math.PI;
-  const ox = (s: number, r: number) => cx + r * Math.cos(a(s));
-  const oy = (s: number, r: number) => cy - r * Math.sin(a(s));
-  const seg = (s0: number, s1: number, fill: string) => {
-    const lg = s1 - s0 > 50 ? 1 : 0;
+  const cx=160,cy=155,Ro=130,Ri=88;
+  const a=(s:number)=>Math.PI-(s/100)*Math.PI;
+  const ox=(s:number,r:number)=>cx+r*Math.cos(a(s));
+  const oy=(s:number,r:number)=>cy-r*Math.sin(a(s));
+  const seg=(s0:number,s1:number,fill:string)=>{
+    const lg=s1-s0>50?1:0;
     return <path d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 1 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 0 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`} fill={fill} stroke="white" strokeWidth="2"/>;
   };
-  const mi = Ri - 8, mo = Ro + 8;
+  const mi=Ri-8,mo=Ro+8;
   return (
-    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
-      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#374151', marginBottom: 4 }}>{brand}</div>
-      <svg viewBox="0 0 320 175" style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {seg(0, 44, '#FECACA')}{seg(44, 69, '#FEF08A')}{seg(69, 79, '#BAE6FD')}{seg(79, 100, '#BBF7D0')}
+    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 16px 14px',textAlign:'center'}}>
+      <div style={{fontSize:'0.9rem',fontWeight:700,color:'#374151',marginBottom:4}}>{brand}</div>
+      <svg viewBox="0 0 320 175" style={{width:'100%',display:'block',overflow:'visible'}}>
+        {seg(0,44,'#FECACA')}{seg(44,69,'#FEF08A')}{seg(69,79,'#BAE6FD')}{seg(79,100,'#BBF7D0')}
         <line x1={ox(score,mi)} y1={oy(score,mi)} x2={ox(score,mo)} y2={oy(score,mo)} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"/>
-        {[0,20,40,60,80,100].map(t => <text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
+        {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
         <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
-      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
+      <span style={{background:badge.bg,color:badge.color,borderRadius:50,padding:'5px 18px',fontSize:'0.82rem',fontWeight:700}}>{badge.label}</span>
     </div>
   );
 }
 
-function SankeyChart({ result }: { result: any }) {
-  const [hov, setHov] = useState<number | null>(null);
-  const vis = result.visibility??0, cit = result.citation_share??0, sent = result.sentiment??0;
-  const prom = result.prominence??0, sov = result.share_of_voice??0, geo = result.overall_geo_score??0;
-  const inputs = [
+function SankeyChart({ result }: { result:any }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const vis=result.visibility??0,cit=result.citation_share??0,sent=result.sentiment??0;
+  const prom=result.prominence??0,sov=result.share_of_voice??0,geo=result.overall_geo_score??0;
+  const inputs=[
     {label:'Visibility',value:vis,color:'#7C3AED',weight:30},
     {label:'Sentiment',value:sent,color:'#10B981',weight:20},
     {label:'Prominence',value:prom,color:'#3B82F6',weight:20},
@@ -107,9 +107,9 @@ function SankeyChart({ result }: { result: any }) {
     {label:'Share of Voice',value:sov,color:'#EF4444',weight:15},
   ];
   const W=500,H=330,lx=175,rx=415,nw=22,gH=140,gCY=H/2,nH=30,gap=20;
-  const totalH = inputs.length*nH+(inputs.length-1)*gap;
-  const startY = (H-totalH)/2;
-  const nodes = inputs.map((n,i)=>({...n,y:startY+i*(nH+gap)}));
+  const totalH=inputs.length*nH+(inputs.length-1)*gap;
+  const startY=(H-totalH)/2;
+  const nodes=inputs.map((n,i)=>({...n,y:startY+i*(nH+gap)}));
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',flex:1}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Composition</div>
@@ -138,10 +138,10 @@ function SankeyChart({ result }: { result: any }) {
   );
 }
 
-function BusinessImpact({ result, onGo }: { result: any; onGo: () => void }) {
-  const geo = result.overall_geo_score??0, brand = result.brand_name??'Your Brand';
-  const nextTier = geo>=80?null:geo>=70?{score:80,label:'Excellent'}:geo>=45?{score:70,label:'Good'}:{score:45,label:'Needs Work'};
-  const steps = [
+function BusinessImpact({ result, onGo }: { result:any; onGo:()=>void }) {
+  const geo=result.overall_geo_score??0,brand=result.brand_name??'Your Brand';
+  const nextTier=geo>=80?null:geo>=70?{score:80,label:'Excellent'}:geo>=45?{score:70,label:'Good'}:{score:45,label:'Needs Work'};
+  const steps=[
     {title:'Higher GEO Score',sub:'Stronger AI visibility'},
     {title:'Stronger AI Visibility',sub:'More surfaces where brand is recommended'},
     {title:'More Surfaces',sub:'Higher organic traffic'},
@@ -176,11 +176,11 @@ function BusinessImpact({ result, onGo }: { result: any; onGo: () => void }) {
   );
 }
 
-function LinkAnalysis({ result }: { result: any }) {
-  const [hov, setHov] = useState<string|null>(null);
-  const brand = result.brand_name||'Brand';
-  const competitors = (result.competitors||[]).slice(0,4);
-  const sources = (result.citation_sources||[]).slice(0,4);
+function LinkAnalysis({ result }: { result:any }) {
+  const [hov,setHov] = useState<string|null>(null);
+  const brand=result.brand_name||'Brand';
+  const competitors=(result.competitors||[]).slice(0,4);
+  const sources=(result.citation_sources||[]).slice(0,4);
   const W=700,H=420,cx=W/2,cy=H/2-10;
   type N={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
   const nodes:N[]=[];
@@ -222,8 +222,8 @@ function LinkAnalysis({ result }: { result: any }) {
   );
 }
 
-function MarkdownText({ text }: { text: string }) {
-  const lines = text.split('\n');
+function MarkdownText({ text }: { text:string }) {
+  const lines=text.split('\n');
   return (
     <div style={{fontSize:'0.92rem',color:'#374151',lineHeight:1.85,fontFamily:'Inter,sans-serif'}}>
       {lines.map((line,i)=>{
@@ -240,18 +240,18 @@ function MarkdownText({ text }: { text: string }) {
   );
 }
 
-function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: number }) {
-  const [hov, setHov] = useState<number|null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{x:number;y:number}|null>(null);
-  const dims = [
+function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number }) {
+  const [hov,setHov] = useState<number|null>(null);
+  const [tooltipPos,setTooltipPos] = useState<{x:number;y:number}|null>(null);
+  const dims=[
     {label:'Positivity',val:sent},
     {label:'Brand Authority',val:Math.round(sent*0.85)},
-    {label:'Trust',val:Math.round(vis*0.9)},
+    {label:'Trust',val:Math.round(sent*0.7)},
     {label:'Market Relevance',val:Math.round(prom*0.95)},
     {label:'Message Clarity',val:Math.round(sent*0.75)},
-    {label:'Recommendation',val:Math.round(vis*0.8)},
+    {label:'Recommendation',val:Math.round(sent*0.65)},
   ];
-  const compDims = dims.map(d=>({...d,val:Math.round(d.val*0.75)}));
+  const compDims=dims.map(d=>({...d,val:Math.round(d.val*0.75)}));
   const cx=200,cy=200,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
@@ -277,7 +277,12 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
         {dims.map((d,i)=>{
           const p=pt(i,(d.val/100)*R);
           return <circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}}
-            onMouseEnter={(e)=>{setHov(i);const rect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const svgEl=e.currentTarget as SVGElement;const cx2=svgEl.getBoundingClientRect().left+svgEl.getBoundingClientRect().width/2;const cy2=svgEl.getBoundingClientRect().top;setTooltipPos({x:cx2-rect.left,y:cy2-rect.top-8});}}
+            onMouseEnter={(e)=>{
+              setHov(i);
+              const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();
+              const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();
+              setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left, y:circRect.top-svgRect.top});
+            }}
             onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;
         })}
         {dims.map((d,i)=>{
@@ -291,9 +296,8 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
           <circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text>
         </g>
       </svg>
-      {/* HTML tooltip overlay — always renders on top */}
       {hov!==null&&tooltipPos&&(
-        <div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:tooltipPos.y-60,background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}>
+        <div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}>
           <div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div>
           <div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{RADAR_TIPS[dims[hov].label]}</div>
         </div>
@@ -306,47 +310,51 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
 }
 
 function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandName:string; sent:number; prom:number; vis:number; competitors:any[] }) {
-  const [hovCell, setHovCell] = useState<string|null>(null);
-  const dims = [
-    {key:'Positivity',    fn:(s:number,p:number,v:number)=>s},
-    {key:'Brand Authority',fn:(s:number,p:number,v:number)=>Math.round(s*0.85)},
-    {key:'Trust',         fn:(s:number,p:number,v:number)=>Math.round(v*0.9)},
-    {key:'Mkt Relevance', fn:(s:number,p:number,v:number)=>Math.round(p*0.95)},
-    {key:'Msg Clarity',   fn:(s:number,p:number,v:number)=>Math.round(s*0.75)},
-    {key:'Recommend.',    fn:(s:number,p:number,v:number)=>Math.round(v*0.8)},
+  const [hovCell,setHovCell] = useState<string|null>(null);
+  const dims=[
+    {key:'Positivity',    fn:(s:number,p:number)=>s},
+    {key:'Brand Authority',fn:(s:number,p:number)=>Math.round(s*0.85)},
+    {key:'Trust',         fn:(s:number,p:number)=>Math.round(s*0.7)},
+    {key:'Mkt Relevance', fn:(s:number,p:number)=>Math.round(p*0.95)},
+    {key:'Msg Clarity',   fn:(s:number,p:number)=>Math.round(s*0.75)},
+    {key:'Recommend.',    fn:(s:number,p:number)=>Math.round(s*0.65)},
   ];
-  // Build rows: your brand first, then competitors
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
-    {name:brandName,isYou:true,scores:dims.map(d=>d.fn(sent,prom,vis))},
+    {name:brandName,isYou:true,scores:dims.map(d=>d.fn(sent,prom))},
     ...(competitors||[]).slice(0,8).map((c:any)=>{
-      const cs=c.Sen||Math.round(sent*0.8+seed(c.Brand||'',0)*20);
-      const cp=c.Prom||Math.round(prom*0.8+seed(c.Brand||'',1)*20);
-      const cv=c.Vis||Math.round(vis*0.8+seed(c.Brand||'',2)*20);
-      return {name:c.Brand||'',isYou:false,scores:dims.map(d=>Math.min(100,Math.max(0,d.fn(cs,cp,cv)+Math.round(seed(c.Brand||'',3)*16-8))))};
+      const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
+      const cp=c.Prom||Math.round(prom*0.75+seed(c.Brand||'',1)*25);
+      return {name:c.Brand||'',isYou:false,scores:dims.map(d=>Math.min(100,Math.max(10,d.fn(cs,cp)+Math.round(seed(c.Brand||'',3)*20-10))))};
     })
   ];
   const allScores=rows.flatMap(r=>r.scores);
   const minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
   const cellColor=(val:number)=>{
-    const t=(val-minS)/(maxS-minS||1);
+    const t=(val-minS)/Math.max(maxS-minS,1);
     if(t<0.2)  return {bg:'#F3F4F6',text:'#9CA3AF'};
     if(t<0.4)  return {bg:'#EDE9FE',text:'#6D28D9'};
     if(t<0.6)  return {bg:'#C4B5FD',text:'#5B21B6'};
     if(t<0.8)  return {bg:'#8B5CF6',text:'white'};
     return {bg:'#5B21B6',text:'white'};
   };
+  const compRows=rows.slice(1);
+  const dimWins=dims.map((d,di)=>{
+    const yourScore=rows[0].scores[di];
+    const beaten=compRows.filter(r=>yourScore>r.scores[di]).length;
+    return {dim:d.key,score:yourScore,beaten};
+  });
+  const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0];
+  const weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sentiment Dimensions vs Competitors</div>
       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Scores across all 6 sentiment dimensions. Darker = stronger. Hover to see score.</div>
-      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4,alignItems:'stretch'}}>
-        {/* Header */}
+      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
         <div/>
         {dims.map((d,i)=>(
           <div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{d.key}</div>
         ))}
-        {/* Rows */}
         {rows.map((r,ri)=>[
           <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,
           ...r.scores.map((val,ci)=>{
@@ -354,8 +362,7 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
             const {bg,text}=cellColor(val);
             const isH=hovCell===k;
             return (
-              <div key={`c${k}`}
-                onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
+              <div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
                 style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>
                 {isH?val:''}
               </div>
@@ -369,27 +376,14 @@ function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandNa
         ))}
         <div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>Your brand</span></div>
       </div>
-      {(()=>{
-        const yourRow=rows[0];
-        const compRows=rows.slice(1);
-        const dimWins=dims.map((d,di)=>{
-          const yourScore=yourRow.scores[di];
-          const beaten=compRows.filter(r=>yourScore>r.scores[di]).length;
-          return {dim:d.key,score:yourScore,beaten};
-        });
-        const strongest=dimWins.sort((a,b)=>b.score-a.score)[0];
-        const weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
-        return (
-          <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>
-            💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) — ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}) — improvement here would have the highest GEO impact.
-          </div>
-        );
-      })()}
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>
+        💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) — ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}) — improvement here would have the highest GEO impact.
+      </div>
     </div>
   );
 }
 
-function VisibilityBars({ brand, vis, competitors }: { brand: string; vis: number; competitors: any[] }) {
+function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number; competitors:any[] }) {
   const all=[{Brand:brand,Vis:vis,isYou:true},...competitors.map(c=>({Brand:c.Brand,Vis:c.Vis,isYou:false}))].sort((a,b)=>b.Vis-a.Vis);
   const max=Math.max(...all.map(a=>a.Vis),1);
   return (
@@ -410,8 +404,8 @@ function VisibilityBars({ brand, vis, competitors }: { brand: string; vis: numbe
   );
 }
 
-function ScatterPlot({ brand, vis, geo, competitors }: { brand: string; vis: number; geo: number; competitors: any[] }) {
-  const [hov, setHov] = useState<number|null>(null);
+function ScatterPlot({ brand, vis, geo, competitors }: { brand:string; vis:number; geo:number; competitors:any[] }) {
+  const [hov,setHov] = useState<number|null>(null);
   const all=[{label:brand,x:vis,y:geo,isYou:true},...competitors.map(c=>({label:c.Brand,x:c.Vis,y:c.GEO,isYou:false}))];
   const W=700,H=320,padL=52,padR=24,padT=24,padB=48;
   const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
@@ -431,22 +425,20 @@ function ScatterPlot({ brand, vis, geo, competitors }: { brand: string; vis: num
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         {all.map((a,i)=>{
-          const cx=sx(a.x),cy=sy(a.y),isH=hov===i;
+          const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i;
           return (
             <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
-              {isH&&<circle cx={cx} cy={cy} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
-              <circle cx={cx} cy={cy} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
-              <text x={cx} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{a.x}</text>
+              {isH&&<circle cx={cx2} cy={cy2} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
+              <circle cx={cx2} cy={cy2} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
+              <text x={cx2} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{a.x}</text>
               {isH&&(()=>{
-                const tx=Math.min(Math.max(cx-60,padL),W-padR-130);
-                const ty=cy>padT+60?cy-56:cy+14;
-                return (
-                  <g>
-                    <rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/>
-                    <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
-                    <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text>
-                  </g>
-                );
+                const tx=Math.min(Math.max(cx2-60,padL),W-padR-130);
+                const ty=cy2>padT+60?cy2-56:cy2+14;
+                return <g>
+                  <rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/>
+                  <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
+                  <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text>
+                </g>;
               })()}
             </g>
           );
@@ -458,7 +450,7 @@ function ScatterPlot({ brand, vis, geo, competitors }: { brand: string; vis: num
   );
 }
 
-function CitationPie({ sources }: { sources: any[] }) {
+function CitationPie({ sources }: { sources:any[] }) {
   if(!sources||sources.length===0) return null;
   const cx=110,cy=110,R=90;
   const colors=['#7C3AED','#10B981','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#84CC16','#F97316','#EC4899'];
@@ -479,16 +471,16 @@ function CitationPie({ sources }: { sources: any[] }) {
 }
 
 export default function GeoHub() {
-  const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState(0);
-  const [promptInput, setPromptInput] = useState('');
-  const [promptHistory, setPromptHistory] = useState<{q:string;a:string}[]>([]);
-  const [promptLoading, setPromptLoading] = useState(false);
-  const [filterCat, setFilterCat] = useState('All');
-  const [hovBar, setHovBar] = useState<number|null>(null);
+  const [url,setUrl] = useState('');
+  const [loading,setLoading] = useState(false);
+  const [result,setResult] = useState<any>(null);
+  const [error,setError] = useState('');
+  const [activeTab,setActiveTab] = useState(0);
+  const [promptInput,setPromptInput] = useState('');
+  const [promptHistory,setPromptHistory] = useState<{q:string;a:string}[]>([]);
+  const [promptLoading,setPromptLoading] = useState(false);
+  const [filterCat,setFilterCat] = useState('All');
+  const [hovBar,setHovBar] = useState<number|null>(null);
 
   async function runAnalysis() {
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
@@ -514,19 +506,19 @@ export default function GeoHub() {
     setPromptLoading(false);
   }
 
-  const examplePrompts = result?.ind_key==='fin' ? [
+  const examplePrompts=result?.ind_key==='fin'?[
     'Compare invite-only credit cards for high net worth individuals',
     'What is the best credit card for someone who travels internationally?',
     'Which bank offers the best rewards for small business owners?',
     'Best first credit card for someone with no credit history',
     'Compare Chase Sapphire Reserve vs Capital One Venture X for travel',
-  ] : result?.ind_key==='auto' ? [
+  ]:result?.ind_key==='auto'?[
     'Best electric vehicle for long road trips in 2025',
     'Most reliable SUV for families',
     'Compare Tesla Model 3 vs BMW i4',
     'Best car for first-time buyers under $30,000',
     'Which car brand has the best safety record?',
-  ] : [
+  ]:[
     'What are the most trusted brands right now?',
     'Best companies for customer service in 2025',
     'Compare top brands for value and quality',
@@ -543,7 +535,7 @@ export default function GeoHub() {
         <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>⏱ &nbsp;Live data · Updated in real-time · Not cached like competitors</div>
       </div>
 
-      {!result ? (
+      {!result?(
         <div style={{padding:'48px 40px 60px'}}>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:40}}>
             {bands.map((b,i)=>(
@@ -570,7 +562,7 @@ export default function GeoHub() {
             {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
           </div>
         </div>
-      ) : (
+      ):(
         <div>
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4}}>
             {TABS.map((t,i)=>(
@@ -656,14 +648,11 @@ export default function GeoHub() {
                         const gh=((c.GEO||0)/100)*bMH,vh=((c.Vis||0)/100)*bMH,ch=((c.Cit||0)/100)*bMH;
                         const isY=c.isYou,isH=hovBar===i;
                         const tipY=bH-Math.max(gh,vh,ch)-44;
-                        const geoCol=isY?'#1F2937':'#9CA3AF';
-                        const visCol=isY?'#7C3AED':'#A5B4FC';
-                        const citCol=isY?'#C4B5FD':'#E9D5FF';
                         return (
                           <g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>
-                            <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={geoCol} rx={2}/>
-                            <rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={visCol} rx={2}/>
-                            <rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={citCol} rx={2}/>
+                            <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={isY?'#1F2937':'#9CA3AF'} rx={2}/>
+                            <rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={isY?'#7C3AED':'#A5B4FC'} rx={2}/>
+                            <rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={isY?'#C4B5FD':'#E9D5FF'} rx={2}/>
                             <text x={bx+bw2*1.5} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#7C3AED':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>
                             {isH&&(
                               <g>
@@ -814,6 +803,7 @@ export default function GeoHub() {
                         <RadarChart sent={sent} prom={prom} vis={vis}/>
                       </div>
                     </div>
+                    <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
