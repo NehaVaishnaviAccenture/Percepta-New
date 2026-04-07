@@ -354,6 +354,7 @@ export default function GeoHub() {
   const [promptHistory, setPromptHistory] = useState<{q:string;a:string}[]>([]);
   const [promptLoading, setPromptLoading] = useState(false);
   const [filterCat, setFilterCat] = useState('All');
+  const [hovBar, setHovBar] = useState<number|null>(null);
 
   async function runAnalysis() {
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
@@ -495,7 +496,6 @@ export default function GeoHub() {
               const myRank=top.findIndex(c=>c.isYou)+1;
               const leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
-              const [hovBar,setHovBar]=useState<number|null>(null);
               const bW=680,bH=140,bPad=32,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
               return (
                 <div>
