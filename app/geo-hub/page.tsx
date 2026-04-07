@@ -1176,3 +1176,70 @@ export default function GeoHub() {
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}>
                       <div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ What is Working Well</div>
                       <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>✓</span><span
+
+                                                                                                                                                                                                                                                                                                               >{s}</span></li>))}
+                      </ul>
+                    </div>
+                    <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ What Needs Improvement</div>
+                      <ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(<li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>))}</ul>
+                    </div>
+                  </div>
+                  {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
+                </div>
+              );
+            })()}
+
+            {/* TAB 7: LIVE PROMPT */}
+            {activeTab===7&&(()=>{
+              return (
+                <div>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Live Prompt Tester</div>
+                  <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:20}}>Run any prompt against a live AI model and see how your brand appears in real responses.</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>
+                    {examplePrompts.map((p,i)=>(
+                      <button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:10,padding:'10px 16px',fontSize:'0.82rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',textAlign:'left' as const,lineHeight:1.5}}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:20,marginBottom:20}}>
+                    <div style={{display:'flex',gap:10}}>
+                      <input
+                        type="text"
+                        value={promptInput}
+                        onChange={e=>setPromptInput(e.target.value)}
+                        onKeyDown={e=>e.key==='Enter'&&runPrompt()}
+                        placeholder="Ask any question — e.g. What's the best travel credit card?"
+                        style={{flex:1,border:'1.5px solid #E5E7EB',borderRadius:10,padding:'11px 16px',fontSize:'0.9rem',outline:'none',color:'#374151'}}
+                      />
+                      <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'0 22px',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',flexShrink:0}}>
+                        {promptLoading?'Asking…':'Ask AI'}
+                      </button>
+                    </div>
+                  </div>
+                  {promptHistory.length>0&&(
+                    <div style={{display:'flex',flexDirection:'column' as const,gap:16}}>
+                      {promptHistory.map((h,i)=>(
+                        <div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
+                          <div style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',marginBottom:10}}>Q: {h.q}</div>
+                          <MarkdownText text={h.a}/>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {promptLoading&&(
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.88rem'}}>
+                      Querying AI model…
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
