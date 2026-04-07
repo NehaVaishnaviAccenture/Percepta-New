@@ -495,7 +495,14 @@ export default function GeoHub() {
     } catch{}
   });
 
-  async function runAnalysis() {
+  // Alias-based visibility recalculation on the frontend
+  // Mirrors the Python backend fix: catches "capitalone", "capital-one" etc.
+  function recalcVisibility(rd: any[], brandName: string): number {
+    const bl = brandName.toLowerCase();
+    const aliases = [bl, bl.replace(/\s+/g,''), bl.replace(/\s+/g,'-'), bl.split(' ')[0]];
+    const mentions = rd.filter(r => aliases.some(a => (r.response_preview||'').toLowerCase().includes(a))).length;
+    return Math.round((mentions / Math.max(rd.length, 1)) * 100);
+  }
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
     setError('');setLoading(true);
     try {
@@ -554,7 +561,7 @@ export default function GeoHub() {
 
       {!result?(
         <div style={{padding:'48px 40px 60px'}}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:40}}>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:24}}>
             {bands.map((b,i)=>(
               <div key={i} style={{background:b.bg,borderRadius:20,padding:'36px 28px',textAlign:'center',border:`1.5px solid ${b.border}`}}>
                 <div style={{fontSize:'0.85rem',fontWeight:700,color:b.color,marginBottom:8}}>{b.range}</div>
@@ -562,6 +569,28 @@ export default function GeoHub() {
                 <div style={{fontSize:'0.85rem',color:b.color,lineHeight:1.5}}>{b.desc}</div>
               </div>
             ))}
+          </div>
+
+          {/* WHY PERCEPTA GEO IS DIFFERENT — shown before input box */}
+          <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'32px 36px',marginBottom:24}}>
+            <div style={{fontSize:'1.1rem',fontWeight:800,color:'#111827',marginBottom:28}}>Why Percepta GEO is different</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:32}}>
+              {[
+                {icon:'↗',title:'Score + Diagnosis',desc:'One unified GEO score across visibility, citations, sentiment — not scattered metrics.'},
+                {icon:'⚡',title:'Strategy + Action',desc:"We don't just show data. We tell you what to fix, how to fix it, and why it matters."},
+                {icon:'👥',title:'Team + Execution',desc:'Backed by Accenture consultants who implement the recommendations for you.'},
+              ].map((item,i)=>(
+                <div key={i} style={{display:'flex',gap:16,alignItems:'flex-start'}}>
+                  <div style={{width:40,height:40,borderRadius:10,background:'#F5F3FF',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.1rem',flexShrink:0,color:'#7C3AED'}}>
+                    {item.icon}
+                  </div>
+                  <div>
+                    <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:6}}>{item.title}</div>
+                    <div style={{fontSize:'0.83rem',color:'#6B7280',lineHeight:1.6}}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
@@ -593,7 +622,9 @@ export default function GeoHub() {
             {/* TAB 0: GEO SCORE */}
             {activeTab===0&&(()=>{
               const geo=result.overall_geo_score,badge=scoreBadge(geo);
-              const vis=result.visibility,cit=result.citation_share,sent=result.sentiment;
+              const rd=result.responses_detail||[];
+              const vis=recalcVisibility(rd, result.brand_name||'') || result.visibility;
+              const cit=result.citation_share,sent=result.sentiment;
               const prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
               const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), typically mentioned mid-list rather than first; Share of Voice (${sov}), competitors are dominating more of the AI conversation; Citation (${cit}), rarely the top pick in AI responses; Sentiment (${sent}), neutral tone with no strong recommendation language.`;
               return (
