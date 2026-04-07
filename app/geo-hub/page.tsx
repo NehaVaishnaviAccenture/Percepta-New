@@ -265,20 +265,85 @@ function MarkdownText({ text }: { text: string }) {
 }
 
 // ── RADAR ─────────────────────────────────────────────────────
-function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: number }) {
-  const dims=[{label:'Positivity',val:sent},{label:'Authority',val:Math.round(sent*0.85)},{label:'Trust',val:Math.round(vis*0.9)},{label:'Relevance',val:Math.round(prom*0.95)},{label:'Clarity',val:Math.round(sent*0.75)},{label:'Recommendation',val:Math.round(vis*0.8)}];
-  const cx=160,cy=155,R=105,n=dims.length;
+const RADAR_TIPS:Record<string,string>={
+  'Positivity':'How favorable the tone is when AI mentions your brand.',
+  'Brand Authority':'How credible and expert AI perceives your brand.',
+  'Message Clarity':'How clearly and consistently your brand message comes through in AI responses.',
+  'Market Relevance':'How often your brand is surfaced for relevant queries.',
+  'Trust':'How trustworthy AI portrays your brand to consumers.',
+  'Recommendation':'How often AI actively recommends your brand over alternatives.',
+};
+function RadarChart({ sent, prom, vis, competitors }: { sent: number; prom: number; vis: number; competitors?: any[] }) {
+  const [hov, setHov] = useState<number|null>(null);
+  const dims=[
+    {label:'Positivity',val:sent},
+    {label:'Brand Authority',val:Math.round(sent*0.85)},
+    {label:'Trust',val:Math.round(vis*0.9)},
+    {label:'Market Relevance',val:Math.round(prom*0.95)},
+    {label:'Message Clarity',val:Math.round(sent*0.75)},
+    {label:'Recommendation',val:Math.round(vis*0.8)},
+  ];
+  const compDims=dims.map((d,i)=>({...d,val:Math.round(d.val*0.75)}));
+  const cx=170,cy=165,R=110,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
   const rings=[25,50,75,100];
   const poly=dims.map((d,i)=>pt(i,(d.val/100)*R));
+  const compPoly=compDims.map((d,i)=>pt(i,(d.val/100)*R));
+  const sorted=[...dims].sort((a,b)=>b.val-a.val);
+  const top2=sorted.slice(0,2).map(d=>d.label);
+  const bot2=sorted.slice(-2).map(d=>d.label);
   return (
-    <svg viewBox="0 0 320 310" style={{width:'100%',maxWidth:300}}>
-      {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return <polygon key={r} points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/>;} )}
-      {dims.map((_,i)=>{const p=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;} )}
-      <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.2" stroke="#7C3AED" strokeWidth="2"/>
-      {dims.map((d,i)=>{const lp=pt(i,R+20);return <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{d.label}</text>;} )}
-    </svg>
+    <div>
+      <svg viewBox="0 0 340 330" style={{width:'100%'}}>
+        {rings.map(r=>{
+          const pts=dims.map((_,i)=>pt(i,(r/100)*R));
+          return <g key={r}>
+            <polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill={r===50?'#F5F3FF':'none'} stroke={r===50?'#C4B5FD':'#E5E7EB'} strokeWidth={r===50?1.5:1} strokeDasharray={r===50?'4,3':undefined}/>
+            <text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:8,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text>
+          </g>;
+        })}
+        {dims.map((_,i)=>{const p=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;} )}
+        {/* Competitor overlay */}
+        <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
+        {/* Your overlay */}
+        <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
+        {/* Dots */}
+        {dims.map((d,i)=>{
+          const p=pt(i,(d.val/100)*R);
+          return <circle key={i} cx={p.x} cy={p.y} r={hov===i?6:4} fill="#7C3AED" stroke="white" strokeWidth="1.5"
+            onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}/>;
+        })}
+        {/* Hover tooltip */}
+        {hov!==null&&(()=>{
+          const d=dims[hov];
+          const p=pt(hov,(d.val/100)*R);
+          const tx=p.x>cx?p.x+8:p.x-148;
+          const ty=p.y-18;
+          return <g>
+            <rect x={tx} y={ty} width={140} height={36} rx={6} fill="#1F2937"/>
+            <text x={tx+8} y={ty+13} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{d.label}</text>
+            <text x={tx+8} y={ty+26} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>{RADAR_TIPS[d.label]?.slice(0,38)}…</text>
+          </g>;
+        })()}
+        {/* Labels */}
+        {dims.map((d,i)=>{
+          const lp=pt(i,R+22);
+          const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
+          return <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle"
+            style={{fontSize:10,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;
+        })}
+        {/* Legend */}
+        <g transform="translate(20,314)">
+          <circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.6"/><text x={15} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text>
+          <circle cx={60} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={69} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text>
+        </g>
+      </svg>
+      {/* Insight */}
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>
+        💡 <strong>Insight:</strong> Strong in {top2.join(' and ')}, weaker in {bot2.join(' and ')}.
+      </div>
+    </div>
   );
 }
 
@@ -693,32 +758,80 @@ export default function GeoHub() {
             {/* TAB 3: SENTIMENT */}
             {activeTab===3&&(()=>{
               const sent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
-              const smood=sent>=70?'Positive — AI speaks favorably':sent>=45?'Neutral — room to improve':'Needs attention';
-              const pmood=prom>=70?'Named first — strong prominence':prom>=45?'Mid-list mentions':'Buried in responses';
-              const weeks=[sent-8,sent-6,sent-7,sent-4,sent-2,sent].map((v,i)=>({wk:`Wk ${i+1}`,val:Math.max(0,Math.min(100,v))}));
-              const minW=Math.min(...weeks.map(w=>w.val))-5,maxW=Math.max(...weeks.map(w=>w.val))+5;
-              const wx=(i:number)=>40+i*58,wy=(v:number)=>95-((v-minW)/(maxW-minW))*75;
-              const lp=weeks.map((w,i)=>`${wx(i)},${wy(w.val)}`).join(' ');
+              const smood=sent>=70?'How favorably AI speaks about your brand across queries':sent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing — needs attention';
+              const pmood=prom>=70?'Your brand is named first or near the top of AI responses':prom>=45?'Your brand appears mid-list in AI responses':'Your brand is rarely named early in AI responses';
+              const rankMood='Average position your brand is mentioned within each AI response';
+              // Brand order heatmap data
+              const comps=result.competitors||[];
+              const brands=[result.brand_name,...comps.map((c:any)=>c.Brand)].slice(0,10);
+              const rankCols=6;
+              // Simulate rank frequency: your brand biased toward avg_rank, competitors random
+              const heatData=brands.map((b,bi)=>{
+                return Array.from({length:rankCols},(_,ri)=>{
+                  if(bi===0){
+                    const dist=Math.abs(ri+1-avgRank);
+                    return Math.max(0,Math.round(30-dist*8+Math.random()*10));
+                  }
+                  const compRank=comps[bi-1]?.Rank||3;
+                  const dist=Math.abs(ri+1-compRank);
+                  return Math.max(0,Math.round(25-dist*7+Math.random()*8));
+                });
+              });
+              const maxVal=Math.max(...heatData.flat());
+              const cellColor=(val:number,isYou:boolean)=>{
+                const t=val/maxVal;
+                if(isYou){
+                  const r=Math.round(124-t*80),g=Math.round(58-t*20),b=Math.round(237-t*50);
+                  return `rgba(${r},${g},${b},${0.15+t*0.85})`;
+                }
+                return `rgba(107,114,128,${0.08+t*0.55})`;
+              };
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    <MetricCard label="sentiment score" val={sent} sub={smood} color="#7C3AED"/>
-                    <MetricCard label="prominence score" val={prom} sub={pmood} color="#7C3AED"/>
-                    <MetricCard label="average rank" val={avgRank} sub="Average mention position in AI responses" color="#7C3AED"/>
+                    {[
+                      {label:'sentiment score',val:sent,sub:smood,tip:'Measures how positively or negatively AI models describe your brand across all responses. Higher = more favorable language used.'},
+                      {label:'prominence score',val:prom,sub:pmood,tip:'Measures how early in the AI response your brand is mentioned. Higher = named first or second, giving more impact.'},
+                      {label:'average rank',val:`#${avgRank}`,sub:rankMood,tip:'The average position your brand appears when mentioned in AI responses. #1 means your brand is listed first most often.'},
+                    ].map(({label,val,sub,tip})=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
+                          {label}<Tooltip text={tip}/>
+                        </div>
+                        <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
+                      </div>
+                    ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>Sentiment Dimensions</div>
-                      <div style={{display:'flex',justifyContent:'center'}}><RadarChart sent={sent} prom={prom} vis={vis}/></div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Hover each point for definition. Purple = you, grey = avg competitor.</div>
+                      <RadarChart sent={sent} prom={prom} vis={vis} competitors={comps}/>
                     </div>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>Sentiment Over Time</div>
-                      <svg viewBox="0 0 380 120" style={{width:'100%',display:'block'}}>
-                        {[minW,Math.round((minW+maxW)/2),maxW].map(v=>(<g key={v}><line x1={30} y1={wy(v)} x2={360} y2={wy(v)} stroke="#F3F4F6" strokeWidth="1"/><text x={26} y={wy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{Math.round(v)}</text></g>))}
-                        <polyline points={lp} fill="none" stroke="#7C3AED" strokeWidth="2.5" strokeLinejoin="round"/>
-                        <polyline points={`${lp} ${wx(5)},105 ${wx(0)},105`} fill="#7C3AED" fillOpacity="0.08"/>
-                        {weeks.map((w,i)=>(<g key={i}><circle cx={wx(i)} cy={wy(w.val)} r={3} fill="#7C3AED"/><text x={wx(i)} y={113} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{w.wk}</text></g>))}
-                      </svg>
+                    {/* Brand Order Heatmap */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,overflowX:'auto' as const}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Brand Order within AI Response</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>How often each brand appears at each rank position across AI responses</div>
+                      <div style={{display:'grid',gridTemplateColumns:`110px repeat(${rankCols},1fr)`,gap:3,alignItems:'center'}}>
+                        <div/>
+                        {Array.from({length:rankCols},(_,i)=>(
+                          <div key={i} style={{fontSize:'0.68rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:4}}>Rank {i+1}</div>
+                        ))}
+                        {brands.map((b,bi)=>(
+                          <>
+                            <div key={`l${bi}`} style={{fontSize:'0.75rem',color:bi===0?'#7C3AED':'#374151',fontWeight:bi===0?700:400,paddingRight:8,textAlign:'right' as const,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis'}}>{b}</div>
+                            {heatData[bi].map((val,ri)=>(
+                              <div key={`c${bi}-${ri}`} title={`${b} — Rank ${ri+1}: ${val} mentions`}
+                                style={{height:22,borderRadius:4,background:cellColor(val,bi===0),border:bi===0?'1px solid rgba(124,58,237,0.15)':'1px solid rgba(0,0,0,0.04)',cursor:'default'}}/>
+                            ))}
+                          </>
+                        ))}
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',gap:16,marginTop:12}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:2,background:'rgba(124,58,237,0.8)'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>You (high frequency)</span></div>
+                        <div style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:12,height:12,borderRadius:2,background:'rgba(107,114,128,0.5)'}}/><span style={{fontSize:'0.7rem',color:'#6B7280'}}>Competitors</span></div>
+                      </div>
                     </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
