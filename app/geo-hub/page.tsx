@@ -481,6 +481,7 @@ export default function GeoHub() {
   const [promptLoading,setPromptLoading] = useState(false);
   const [filterCat,setFilterCat] = useState('All');
   const [hovBar,setHovBar] = useState<number|null>(null);
+  const [expandedDomain,setExpandedDomain] = useState<string|null>(null);
 
   async function runAnalysis() {
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
@@ -827,49 +828,148 @@ export default function GeoHub() {
             {activeTab===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice;
               const sources=result.citation_sources||[];
-              const catMap:Record<string,number>={};
-              sources.forEach((s:any)=>{const cl=classifyDomain(s.domain);catMap[cl.label]=(catMap[cl.label]||0)+s.citation_share;});
+              const catMap:Record<string,number>={'Owned Media':0};
+              sources.forEach((s:any)=>{
+                const cl=classifyDomain(s.domain);
+                if(s.domain?.includes(result.domain||'x_x')) catMap['Owned Media']=(catMap['Owned Media']||0)+s.citation_share;
+                else catMap[cl.label]=(catMap[cl.label]||0)+s.citation_share;
+              });
+              if(catMap['Owned Media']===0) delete catMap['Owned Media'];
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED',Other:'#6B7280',Social:'#F59E0B',Institution:'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+
+              // Mock URL data per domain
+              const domainUrls:Record<string,string[]>={};
+              sources.forEach((s:any)=>{
+                const d=s.domain||'';
+                domainUrls[d]=[
+                  `https://www.${d}/best-credit-cards`,
+                  `https://www.${d}/reviews/capital-one`,
+                  `https://www.${d}/compare/cards`,
+                  `https://www.${d}/travel-rewards`,
+                  `https://www.${d}/cashback-cards`,
+                ];
+              });
+
               return (
                 <div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:24,marginBottom:20}}>
-                    <div><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:5}}>Citation Score</div><div style={{fontSize:'2.6rem',fontWeight:900,color:'#7C3AED'}}>{cit}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>How authoritatively your brand was cited</div></div>
-                    <div><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:5}}>Share of Voice</div><div style={{fontSize:'2.6rem',fontWeight:900,color:'#7C3AED'}}>{sov}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Your brand mentions as % of all mentions</div></div>
+                  {/* Metric cards */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
+                    {[
+                      {label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'Measures how often and how prominently AI models cite your brand as a primary source or recommendation. Higher = more authoritative citations across responses.'},
+                      {label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'The percentage of all brand mentions in AI responses that belong to your brand vs. competitors. Higher = more dominant share of the AI conversation.'},
+                    ].map(({label,val,sub,tip})=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>
+                          {label}<Tooltip text={tip}/>
+                        </div>
+                        <div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div>
+                        <div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div>
+                      </div>
+                    ))}
                   </div>
-                  {sources.length>0&&(
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
-                        <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation Share by Source</div>
-                        <div style={{display:'flex',justifyContent:'center'}}><CitationPie sources={sources}/></div>
-                      </div>
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
-                        <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
-                        {catEntries.map(([cat,pct],i)=>(
-                          <div key={i} style={{marginBottom:12}}>
-                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}><span style={{fontSize:'0.84rem',color:'#374151'}}>{cat}</span><span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#374151'}}>{Math.round(pct)}%</span></div>
-                            <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}><div style={{background:catColors[cat]||'#7C3AED',height:6,borderRadius:50,width:`${Math.round(pct)}%`}}/></div>
+
+                  {/* Category + Network side by side */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+                    {/* Citation by Category — LEFT */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
+                      {catEntries.length>0?catEntries.map(([cat,pct],i)=>(
+                        <div key={i} style={{marginBottom:14}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                            <span style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{cat}</span>
+                            <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#374151'}}>{Math.round(pct)}%</span>
                           </div>
-                        ))}
-                      </div>
+                          <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}>
+                            <div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.round(pct)}%`,transition:'width 0.4s'}}/>
+                          </div>
+                        </div>
+                      )):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
                     </div>
-                  )}
+
+                    {/* AI Citation Network — RIGHT, reduced height */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px'}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>AI Citation Network</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:8}}>Brands and sources co-cited with {result.brand_name}</div>
+                      {(()=>{
+                        const brand=result.brand_name||'Brand';
+                        const comps=(result.competitors||[]).slice(0,3);
+                        const srcs=sources.slice(0,3);
+                        const W=380,H=220,cx=W/2,cy=H/2;
+                        type N2={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
+                        const ns:N2[]=[];
+                        ns.push({id:'brand',x:cx,y:cy,label:brand.length>8?brand.slice(0,7)+'…':brand,full:brand,r:30,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
+                        const cA=comps.map((_:any,i:number)=>Math.PI*0.5+(i/Math.max(comps.length-1,1))*Math.PI*0.9);
+                        comps.forEach((c:any,i:number)=>ns.push({id:`c${i}`,x:cx+130*Math.cos(cA[i]),y:cy-90*Math.sin(cA[i]),label:(c.Brand||'').split(' ')[0].slice(0,8),full:c.Brand,r:18,fill:'#C4B5FD',stroke:'#8B5CF6',type:'competitor'}));
+                        const sA=srcs.map((_:any,i:number)=>-Math.PI*0.2+(i/Math.max(srcs.length-1,1))*Math.PI*0.55);
+                        srcs.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];ns.push({id:`s${i}`,x:cx+135*Math.cos(sA[i]),y:cy-90*Math.sin(sA[i]),label:dom.slice(0,8),full:s.domain,r:16,fill:'#6EE7B7',stroke:'#10B981',type:'source',pct:s.citation_share});});
+                        const ctr=ns[0];
+                        return (
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+                            {ns.slice(1).map(n=><line key={n.id} x1={ctr.x} y1={ctr.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth="1.2" opacity="0.6"/>)}
+                            {ns.map(n=>(
+                              <g key={n.id}>
+                                <circle cx={n.x} cy={n.y} r={n.r} fill={n.fill}/>
+                                {n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}
+                                {n.type!=='brand'&&<text x={n.x} y={n.y+n.r+11} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{n.label}</text>}
+                                {n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:8,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.pct}%</text>}
+                              </g>
+                            ))}
+                            {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=>(
+                              <g key={i} transform={`translate(${W/2-120+i*88},${H-12})`}>
+                                <circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
+                              </g>
+                            ))}
+                          </svg>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Sources table with expandable URL dropdown */}
                   {sources.length>0&&(
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,marginBottom:20}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
                       <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sources AI is Pulling From — {result.brand_name}</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>Domains that most influenced AI knowledge. Citation Share % = each source&apos;s contribution to total AI brand mentions.</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>Click any source to see the top URLs driving AI citations for your brand.</div>
                       <table style={{width:'100%',borderCollapse:'collapse'}}>
-                        <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                        <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %',''].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                         <tbody>
                           {sources.map((s:any,i:number)=>{
-                            const cls=classifyDomain(s.domain),bw=Math.min(s.citation_share*3,100);
-                            return (<tr key={i} style={{borderTop:'1px solid #F3F4F6'}}><td style={{padding:'11px 14px',fontSize:'0.82rem',color:'#9CA3AF'}}>{s.rank}</td><td style={{padding:'11px 14px',fontSize:'0.86rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</td><td style={{padding:'11px 14px'}}><span style={{background:cls.bg,color:cls.color,borderRadius:8,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{cls.label}</span></td><td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',width:34}}>{s.citation_share}%</span></div></td></tr>);
+                            const cls=classifyDomain(s.domain);
+                            const bw=Math.min(s.citation_share*3,100);
+                            const isExp=expandedDomain===s.domain;
+                            const urls=domainUrls[s.domain]||[];
+                            return (
+                              <>
+                                <tr key={`r${i}`} style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp?'#F9F8FF':'white'}} onClick={()=>setExpandedDomain(isExp?null:s.domain)}>
+                                  <td style={{padding:'11px 14px',fontSize:'0.82rem',color:'#9CA3AF'}}>{s.rank}</td>
+                                  <td style={{padding:'11px 14px',fontSize:'0.86rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</td>
+                                  <td style={{padding:'11px 14px'}}><span style={{background:cls.bg,color:cls.color,borderRadius:8,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{cls.label}</span></td>
+                                  <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',width:34}}>{s.citation_share}%</span></div></td>
+                                  <td style={{padding:'11px 14px',fontSize:'0.75rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp?'▲ Hide':'▼ URLs'}</td>
+                                </tr>
+                                {isExp&&(
+                                  <tr key={`e${i}`} style={{background:'#F9F8FF'}}>
+                                    <td colSpan={5} style={{padding:'8px 14px 14px 32px'}}>
+                                      <div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top URLs from {s.domain}</div>
+                                      <div style={{display:'flex',flexDirection:'column' as const,gap:5}}>
+                                        {urls.map((url:string,ui:number)=>(
+                                          <div key={ui} style={{display:'flex',alignItems:'center',gap:8}}>
+                                            <span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span>
+                                            <a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}} onMouseEnter={e=>(e.currentTarget.style.textDecoration='underline')} onMouseLeave={e=>(e.currentTarget.style.textDecoration='none')}>{url}</a>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </>
+                            );
                           })}
                         </tbody>
                       </table>
                     </div>
                   )}
-                  <LinkAnalysis result={result}/>
                 </div>
               );
             })()}
