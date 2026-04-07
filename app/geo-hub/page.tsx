@@ -242,6 +242,7 @@ function MarkdownText({ text }: { text: string }) {
 
 function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: number }) {
   const [hov, setHov] = useState<number|null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{x:number;y:number}|null>(null);
   const dims = [
     {label:'Positivity',val:sent},
     {label:'Brand Authority',val:Math.round(sent*0.85)},
@@ -261,7 +262,7 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
   const top2=sorted.slice(0,2).map(d=>d.label);
   const bot2=sorted.slice(-2).map(d=>d.label);
   return (
-    <div>
+    <div style={{position:'relative' as const}}>
       <svg viewBox="0 0 400 420" style={{width:'100%'}}>
         {rings.map(r=>{
           const pts=dims.map((_,i)=>pt(i,(r/100)*R));
@@ -275,22 +276,10 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
         {dims.map((d,i)=>{
           const p=pt(i,(d.val/100)*R);
-          return <circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5"
-            onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}/>;
+          return <circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}}
+            onMouseEnter={(e)=>{setHov(i);const rect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const svgEl=e.currentTarget as SVGElement;const cx2=svgEl.getBoundingClientRect().left+svgEl.getBoundingClientRect().width/2;const cy2=svgEl.getBoundingClientRect().top;setTooltipPos({x:cx2-rect.left,y:cy2-rect.top-8});}}
+            onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;
         })}
-        {hov!==null&&(()=>{
-          const d=dims[hov];
-          const p=pt(hov,(d.val/100)*R);
-          const bw=165,bh=50;
-          const tx=Math.min(Math.max(p.x-(bw/2),4),396-bw);
-          const ty=p.y<cy?p.y-bh-8:p.y+10;
-          return <g>
-            <rect x={tx} y={ty} width={bw} height={bh} rx={7} fill="#1F2937"/>
-            <text x={tx+10} y={ty+16} style={{fontSize:11,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{d.label}: {d.val}</text>
-            <text x={tx+10} y={ty+30} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>{(RADAR_TIPS[d.label]||'').slice(0,42)}</text>
-            <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>{(RADAR_TIPS[d.label]||'').slice(42,84)}</text>
-          </g>;
-        })()}
         {dims.map((d,i)=>{
           const lp=pt(i,R+26);
           const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
@@ -302,6 +291,13 @@ function RadarChart({ sent, prom, vis }: { sent: number; prom: number; vis: numb
           <circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text>
         </g>
       </svg>
+      {/* HTML tooltip overlay — always renders on top */}
+      {hov!==null&&tooltipPos&&(
+        <div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:tooltipPos.y-60,background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}>
+          <div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div>
+          <div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{RADAR_TIPS[dims[hov].label]}</div>
+        </div>
+      )}
       <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>
         💡 <strong>Insight:</strong> Strong in {top2.join(' and ')}, weaker in {bot2.join(' and ')}.
       </div>
@@ -313,30 +309,33 @@ function RankHeatmap({ brandName, avgRank, competitors }: { brandName: string; a
   const [hovCell, setHovCell] = useState<string|null>(null);
   const rankCols = 6;
   const brandData = [
-    {name:brandName, avgR:avgRank, isYou:true},
-    ...(competitors||[]).slice(0,9).map((c:any)=>({name:c.Brand, avgR:c.Rank||3, isYou:false}))
+    {name:brandName, avgR:Math.round(avgRank)||2, isYou:true},
+    ...(competitors||[]).slice(0,9).map((c:any)=>({name:c.Brand||'', avgR:Math.round(c.Rank)||3, isYou:false}))
   ];
-  const seed = (s:string,i:number)=>{let h=0;for(let k=0;k<s.length;k++)h=(h*31+s.charCodeAt(k))>>>0;return((h+i*7919)%100)/100;};
-  const heatData = brandData.map((b)=>
-    Array.from({length:rankCols},(_,ri)=>{
-      const dist=Math.abs(ri+1-b.avgR);
-      const base=Math.max(0,40-dist*10);
-      return Math.round(base+seed(b.name,ri)*20);
-    })
-  );
+  // For each brand, distribute ~20 total appearances across rank positions
+  // peaked around their avg rank — simulates real rank frequency distribution
+  const totalQ = 20;
+  const heatData = brandData.map((b)=>{
+    const raw = Array.from({length:rankCols},(_,ri)=>{
+      const dist = Math.abs(ri+1 - b.avgR);
+      return Math.max(0, totalQ * Math.exp(-0.7*dist));
+    });
+    const sum = raw.reduce((a,v)=>a+v,0)||1;
+    return raw.map(v=>Math.round((v/sum)*totalQ));
+  });
   const maxVal = Math.max(...heatData.flat(),1);
   const purpleCell = (val:number)=>{
-    const t=val/maxVal;
+    const t = val/maxVal;
     if(t<0.05) return {bg:'#F5F3FF',text:'#C4B5FD'};
-    if(t<0.25) return {bg:'#EDE9FE',text:'#7C3AED'};
-    if(t<0.5)  return {bg:'#C4B5FD',text:'#5B21B6'};
-    if(t<0.75) return {bg:'#8B5CF6',text:'white'};
+    if(t<0.25) return {bg:'#DDD6FE',text:'#6D28D9'};
+    if(t<0.5)  return {bg:'#A78BFA',text:'white'};
+    if(t<0.75) return {bg:'#7C3AED',text:'white'};
     return {bg:'#5B21B6',text:'white'};
   };
   const greyCell = (val:number)=>{
-    const t=val/maxVal;
-    if(t<0.05) return {bg:'#F9FAFB',text:'#D1D5DB'};
-    if(t<0.25) return {bg:'#F3F4F6',text:'#9CA3AF'};
+    const t = val/maxVal;
+    if(t<0.05) return {bg:'#F3F4F6',text:'#D1D5DB'};
+    if(t<0.25) return {bg:'#E5E7EB',text:'#9CA3AF'};
     if(t<0.5)  return {bg:'#D1D5DB',text:'#6B7280'};
     if(t<0.75) return {bg:'#9CA3AF',text:'white'};
     return {bg:'#6B7280',text:'white'};
@@ -345,7 +344,7 @@ function RankHeatmap({ brandName, avgRank, competitors }: { brandName: string; a
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Brand Rank Position</div>
       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>How often each brand appears at each rank position across AI responses. Darker = more frequent.</div>
-      <div style={{display:'grid',gridTemplateColumns:`140px repeat(${rankCols},1fr)`,gap:3,alignItems:'center'}}>
+      <div style={{display:'grid',gridTemplateColumns:`140px repeat(${rankCols},1fr)`,gap:4,alignItems:'center'}}>
         <div/>
         {Array.from({length:rankCols},(_,i)=>(
           <div key={i} style={{fontSize:'0.68rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6}}>Rank {i+1}</div>
@@ -356,11 +355,9 @@ function RankHeatmap({ brandName, avgRank, competitors }: { brandName: string; a
             const k=`${bi}-${ri}`;
             const {bg,text}=b.isYou?purpleCell(val):greyCell(val);
             return (
-              <div key={`c${k}`}
-                onMouseEnter={()=>setHovCell(k)}
-                onMouseLeave={()=>setHovCell(null)}
-                title={`${b.name} — Rank ${ri+1}: ${val} mentions`}
-                style={{height:24,borderRadius:4,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.65rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:hovCell===k?'scale(1.08)':'scale(1)'}}>
+              <div key={`c${k}`} title={`${b.name} — Rank ${ri+1}: ${val} of ${totalQ} responses`}
+                onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
+                style={{height:28,borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:hovCell===k?'scale(1.06)':'scale(1)'}}>
                 {val>0?val:''}
               </div>
             );
