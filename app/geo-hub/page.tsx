@@ -967,13 +967,13 @@ export default function GeoHub() {
             {activeTab===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice;
               const sources=result.citation_sources||[];
-              const catMap:Record<string,number>={'Owned Media':0};
+              const catMap:Record<string,number>={};
               sources.forEach((s:any)=>{
-                const cl=classifyDomain(s.domain);
-                if(s.domain?.includes(result.domain||'x_x')) catMap['Owned Media']=(catMap['Owned Media']||0)+s.citation_share;
-                else catMap[cl.label]=(catMap[cl.label]||0)+s.citation_share;
+                const cl=classifyDomain(s.domain||'');
+                const isOwned=(result.domain&&s.domain&&s.domain.includes(result.domain))||false;
+                const cat=isOwned?'Owned Media':cl.label;
+                catMap[cat]=(catMap[cat]||0)+(s.citation_share||0);
               });
-              if(catMap['Owned Media']===0) delete catMap['Owned Media'];
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED',Other:'#6B7280',Social:'#F59E0B',Institution:'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
               const domainUrls:Record<string,string[]>={};
