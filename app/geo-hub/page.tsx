@@ -221,7 +221,7 @@ function GapCards({ result }: { result:any }) {
     const topComp=(result.competitors||[])[0]?.Brand||'top competitor';
     const topCompGEO=(result.competitors||[])[0]?.GEO||'unknown';
     const topCompSOV=(result.competitors||[])[0]?.Sov||'unknown';
-    const prompt=`You are a senior GEO strategist at Accenture. Generate exactly 5 strategic gaps for this brand. Keep all text SHORT and PUNCHY — like a consultant's slide, not an essay. Max 1 sentence per field.
+    const prompt=`You are a senior GEO strategist at Accenture. Generate exactly 5 strategic gaps for this brand. Write like a sharp consultant — specific, clear, 2 sentences max per field. No fluff, no essays.
 
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Prominence: ${result.prominence}
@@ -235,8 +235,8 @@ Use EXACTLY these 5 gap types in order:
 4. Segment Depth
 5. Answer Completeness
 
-Return ONLY valid JSON array, no markdown, no backticks. Each object must use SHORT sentences (max 15 words each):
-{"title":"gap type: short punchy finding under 10 words","impact":"HIGH IMPACT"|"MEDIUM IMPACT"|"LOW-MEDIUM IMPACT","effort":"Low"|"Medium"|"High"|"Low-Medium","timeframe":"e.g. 4-8 weeks","currentMetric":number,"targetMetric":number,"currentState":"One short sentence. Max 15 words.","rootCause":"One short sentence. Max 15 words.","howToFix":"One to two short sentences. Max 25 words total.","rankImpact":"One short sentence. Max 15 words.","conversionImpact":"One short sentence. Max 15 words."}
+Return ONLY valid JSON array, no markdown, no backticks. Each object:
+{"title":"gap type: punchy specific finding (under 12 words)","impact":"HIGH IMPACT"|"MEDIUM IMPACT"|"LOW-MEDIUM IMPACT","effort":"Low"|"Medium"|"High"|"Low-Medium","currentMetric":number,"targetMetric":number,"currentState":"2 sentences max. Be specific — use the brand name and real numbers.","rootCause":"2 sentences max. Name the specific structural reason, not generic advice.","howToFix":"2 sentences max. Give concrete actions, not vague strategy.","rankImpact":"1-2 sentences. Specific rank or score improvement.","conversionImpact":"1-2 sentences. Specific business outcome."}
 Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(data=>{
@@ -296,7 +296,6 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
                   <span style={{background:impactBg,color:impactColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span>
                 </div>
                 <div style={{display:'flex',gap:16,marginTop:4,flexWrap:'wrap' as const}}>
-                  {g.timeframe&&<span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⏱ {g.timeframe}</span>}
                   <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⚡ Effort: {g.effort}</span>
                   <span style={{fontSize:'0.72rem',fontWeight:600,color:dotColor}}>Score target: {g.currentMetric} → {g.targetMetric}</span>
                 </div>
