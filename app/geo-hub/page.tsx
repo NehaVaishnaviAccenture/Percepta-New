@@ -221,7 +221,7 @@ function GapCards({ result }: { result:any }) {
     const topComp=(result.competitors||[])[0]?.Brand||'top competitor';
     const topCompGEO=(result.competitors||[])[0]?.GEO||'unknown';
     const topCompSOV=(result.competitors||[])[0]?.Sov||'unknown';
-    const prompt=`You are a senior GEO strategist at Accenture. Generate exactly 5 strategic gaps for this brand. Write like a sharp consultant — specific, clear, 2 sentences max per field. No fluff, no essays.
+    const prompt=`You are a blunt GEO analyst at Accenture. Generate exactly 5 strategic gaps. Write like a doctor giving a diagnosis — state facts, use numbers, be direct. No hedging words like "should", "may", "could", "appears". Every sentence is a statement of fact.
 
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Prominence: ${result.prominence}
@@ -236,7 +236,18 @@ Use EXACTLY these 5 gap types in order:
 5. Answer Completeness
 
 Return ONLY valid JSON array, no markdown, no backticks. Each object:
-{"title":"gap type: punchy specific finding (under 12 words)","impact":"HIGH IMPACT"|"MEDIUM IMPACT"|"LOW-MEDIUM IMPACT","effort":"Low"|"Medium"|"High"|"Low-Medium","currentMetric":number,"targetMetric":number,"currentState":"2 sentences max. Be specific — use the brand name and real numbers.","rootCause":"2 sentences max. Name the specific structural reason, not generic advice.","howToFix":"2 sentences max. Give concrete actions, not vague strategy.","rankImpact":"1-2 sentences. Specific rank or score improvement.","conversionImpact":"1-2 sentences. Specific business outcome."}
+{
+  "title": "gap type: one sharp finding, under 10 words, no fluff",
+  "impact": "HIGH IMPACT" | "MEDIUM IMPACT" | "LOW-MEDIUM IMPACT",
+  "effort": "Low" | "Medium" | "High" | "Low-Medium",
+  "currentMetric": number,
+  "targetMetric": number,
+  "currentState": "2 sentences. Start with a specific number or fact. Name ${result.brand_name} directly. Example: 'In only 4 of 50 prompts is ${result.brand_name} the primary recommendation. In 30 prompts it appears but ${topComp} leads.'",
+  "rootCause": "2 sentences. State the structural reason bluntly. Name the exact mechanism. No vague abstractions.",
+  "howToFix": "2 sentences. Give two concrete actions with named platforms or formats. Start with a verb.",
+  "rankImpact": "1 sentence. State the specific rank or score movement as a fact.",
+  "conversionImpact": "1 sentence. State the specific business outcome as a fact."
+}
 Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(data=>{
