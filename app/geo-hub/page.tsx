@@ -1030,8 +1030,20 @@ export default function GeoHub() {
               // Category map — always from domain classification (Earned Media, Institution, Owned Media etc.)
               const catMap:Record<string,number>={};
               const allSourcesToClassify = sources.length > 0 ? sources : (() => {
-                const knownSources = ['nerdwallet.com','bankrate.com','creditkarma.com','forbes.com','cnbc.com','investopedia.com','wsj.com','bloomberg.com','thepointsguy.com','wallethub.com'];
-                return knownSources.map((d, i) => ({ domain: d, citation_share: Math.max(5, Math.round(20 - i * 1.5)) }));
+                // Mix of all category types so Citation by Category shows all media types
+                const knownSources = [
+                  {domain:'nerdwallet.com', share:20},
+                  {domain:'bankrate.com', share:18},
+                  {domain:'thepointsguy.com', share:14},
+                  {domain:'forbes.com', share:12},
+                  {domain:'creditkarma.com', share:10},
+                  {domain:'reddit.com', share:8},        // Social
+                  {domain:'wikipedia.org', share:7},     // Institution
+                  {domain:'consumerfinance.gov', share:6}, // Institution
+                  {domain:'cnbc.com', share:6},
+                  {domain:'investopedia.com', share:5},
+                ];
+                return knownSources.map(s => ({ domain: s.domain, citation_share: s.share }));
               })();
 
               // Include the brand's own domain as Owned Media
@@ -1214,45 +1226,14 @@ export default function GeoHub() {
               <div>
                 <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>What does this score mean for your business?</div>
                 <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:24}}>Everything you need to understand your score and how to act on it.</div>
-                <div style={{display:'flex',gap:20,marginBottom:24}}>
-                  <SankeyChart result={result}/>
-                  <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
-                </div>
-
-                {/* Metric Definitions */}
-                <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>📊 Metric Definitions</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:24}}>
-                  {[
-                    {metric:'GEO Score',icon:'🏆',color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',def:'A single 0–100 number measuring how often and how favorably your brand appears in AI-generated responses.',example:'A score of 72 means AI recommends your brand consistently and prominently — you\'re above the 70 efficiency threshold.'},
-                    {metric:'Visibility',icon:'👁️',color:'#3B82F6',bg:'#EFF6FF',border:'#BFDBFE',def:'The % of AI queries where your brand was mentioned at least once out of all queries run.',example:'Visibility of 60 means your brand appeared in 30 out of 50 queries. Chase at 78 appeared in 39 of 50.'},
-                    {metric:'Sentiment',icon:'💬',color:'#10B981',bg:'#ECFDF5',border:'#6EE7B7',def:'How positively AI describes your brand when it does mention you. Scored 0–100 based on tone, language, and context.',example:'Sentiment of 82 = AI consistently uses phrases like "excellent rewards" and "highly recommended". Below 60 = neutral or mixed language.'},
-                    {metric:'Prominence',icon:'📍',color:'#F59E0B',bg:'#FFFBEB',border:'#FCD34D',def:'Where in an AI response your brand appears. Being named first scores higher than being named fifth.',example:'Prominence 74 = you\'re typically the 1st or 2nd brand named. Prominence 40 = you\'re buried mid-list after competitors.'},
-                    {metric:'Citation Score',icon:'🔗',color:'#EC4899',bg:'#FDF2F8',border:'#FBCFE8',def:'How authoritatively your brand is cited — factoring in which sources mention you and how prominently.',example:'Citation 65 = trusted sources like NerdWallet and Forbes mention you. Citation 30 = only obscure or low-authority sources.'},
-                    {metric:'Share of Voice',icon:'📣',color:'#8B5CF6',bg:'#F5F3FF',border:'#DDD6FE',def:'Your brand\'s dominance in AI responses relative to all competitors. 100 = mentioned in every response prominently. 0 = never mentioned.',example:'SOV 68 means you dominate the conversation. SOV 20 means competitors crowd you out in most responses.'},
-                    {metric:'Avg Rank',icon:'🥇',color:'#06B6D4',bg:'#ECFEFF',border:'#A5F3FC',def:'Your average position when mentioned within a single AI response. #1 = named first most often, #4 = three brands named before you.',example:'Avg Rank #1 means AI leads with your brand. Avg Rank #3 means Chase and Amex are typically named before Capital One.'},
-                  ].map((m,i)=>(
-                    <div key={i} style={{background:m.bg,borderRadius:12,border:`1px solid ${m.border}`,padding:'16px 18px'}}>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                        <span style={{fontSize:'1.1rem'}}>{m.icon}</span>
-                        <span style={{fontSize:'0.88rem',fontWeight:700,color:m.color}}>{m.metric}</span>
-                      </div>
-                      <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:8}}>{m.def}</div>
-                      <div style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.5,borderTop:`1px solid ${m.border}`,paddingTop:8}}>
-                        <span style={{fontWeight:600,color:m.color}}>Example: </span>{m.example}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* FAQ Questions */}
-                <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>❓ Frequently Asked Questions</div>
                 <div style={{display:'flex',flexDirection:'column' as const,gap:14}}>
                   {[
                     {q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines.'},
                     {q:'Why does 70 matter?',a:'70 is the efficiency threshold — where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},
-                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%). Each metric captures a different dimension of how AI perceives and presents your brand.'},
+                    {q:'How is the GEO Score calculated?',a:'The GEO Score is a weighted average of five signals: Visibility × 0.30 + Sentiment × 0.20 + Prominence × 0.20 + Citation Share × 0.15 + Share of Voice × 0.15. For example, a brand with Visibility 60, Sentiment 62, Prominence 58, Citation 55, and SOV 48 scores: (60×0.30) + (62×0.20) + (58×0.20) + (55×0.15) + (48×0.15) = 18 + 12.4 + 11.6 + 8.25 + 7.2 = 57.'},
                     {q:'How often is the score updated?',a:'The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data.'},
-                    {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all in an AI response. Prominence measures where — being named first scores much higher than being named fifth. A brand can have high visibility but low prominence if it\'s always mentioned last.'},
+                    {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all in an AI response. Prominence measures where — being named first scores much higher than being named fifth. A brand can have high visibility but low prominence if it\'s always mentioned last after competitors.'},
+                    {q:"What's the difference between Citation Score and Share of Voice?",a:'Citation Score measures how authoritatively your brand is referenced — which sources cite you and how prominently. Share of Voice measures your dominance across all brand mentions — how much of the AI conversation belongs to you vs. competitors.'},
                     {q:'How do I improve my GEO Score?',a:"The Top 5 Gaps section on the GEO Score tab identifies your highest-impact opportunities. Build authoritative content, earn placements on sources AI trusts, restructure content for AI extraction, and expand coverage across segments where you're currently invisible."},
                   ].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
                 </div>
