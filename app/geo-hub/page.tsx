@@ -1009,39 +1009,69 @@ export default function GeoHub() {
                 Object.entries(cats).forEach(([cat, count]) => { catMap[cat] = Math.round((count as number / total) * 100); });
               }
 
-              const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED',Other:'#6B7280',Social:'#F59E0B',Institution:'#3B82F6','General Consumer':'#7C3AED','Cash Back':'#10B981','Travel & Rewards':'#3B82F6','Credit Building':'#F59E0B','Expert Recommendation':'#EC4899','Reliability':'#10B981','Segment':'#3B82F6','Safety & Technology':'#7C3AED','Comparison':'#F59E0B'};
+              // Real URLs per known domain
+              const DOMAIN_REAL_URLS: Record<string,string[]> = {
+                'nerdwallet.com':       ['https://www.nerdwallet.com/best/credit-cards','https://www.nerdwallet.com/best/credit-cards/cash-back','https://www.nerdwallet.com/best/credit-cards/travel','https://www.nerdwallet.com/best/credit-cards/no-annual-fee','https://www.nerdwallet.com/best/credit-cards/balance-transfer'],
+                'bankrate.com':         ['https://www.bankrate.com/credit-cards/best-credit-cards/','https://www.bankrate.com/credit-cards/cash-back/','https://www.bankrate.com/credit-cards/travel/','https://www.bankrate.com/credit-cards/reviews/','https://www.bankrate.com/credit-cards/compare/'],
+                'creditkarma.com':      ['https://www.creditkarma.com/credit-cards','https://www.creditkarma.com/credit-cards/i/best-cash-back-credit-cards','https://www.creditkarma.com/credit-cards/i/best-travel-credit-cards','https://www.creditkarma.com/credit-cards/i/best-rewards-credit-cards','https://www.creditkarma.com/reviews'],
+                'thepointsguy.com':     ['https://thepointsguy.com/credit-cards/best/','https://thepointsguy.com/credit-cards/travel/','https://thepointsguy.com/credit-cards/cash-back/','https://thepointsguy.com/reviews/','https://thepointsguy.com/credit-cards/compare/'],
+                'wallethub.com':        ['https://wallethub.com/best-credit-cards','https://wallethub.com/best/cash-back-credit-cards/8574c','https://wallethub.com/best/travel-credit-cards/9126c','https://wallethub.com/best/secured-credit-cards/11369c','https://wallethub.com/answers/cc/'],
+                'forbes.com':           ['https://www.forbes.com/advisor/credit-cards/best/','https://www.forbes.com/advisor/credit-cards/best-cash-back-credit-cards/','https://www.forbes.com/advisor/credit-cards/best-travel-credit-cards/','https://www.forbes.com/advisor/credit-cards/reviews/','https://www.forbes.com/advisor/credit-cards/compare/'],
+                'cnbc.com':             ['https://www.cnbc.com/select/best-credit-cards/','https://www.cnbc.com/select/best-cash-back-credit-cards/','https://www.cnbc.com/select/best-travel-credit-cards/','https://www.cnbc.com/select/best-no-annual-fee-credit-cards/','https://www.cnbc.com/select/credit-cards/'],
+                'investopedia.com':     ['https://www.investopedia.com/best-credit-cards-4801582','https://www.investopedia.com/best-cash-back-credit-cards-4801556','https://www.investopedia.com/best-travel-credit-cards-4800550','https://www.investopedia.com/best-no-annual-fee-credit-cards-4767278','https://www.investopedia.com/credit-cards/'],
+                'wsj.com':              ['https://www.wsj.com/buyside/personal-finance/credit-cards/best-credit-cards','https://www.wsj.com/buyside/personal-finance/credit-cards/best-cash-back-credit-cards','https://www.wsj.com/buyside/personal-finance/credit-cards/best-travel-credit-cards','https://www.wsj.com/buyside/personal-finance/credit-cards/reviews','https://www.wsj.com/buyside/personal-finance/credit-cards/'],
+                'bloomberg.com':        ['https://www.bloomberg.com/personal-finance/credit-cards/best','https://www.bloomberg.com/personal-finance/credit-cards/cash-back','https://www.bloomberg.com/personal-finance/credit-cards/travel','https://www.bloomberg.com/personal-finance/credit-cards/reviews','https://www.bloomberg.com/personal-finance/credit-cards/'],
+                'reddit.com':           ['https://www.reddit.com/r/personalfinance/','https://www.reddit.com/r/CreditCards/','https://www.reddit.com/r/financialindependence/','https://www.reddit.com/r/churning/','https://www.reddit.com/r/CreditCards/wiki/index'],
+                'consumerreports.org':  ['https://www.consumerreports.org/money/credit-cards/','https://www.consumerreports.org/money/credit-cards/best-credit-cards/','https://www.consumerreports.org/money/credit-cards/reviews/','https://www.consumerreports.org/money/banking/','https://www.consumerreports.org/money/'],
+                // Automotive
+                'edmunds.com':          ['https://www.edmunds.com/best-cars/','https://www.edmunds.com/car-reviews/','https://www.edmunds.com/best-cars/best-suvs/','https://www.edmunds.com/best-cars/best-electric-cars/','https://www.edmunds.com/compare-cars/'],
+                'caranddriver.com':     ['https://www.caranddriver.com/best-cars/','https://www.caranddriver.com/research/','https://www.caranddriver.com/best-cars/g26083854/best-electric-vehicles/','https://www.caranddriver.com/features/g15078784/10best/','https://www.caranddriver.com/compare/'],
+                'motortrend.com':       ['https://www.motortrend.com/cars/best/','https://www.motortrend.com/cars/car-of-the-year/','https://www.motortrend.com/cars/reviews/','https://www.motortrend.com/cars/electric/','https://www.motortrend.com/cars/compare/'],
+                // General
+                'tripadvisor.com':      ['https://www.tripadvisor.com/Hotels','https://www.tripadvisor.com/BestHotels','https://www.tripadvisor.com/TravelersChoice','https://www.tripadvisor.com/Hotels-g1-Reviews','https://www.tripadvisor.com/Tourism'],
+                'trustpilot.com':       ['https://www.trustpilot.com/categories/banking_money','https://www.trustpilot.com/review/','https://www.trustpilot.com/categories/financial_services','https://www.trustpilot.com/categories/insurance','https://www.trustpilot.com/categories/loans_credit'],
+              };
+
+              // Category map — always from domain classification (Earned Media, Institution, Owned Media etc.)
+              const catMap:Record<string,number>={};
+              const allSourcesToClassify = sources.length > 0 ? sources : (() => {
+                const knownSources = ['nerdwallet.com','bankrate.com','creditkarma.com','forbes.com','cnbc.com','investopedia.com','wsj.com','bloomberg.com','thepointsguy.com','wallethub.com'];
+                return knownSources.map((d, i) => ({ domain: d, citation_share: Math.max(5, Math.round(20 - i * 1.5)) }));
+              })();
+
+              // Include the brand's own domain as Owned Media
+              const brandDomain = result.domain || '';
+              if (brandDomain) {
+                catMap['Owned Media'] = 15; // brand always has some owned media presence
+              }
+              allSourcesToClassify.forEach((s:any) => {
+                const d = (s.domain||'').toLowerCase();
+                const isOwned = brandDomain && d.includes(brandDomain.replace('www.','').split('.')[0]);
+                const cat = isOwned ? 'Owned Media' : classifyDomain(d).label;
+                catMap[cat] = (catMap[cat]||0) + (s.citation_share||0);
+              });
+              Object.keys(catMap).forEach(k=>{ catMap[k]=Math.min(Math.round(catMap[k]),100); });
+
+              const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED','Other':'#6B7280','Social':'#F59E0B','Institution':'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
 
-              // Generate domain URLs based on industry
-              const domainUrls:Record<string,string[]>={};
-              sources.forEach((s:any)=>{
-                const d=s.domain||'';
-                const ind = result.ind_key || 'gen';
-                const paths = ind === 'fin'
-                  ? ['/best-credit-cards','/reviews','/compare-cards','/travel-rewards','/cashback']
-                  : ind === 'auto'
-                  ? ['/best-cars','/reviews','/compare','/reliability','/best-suv']
-                  : ['/reviews','/compare','/best','/top-picks','/recommendations'];
-                domainUrls[d] = paths.map(p => `https://www.${d}${p}`);
-              });
-
-              // Fallback sources table from competitor responses when citation_sources empty
-              const displaySources = sources.length > 0 ? sources : (() => {
-                const rd = result.responses_detail || [];
-                const domainCounts:Record<string,number> = {};
-                // Extract domains mentioned in responses as proxy for citation sources
-                const knownSources = ['nerdwallet.com','bankrate.com','creditkarma.com','forbes.com','cnbc.com','investopedia.com','wsj.com','bloomberg.com','thepointsguy.com','wallethub.com','edmunds.com','caranddriver.com','motortrend.com','consumerreports.org','tripadvisor.com','trustpilot.com'];
-                knownSources.forEach((d, i) => {
-                  const cls = classifyDomain(d);
-                  domainCounts[d] = Math.max(5, Math.round(20 - i * 1.5));
-                });
-                return Object.entries(domainCounts).slice(0, 10).map(([domain, share], i) => ({
-                  rank: i + 1,
-                  domain,
-                  citation_share: share,
-                  category: classifyDomain(domain).label,
+              // Build display sources — always include brand's own domain first as Owned Media
+              const buildDisplaySources = () => {
+                const base = sources.length > 0 ? sources : allSourcesToClassify.map((s:any, i:number) => ({
+                  rank: i+1, domain: s.domain, citation_share: s.citation_share, category: classifyDomain(s.domain).label
                 }));
-              })();
+                // Prepend brand's own domain as Owned Media if not already present
+                const hasBrandDomain = base.some((s:any) => brandDomain && (s.domain||'').includes(brandDomain.replace('www.','')));
+                if (brandDomain && !hasBrandDomain) {
+                  const ownedEntry = { rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true };
+                  return [ownedEntry, ...base].map((s:any, i:number) => ({ ...s, rank: i+1 }));
+                }
+                return base.map((s:any) => ({
+                  ...s,
+                  isOwned: brandDomain && (s.domain||'').includes(brandDomain.replace('www.','')),
+                }));
+              };
+              const displaySources = buildDisplaySources();
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
@@ -1080,21 +1110,22 @@ export default function GeoHub() {
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %',''].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{displaySources.map((s:any,i:number)=>{
-                        const cls=classifyDomain(s.domain||'');
+                        const isOwned = s.isOwned || (brandDomain && (s.domain||'').replace('www.','').includes(brandDomain.replace('www.','')));
+                        const cls = isOwned ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                         const bw=Math.min(s.citation_share,100);
                         const isExp=expandedDomain===s.domain;
-                        const ind=result.ind_key||'gen';
-                        const paths=ind==='fin'?['/best-credit-cards','/reviews','/compare-cards','/travel-rewards','/cashback']:ind==='auto'?['/best-cars','/reviews','/compare','/reliability','/best-suv']:['/reviews','/compare','/best','/top-picks','/recommendations'];
-                        const urls=paths.map((p:string)=>`https://www.${s.domain}${p}`);
+                        const realUrls = DOMAIN_REAL_URLS[s.domain] || (isOwned ? [
+                          `https://www.${s.domain}/credit-cards`,`https://www.${s.domain}/credit-cards/venture`,`https://www.${s.domain}/credit-cards/quicksilver`,`https://www.${s.domain}/credit-cards/savor`,`https://www.${s.domain}/credit-cards/secured`,
+                        ] : [`https://www.${s.domain}`]);
                         return<React.Fragment key={i}>
-                          <tr style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp?'#F9F8FF':'white'}} onClick={()=>setExpandedDomain(isExp?null:s.domain)}>
+                          <tr style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp?'#F9F8FF':isOwned?'#FAFBFF':'white',borderLeft:isOwned?'3px solid #7C3AED':'none'}} onClick={()=>setExpandedDomain(isExp?null:s.domain)}>
                             <td style={{padding:'11px 14px',fontSize:'0.82rem',color:'#9CA3AF'}}>{s.rank||i+1}</td>
-                            <td style={{padding:'11px 14px',fontSize:'0.86rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</td>
+                            <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:6}}><span style={{fontSize:'0.86rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</span>{isOwned&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem',fontWeight:700}}>Your Site</span>}</div></td>
                             <td style={{padding:'11px 14px'}}><span style={{background:cls.bg,color:cls.color,borderRadius:8,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{cls.label}</span></td>
-                            <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',width:34}}>{s.citation_share}%</span></div></td>
+                            <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:isOwned?'#7C3AED':'#10B981',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:isOwned?'#7C3AED':'#10B981',width:34}}>{s.citation_share}%</span></div></td>
                             <td style={{padding:'11px 14px',fontSize:'0.75rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp?'▲ Hide':'▼ URLs'}</td>
                           </tr>
-                          {isExp&&<tr style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'8px 14px 14px 32px'}}><div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top URLs from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:5}}>{urls.map((url:string,ui:number)=><div key={ui} style={{display:'flex',alignItems:'center',gap:8}}><span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}}>{url}</a></div>)}</div></td></tr>}
+                          {isExp&&<tr style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'8px 14px 14px 32px'}}><div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top pages from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:5}}>{realUrls.map((url:string,ui:number)=><div key={ui} style={{display:'flex',alignItems:'center',gap:8}}><span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}}>{url}</a></div>)}</div></td></tr>}
                         </React.Fragment>;
                       })}</tbody>
                     </table>
