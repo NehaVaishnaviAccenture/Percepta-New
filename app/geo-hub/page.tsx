@@ -109,7 +109,6 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
     { range:'70–79', label:'Good', color:'#1E40AF', bg:'#EFF6FF', border:'#93C5FD', desc:'AI crosses the confidence threshold. Frequent top-3 placements begin.' },
     { range:'80–100', label:'Excellent', color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7', desc:'Dominant brand signal. AI leads with you as the primary recommendation.' },
   ];
-  const current = score<45?scoreBands[0]:score<70?scoreBands[1]:score<80?scoreBands[2]:scoreBands[3];
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
@@ -124,7 +123,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
-          <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${score>=parseInt(b.range)&&score<=(parseInt(b.range.split('–')[1])||100)?b.border:'transparent'}`,padding:'10px 12px',outline:current.range===b.range?`2px solid ${b.color}`:'none'}}>
+          <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${b.border}`,padding:'10px 12px'}}>
             <div style={{fontSize:'0.72rem',fontWeight:700,color:b.color,marginBottom:2}}>{b.range}</div>
             <div style={{fontSize:'0.88rem',fontWeight:800,color:b.color,marginBottom:4}}>{b.label}</div>
             <div style={{fontSize:'0.72rem',color:b.color,lineHeight:1.5}}>{b.desc}</div>
@@ -136,50 +135,38 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score:number }) {
-  const W=700,H=280,padL=52,padR=32,padT=24,padB=64;
-  // X-axis: 5 maturity stages mapped to x positions 0-100
-  const stages=[
-    {label:'Fragmented', x:0,  geoRange:[0,30],  color:'#EF4444'},
-    {label:'Emerging',   x:25, geoRange:[30,55], color:'#F59E0B'},
-    {label:'Competitive',x:50, geoRange:[55,72], color:'#3B82F6'},
-    {label:'Leader',     x:75, geoRange:[72,85], color:'#10B981'},
-    {label:'Authority',  x:100,geoRange:[85,100],color:'#7C3AED'},
-  ];
-  // S-curve: slow start, fast middle, diminishing returns
-  // Maps x (0-100) → GEO score using a logistic-like curve
+  const W=700,H=300,padL=52,padR=32,padT=24,padB=80;
+  // Logistic S-curve: slow start, fast middle, diminishing returns
   const curve=(x:number)=>Math.round(5+90/(1+Math.exp(-0.09*(x-45))));
   const pts=Array.from({length:101},(_,x)=>({x,y:curve(x)}));
-
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+(100-v)/100*(H-padT-padB);
 
-  // Find where current score sits on X axis (inverse of curve)
-  const scoreToX=(s:number)=>{
-    let best=0,bestDiff=999;
-    pts.forEach(p=>{const d=Math.abs(p.y-s);if(d<bestDiff){bestDiff=d;best=p.x;}});
-    return best;
-  };
+  // Map score → x position on curve
+  const scoreToX=(s:number)=>{let best=0,bestDiff=999;pts.forEach(p=>{const d=Math.abs(p.y-s);if(d<bestDiff){bestDiff=d;best=p.x;}});return best;};
   const currentX=scoreToX(score);
   const projected=Math.min(score+22,95);
   const projectedX=scoreToX(projected);
-  const sweetX=scoreToX(70);
+  const goalX=scoreToX(70);
+  const authX=scoreToX(80);
 
   const pathD=pts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ');
 
-  // Shaded gap between current and competitive threshold (~70)
-  const gapPts=pts.slice(currentX,sweetX+1);
+  // Shaded gap between current and goal (70)
+  const gapPts=score<70?pts.slice(currentX,goalX+1):[];
   const fillD=gapPts.length>1
-    ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(sweetX)},${H-padB} L${sx(currentX)},${H-padB} Z`
+    ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(goalX)},${H-padB} L${sx(currentX)},${H-padB} Z`
     :'';
 
-  const [hov,setHov]=useState<{x:number;y:number;geo:number;stage:string}|null>(null);
+  const [hov,setHov]=useState<{x:number;y:number;geo:number}|null>(null);
 
-  // Stage band boundaries on x-axis
-  const stageBands=stages.map((s,i)=>({
-    ...s,
-    x0:i===0?0:(stages[i-1].x+s.x)/2,
-    x1:i===stages.length-1?100:(s.x+stages[i+1].x)/2,
-  }));
+  const stages=[
+    {label:'Fragmented', range:'0–30',  x:10,  color:'#EF4444'},
+    {label:'Emerging',   range:'30–55', x:32,  color:'#F59E0B'},
+    {label:'Competitive',range:'55–72', x:58,  color:'#3B82F6'},
+    {label:'Leader',     range:'72–85', x:76,  color:'#10B981'},
+    {label:'Authority',  range:'85+',   x:93,  color:'#7C3AED'},
+  ];
 
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0',position:'relative' as const}}>
@@ -188,15 +175,11 @@ function ROICurve({ score }: { score:number }) {
           const rect=(e.currentTarget as SVGElement).getBoundingClientRect();
           const mx=((e.clientX-rect.left)/rect.width)*W;
           const xi=Math.round((mx-padL)/(W-padL-padR)*100);
-          if(xi>=0&&xi<=100){
-            const geo=pts[xi]?.y??0;
-            const stage=stages.reduce((a,b)=>Math.abs(b.x-xi)<Math.abs(a.x-xi)?b:a).label;
-            setHov({x:sx(xi),y:sy(geo),geo,stage});
-          }
+          if(xi>=0&&xi<=100){const geo=pts[xi]?.y??0;setHov({x:sx(xi),y:sy(geo),geo});}
         }}
         onMouseLeave={()=>setHov(null)}>
 
-        {/* Y-axis grid lines */}
+        {/* Y-axis grid */}
         {[0,25,50,75,100].map(v=>(
           <g key={v}>
             <line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/>
@@ -204,24 +187,12 @@ function ROICurve({ score }: { score:number }) {
           </g>
         ))}
 
-        {/* Stage band background shading */}
-        {stageBands.map((s,i)=>(
-          <rect key={i} x={sx(s.x0)} y={padT} width={sx(s.x1)-sx(s.x0)} height={H-padT-padB}
-            fill={s.color} opacity={0.04}/>
-        ))}
-
-        {/* Stage divider lines */}
-        {stageBands.slice(1).map((s,i)=>(
-          <line key={i} x1={sx(s.x0)} y1={padT} x2={sx(s.x0)} y2={H-padB}
-            stroke="#E5E7EB" strokeWidth="1" strokeDasharray="3,3"/>
-        ))}
-
         {/* Gap fill */}
-        {fillD&&score<70&&<path d={fillD} fill="#EDE9FE" opacity="0.5"/>}
+        {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.5"/>}
 
-        {/* Efficiency threshold horizontal line at GEO 70 */}
+        {/* Efficiency threshold at 70 */}
         <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
-        <text x={W-padR+2} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
+        <text x={W-padR+4} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
 
         {/* S-curve */}
         <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5"/>
@@ -230,37 +201,50 @@ function ROICurve({ score }: { score:number }) {
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
 
-        {/* X-axis stage labels */}
+        {/* X-axis numeric ticks: 0,20,40,60,80,100 */}
+        {[0,20,40,60,80,100].map(v=>(
+          <g key={v}>
+            <line x1={sx(v)} y1={H-padB} x2={sx(v)} y2={H-padB+4} stroke="#D1D5DB" strokeWidth="1"/>
+            <text x={sx(v)} y={H-padB+13} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
+          </g>
+        ))}
+
+        {/* X-axis label */}
+        <text x={(padL+W-padR)/2} y={H-padB+26} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
+
+        {/* Stage legend row below x-axis label */}
         {stages.map((s,i)=>(
           <g key={i}>
-            <line x1={sx(s.x)} y1={H-padB} x2={sx(s.x)} y2={H-padB+5} stroke={s.color} strokeWidth="2"/>
-            <text x={sx(s.x)} y={H-padB+16} textAnchor="middle" style={{fontSize:10,fill:s.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{s.label}</text>
-            <text x={sx(s.x)} y={H-padB+28} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.geoRange[0]}–{s.geoRange[1]}</text>
+            <text x={sx(s.x)} y={H-padB+42} textAnchor="middle" style={{fontSize:8,fill:s.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{s.label}</text>
+            <text x={sx(s.x)} y={H-padB+52} textAnchor="middle" style={{fontSize:7,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.range}</text>
           </g>
         ))}
 
         {/* Y-axis label */}
         <text x={12} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,12,${(padT+H-padB)/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
 
-        {/* Key dots */}
+        {/* Current dot */}
         <circle cx={sx(currentX)} cy={sy(score)} r={8} fill="#F59E0B" stroke="white" strokeWidth="2"/>
         <text x={sx(currentX)} y={sy(score)-14} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
 
-        <circle cx={sx(sweetX)} cy={sy(70)} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
-        <text x={sx(sweetX)+2} y={sy(70)-13} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Target (70)</text>
+        {/* Goal dot */}
+        <circle cx={sx(goalX)} cy={sy(70)} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
+        <text x={sx(goalX)} y={sy(70)-13} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Goal (70) — Sweet Spot</text>
 
+        {/* Projected dot */}
         <circle cx={sx(projectedX)} cy={sy(projected)} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
         <text x={sx(projectedX)} y={sy(projected)-13} textAnchor="middle" style={{fontSize:9,fill:'#10B981',fontFamily:'Inter,sans-serif',fontWeight:700}}>Projected ({projected})</text>
 
-        <circle cx={sx(100)} cy={sy(pts[100]?.y??95)} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+        {/* Authority dot */}
+        <circle cx={sx(authX)} cy={sy(80)} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+        <text x={sx(authX)+2} y={sy(80)-13} textAnchor="middle" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80) — Dim. Returns</text>
 
-        {/* Hover tooltip */}
+        {/* Hover */}
         {hov&&(
           <g>
             <line x1={hov.x} y1={padT} x2={hov.x} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="3,3"/>
-            <rect x={Math.min(hov.x+8,W-padR-130)} y={hov.y-28} width={124} height={36} rx={6} fill="#1F2937"/>
-            <text x={Math.min(hov.x+8,W-padR-130)+62} y={hov.y-14} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{hov.stage}</text>
-            <text x={Math.min(hov.x+8,W-padR-130)+62} y={hov.y-2} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO Score: {hov.geo}</text>
+            <rect x={Math.min(hov.x+8,W-padR-130)} y={hov.y-24} width={118} height={26} rx={6} fill="#1F2937"/>
+            <text x={Math.min(hov.x+8,W-padR-130)+59} y={hov.y-11} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>GEO Score: {hov.geo}</text>
             <circle cx={hov.x} cy={hov.y} r={4} fill="#7C3AED"/>
           </g>
         )}
@@ -268,10 +252,10 @@ function ROICurve({ score }: { score:number }) {
 
       {/* Legend */}
       <div style={{display:'flex',gap:20,justifyContent:'center',padding:'6px 0 10px',flexWrap:'wrap' as const}}>
-        {[{color:'#F59E0B',label:`You (${score})`},{color:'#EF4444',label:'Target (70)'},{color:'#10B981',label:`Projected (${projected})`},{color:'#7C3AED',label:'Authority Zone'}].map((l,i)=>(
+        {[{color:'#F59E0B',label:`You (${score})`},{color:'#EF4444',label:'Goal (70) Sweet Spot'},{color:'#10B981',label:`Projected (${projected})`},{color:'#7C3AED',label:'Authority (80) Dim. Returns'}].map((l,i)=>(
           <div key={i} style={{display:'flex',alignItems:'center',gap:6}}>
-            <div style={{width:10,height:10,borderRadius:'50%',background:l.color}}/>
-            <span style={{fontSize:'0.75rem',color:'#374151'}}>{l.label}</span>
+            <div style={{width:9,height:9,borderRadius:'50%',background:l.color}}/>
+            <span style={{fontSize:'0.7rem',color:'#6B7280'}}>{l.label}</span>
           </div>
         ))}
       </div>
@@ -290,46 +274,57 @@ function GapCards({ result }: { result:any }) {
     setFetched(true);
     setLoading(true);
     const topComp=(result.competitors||[])[0]?.Brand||'top competitor';
-    const prompt=`You are a GEO optimization strategist. Analyze this brand and generate exactly 5 gaps ranked by impact on AI rank and conversions.
+    const topCompGEO=(result.competitors||[])[0]?.GEO||'unknown';
+    const topCompSOV=(result.competitors||[])[0]?.Sov||'unknown';
+    const prompt=`You are a senior GEO (Generative Engine Optimization) strategist at Accenture. Analyze this brand and generate exactly 5 strategic gaps ranked by impact on AI rank and conversions. These gaps must go BEYOND basic metrics — focus on qualitative, strategic, and structural issues that a consultant would identify.
 
 Brand: ${result.brand_name}
 Industry: ${result.ind_label}
 GEO Score: ${result.overall_geo_score}
 Visibility: ${result.visibility}
 Sentiment: ${result.sentiment}
-Prominence: ${result.prominence}
+Prominence/Avg Rank: ${result.prominence} (avg position ${result.avg_rank})
 Citation Share: ${result.citation_share}
 Share of Voice: ${result.share_of_voice}
-Avg Rank: ${result.avg_rank}
-Top Competitor: ${topComp} (GEO: ${(result.competitors||[])[0]?.GEO||'unknown'})
-Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
+Top Competitor: ${topComp} (GEO: ${topCompGEO}, SOV: ${topCompSOV})
+All Competitors: ${(result.competitors||[]).map((c:any)=>`${c.Brand} GEO:${c.GEO}`).join(', ')}
 Strengths: ${(result.strengths_list||[]).join('; ')}
 Issues: ${(result.improvements_list||[]).join('; ')}
 
-Return ONLY a valid JSON array of exactly 5 objects. No markdown, no backticks. Each object:
+IMPORTANT: Use EXACTLY these 5 gap types, in this order, sorted by impact (HIGH first, then MEDIUM, then LOW):
+1. Primary Recommendation Rate — how often AI leads with this brand vs just mentions it. Not in standard metrics.
+2. Share of Voice vs #1 competitor — specific gap vs ${topComp} with real percentages.
+3. Earned Media Authority — which trusted 3rd-party sources (NerdWallet, Forbes, etc.) AI pulls from and how the brand ranks there.
+4. Segment Depth — which audience segments AI does NOT associate with this brand at all.
+5. Answer Completeness — whether the brand's content is structured for AI extraction (FAQ schema, direct answers, comparison tables).
+
+Return ONLY a valid JSON array of exactly 5 objects. No markdown, no backticks, no explanation. Each object:
 {
-  "title": "short gap title like 'Prominence: Stop being buried mid-list'",
+  "title": "Gap type: specific finding with real numbers e.g. 'Primary Recommendation Rate: AI describes you, rarely recommends you first'",
   "impact": "HIGH IMPACT" | "MEDIUM IMPACT" | "LOW-MEDIUM IMPACT",
-  "timeline": "e.g. 4-8 weeks",
   "effort": "Low" | "Medium" | "High" | "Low-Medium",
-  "currentMetric": number (the current score for this signal),
-  "targetMetric": number (realistic target after fixing),
-  "color": a hex color matching impact (HIGH=#EF4444, MEDIUM=#F59E0B, LOW=#7C3AED),
-  "currentState": "2-3 sentences describing exactly what is broken right now with real numbers",
-  "rootCause": "2-3 sentences on why this gap exists",
+  "currentMetric": number,
+  "targetMetric": number,
+  "color": "#EF4444" for HIGH, "#F59E0B" for MEDIUM, "#7C3AED" for LOW-MEDIUM,
+  "currentState": "2-3 sentences with real numbers describing exactly what is broken right now",
+  "rootCause": "2-3 sentences on why this gap exists structurally",
   "howToFix": "3-4 sentences of specific actionable steps referencing real competitors and platforms",
   "rankImpact": "specific projected rank improvement with numbers",
   "conversionImpact": "specific projected conversion/traffic uplift with numbers"
 }
 
-Focus gaps on: AI prominence/ranking, share of voice vs top competitor, earned media coverage, segment depth, primary recommendation rate. Use real brand data.`;
+Sort the array: HIGH IMPACT items first, then MEDIUM IMPACT, then LOW-MEDIUM IMPACT.`;
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json())
       .then(data=>{
         const text=data.response||'';
         const clean=text.replace(/```json|```/g,'').trim();
-        setGaps(JSON.parse(clean));
+        const parsed=JSON.parse(clean);
+        // Ensure sorted: HIGH first, MEDIUM second, LOW-MEDIUM last
+        const order:Record<string,number>={'HIGH IMPACT':0,'MEDIUM IMPACT':1,'LOW-MEDIUM IMPACT':2};
+        parsed.sort((a:any,b:any)=>(order[a.impact]??3)-(order[b.impact]??3));
+        setGaps(parsed);
       })
       .catch(()=>setGaps([]))
       .finally(()=>setLoading(false));
@@ -337,6 +332,7 @@ Focus gaps on: AI prominence/ranking, share of voice vs top competitor, earned m
 
   const geo=result.overall_geo_score??0;
   const projected=Math.min(geo+22,95);
+  const gapColors=['#F59E0B','#10B981','#7C3AED','#EC4899','#3B82F6'];
 
   return (
     <div>
@@ -365,14 +361,14 @@ Focus gaps on: AI prominence/ranking, share of voice vs top competitor, earned m
         </div>
       </div>
 
-      {/* gap cards */}
+      {/* Gap cards header */}
       <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Top 5 Gaps to Fill — Ranked by Impact on Rank & Conversions</div>
       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what's broken, why, and how to fix it — with projected rank and conversion impact.</div>
 
       {loading&&(
         <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:32,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}>
           <div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
-          Analysing {result.brand_name}'s gaps…
+          Analysing {result.brand_name}'s strategic gaps…
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
@@ -380,24 +376,23 @@ Focus gaps on: AI prominence/ranking, share of voice vs top competitor, earned m
       {!loading&&gaps.map((g,i)=>{
         const isOpen=expanded===i;
         const pct=Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100);
-        const numColor=g.impact==='HIGH IMPACT'?'#EF4444':g.impact==='MEDIUM IMPACT'?'#F59E0B':'#7C3AED';
-        const numBg=g.impact==='HIGH IMPACT'?'#FEE2E2':g.impact==='MEDIUM IMPACT'?'#FEF3C7':'#EDE9FE';
-        const gapColors=['#F59E0B','#10B981','#7C3AED','#EC4899','#3B82F6'];
+        const impactColor=g.impact==='HIGH IMPACT'?'#EF4444':g.impact==='MEDIUM IMPACT'?'#F59E0B':'#7C3AED';
+        const impactBg=g.impact==='HIGH IMPACT'?'#FEE2E2':g.impact==='MEDIUM IMPACT'?'#FEF3C7':'#EDE9FE';
+        const dotColor=gapColors[i];
         return (
           <div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',marginBottom:10,overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 20px',cursor:'pointer'}} onClick={()=>setExpanded(isOpen?null:i)}>
-              <div style={{width:34,height:34,borderRadius:'50%',background:gapColors[i]+'22',border:`2px solid ${gapColors[i]}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <span style={{fontSize:'0.75rem',fontWeight:800,color:gapColors[i]}}>#{i+1}</span>
+              <div style={{width:34,height:34,borderRadius:'50%',background:dotColor+'22',border:`2px solid ${dotColor}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <span style={{fontSize:'0.75rem',fontWeight:800,color:dotColor}}>#{i+1}</span>
               </div>
               <div style={{flex:1}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' as const}}>
                   <span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{g.title}</span>
-                  <span style={{background:numBg,color:numColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span>
+                  <span style={{background:impactBg,color:impactColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span>
                 </div>
                 <div style={{display:'flex',gap:16,marginTop:4,flexWrap:'wrap' as const}}>
-                  <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⏱ {g.timeline}</span>
                   <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⚡ Effort: {g.effort}</span>
-                  <span style={{fontSize:'0.72rem',fontWeight:600,color:gapColors[i]}}>Score target: {g.currentMetric} → {g.targetMetric}</span>
+                  <span style={{fontSize:'0.72rem',fontWeight:600,color:dotColor}}>Score target: {g.currentMetric} → {g.targetMetric}</span>
                 </div>
               </div>
               <span style={{color:'#9CA3AF',fontSize:'1rem'}}>{isOpen?'∧':'›'}</span>
@@ -430,10 +425,10 @@ Focus gaps on: AI prominence/ranking, share of voice vs top competitor, earned m
                 </div>
                 <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:'#9CA3AF',marginBottom:6}}>
                   <span>Current metric: {g.currentMetric}</span>
-                  <span style={{color:gapColors[i],fontWeight:700}}>Target: {g.targetMetric}</span>
+                  <span style={{color:dotColor,fontWeight:700}}>Target: {g.targetMetric}</span>
                 </div>
                 <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}>
-                  <div style={{background:gapColors[i],height:6,borderRadius:50,width:`${pct}%`,transition:'width 0.5s'}}/>
+                  <div style={{background:dotColor,height:6,borderRadius:50,width:`${pct}%`,transition:'width 0.5s'}}/>
                 </div>
               </div>
             )}
@@ -569,10 +564,7 @@ function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number 
       <svg viewBox="0 0 400 420" style={{width:'100%'}}>
         {rings.map(r=>{
           const pts=dims.map((_,i)=>pt(i,(r/100)*R));
-          return <g key={r}>
-            <polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill={r===50?'#F5F3FF':'none'} stroke={r===50?'#C4B5FD':'#E5E7EB'} strokeWidth={r===50?1.5:1} strokeDasharray={r===50?'4,3':undefined}/>
-            <text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text>
-          </g>;
+          return <g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill={r===50?'#F5F3FF':'none'} stroke={r===50?'#C4B5FD':'#E5E7EB'} strokeWidth={r===50?1.5:1} strokeDasharray={r===50?'4,3':undefined}/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;
         })}
         {dims.map((_,i)=>{const p=pt(i,R);return <line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;} )}
         <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
@@ -584,8 +576,7 @@ function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number 
             onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;
         })}
         {dims.map((d,i)=>{
-          const lp=pt(i,R+26);
-          const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
+          const lp=pt(i,R+26);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
           return <text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;
         })}
         <g transform="translate(20,398)">
@@ -712,15 +703,11 @@ function ScatterPlot({ brand, vis, geo, competitors }: { brand:string; vis:numbe
             <g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
               {isH&&<circle cx={cx2} cy={cy2} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}
               <circle cx={cx2} cy={cy2} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>
-              {isH&&(()=>{
-                const tx=Math.min(Math.max(cx2-60,padL),W-padR-130);
-                const ty=cy2>padT+60?cy2-56:cy2+14;
-                return <g><rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/><text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text><text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text></g>;
-              })()}
+              {isH&&(()=>{const tx=Math.min(Math.max(cx2-60,padL),W-padR-130);const ty=cy2>padT+60?cy2-56:cy2+14;return <g><rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/><text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text><text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO: {a.y} · Visibility: {a.x}</text></g>;})()}
             </g>
           );
         })}
-        {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax) return null;return <text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
+        {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax)return null;return <text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
         <text x={(padL+W-padR)/2} y={H-6} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO</text>
       </svg>
@@ -728,102 +715,66 @@ function ScatterPlot({ brand, vis, geo, competitors }: { brand:string; vis:numbe
   );
 }
 
-function CitationPie({ sources }: { sources:any[] }) {
-  if(!sources||sources.length===0) return null;
-  const cx=110,cy=110,R=90;
-  const colors=['#7C3AED','#10B981','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#84CC16','#F97316','#EC4899'];
-  let cum=-Math.PI/2;
-  const slices=sources.map((s,i)=>{
-    const a=(s.citation_share/100)*2*Math.PI;
-    const x1=cx+R*Math.cos(cum),y1=cy+R*Math.sin(cum);
-    cum+=a;
-    const x2=cx+R*Math.cos(cum),y2=cy+R*Math.sin(cum);
-    const mA=cum-a/2,lx=cx+(R+18)*Math.cos(mA),ly=cy+(R+18)*Math.sin(mA);
-    return {path:`M${cx},${cy} L${x1},${y1} A${R},${R} 0 ${a>Math.PI?1:0} 1 ${x2},${y2}Z`,lx,ly,share:s.citation_share,color:colors[i%colors.length]};
-  });
-  return (
-    <svg viewBox="0 0 220 220" style={{width:'100%',maxWidth:220}}>
-      {slices.map((s,i)=>(<g key={i}><path d={s.path} fill={s.color} stroke="white" strokeWidth="1.5"/>{s.share>=8&&<text x={s.lx} y={s.ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{s.share}%</text>}</g>))}
-    </svg>
-  );
-}
-
 function PriorityActionsTable({ result }: { result: any }) {
-  const [actions, setActions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [fetched, setFetched] = useState(false);
-
-  useEffect(() => {
-    if (fetched) return;
-    setFetched(true);
-    setLoading(true);
-    const prompt = `You are a GEO strategist. Based on this brand analysis, generate a JSON array of 5-7 specific implementable priority actions.
-
+  const [actions,setActions]=useState<any[]>([]);
+  const [loading,setLoading]=useState(false);
+  const [fetched,setFetched]=useState(false);
+  useEffect(()=>{
+    if(fetched)return;setFetched(true);setLoading(true);
+    const prompt=`You are a GEO strategist. Based on this brand analysis, generate a JSON array of 5-7 specific implementable priority actions.
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Citation: ${result.citation_share}
 SOV: ${result.share_of_voice}, Prominence: ${result.prominence}, Avg Rank: ${result.avg_rank}
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
 Strengths: ${(result.strengths_list||[]).join('; ')}
 Issues: ${(result.improvements_list||[]).join('; ')}
-
 Return ONLY a valid JSON array, no markdown, no backticks. Each object:
 { "priority": "High"|"Medium"|"Low", "segment": "audience segment", "type": "Content Page"|"Comparison Page"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media", "action": "specific 1-3 sentence action referencing real brand and competitors", "deliverable": "Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1" }
-Order by priority (High first).`;
-
+Order: High first, then Medium, then Low.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
-      .then(r=>r.json())
-      .then(data=>{const text=data.response||'';const clean=text.replace(/```json|```/g,'').trim();setActions(JSON.parse(clean));})
-      .catch(()=>setActions([]))
-      .finally(()=>setLoading(false));
+      .then(r=>r.json()).then(data=>{const text=data.response||'';const clean=text.replace(/```json|```/g,'').trim();setActions(JSON.parse(clean));}).catch(()=>setActions([])).finally(()=>setLoading(false));
   },[]);
-
-  const priorityStyle=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
-
+  const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-        <span style={{color:'#F59E0B',fontSize:'1.1rem'}}>⚡</span>
-        <span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions — Implementable</span>
-      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{color:'#F59E0B',fontSize:'1.1rem'}}>⚡</span><span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions — Implementable</span></div>
       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:24}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
-      {loading?(<div style={{display:'flex',alignItems:'center',gap:10,padding:'24px 0',color:'#9CA3AF',fontSize:'0.85rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Generating priority actions for {result.brand_name}…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>)
+      {loading?(<div style={{display:'flex',alignItems:'center',gap:10,padding:'24px 0',color:'#9CA3AF',fontSize:'0.85rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Generating priority actions…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>)
       :actions.length===0?<div style={{fontSize:'0.84rem',color:'#9CA3AF'}}>No actions generated.</div>
-      :(
-        <table style={{width:'100%',borderCollapse:'collapse'}}>
-          <thead><tr>{['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=>(<th key={h} style={{padding:'8px 16px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.08em',borderBottom:'1px solid #F3F4F6'}}>{h}</th>))}</tr></thead>
-          <tbody>{actions.map((a,i)=>{const ps=priorityStyle(a.priority);return(<tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'#FAFAFA':'white'}}><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{background:ps.bg,color:ps.color,borderRadius:50,padding:'3px 12px',fontSize:'0.75rem',fontWeight:700}}>{a.priority}</span></td><td style={{padding:'18px 16px',verticalAlign:'top'}}><span style={{fontSize:'0.84rem',fontWeight:600,color:'#7C3AED'}}>{a.segment}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.82rem',color:'#374151'}}>{a.type}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',maxWidth:420}}><span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.65}}>{a.action}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.84rem',fontWeight:700,color:'#7C3AED'}}>{a.deliverable}</span></td></tr>);})}</tbody>
-        </table>
-      )}
+      :<table style={{width:'100%',borderCollapse:'collapse'}}>
+        <thead><tr>{['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=>(<th key={h} style={{padding:'8px 16px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.08em',borderBottom:'1px solid #F3F4F6'}}>{h}</th>))}</tr></thead>
+        <tbody>{actions.map((a,i)=>{const s=ps(a.priority);return(<tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'#FAFAFA':'white'}}><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{background:s.bg,color:s.color,borderRadius:50,padding:'3px 12px',fontSize:'0.75rem',fontWeight:700}}>{a.priority}</span></td><td style={{padding:'18px 16px',verticalAlign:'top'}}><span style={{fontSize:'0.84rem',fontWeight:600,color:'#7C3AED'}}>{a.segment}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.82rem',color:'#374151'}}>{a.type}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',maxWidth:420}}><span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.65}}>{a.action}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.84rem',fontWeight:700,color:'#7C3AED'}}>{a.deliverable}</span></td></tr>);})}</tbody>
+      </table>}
     </div>
   );
 }
 
 export default function GeoHub() {
-  const [url,setUrl] = useState('');
-  const [loading,setLoading] = useState(false);
-  const [result,setResult] = useState<any>(null);
-  const [error,setError] = useState('');
-  const [activeTab,setActiveTab] = useState(0);
-  const [promptInput,setPromptInput] = useState('');
-  const [promptHistory,setPromptHistory] = useState<{q:string;a:string}[]>([]);
-  const [promptLoading,setPromptLoading] = useState(false);
-  const [filterCat,setFilterCat] = useState('All');
-  const [hovBar,setHovBar] = useState<number|null>(null);
-  const [expandedDomain,setExpandedDomain] = useState<string|null>(null);
-  const [hovNode,setHovNode] = useState<string|null>(null);
+  const [url,setUrl]=useState('');
+  const [loading,setLoading]=useState(false);
+  const [result,setResult]=useState<any>(null);
+  const [error,setError]=useState('');
+  const [activeTab,setActiveTab]=useState(0);
+  const [promptInput,setPromptInput]=useState('');
+  const [promptHistory,setPromptHistory]=useState<{q:string;a:string}[]>([]);
+  const [promptLoading,setPromptLoading]=useState(false);
+  const [filterCat,setFilterCat]=useState('All');
+  const [hovBar,setHovBar]=useState<number|null>(null);
+  const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
+  const [hovNode,setHovNode]=useState<string|null>(null);
 
   useEffect(()=>{
     try{const saved=sessionStorage.getItem('geo_result');const savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}
   },[]);
 
-  async function runAnalysis() {
+  async function runAnalysis(){
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
     setError('');setLoading(true);
     try{const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});const data=await res.json();if(data.error)setError(data.error);else{setResult(data);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}}catch(e:any){setError(e.message);}
     setLoading(false);
   }
 
-  async function runPrompt(q?:string) {
+  async function runPrompt(q?:string){
     const query=q||promptInput;if(!query.trim())return;setPromptLoading(true);if(!q)setPromptInput('');
     try{const res=await fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:query})});const data=await res.json();setPromptHistory(h=>[{q:query,a:data.response},...h]);}catch{}
     setPromptLoading(false);
@@ -833,7 +784,6 @@ export default function GeoHub() {
 
   return (
     <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
-      {/* HERO */}
       <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:'64px 40px 72px',textAlign:'center'}}>
         <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>✦ &nbsp;Real Time GEO Scoring</div>
         <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
@@ -857,7 +807,6 @@ export default function GeoHub() {
         </div>
       ):(
         <div>
-          {/* TABS */}
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
             {TABS.map((t,i)=>(<button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>))}
             <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{marginLeft:'auto',background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer',alignSelf:'center',flexShrink:0}}>← New Analysis</button>
@@ -870,9 +819,8 @@ export default function GeoHub() {
               const geo=result.overall_geo_score,badge=scoreBadge(geo);
               const rd=result.responses_detail||[];
               const vis=recalcVisibility(rd,result.brand_name||'')||result.visibility;
-              const cit=result.citation_share,sent=result.sentiment;
-              const prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
-              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), typically mentioned mid-list rather than first; Share of Voice (${sov}), competitors are dominating more of the AI conversation; Citation (${cit}), rarely the top pick in AI responses; Sentiment (${sent}), neutral tone with no strong recommendation language.`;
+              const cit=result.citation_share,sent=result.sentiment,prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
+              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list rather than first; Share of Voice (${sov}), competitors dominating more AI conversation; Citation (${cit}), rarely the top pick; Sentiment (${sent}), neutral tone with no strong recommendation language.`;
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
@@ -899,8 +847,7 @@ export default function GeoHub() {
 
             {/* TAB 1: COMPETITORS */}
             {activeTab===1&&(()=>{
-              const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share;
-              const sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
+              const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
               const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
               const myRank=top.findIndex(c=>c.isYou)+1;
               const leader=top[0],next=top[myRank]||null;
@@ -912,8 +859,8 @@ export default function GeoHub() {
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your Rank (GEO Score)</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>#{myRank}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>out of {top.length} competitors</div></div>
-                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'—':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close — strong opportunity to overtake':'Gap to close'}</div></div>
-                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'—'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close — defend this position':'Comfortable but not safe'):'Leading the category'}</div></div>
+                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'—':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close — strong opportunity':'Gap to close'}</div></div>
+                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'—'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close — defend position':'Comfortable but not safe'):'Leading the category'}</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                     <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Comparison</div>
@@ -923,8 +870,7 @@ export default function GeoHub() {
                       {top.map((c:any,i:number)=>{
                         const bx=bPad+i*gW+gW*0.08,bw2=gW*0.26;
                         const gh=((c.GEO||0)/100)*bMH,vh=((c.Vis||0)/100)*bMH,ch=((c.Cit||0)/100)*bMH;
-                        const isY=c.isYou,isH=hovBar===i;
-                        const tipY=bH-Math.max(gh,vh,ch)-44;
+                        const isY=c.isYou,isH=hovBar===i;const tipY=bH-Math.max(gh,vh,ch)-44;
                         return (
                           <g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>
                             <rect x={bx} y={bH-gh} width={bw2} height={gh} fill={isY?'#1F2937':'#9CA3AF'} rx={2}/>
@@ -973,14 +919,14 @@ export default function GeoHub() {
               const vis=result.visibility;const comps=result.competitors||[];const allVis=[vis,...comps.map((c:any)=>c.Vis)];
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1;
               const topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
-              const topVisScore=topComp?topComp.Vis:vis;const gapToTop=vis-topVisScore;
+              const gapToTop=vis-(topComp?topComp.Vis:vis);
               const avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:24}}>
-                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px 18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Rank (Visibility)</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>#{myVisRank}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>out of {allVis.length} competitors</div></div>
-                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px 18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Score</div><div style={{fontSize:'2rem',fontWeight:800,color:'#111827'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>vs industry avg {avgVis}</div></div>
-                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px 18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 Competitor {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
+                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Rank (Visibility)</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>#{myVisRank}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>out of {allVis.length} competitors</div></div>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Score</div><div style={{fontSize:'2rem',fontWeight:800,color:'#111827'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>vs industry avg {avgVis}</div></div>
+                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}><VisibilityBars brand={result.brand_name} vis={vis} competitors={result.competitors||[]}/></div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>GEO Score vs. Visibility — Market Positioning</div><div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div><ScatterPlot brand={result.brand_name} vis={vis} geo={result.overall_geo_score} competitors={result.competitors||[]}/></div>
@@ -991,15 +937,15 @@ export default function GeoHub() {
             {/* TAB 3: SENTIMENT */}
             {activeTab===3&&(()=>{
               const sent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
-              const smood=sent>=70?'How favorably AI speaks about your brand across queries':sent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing — needs attention';
-              const pmood=prom>=70?'Your brand is named first or near the top of AI responses':prom>=45?'Your brand appears mid-list in AI responses':'Your brand is rarely named early in AI responses';
+              const smood=sent>=70?'AI speaks favorably about your brand':sent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing';
+              const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    {[{label:'sentiment score',val:sent,sub:smood,tip:'Measures how positively or negatively AI models describe your brand.'},{label:'prominence score',val:prom,sub:pmood,tip:'Measures how early in the AI response your brand is mentioned.'},{label:'average rank',val:avgRank,sub:'Average position your brand is mentioned within each AI response',tip:'The average position your brand appears when mentioned in AI responses.'}].map(({label,val,sub,tip})=>(<div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div></div>))}
+                    {[{label:'sentiment score',val:sent,sub:smood,tip:'How positively AI describes your brand.'},{label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},{label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}].map(({label,val,sub,tip})=>(<div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div></div>))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div><div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition. Purple = you, grey = avg competitor.</div><div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}><RadarChart sent={sent} prom={prom} vis={vis}/></div></div>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div><div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition.</div><div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}><RadarChart sent={sent} prom={prom} vis={vis}/></div></div>
                     <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
@@ -1023,7 +969,7 @@ export default function GeoHub() {
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
-                    {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'Measures how often and how prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'The percentage of all brand mentions in AI responses that belong to your brand.'}].map(({label,val,sub,tip})=>(<div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>))}
+                    {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=>(<div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
@@ -1056,7 +1002,7 @@ export default function GeoHub() {
                                 {n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}
                                 {n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:800,pointerEvents:'none'}}>{n.pct}%</text>}
                                 {n.type!=='brand'&&<text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>}
-                                {isH&&(<g style={{filter:'drop-shadow(0 2px 6px rgba(0,0,0,0.18))'}}><rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/><text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>{n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}{n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}</g>)}
+                                {isH&&(<g><rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/><text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>{n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}{n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}</g>)}
                               </g>);
                             })}
                             {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=>(<g key={i} transform={`translate(${W/2-108+i*78},${H-10})`}><circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:8,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>))}
@@ -1082,7 +1028,7 @@ export default function GeoHub() {
                                 <td style={{padding:'11px 14px'}}><div style={{display:'flex',alignItems:'center',gap:10}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${bw}%`}}/></div><span style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',width:34}}>{s.citation_share}%</span></div></td>
                                 <td style={{padding:'11px 14px',fontSize:'0.75rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp?'▲ Hide':'▼ URLs'}</td>
                               </tr>
-                              {isExp&&(<tr key={`e${i}`} style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'8px 14px 14px 32px'}}><div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top URLs from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:5}}>{urls.map((url:string,ui:number)=>(<div key={ui} style={{display:'flex',alignItems:'center',gap:8}}><span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}} onMouseEnter={e=>(e.currentTarget.style.textDecoration='underline')} onMouseLeave={e=>(e.currentTarget.style.textDecoration='none')}>{url}</a></div>))}</div></td></tr>)}
+                              {isExp&&(<tr key={`e${i}`} style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'8px 14px 14px 32px'}}><div style={{fontSize:'0.73rem',fontWeight:600,color:'#7C3AED',marginBottom:8}}>Top URLs from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:5}}>{urls.map((url:string,ui:number)=>(<div key={ui} style={{display:'flex',alignItems:'center',gap:8}}><span style={{width:16,height:16,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.6rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.78rem',color:'#4F46E5',textDecoration:'none'}}>{url}</a></div>))}</div></td></tr>)}
                             </>);
                           })}
                         </tbody>
@@ -1110,7 +1056,7 @@ export default function GeoHub() {
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <MetricCard label="queries run" val={20} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
-                    <MetricCard label="appearances" val={`${totalMentions}/20`} sub="Shown queries where brand appeared" color="#7C3AED"/>
+                    <MetricCard label="appearances" val={`${totalMentions}/20`} sub="Queries where brand appeared" color="#7C3AED"/>
                     <MetricCard label="appearance rate" val={`${Math.round((totalMentions/20)*100)}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
                   <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>Appearance Rate by Category</div>
@@ -1123,7 +1069,7 @@ export default function GeoHub() {
                     <div style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Sorted by rank. &quot;Who Beat You&quot; shows the top competitor on queries where you didn&apos;t appear.</div></div>
+                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Sorted by rank.</div></div>
                     <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>{cats.map(c=><option key={c}>{c}</option>)}</select>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
