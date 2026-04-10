@@ -195,17 +195,17 @@ function ROICurve({ score }: { score: number }) {
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
           <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
           <text x={authCX-12} y={authCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
-          <text x={authCX-12} y={authCY-3} textAnchor="end" style={{fontSize:6,fill:'#065F46',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Diminishing Returns</text>
           {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
-        {stages.map((s,i)=>{
-          const cx2 = padL + (i+0.5)*(plotW/stages.length);
-          return (
-            <g key={i}>
-              <text x={cx2} y={padT+plotH+36} textAnchor="middle" style={{fontSize:7,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>{s.label} <tspan style={{fontWeight:400,fill:'#9CA3AF'}}>{s.range}</tspan></text>
-            </g>
-          );
-        })}
+        {(()=>{
+          const totalW = stages.length * 90;
+          const startX = (padL + W - padR) / 2 - totalW / 2;
+          return stages.map((s,i)=>(
+            <text key={i} x={startX + i*90 + 45} y={padT+plotH+36} textAnchor="middle" style={{fontSize:6.5,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>
+              {s.label} <tspan style={{fontWeight:400,fill:'#9CA3AF'}}>{s.range}</tspan>
+            </text>
+          ));
+        })()}
       </svg>
     </div>
   );
