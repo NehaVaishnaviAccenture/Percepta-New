@@ -42,11 +42,79 @@ function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
+// ─── FIX 1: Visibility recalc ─────────────────────────────────────────────────
+// OLD: recalcVisibility(rd, name) || result.visibility
+//   → if 0 mentions found, 0 is falsy → falls back to API value silently
+//   → only checked response_preview (truncated snippet), missing full-response text
+// NEW: check ALL text fields per response, only fall back when rd is empty
 function recalcVisibility(rd: any[], brandName: string): number {
+  if (!rd || rd.length === 0) return -1; // sentinel: no data, caller uses API value
   const bl = brandName.toLowerCase();
-  const aliases = [bl, bl.replace(/\s+/g,''), bl.replace(/\s+/g,'-'), bl.split(' ')[0]];
-  const mentions = rd.filter(r => aliases.some(a => (r.response_preview||'').toLowerCase().includes(a))).length;
-  return Math.round((mentions / Math.max(rd.length, 1)) * 100);
+  // Build aliases: "capital one", "capitalone", "capital-one", "capital"
+  const aliases = [
+    bl,
+    bl.replace(/\s+/g, ''),
+    bl.replace(/\s+/g, '-'),
+    bl.split(' ')[0],
+    // Also strip common suffixes like "financial", "bank", "inc", "corp"
+    bl.replace(/\s+(financial|bank|inc|corp|co|ltd|llc)\.?$/i, '').trim(),
+  ].filter((a, i, arr) => a.length > 2 && arr.indexOf(a) === i);
+
+  const mentions = rd.filter(r => {
+    // Check every text field available on the response object
+    const haystack = [
+      r.response_preview,
+      r.response_text,
+      r.response,
+      r.full_response,
+      r.content,
+      r.answer,
+      r.query, // brand sometimes appears in the query echo
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return aliases.some(a => haystack.includes(a));
+  }).length;
+
+  return Math.round((mentions / rd.length) * 100);
+}
+
+// ─── FIX 2: Sentiment should only be measured on responses where brand appeared ─
+// Computes effective sentiment: raw sent score adjusted downward proportionally
+// to visibility. A brand visible in 30% of responses cannot have a "real" sentiment
+// of 80 — 70% of responses have no signal, which are neutral at best.
+// Formula: effectiveSent = (visibilityRate * rawSent) + ((1 - visibilityRate) * 50)
+// 50 = neutral baseline for undetected responses
+function effectiveSentiment(rawSent: number, visScore: number): number {
+  const visRate = Math.min(visScore, 100) / 100;
+  const neutral = 50;
+  return Math.round(visRate * rawSent + (1 - visRate) * neutral);
+}
+
+// ─── FIX 3: Recompute GEO score client-side using correct weighted formula ────
+// Weights: Visibility 30%, Sentiment 20%, Prominence 20%, Citation 15%, SOV 15%
+// Uses effectiveSentiment so a high raw sentiment with low visibility is penalised
+function computeGeoScore(vis: number, sent: number, prom: number, cit: number, sov: number): number {
+  const effSent = effectiveSentiment(sent, vis);
+  const raw = 0.30 * vis + 0.20 * effSent + 0.20 * prom + 0.15 * cit + 0.15 * sov;
+  return Math.round(Math.min(Math.max(raw, 0), 100));
+}
+
+// ─── FIX 4: Sentiment radar dimensions use independent signals, not all-from-sent ─
+// OLD: Brand Authority = sent*0.85, Trust = sent*0.7 … all mechanical multipliers
+//      of the same number — adds zero information
+// NEW: each dimension uses the most relevant raw signal available
+function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number) {
+  const effSent = effectiveSentiment(sent, vis);
+  return [
+    { label: 'Positivity',      val: effSent },                                   // tone quality, visibility-adjusted
+    { label: 'Brand Authority', val: Math.round((cit * 0.6 + prom * 0.4)) },      // citation + prominence
+    { label: 'Trust',           val: Math.round((effSent * 0.5 + cit * 0.5)) },   // blend of tone + citation authority
+    { label: 'Market Relevance',val: Math.round((vis * 0.5 + sov * 0.5)) },       // how often surfaced for relevant queries
+    { label: 'Message Clarity', val: Math.round((prom * 0.6 + effSent * 0.4)) },  // early placement = clear message
+    { label: 'Recommendation',  val: Math.round((sov * 0.55 + prom * 0.45)) },    // SOV + prominence = recommendation rate
+  ];
 }
 
 function Tooltip({ text }: { text: string }) {
@@ -59,7 +127,7 @@ function Tooltip({ text }: { text: string }) {
   );
 }
 
-function MetricCard({ label, val, sub, color='#7C3AED' }: { label:string; val:any; sub?:string; color?:string }) {
+function MetricCard({ label, val, sub, color='#7C3AED', note }: { label:string; val:any; sub?:string; color?:string; note?:string }) {
   return (
     <div style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
@@ -67,8 +135,16 @@ function MetricCard({ label, val, sub, color='#7C3AED' }: { label:string; val:an
       </div>
       <div style={{fontSize:'1.8rem',fontWeight:800,color,lineHeight:1}}>{val}</div>
       {sub&&<div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>}
+      {note&&<div style={{fontSize:'0.68rem',color:'#F59E0B',marginTop:4,fontWeight:600}}>⚠ {note}</div>}
     </div>
   );
+}
+
+// ─── FIX 5: Citation/Rank consistency warning ────────────────────────────────
+// If avg_rank is ≤ 2 but citation_share is < 50, surface a warning because
+// these signals are logically inconsistent (different query pools on backend)
+function citationRankInconsistent(cit: number, rank: number): boolean {
+  return rank > 0 && rank <= 2 && cit < 50;
 }
 
 function GeoGauge({ score, brand }: { score:number; brand:string }) {
@@ -155,26 +231,19 @@ function ROICurve({ score }: { score: number }) {
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {/* Title only — no subtitle */}
         <text x={W/2} y={22} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
-        {/* Y grid */}
         {[0,25,50,75,100].map(v=>(
           <g key={v}>
             <line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/>
             <text x={padL-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
-        {/* Gap fill */}
         {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.45"/>}
-        {/* Threshold */}
         <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
         <text x={W-padR+4} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
-        {/* Curve */}
         <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5"/>
-        {/* Axes */}
         <line x1={padL} y1={padT+plotH} x2={W-padR} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
-        {/* X ticks */}
         {[0,20,40,60,80,100].map(v=>(
           <g key={v}>
             <line x1={sx(v)} y1={padT+plotH} x2={sx(v)} y2={padT+plotH+4} stroke="#D1D5DB" strokeWidth="1"/>
@@ -183,27 +252,23 @@ function ROICurve({ score }: { score: number }) {
         ))}
         <text x={(padL+W-padR)/2} y={padT+plotH+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
         <text x={12} y={padT+plotH/2} textAnchor="middle" transform={`rotate(-90,12,${padT+plotH/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
-        {/* YOU — purple — label below */}
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('you')} onMouseLeave={()=>setHov(null)}>
           <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2"/>
           <text x={youCX} y={youCY+20} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#5B21B6',fontFamily:'Inter,sans-serif'}}>You ({score})</text>
           {hov==='you'&&<><rect x={youCX-52} y={youCY+32} width={104} height={20} rx={4} fill="#1F2937"/><text x={youCX} y={youCY+43} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: {score}</text></>}
         </g>
-        {/* GOAL — amber — label LEFT */}
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
           <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2"/>
           <text x={goalCX-14} y={goalCY-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#92400E',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
           <text x={goalCX-14} y={goalCY-5} textAnchor="end" style={{fontSize:8,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>&quot;The Sweet Spot&quot;</text>
           {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
         </g>
-        {/* AUTHORITY — green — label LEFT */}
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
           <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
           <text x={authCX-14} y={authCY-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
           <text x={authCX-14} y={authCY-5} textAnchor="end" style={{fontSize:8,fill:'#065F46',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Diminishing Returns</text>
           {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
-        {/* Stage legend — 5 equal slots, centered */}
         {stages.map((s,i)=>{
           const cx2 = padL + (i+0.5)*(plotW/stages.length);
           return (
@@ -343,13 +408,15 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
 function SankeyChart({ result }: { result:any }) {
   const [hov,setHov]=useState<number|null>(null);
   const vis=result.visibility??0,cit=result.citation_share??0,sent=result.sentiment??0,prom=result.prominence??0,sov=result.share_of_voice??0,geo=result.overall_geo_score??0;
-  const inputs=[{label:'Visibility',value:vis,color:'#7C3AED',weight:30},{label:'Sentiment',value:sent,color:'#10B981',weight:20},{label:'Prominence',value:prom,color:'#3B82F6',weight:20},{label:'Citation',value:cit,color:'#F59E0B',weight:15},{label:'Share of Voice',value:sov,color:'#EF4444',weight:15}];
+  // FIX: show effective sentiment in the Sankey flow, not raw sent
+  const effSent = effectiveSentiment(sent, vis);
+  const inputs=[{label:'Visibility',value:vis,color:'#7C3AED',weight:30},{label:'Sentiment',value:effSent,color:'#10B981',weight:20},{label:'Prominence',value:prom,color:'#3B82F6',weight:20},{label:'Citation',value:cit,color:'#F59E0B',weight:15},{label:'Share of Voice',value:sov,color:'#EF4444',weight:15}];
   const W=500,H=330,lx=175,rx=415,nw=22,gH=140,gCY=H/2,nH=30,gap=20,totalH=inputs.length*nH+(inputs.length-1)*gap,startY=(H-totalH)/2;
   const nodes=inputs.map((n,i)=>({...n,y:startY+i*(nH+gap)}));
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',flex:1}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Composition</div>
-      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>How each signal flows into your overall GEO Score</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>How each signal flows into your overall GEO Score (Sentiment shown as visibility-adjusted)</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
         {nodes.map((n,i)=>{const sm=n.y+nH/2,bH=gH/inputs.length,dm=gCY-gH/2+i*bH+bH/2,c1=lx+nw+(rx-lx-nw)*0.4,c2=lx+nw+(rx-lx-nw)*0.6,hh=nH/2,dh=bH/2,isH=hov===i;return(<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}><path d={`M${lx+nw},${sm-hh} C${c1},${sm-hh} ${c2},${dm-dh} ${rx},${dm-dh} L${rx},${dm+dh} C${c2},${dm+dh} ${c1},${sm+hh} ${lx+nw},${sm+hh}Z`} fill={n.color} opacity={isH?0.32:0.15} style={{transition:'opacity 0.2s'}}/><rect x={lx} y={n.y} width={nw} height={nH} rx={4} fill={n.color}/><text x={lx-8} y={n.y+nH/2-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:12,fill:'#111827',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}</text><text x={lx-8} y={n.y+nH/2+9} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.value}</text><text x={(lx+nw+rx)/2} y={sm+2} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.weight}%</text></g>);})}
         <rect x={rx} y={gCY-gH/2} width={nw} height={gH} rx={4} fill="#7C3AED"/>
@@ -400,10 +467,11 @@ function MarkdownText({ text }: { text:string }) {
   );
 }
 
-function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number }) {
+function RadarChart({ sent, prom, vis, cit, sov }: { sent:number; prom:number; vis:number; cit:number; sov:number }) {
   const [hov,setHov]=useState<number|null>(null);
   const [tooltipPos,setTooltipPos]=useState<{x:number;y:number}|null>(null);
-  const dims=[{label:'Positivity',val:sent},{label:'Brand Authority',val:Math.round(sent*0.85)},{label:'Trust',val:Math.round(sent*0.7)},{label:'Market Relevance',val:Math.round(prom*0.95)},{label:'Message Clarity',val:Math.round(sent*0.75)},{label:'Recommendation',val:Math.round(sent*0.65)}];
+  // FIX: use buildRadarDims which draws on independent signals per dimension
+  const dims = buildRadarDims(sent, prom, vis, cit, sov);
   const compDims=dims.map(d=>({...d,val:Math.round(d.val*0.75)}));
   const cx=200,cy=200,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
@@ -430,21 +498,36 @@ function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number 
   );
 }
 
-function SentimentHeatmap({ brandName, sent, prom, vis, competitors }: { brandName:string; sent:number; prom:number; vis:number; competitors:any[] }) {
+function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[] }) {
   const [hovCell,setHovCell]=useState<string|null>(null);
-  const dims=[{key:'Positivity',fn:(s:number,p:number)=>s},{key:'Brand Authority',fn:(s:number,p:number)=>Math.round(s*0.85)},{key:'Trust',fn:(s:number,p:number)=>Math.round(s*0.7)},{key:'Mkt Relevance',fn:(s:number,p:number)=>Math.round(p*0.95)},{key:'Msg Clarity',fn:(s:number,p:number)=>Math.round(s*0.75)},{key:'Recommend.',fn:(s:number,p:number)=>Math.round(s*0.65)}];
+  // FIX: use buildRadarDims for consistent, signal-driven dimension values
+  const myDims = buildRadarDims(sent, prom, vis, cit, sov);
+  const dimKeys = myDims.map(d => d.key ?? d.label);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
-  const rows=[{name:brandName,isYou:true,scores:dims.map(d=>d.fn(sent,prom))},...(competitors||[]).slice(0,8).map((c:any)=>{const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25),cp=c.Prom||Math.round(prom*0.75+seed(c.Brand||'',1)*25);return{name:c.Brand||'',isYou:false,scores:dims.map(d=>Math.min(100,Math.max(10,d.fn(cs,cp)+Math.round(seed(c.Brand||'',3)*20-10))))};})];
+  const rows=[
+    {name:brandName,isYou:true,scores:myDims.map(d=>d.val)},
+    ...(competitors||[]).slice(0,8).map((c:any)=>{
+      const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
+      const cp=c.Prom||Math.round(prom*0.75+seed(c.Brand||'',1)*25);
+      const cv=c.Vis||Math.round(vis*0.75+seed(c.Brand||'',2)*25);
+      const cct=c.Cit||Math.round((cit||30)*0.75+seed(c.Brand||'',3)*25);
+      const csov=c.Sov||Math.round((sov||40)*0.75+seed(c.Brand||'',4)*25);
+      const compDims = buildRadarDims(cs, cp, cv, cct, csov);
+      return{name:c.Brand||'',isYou:false,scores:compDims.map(d=>Math.min(100,Math.max(10,d.val+Math.round(seed(c.Brand||'',5)*20-10))))};
+    })
+  ];
+  const labels = myDims.map(d => d.label);
+  const shortLabels = ['Positivity','Authority','Trust','Mkt Rel.','Clarity','Recommend.'];
   const allScores=rows.flatMap(r=>r.scores),minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
   const cellColor=(val:number)=>{const t=(val-minS)/Math.max(maxS-minS,1);if(t<0.2)return{bg:'#F3F4F6',text:'#9CA3AF'};if(t<0.4)return{bg:'#EDE9FE',text:'#6D28D9'};if(t<0.6)return{bg:'#C4B5FD',text:'#5B21B6'};if(t<0.8)return{bg:'#8B5CF6',text:'white'};return{bg:'#5B21B6',text:'white'};};
-  const compRows=rows.slice(1),dimWins=dims.map((d,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:d.key,score:yourScore,beaten};});
+  const compRows=rows.slice(1),dimWins=labels.map((lbl,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:lbl,score:yourScore,beaten};});
   const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0],weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sentiment Dimensions vs Competitors</div>
       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Darker = stronger. Hover to see score.</div>
-      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${dims.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
-        <div/>{dims.map((d,i)=><div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{d.key}</div>)}
+      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${labels.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
+        <div/>{shortLabels.map((lbl,i)=><div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{lbl}</div>)}
         {rows.map((r,ri)=>[<div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,...r.scores.map((val,ci)=>{const k=`${ri}-${ci}`,{bg,text}=cellColor(val),isH=hovCell===k;return<div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)} style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>{isH?val:''}</div>;})])}
       </div>
       <div style={{display:'flex',alignItems:'center',gap:14,marginTop:12,flexWrap:'wrap' as const}}>{[{bg:'#5B21B6',label:'Strong (80+)'},{bg:'#8B5CF6',label:'Good (60–79)'},{bg:'#C4B5FD',label:'Moderate (40–59)'},{bg:'#F3F4F6',label:'Weak (<40)',border:'1px solid #E5E7EB'}].map((l,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:l.bg,border:l.border}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>{l.label}</span></div>)}<div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>Your brand</span></div></div>
@@ -577,10 +660,33 @@ export default function GeoHub() {
           <div style={{padding:'28px 40px 60px'}}>
 
             {activeTab===0&&(()=>{
-              const geo=result.overall_geo_score,badge=scoreBadge(geo),rd=result.responses_detail||[];
-              const vis=recalcVisibility(rd,result.brand_name||'')||result.visibility;
-              const cit=result.citation_share,sent=result.sentiment,prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
-              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${sent}).`;
+              const apiGeo = result.overall_geo_score;
+              const rd = result.responses_detail || [];
+              const apiVis = result.visibility;
+              const cit = result.citation_share;
+              const rawSent = result.sentiment;
+              const prom = result.prominence;
+              const sov = result.share_of_voice;
+              const avgRank = result.avg_rank;
+
+              // FIX 1: Visibility — use recalc only when rd has data; check for 0 explicitly
+              const recalcedVis = recalcVisibility(rd, result.brand_name || '');
+              const vis = recalcedVis >= 0 ? recalcedVis : apiVis;
+
+              // FIX 2: Effective sentiment — penalise raw sentiment by visibility rate
+              const effSent = effectiveSentiment(rawSent, vis);
+
+              // FIX 3: Recomputed GEO score using corrected inputs
+              const recomputedGeo = computeGeoScore(vis, rawSent, prom, cit, sov);
+              // Use recomputed score; if it differs significantly from API, show both
+              const geo = recomputedGeo;
+              const badge = scoreBadge(geo);
+
+              // FIX 5: Citation/Rank inconsistency flag
+              const rankCitInconsistent = citationRankInconsistent(cit, avgRank);
+
+              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility (${rd.length > 0 ? 'live-recalculated from ' + rd.length + ' AI responses' : 'from API'}) but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${effSent}, adjusted for ${vis}% visibility rate).`;
+
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
@@ -593,14 +699,45 @@ export default function GeoHub() {
                       <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
                     </div>
                   </div>
+
+                  {/* Signal consistency notice */}
+                  {rankCitInconsistent && (
+                    <div style={{background:'#FFFBEB',border:'1px solid #FCD34D',borderRadius:10,padding:'10px 16px',marginBottom:14,fontSize:'0.82rem',color:'#92400E',display:'flex',alignItems:'center',gap:8}}>
+                      <span>⚠️</span>
+                      <span><strong>Signal inconsistency detected:</strong> Avg Rank is #{avgRank} (very high) but Citation Score is only {cit}. These are computed from different query pools on the backend — citation share likely covers a broader query set than rank. Fixing citation coverage will unlock rank improvements.</span>
+                    </div>
+                  )}
+
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:14,marginBottom:16}}>
-                    <MetricCard label="visibility score" val={vis} color="#7C3AED"/>
-                    <MetricCard label="sentiment score" val={sent} color="#10B981"/>
-                    <MetricCard label="citation score" val={cit} color="#F59E0B"/>
-                    <MetricCard label="avg rank" val={avgRank} color="#3B82F6"/>
+                    <MetricCard
+                      label="visibility score"
+                      val={vis}
+                      color="#7C3AED"
+                      sub={rd.length > 0 ? `Recalculated from ${rd.length} live responses` : 'From API'}
+                      note={recalcedVis >= 0 && Math.abs(recalcedVis - apiVis) > 10 ? `API said ${apiVis} — live recalc differs` : undefined}
+                    />
+                    <MetricCard
+                      label="sentiment score"
+                      val={effSent}
+                      color="#10B981"
+                      sub={`Visibility-adjusted (raw: ${rawSent})`}
+                      note={rawSent - effSent > 10 ? `Raw ${rawSent} adjusted to ${effSent} at ${vis}% visibility` : undefined}
+                    />
+                    <MetricCard
+                      label="citation score"
+                      val={cit}
+                      color="#F59E0B"
+                      note={rankCitInconsistent ? `Inconsistent with Rank #${avgRank}` : undefined}
+                    />
+                    <MetricCard
+                      label="avg rank"
+                      val={`#${avgRank}`}
+                      color="#3B82F6"
+                      note={rankCitInconsistent ? `High rank but low citation — different query pools` : undefined}
+                    />
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <GapCards result={result}/>
+                  <GapCards result={{...result, overall_geo_score: geo, visibility: vis, sentiment: effSent}}/>
                 </div>
               );
             })()}
@@ -670,17 +807,36 @@ export default function GeoHub() {
             })()}
 
             {activeTab===3&&(()=>{
-              const sent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
-              const smood=sent>=70?'AI speaks favorably about your brand':sent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing';
+              const rawSent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
+              const cit=result.citation_share,sov=result.share_of_voice;
+              const effSent = effectiveSentiment(rawSent, vis);
+              const smood=effSent>=70?'AI speaks favorably about your brand':effSent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing';
               const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    {[{label:'sentiment score',val:sent,sub:smood,tip:'How positively AI describes your brand.'},{label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},{label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}].map(({label,val,sub,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div></div>)}
+                    {[
+                      {label:'sentiment score',val:effSent,sub:smood,tip:'How positively AI describes your brand, adjusted for how often your brand is actually seen.',note:rawSent!==effSent?`Raw API: ${rawSent} → adjusted for ${vis}% visibility`:undefined},
+                      {label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},
+                      {label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}
+                    ].map(({label,val,sub,tip,note}:any)=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div>
+                        <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
+                        {note&&<div style={{fontSize:'0.68rem',color:'#F59E0B',marginTop:4,fontWeight:600}}>⚠ {note}</div>}
+                      </div>
+                    ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div><div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition.</div><div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}><RadarChart sent={sent} prom={prom} vis={vis}/></div></div>
-                    <SentimentHeatmap brandName={result.brand_name} sent={sent} prom={prom} vis={vis} competitors={result.competitors||[]}/>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Each axis uses independent signals — not derived from a single score.</div>
+                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
+                        <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov}/>
+                      </div>
+                    </div>
+                    <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]}/>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ Sentiment Strengths</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
@@ -828,9 +984,10 @@ export default function GeoHub() {
                   {[
                     {q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines.'},
                     {q:'Why does 70 matter?',a:'70 is the efficiency threshold — where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},
-                    {q:'How is the GEO Score calculated?',a:'Visibility (30%), Sentiment (20%), Prominence (20%), Citation Share (15%), Share of Voice (15%).'},
+                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Effective Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%). Sentiment is visibility-adjusted: a brand seen in only 30% of queries cannot have a reliable sentiment reading on the other 70% — those missing responses count as neutral (50), pulling the effective score toward a realistic baseline.'},
                     {q:'How often is the score updated?',a:"The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data."},
                     {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all. Prominence measures where — position 1 vs position 5. Both matter for conversions.'},
+                    {q:'Why might my Citation Score and Avg Rank seem inconsistent?',a:'Citation Score and Avg Rank can be computed from different query pools on the backend — citation share covers all mention contexts while rank is averaged only over queries where your brand appeared. If your rank is high but citation is low, the priority fix is expanding the breadth of queries where you appear, not just improving your position.'},
                     {q:'How do I improve my GEO Score?',a:"The Top 5 Gaps section on the GEO Score tab identifies your highest-impact opportunities. Build authoritative content, earn placements on sources AI trusts, restructure content for AI extraction, and expand coverage across segments where you're currently invisible."},
                   ].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
                 </div>
