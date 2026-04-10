@@ -994,7 +994,17 @@ export default function GeoHub() {
             {activeTab===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
 
-              // Real URLs per known domain
+              // Real URLs per known domain — earned + institution + owned
+              const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
+              const OWNED_URLS: Record<string,string[]> = {
+                'capitalone': ['https://www.capitalone.com/credit-cards/','https://www.capitalone.com/credit-cards/venture/','https://www.capitalone.com/credit-cards/quicksilver/','https://www.capitalone.com/credit-cards/savor/','https://www.capitalone.com/credit-cards/secured/'],
+                'chase':      ['https://www.chase.com/personal/credit-cards','https://www.chase.com/personal/credit-cards/sapphire','https://www.chase.com/personal/credit-cards/freedom','https://www.chase.com/personal/credit-cards/ink-business','https://www.chase.com/personal/credit-cards/amazon'],
+                'citi':       ['https://www.citi.com/credit-cards/home','https://www.citi.com/credit-cards/citi-double-cash-credit-card','https://www.citi.com/credit-cards/citi-custom-cash-card','https://www.citi.com/credit-cards/citi-premier-card','https://www.citi.com/credit-cards/compare/view-all-credit-cards'],
+                'americanexpress': ['https://www.americanexpress.com/us/credit-cards/','https://www.americanexpress.com/us/credit-cards/gold-card/','https://www.americanexpress.com/us/credit-cards/platinum/','https://www.americanexpress.com/us/credit-cards/blue-cash-preferred/','https://www.americanexpress.com/us/credit-cards/blue-cash-everyday/'],
+                'discover':   ['https://www.discover.com/credit-cards/','https://www.discover.com/credit-cards/cash-back/','https://www.discover.com/credit-cards/student/','https://www.discover.com/credit-cards/secured/','https://www.discover.com/credit-cards/miles/'],
+                'wellsfargo': ['https://www.wellsfargo.com/credit-cards/','https://www.wellsfargo.com/credit-cards/active-cash/','https://www.wellsfargo.com/credit-cards/autograph/','https://www.wellsfargo.com/credit-cards/reflect/','https://www.wellsfargo.com/credit-cards/compare/'],
+                'bankofamerica': ['https://www.bankofamerica.com/credit-cards/','https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/','https://www.bankofamerica.com/credit-cards/products/travel-rewards-credit-card/','https://www.bankofamerica.com/credit-cards/products/customized-cash-rewards-credit-card/','https://www.bankofamerica.com/credit-cards/compare-credit-cards/'],
+              };
               const DOMAIN_REAL_URLS: Record<string,string[]> = {
                 'nerdwallet.com':       ['https://www.nerdwallet.com/best/credit-cards','https://www.nerdwallet.com/best/credit-cards/cash-back','https://www.nerdwallet.com/best/credit-cards/travel','https://www.nerdwallet.com/best/credit-cards/no-annual-fee','https://www.nerdwallet.com/best/credit-cards/balance-transfer'],
                 'bankrate.com':         ['https://www.bankrate.com/credit-cards/best-credit-cards/','https://www.bankrate.com/credit-cards/cash-back/','https://www.bankrate.com/credit-cards/travel/','https://www.bankrate.com/credit-cards/reviews/','https://www.bankrate.com/credit-cards/compare/'],
@@ -1008,11 +1018,11 @@ export default function GeoHub() {
                 'bloomberg.com':        ['https://www.bloomberg.com/personal-finance/credit-cards/best','https://www.bloomberg.com/personal-finance/credit-cards/cash-back','https://www.bloomberg.com/personal-finance/credit-cards/travel','https://www.bloomberg.com/personal-finance/credit-cards/reviews','https://www.bloomberg.com/personal-finance/credit-cards/'],
                 'reddit.com':           ['https://www.reddit.com/r/personalfinance/','https://www.reddit.com/r/CreditCards/','https://www.reddit.com/r/financialindependence/','https://www.reddit.com/r/churning/','https://www.reddit.com/r/CreditCards/wiki/index'],
                 'consumerreports.org':  ['https://www.consumerreports.org/money/credit-cards/','https://www.consumerreports.org/money/credit-cards/best-credit-cards/','https://www.consumerreports.org/money/credit-cards/reviews/','https://www.consumerreports.org/money/banking/','https://www.consumerreports.org/money/'],
-                // Automotive
+                'wikipedia.org':        ['https://en.wikipedia.org/wiki/Credit_card','https://en.wikipedia.org/wiki/Cashback_reward_program','https://en.wikipedia.org/wiki/Rewards_credit_card','https://en.wikipedia.org/wiki/Travel_credit_card','https://en.wikipedia.org/wiki/Secured_credit_card'],
+                'consumerfinance.gov':  ['https://www.consumerfinance.gov/consumer-tools/credit-cards/','https://www.consumerfinance.gov/ask-cfpb/what-is-a-credit-card/','https://www.consumerfinance.gov/consumer-tools/credit-cards/explore-cards/','https://www.consumerfinance.gov/about-us/blog/choosing-right-credit-card/','https://www.consumerfinance.gov/consumer-tools/'],
                 'edmunds.com':          ['https://www.edmunds.com/best-cars/','https://www.edmunds.com/car-reviews/','https://www.edmunds.com/best-cars/best-suvs/','https://www.edmunds.com/best-cars/best-electric-cars/','https://www.edmunds.com/compare-cars/'],
                 'caranddriver.com':     ['https://www.caranddriver.com/best-cars/','https://www.caranddriver.com/research/','https://www.caranddriver.com/best-cars/g26083854/best-electric-vehicles/','https://www.caranddriver.com/features/g15078784/10best/','https://www.caranddriver.com/compare/'],
                 'motortrend.com':       ['https://www.motortrend.com/cars/best/','https://www.motortrend.com/cars/car-of-the-year/','https://www.motortrend.com/cars/reviews/','https://www.motortrend.com/cars/electric/','https://www.motortrend.com/cars/compare/'],
-                // General
                 'tripadvisor.com':      ['https://www.tripadvisor.com/Hotels','https://www.tripadvisor.com/BestHotels','https://www.tripadvisor.com/TravelersChoice','https://www.tripadvisor.com/Hotels-g1-Reviews','https://www.tripadvisor.com/Tourism'],
                 'trustpilot.com':       ['https://www.trustpilot.com/categories/banking_money','https://www.trustpilot.com/review/','https://www.trustpilot.com/categories/financial_services','https://www.trustpilot.com/categories/insurance','https://www.trustpilot.com/categories/loans_credit'],
               };
@@ -1100,9 +1110,9 @@ export default function GeoHub() {
                         const cls = isOwned ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                         const bw=Math.min(s.citation_share,100);
                         const isExp=expandedDomain===s.domain;
-                        const realUrls = DOMAIN_REAL_URLS[s.domain] || (isOwned ? [
-                          `https://www.${s.domain}/credit-cards`,`https://www.${s.domain}/credit-cards/venture`,`https://www.${s.domain}/credit-cards/quicksilver`,`https://www.${s.domain}/credit-cards/savor`,`https://www.${s.domain}/credit-cards/secured`,
-                        ] : [`https://www.${s.domain}`]);
+                        const realUrls = isOwned
+                          ? (OWNED_URLS[brandKey3] || [`https://www.${s.domain}/credit-cards`,`https://www.${s.domain}/credit-cards/rewards`,`https://www.${s.domain}/credit-cards/travel`,`https://www.${s.domain}/credit-cards/cash-back`,`https://www.${s.domain}/credit-cards/secured`])
+                          : (DOMAIN_REAL_URLS[s.domain] || [`https://www.${s.domain}`]);
                         return<React.Fragment key={i}>
                           <tr style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp?'#F9F8FF':isOwned?'#FAFBFF':'white',borderLeft:isOwned?'3px solid #7C3AED':'none'}} onClick={()=>setExpandedDomain(isExp?null:s.domain)}>
                             <td style={{padding:'11px 14px',fontSize:'0.82rem',color:'#9CA3AF'}}>{s.rank||i+1}</td>
@@ -1202,20 +1212,47 @@ export default function GeoHub() {
 
             {activeTab===8&&(()=>(
               <div>
-                <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>GEO Score — FAQ</div>
+                <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>What does this score mean for your business?</div>
                 <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:24}}>Everything you need to understand your score and how to act on it.</div>
                 <div style={{display:'flex',gap:20,marginBottom:24}}>
                   <SankeyChart result={result}/>
                   <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
                 </div>
+
+                {/* Metric Definitions */}
+                <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>📊 Metric Definitions</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:24}}>
+                  {[
+                    {metric:'GEO Score',icon:'🏆',color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE',def:'A single 0–100 number measuring how often and how favorably your brand appears in AI-generated responses.',example:'A score of 72 means AI recommends your brand consistently and prominently — you\'re above the 70 efficiency threshold.'},
+                    {metric:'Visibility',icon:'👁️',color:'#3B82F6',bg:'#EFF6FF',border:'#BFDBFE',def:'The % of AI queries where your brand was mentioned at least once out of all queries run.',example:'Visibility of 60 means your brand appeared in 30 out of 50 queries. Chase at 78 appeared in 39 of 50.'},
+                    {metric:'Sentiment',icon:'💬',color:'#10B981',bg:'#ECFDF5',border:'#6EE7B7',def:'How positively AI describes your brand when it does mention you. Scored 0–100 based on tone, language, and context.',example:'Sentiment of 82 = AI consistently uses phrases like "excellent rewards" and "highly recommended". Below 60 = neutral or mixed language.'},
+                    {metric:'Prominence',icon:'📍',color:'#F59E0B',bg:'#FFFBEB',border:'#FCD34D',def:'Where in an AI response your brand appears. Being named first scores higher than being named fifth.',example:'Prominence 74 = you\'re typically the 1st or 2nd brand named. Prominence 40 = you\'re buried mid-list after competitors.'},
+                    {metric:'Citation Score',icon:'🔗',color:'#EC4899',bg:'#FDF2F8',border:'#FBCFE8',def:'How authoritatively your brand is cited — factoring in which sources mention you and how prominently.',example:'Citation 65 = trusted sources like NerdWallet and Forbes mention you. Citation 30 = only obscure or low-authority sources.'},
+                    {metric:'Share of Voice',icon:'📣',color:'#8B5CF6',bg:'#F5F3FF',border:'#DDD6FE',def:'Your brand\'s dominance in AI responses relative to all competitors. 100 = mentioned in every response prominently. 0 = never mentioned.',example:'SOV 68 means you dominate the conversation. SOV 20 means competitors crowd you out in most responses.'},
+                    {metric:'Avg Rank',icon:'🥇',color:'#06B6D4',bg:'#ECFEFF',border:'#A5F3FC',def:'Your average position when mentioned within a single AI response. #1 = named first most often, #4 = three brands named before you.',example:'Avg Rank #1 means AI leads with your brand. Avg Rank #3 means Chase and Amex are typically named before Capital One.'},
+                  ].map((m,i)=>(
+                    <div key={i} style={{background:m.bg,borderRadius:12,border:`1px solid ${m.border}`,padding:'16px 18px'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                        <span style={{fontSize:'1.1rem'}}>{m.icon}</span>
+                        <span style={{fontSize:'0.88rem',fontWeight:700,color:m.color}}>{m.metric}</span>
+                      </div>
+                      <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:8}}>{m.def}</div>
+                      <div style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.5,borderTop:`1px solid ${m.border}`,paddingTop:8}}>
+                        <span style={{fontWeight:600,color:m.color}}>Example: </span>{m.example}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* FAQ Questions */}
+                <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>❓ Frequently Asked Questions</div>
                 <div style={{display:'flex',flexDirection:'column' as const,gap:14}}>
                   {[
                     {q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines.'},
                     {q:'Why does 70 matter?',a:'70 is the efficiency threshold — where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},
-                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%).'},
-                    {q:'How often is the score updated?',a:"The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data."},
-                    {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all. Prominence measures where — position 1 vs position 5. Both matter for conversions.'},
-                    {q:'Why might my Citation Score and Avg Rank seem inconsistent?',a:'Citation Score and Avg Rank can be computed from different query pools on the backend — citation share covers all mention contexts while rank is averaged only over queries where your brand appeared. If your rank is high but citation is low, the priority fix is expanding the breadth of queries where you appear, not just improving your position.'},
+                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%). Each metric captures a different dimension of how AI perceives and presents your brand.'},
+                    {q:'How often is the score updated?',a:'The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data.'},
+                    {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all in an AI response. Prominence measures where — being named first scores much higher than being named fifth. A brand can have high visibility but low prominence if it\'s always mentioned last.'},
                     {q:'How do I improve my GEO Score?',a:"The Top 5 Gaps section on the GEO Score tab identifies your highest-impact opportunities. Build authoritative content, earn placements on sources AI trusts, restructure content for AI extraction, and expand coverage across segments where you're currently invisible."},
                   ].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
                 </div>
