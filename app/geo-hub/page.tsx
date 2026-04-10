@@ -140,13 +140,6 @@ function MetricCard({ label, val, sub, color='#7C3AED', note }: { label:string; 
   );
 }
 
-// ─── FIX 5: Citation/Rank consistency warning ────────────────────────────────
-// If avg_rank is ≤ 2 but citation_share is < 50, surface a warning because
-// these signals are logically inconsistent (different query pools on backend)
-function citationRankInconsistent(cit: number, rank: number): boolean {
-  return rank > 0 && rank <= 2 && cit < 50;
-}
-
 function GeoGauge({ score, brand }: { score:number; brand:string }) {
   const badge = scoreBadge(score);
   const cx=160,cy=155,Ro=130,Ri=88;
@@ -183,7 +176,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
         <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
-        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you&apos;re not yet the brand AI leads with or recommends first.
+        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you\'re not yet the brand AI leads with or recommends first.'}
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
@@ -355,7 +348,7 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
         </div>
       )}
       {!loading&&gaps.map((g,i)=>{
-        const isOpen=expanded===i, pct=Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100);
+        const isOpen=expanded===i, pct=Math.min(100,Math.max(0,Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100)));
         const impactColor=g.impact==='HIGH IMPACT'?'#EF4444':g.impact==='MEDIUM IMPACT'?'#F59E0B':'#7C3AED';
         const impactBg=g.impact==='HIGH IMPACT'?'#FEE2E2':g.impact==='MEDIUM IMPACT'?'#FEF3C7':'#EDE9FE';
         const dotColor=gapColors[i];
@@ -727,6 +720,14 @@ export default function GeoHub() {
             {activeTab===1&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
               const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
+              // Check if API ranks are duplicated (unreliable) — if so, derive from GEO order
+              const apiRanks=top.map(c=>String(c.Rank).replace(/^#+/,'')).filter(r=>r&&r!=='N/A'&&r!=='null');
+              const hasDuplicateRanks=new Set(apiRanks).size < apiRanks.length;
+              const resolvedRank=(c:any,i:number)=>{
+                if(hasDuplicateRanks) return `#${i+1}`;
+                const r=String(c.Rank||'').replace(/^#+/,'');
+                return r&&r!=='N/A'&&r!=='null'?`#${r}`:'—';
+              };
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
               const bW=680,bH=140,bPad=32,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
@@ -762,7 +763,7 @@ export default function GeoHub() {
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sen}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sov}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{c.Rank}</td>
+                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{resolvedRank(c,i)}</td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -886,7 +887,6 @@ export default function GeoHub() {
               rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
               const totalMentions=rd.filter((r:any)=>r.mentioned).length,rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=rd.filter((r:any)=>!r.mentioned).length;
               const totalQueries = rd.length || 20;
-              const compNames=(result.competitors||[]).map((c:any)=>c.Brand||'').filter(Boolean);
               // Only show "who beat you" if the response object has actual winner data
               const getBeater=(item:any)=>{
                 if(item.winner_brand) return item.winner_brand;
