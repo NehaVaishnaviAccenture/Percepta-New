@@ -994,21 +994,6 @@ export default function GeoHub() {
             {activeTab===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
 
-              // Build category map from sources if available, otherwise from responses_detail
-              const catMap:Record<string,number>={};
-              if (sources.length > 0) {
-                sources.forEach((s:any)=>{const cl=classifyDomain(s.domain||''),isOwned=(result.domain&&s.domain&&s.domain.includes(result.domain))||false,cat=isOwned?'Owned Media':cl.label;catMap[cat]=(catMap[cat]||0)+(s.citation_share||0);});
-                Object.keys(catMap).forEach(k=>{catMap[k]=Math.min(catMap[k],100);});
-              } else {
-                // Fallback: derive category breakdown from response categories
-                const rd = result.responses_detail || [];
-                const mentioned = rd.filter((r:any) => r.mentioned);
-                const total = Math.max(mentioned.length, 1);
-                const cats:Record<string,number> = {};
-                mentioned.forEach((r:any) => { cats[r.category] = (cats[r.category]||0) + 1; });
-                Object.entries(cats).forEach(([cat, count]) => { catMap[cat] = Math.round((count as number / total) * 100); });
-              }
-
               // Real URLs per known domain
               const DOMAIN_REAL_URLS: Record<string,string[]> = {
                 'nerdwallet.com':       ['https://www.nerdwallet.com/best/credit-cards','https://www.nerdwallet.com/best/credit-cards/cash-back','https://www.nerdwallet.com/best/credit-cards/travel','https://www.nerdwallet.com/best/credit-cards/no-annual-fee','https://www.nerdwallet.com/best/credit-cards/balance-transfer'],
