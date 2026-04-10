@@ -155,8 +155,7 @@ function ROICurve({ score }: { score: number }) {
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
 
         {/* Title */}
-        <text x={W / 2} y={20} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
-        <text x={W / 2} y={36} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO follows an S-curve. Below 70, effort produces outsized returns. Above 80, diminishing returns begin.</text>
+        <text x={W / 2} y={28} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
 
         {/* Y grid */}
         {[0, 25, 50, 75, 100].map(v => (
