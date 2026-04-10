@@ -365,14 +365,28 @@ const INDUSTRY_DATA: Record<string, any> = {
   },
 };
 
+// All known brand names across all industries used to detect position accurately
+const ALL_KNOWN_BRANDS = [
+  'chase','american express','amex','capital one','citi','citibank','discover','wells fargo',
+  'bank of america','synchrony','barclays','usaa',
+  'tesla','toyota','bmw','honda','ford','mercedes','hyundai','kia','nissan','volkswagen','subaru','mazda','lexus',
+  'marriott','hilton','hyatt','ihg','wyndham','best western','radisson','accor','four seasons','ritz-carlton',
+  'netflix','disney','hbo','amazon','hulu','peacock','paramount','spotify','apple',
+  'walmart','target','costco','best buy','ebay','etsy','shopify','home depot','kroger',
+  'microsoft','google','salesforce','adobe','oracle','sap','ibm','cisco',
+  'nike','adidas','under armour','lululemon','new balance','puma','reebok','asics','brooks','hoka',
+  'unitedhealth','anthem','aetna','cigna','humana','cvs','walgreens','kaiser',
+];
+
 function getBrandPosition(text: string, brand: string): number {
   const bl = brand.toLowerCase();
   const tl = text.toLowerCase();
   if (!tl.includes(bl)) return 0;
-  const before = text.slice(0, tl.indexOf(bl));
-  const stops = new Set(['The','A','An','In','On','At','For','With','By','From','This','That','These','Those','Some','Many','Most','All','When','Where','What','Which','Who','How','Why','If','Here','There','However','Also','Additionally','Furthermore','First','Second','Third','Finally','Overall','Generally']);
-  const brands = [...new Set((before.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b/g) || []).filter(b => !stops.has(b) && b.length > 2))];
-  return brands.length + 1;
+  const firstIndex = tl.indexOf(bl);
+  const before = tl.slice(0, firstIndex);
+  // Only count known brand names that appear before this brand — not random capitalized words
+  const brandsBeforeCount = ALL_KNOWN_BRANDS.filter(b => b !== bl && before.includes(b)).length;
+  return brandsBeforeCount + 1;
 }
 
 // ── Competitor scoring: blends actual response data with brand awareness baseline ──
