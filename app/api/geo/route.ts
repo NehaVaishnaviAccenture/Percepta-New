@@ -830,7 +830,7 @@ Score the brand on each dimension from 0–100. IMPORTANT CONSTRAINTS:
 - citation_share MUST be between 0 and ${visibility + 10} — it cannot exceed visibility significantly since you can only be cited where you appear
 - sentiment is ONLY based on the ${mentions} responses where brand appeared — how positively was it described in those?
 - prominence: how early in responses did the brand appear when it was mentioned? (100 = always first, 0 = always last)
-- share_of_voice: of all brand mentions across all ${totalQueries} responses, what % were for "${brand}"?
+- share_of_voice: how dominant is this brand in AI responses compared to all competitors? Score 0–100 where 100 = mentioned in every response and always prominently, 50 = mentioned in roughly half of responses at mid-list, 0 = never mentioned. This is NOT a % of total mentions — it is a dominance score. A brand appearing in ${visibility}% of responses with good prominence should score around ${Math.round(visibility * 0.8 + 10)}.
 
 Return ONLY valid JSON, no markdown:
 {"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
@@ -885,11 +885,11 @@ Return ONLY valid JSON, no markdown:
     // Capital One always #3, Citi always #4, both in Needs Work range (45–69)
     if (indKey === 'fin') {
       competitors = competitors.map((c: any) => {
-        if (c.Brand === 'Capital One') return { ...c, GEO: 58, Vis: 42, Cit: 38, Sen: 65, Sov: 35, Rank: '#3' };
-        if (c.Brand === 'Citi')        return { ...c, GEO: 54, Vis: 38, Cit: 34, Sen: 62, Sov: 30, Rank: '#4' };
+        if (c.Brand === 'Capital One') return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
+        if (c.Brand === 'Citi')        return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 57, Sov: 40, Prom: 50, Rank: '#4' };
         return c;
       });
-      // Sort so Capital One and Citi land at #3 and #4 — sort by GEO desc
+      // Sort by GEO desc so Capital One (#3) and Citi (#4) land in correct positions
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
