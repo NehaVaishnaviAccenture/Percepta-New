@@ -13,7 +13,7 @@ const METRIC_TIPS: Record<string,string> = {
   'visibility score': 'Measures how often your brand appears in AI-generated responses across key industry queries.',
   'citation score': 'Reflects how authoritatively AI models reference your brand compared to competitors.',
   'sentiment score': 'Captures the tone and favorability of AI responses when your brand is mentioned.',
-  'avg rank': 'Your average mention position across all AI responses where your brand appeared.',
+  'avg rank': 'Average position when your brand is mentioned within an AI response. #1 means AI names your brand first most often. #3 means two other brands are typically named before yours.',
 };
 
 const RADAR_TIPS: Record<string,string> = {
