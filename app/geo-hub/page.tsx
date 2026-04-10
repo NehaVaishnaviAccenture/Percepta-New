@@ -228,25 +228,26 @@ Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Prominence: ${
 Citation Share: ${result.citation_share}, Share of Voice: ${result.share_of_voice}, Avg Rank: ${result.avg_rank}
 Top Competitor: ${topComp} (GEO: ${topCompGEO}, SOV: ${topCompSOV})
 
-Use EXACTLY these 5 gap types in order:
-1. Primary Recommendation Rate
-2. Share of Voice vs #1 competitor — specific gap vs ${topComp}
-3. Earned Media Authority
-4. Segment Depth
-5. Answer Completeness
+Use EXACTLY these 5 gap types with EXACTLY these title formats — fill in the bracketed numbers with real data:
+
+1. Title MUST be: "Primary Recommendation Rate: AI recognizes ${result.brand_name}, rarely recommends it first"
+2. Title MUST be: "Share of Voice: You're at ${result.share_of_voice}% of AI mentions — ${topComp} is at ${topCompSOV}%"
+3. Title MUST be: "Earned Media: ${result.citation_share}% of citations are from 3rd-party sites you don't control"
+4. Title MUST be: "Segment Depth: Only [X] of [Y] product segments are AI-visible" — estimate X and Y from the data
+5. Title MUST be: "Answer Completeness: AI mentions ${result.brand_name} but skips the full reasoning"
 
 Return ONLY valid JSON array, no markdown, no backticks. Each object:
 {
-  "title": "gap type: one sharp finding, under 10 words, no fluff",
+  "title": "use the EXACT title format above for each gap",
   "impact": "HIGH IMPACT" | "MEDIUM IMPACT" | "LOW-MEDIUM IMPACT",
   "effort": "Low" | "Medium" | "High" | "Low-Medium",
   "currentMetric": number,
   "targetMetric": number,
-  "currentState": "2 sentences. Start with a specific number or fact. Name ${result.brand_name} directly. Example: 'In only 4 of 50 prompts is ${result.brand_name} the primary recommendation. In 30 prompts it appears but ${topComp} leads.'",
-  "rootCause": "2 sentences. State the structural reason bluntly. Name the exact mechanism. No vague abstractions.",
-  "howToFix": "2 sentences. Give two concrete actions with named platforms or formats. Start with a verb.",
-  "rankImpact": "1 sentence. State the specific rank or score movement as a fact.",
-  "conversionImpact": "1 sentence. State the specific business outcome as a fact."
+  "currentState": "2 sentences. Open with a specific number. Name ${result.brand_name} and ${topComp} directly. No vague language.",
+  "rootCause": "2 sentences. State the exact structural reason — name the mechanism. No corporate speak.",
+  "howToFix": "2 sentences. Start with a verb. Name specific platforms (NerdWallet, Bankrate, Forbes). Concrete actions only.",
+  "rankImpact": "1 sentence. State a specific rank or score movement as fact.",
+  "conversionImpact": "1 sentence. State a specific business outcome as fact."
 }
 Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
