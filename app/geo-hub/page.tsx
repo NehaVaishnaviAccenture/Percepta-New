@@ -151,11 +151,11 @@ function ROICurve({ score }: { score: number }) {
   const goalCX = sx(goalX), goalCY = sy(70);
   const authCX = sx(authX), authCY = sy(80);
   const stages = [
-    { label: 'Fragmented', range: '0–30', color: '#EF4444' },
-    { label: 'Emerging', range: '30–55', color: '#F59E0B' },
-    { label: 'Competitive', range: '55–72', color: '#3B82F6' },
-    { label: 'Leader', range: '72–85', color: '#10B981' },
-    { label: 'Authority', range: '85+', color: '#7C3AED' },
+    { label: 'Fragmented', range: '0–44', color: '#EF4444' },
+    { label: 'Emerging', range: '45–55', color: '#F59E0B' },
+    { label: 'Competitive', range: '56–69', color: '#3B82F6' },
+    { label: 'Leader', range: '70–79', color: '#10B981' },
+    { label: 'Authority', range: '80+', color: '#7C3AED' },
   ];
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
@@ -198,10 +198,10 @@ function ROICurve({ score }: { score: number }) {
           {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
         {(()=>{
-          const totalW = stages.length * 90;
+          const totalW = stages.length * 72;
           const startX = (padL + W - padR) / 2 - totalW / 2;
           return stages.map((s,i)=>(
-            <text key={i} x={startX + i*90 + 45} y={padT+plotH+36} textAnchor="middle" style={{fontSize:6.5,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>
+            <text key={i} x={startX + i*72 + 36} y={padT+plotH+36} textAnchor="middle" style={{fontSize:6,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>
               {s.label} <tspan style={{fontWeight:400,fill:'#9CA3AF'}}>{s.range}</tspan>
             </text>
           ));
