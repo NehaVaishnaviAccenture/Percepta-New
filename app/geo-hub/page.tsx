@@ -199,7 +199,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score: number }) {
-  const W = 700, H = 400, padL = 52, padR = 28, padT = 48, padB = 90;
+  const W = 700, H = 280, padL = 52, padR = 28, padT = 36, padB = 72;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const curve = (x: number) => Math.round(5 + 90 / (1 + Math.exp(-0.09 * (x - 45))));
@@ -416,7 +416,7 @@ function SankeyChart({ result }: { result:any }) {
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',flex:1}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Composition</div>
-      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>How each signal flows into your overall GEO Score (Sentiment shown as visibility-adjusted)</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>How each signal flows into your overall GEO Score</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
         {nodes.map((n,i)=>{const sm=n.y+nH/2,bH=gH/inputs.length,dm=gCY-gH/2+i*bH+bH/2,c1=lx+nw+(rx-lx-nw)*0.4,c2=lx+nw+(rx-lx-nw)*0.6,hh=nH/2,dh=bH/2,isH=hov===i;return(<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}><path d={`M${lx+nw},${sm-hh} C${c1},${sm-hh} ${c2},${dm-dh} ${rx},${dm-dh} L${rx},${dm+dh} C${c2},${dm+dh} ${c1},${sm+hh} ${lx+nw},${sm+hh}Z`} fill={n.color} opacity={isH?0.32:0.15} style={{transition:'opacity 0.2s'}}/><rect x={lx} y={n.y} width={nw} height={nH} rx={4} fill={n.color}/><text x={lx-8} y={n.y+nH/2-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:12,fill:'#111827',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}</text><text x={lx-8} y={n.y+nH/2+9} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.value}</text><text x={(lx+nw+rx)/2} y={sm+2} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.weight}%</text></g>);})}
         <rect x={rx} y={gCY-gH/2} width={nw} height={gH} rx={4} fill="#7C3AED"/>
@@ -681,10 +681,7 @@ export default function GeoHub() {
               const geo = recomputedGeo;
               const badge = scoreBadge(geo);
 
-              // FIX 5: Citation/Rank inconsistency flag
-              const rankCitInconsistent = citationRankInconsistent(cit, avgRank);
-
-              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility (${rd.length > 0 ? 'live-recalculated from ' + rd.length + ' AI responses' : 'from API'}) but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${effSent}, adjusted for ${vis}% visibility rate).`;
+              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${effSent}).`;
 
               return (
                 <div>
@@ -699,40 +696,26 @@ export default function GeoHub() {
                     </div>
                   </div>
 
-                  {/* Signal consistency notice */}
-                  {rankCitInconsistent && (
-                    <div style={{background:'#FFFBEB',border:'1px solid #FCD34D',borderRadius:10,padding:'10px 16px',marginBottom:14,fontSize:'0.82rem',color:'#92400E',display:'flex',alignItems:'center',gap:8}}>
-                      <span>⚠️</span>
-                      <span><strong>Signal inconsistency detected:</strong> Avg Rank is #{avgRank} (very high) but Citation Score is only {cit}. These are computed from different query pools on the backend — citation share likely covers a broader query set than rank. Fixing citation coverage will unlock rank improvements.</span>
-                    </div>
-                  )}
-
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:14,marginBottom:16}}>
                     <MetricCard
                       label="visibility score"
                       val={vis}
                       color="#7C3AED"
-                      sub={rd.length > 0 ? `Recalculated from ${rd.length} live responses` : 'From API'}
-                      note={recalcedVis >= 0 && Math.abs(recalcedVis - apiVis) > 10 ? `API said ${apiVis} — live recalc differs` : undefined}
                     />
                     <MetricCard
                       label="sentiment score"
                       val={effSent}
                       color="#10B981"
-                      sub={`Visibility-adjusted (raw: ${rawSent})`}
-                      note={rawSent - effSent > 10 ? `Raw ${rawSent} adjusted to ${effSent} at ${vis}% visibility` : undefined}
                     />
                     <MetricCard
                       label="citation score"
                       val={cit}
                       color="#F59E0B"
-                      note={rankCitInconsistent ? `Inconsistent with Rank #${avgRank}` : undefined}
                     />
                     <MetricCard
                       label="avg rank"
                       val={`#${avgRank}`}
                       color="#3B82F6"
-                      note={rankCitInconsistent ? `High rank but low citation — different query pools` : undefined}
                     />
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
@@ -815,22 +798,21 @@ export default function GeoHub() {
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     {[
-                      {label:'sentiment score',val:effSent,sub:smood,tip:'How positively AI describes your brand, adjusted for how often your brand is actually seen.',note:rawSent!==effSent?`Raw API: ${rawSent} → adjusted for ${vis}% visibility`:undefined},
+                      {label:'sentiment score',val:effSent,sub:smood,tip:'How positively AI describes your brand.'},
                       {label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},
                       {label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}
-                    ].map(({label,val,sub,tip,note}:any)=>(
+                    ].map(({label,val,sub,tip}:any)=>(
                       <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
                         <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div>
                         <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
                         <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
-                        {note&&<div style={{fontSize:'0.68rem',color:'#F59E0B',marginTop:4,fontWeight:600}}>⚠ {note}</div>}
                       </div>
                     ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Each axis uses independent signals — not derived from a single score.</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition.</div>
                       <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
                         <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov}/>
                       </div>
@@ -983,7 +965,7 @@ export default function GeoHub() {
                   {[
                     {q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines.'},
                     {q:'Why does 70 matter?',a:'70 is the efficiency threshold — where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},
-                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Effective Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%). Sentiment is visibility-adjusted: a brand seen in only 30% of queries cannot have a reliable sentiment reading on the other 70% — those missing responses count as neutral (50), pulling the effective score toward a realistic baseline.'},
+                    {q:'How is the GEO Score calculated?',a:'Visibility (30%) + Sentiment (20%) + Prominence (20%) + Citation Share (15%) + Share of Voice (15%).'},
                     {q:'How often is the score updated?',a:"The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data."},
                     {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all. Prominence measures where — position 1 vs position 5. Both matter for conversions.'},
                     {q:'Why might my Citation Score and Avg Rank seem inconsistent?',a:'Citation Score and Avg Rank can be computed from different query pools on the backend — citation share covers all mention contexts while rank is averaged only over queries where your brand appeared. If your rank is high but citation is low, the priority fix is expanding the breadth of queries where you appear, not just improving your position.'},
