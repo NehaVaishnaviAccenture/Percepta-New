@@ -377,19 +377,141 @@ function BusinessImpact({ result, onGo }: { result:any; onGo:()=>void }) {
 }
 
 function MarkdownText({ text }: { text:string }) {
-  const lines=text.split('\n');
+  const lines = text.split('\n');
+
+  // Parse inline formatting: **bold**, *italic*, `code`, and plain text
+  const parseInline = (t: string): React.ReactNode[] => {
+    const parts = t.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+    return parts.map((p, j) => {
+      if (p.startsWith('**') && p.endsWith('**'))
+        return <strong key={j} style={{fontWeight:700,color:'#111827'}}>{p.slice(2,-2)}</strong>;
+      if (p.startsWith('*') && p.endsWith('*') && p.length > 2)
+        return <em key={j} style={{fontStyle:'italic',color:'#374151'}}>{p.slice(1,-1)}</em>;
+      if (p.startsWith('`') && p.endsWith('`'))
+        return <code key={j} style={{background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.85em',fontFamily:'monospace',color:'#7C3AED'}}>{p.slice(1,-1)}</code>;
+      return p;
+    });
+  };
+
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Empty line — spacing
+    if (!trimmed) { elements.push(<div key={i} style={{height:8}}/>); i++; continue; }
+
+    // H1
+    if (trimmed.startsWith('# ') && !trimmed.startsWith('## ')) {
+      elements.push(<div key={i} style={{fontSize:'1.25rem',fontWeight:900,color:'#111827',marginTop:24,marginBottom:8,lineHeight:1.3,borderBottom:'2px solid #F3F4F6',paddingBottom:6}}>{parseInline(trimmed.slice(2))}</div>);
+      i++; continue;
+    }
+
+    // H2
+    if (trimmed.startsWith('## ') && !trimmed.startsWith('### ')) {
+      elements.push(<div key={i} style={{fontSize:'1.08rem',fontWeight:800,color:'#111827',marginTop:20,marginBottom:6,lineHeight:1.4}}>{parseInline(trimmed.slice(3))}</div>);
+      i++; continue;
+    }
+
+    // H3
+    if (trimmed.startsWith('### ')) {
+      elements.push(<div key={i} style={{fontSize:'0.97rem',fontWeight:700,color:'#374151',marginTop:16,marginBottom:4,lineHeight:1.4}}>{parseInline(trimmed.slice(4))}</div>);
+      i++; continue;
+    }
+
+    // H4 — bold label lines like "**1. Best Overall**"
+    if (trimmed.startsWith('#### ')) {
+      elements.push(<div key={i} style={{fontSize:'0.92rem',fontWeight:700,color:'#7C3AED',marginTop:12,marginBottom:3}}>{parseInline(trimmed.slice(5))}</div>);
+      i++; continue;
+    }
+
+    // Divider
+    if (trimmed === '---' || trimmed === '***' || trimmed === '___') {
+      elements.push(<hr key={i} style={{border:'none',borderTop:'1px solid #E5E7EB',margin:'16px 0'}}/>);
+      i++; continue;
+    }
+
+    // Numbered list — collect consecutive numbered items
+    if (/^\d+[\.\)]\s/.test(trimmed)) {
+      const items: React.ReactNode[] = [];
+      while (i < lines.length && /^\d+[\.\)]\s/.test(lines[i].trim())) {
+        const l = lines[i].trim();
+        const num = l.match(/^(\d+)/)![1];
+        const content = l.replace(/^\d+[\.\)]\s/, '');
+        // Check if next line(s) are sub-bullets for this item
+        const subItems: React.ReactNode[] = [];
+        let si = i + 1;
+        while (si < lines.length && /^(\s{2,}|[\s]*[-•*]\s)/.test(lines[si]) && lines[si].trim()) {
+          const sl = lines[si].trim().replace(/^[-•*]\s/, '');
+          subItems.push(<div key={si} style={{display:'flex',gap:8,paddingLeft:16,marginTop:3}}><span style={{color:'#9CA3AF',flexShrink:0}}>◦</span><span style={{fontSize:'0.88rem',color:'#4B5563'}}>{parseInline(sl)}</span></div>);
+          si++;
+        }
+        items.push(
+          <div key={i} style={{marginBottom: subItems.length ? 8 : 5}}>
+            <div style={{display:'flex',gap:10,alignItems:'flex-start'}}>
+              <span style={{background:'#7C3AED',color:'white',borderRadius:'50%',width:22,height:22,display:'inline-flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',fontWeight:700,flexShrink:0,marginTop:1}}>{num}</span>
+              <span style={{fontSize:'0.92rem',color:'#111827',lineHeight:1.65,flex:1}}>{parseInline(content)}</span>
+            </div>
+            {subItems}
+          </div>
+        );
+        i = si;
+      }
+      elements.push(<div key={`nl-${i}`} style={{margin:'8px 0 12px',display:'flex',flexDirection:'column' as const,gap:2}}>{items}</div>);
+      continue;
+    }
+
+    // Bullet list — collect consecutive bullet items
+    if (/^[-•*✅✓✔☑]\s/.test(trimmed) || /^\s{0,3}[-•*]\s/.test(line)) {
+      const items: React.ReactNode[] = [];
+      while (i < lines.length) {
+        const l = lines[i];
+        const lt = l.trim();
+        if (!/^[-•*✅✓✔☑👉📌🔑💡⚡🎯]\s/.test(lt) && !/^\s{0,3}[-•*]\s/.test(l)) break;
+        const isIndented = /^\s{4,}/.test(l);
+        const content = lt.replace(/^[-•*✅✓✔☑👉📌🔑💡⚡🎯]\s/, '');
+        // Detect emoji bullet
+        const emojiMatch = lt.match(/^([✅✓✔☑👉📌🔑💡⚡🎯])\s/);
+        const bullet = emojiMatch ? emojiMatch[1] : '•';
+        const bulletColor = emojiMatch ? 'inherit' : '#7C3AED';
+        items.push(
+          <div key={i} style={{display:'flex',gap:8,marginBottom:4,paddingLeft:isIndented?20:0,alignItems:'flex-start'}}>
+            <span style={{color:bulletColor,flexShrink:0,marginTop:2,fontSize:emojiMatch?'1rem':'0.9rem'}}>{bullet}</span>
+            <span style={{fontSize:'0.92rem',color:'#374151',lineHeight:1.65}}>{parseInline(content)}</span>
+          </div>
+        );
+        i++;
+      }
+      elements.push(<div key={`bl-${i}`} style={{margin:'4px 0 10px',paddingLeft:4}}>{items}</div>);
+      continue;
+    }
+
+    // Blockquote
+    if (trimmed.startsWith('> ')) {
+      elements.push(
+        <div key={i} style={{borderLeft:'3px solid #7C3AED',paddingLeft:14,margin:'8px 0',background:'#F5F3FF',borderRadius:'0 6px 6px 0',padding:'8px 14px'}}>
+          <span style={{fontSize:'0.92rem',color:'#5B21B6',lineHeight:1.65,fontStyle:'italic'}}>{parseInline(trimmed.slice(2))}</span>
+        </div>
+      );
+      i++; continue;
+    }
+
+    // Bold standalone line (e.g. "**Why it's #1:**") — treat as mini-heading
+    if (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.slice(2,-2).includes('**')) {
+      elements.push(<div key={i} style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginTop:14,marginBottom:4}}>{parseInline(trimmed)}</div>);
+      i++; continue;
+    }
+
+    // Regular paragraph
+    elements.push(<p key={i} style={{margin:'3px 0',fontSize:'0.93rem',color:'#374151',lineHeight:1.75}}>{parseInline(trimmed)}</p>);
+    i++;
+  }
+
   return (
-    <div style={{fontSize:'0.92rem',color:'#374151',lineHeight:1.85,fontFamily:'Inter,sans-serif'}}>
-      {lines.map((line,i)=>{
-        if(!line.trim())return<div key={i} style={{height:10}}/>;
-        const bold=(t:string)=>t.split(/(\*\*.*?\*\*)/g).map((p,j)=>p.startsWith('**')&&p.endsWith('**')?<strong key={j} style={{fontWeight:700,color:'#111827'}}>{p.slice(2,-2)}</strong>:p);
-        if(line.startsWith('## '))return<div key={i} style={{fontSize:'1.05rem',fontWeight:800,color:'#111827',marginTop:18,marginBottom:6}}>{bold(line.slice(3))}</div>;
-        if(line.startsWith('# '))return<div key={i} style={{fontSize:'1.15rem',fontWeight:900,color:'#111827',marginTop:18,marginBottom:6}}>{bold(line.slice(2))}</div>;
-        if(/^\d+\.\s/.test(line)){const num=line.match(/^\d+/)![0];return<div key={i} style={{display:'flex',gap:10,marginBottom:6,paddingLeft:4}}><span style={{fontWeight:700,color:'#7C3AED',minWidth:20}}>{num}.</span><span>{bold(line.replace(/^\d+\.\s/,''))}</span></div>;}
-        if(/^[-•]\s/.test(line)||/^\s{2,}[-•]\s/.test(line)){const ind=/^\s{4,}/.test(line)?24:8;return<div key={i} style={{display:'flex',gap:8,marginBottom:5,paddingLeft:ind}}><span style={{color:'#7C3AED',flexShrink:0,marginTop:2}}>•</span><span>{bold(line.replace(/^\s*[-•]\s/,''))}</span></div>;}
-        if(line.trim()==='---')return<hr key={i} style={{border:'none',borderTop:'1px solid #E5E7EB',margin:'14px 0'}}/>;
-        return<p key={i} style={{margin:'3px 0'}}>{bold(line)}</p>;
-      })}
+    <div style={{fontFamily:'Inter,sans-serif',color:'#374151',maxWidth:'100%'}}>
+      {elements}
     </div>
   );
 }
