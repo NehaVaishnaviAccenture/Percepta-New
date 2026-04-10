@@ -113,7 +113,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
         <span style={{color:'#7C3AED',fontSize:'1rem'}}>↗</span>
-        <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean — and why does 70 matter?</span>
+        <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 8px'}}>
         Think of the GEO Score like a credit score for AI. Below 50 (where <strong>{brand}</strong> sits today at <strong>{score}</strong>), AI engines lack enough high-confidence data points to consistently feature your brand. You might appear in a list, but you won't be the one AI describes in detail or recommends first.
@@ -135,24 +135,19 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score:number }) {
-  const W=700,H=300,padL=52,padR=32,padT=24,padB=80;
-  // Logistic S-curve: slow start, fast middle, diminishing returns
+  const W=700,H=320,padL=52,padR=32,padT=24,padB=50;
   const curve=(x:number)=>Math.round(5+90/(1+Math.exp(-0.09*(x-45))));
   const pts=Array.from({length:101},(_,x)=>({x,y:curve(x)}));
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+(100-v)/100*(H-padT-padB);
 
-  // Map score → x position on curve
   const scoreToX=(s:number)=>{let best=0,bestDiff=999;pts.forEach(p=>{const d=Math.abs(p.y-s);if(d<bestDiff){bestDiff=d;best=p.x;}});return best;};
   const currentX=scoreToX(score);
-  const projected=Math.min(score+22,95);
-  const projectedX=scoreToX(projected);
   const goalX=scoreToX(70);
   const authX=scoreToX(80);
 
   const pathD=pts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ');
 
-  // Shaded gap between current and goal (70)
   const gapPts=score<70?pts.slice(currentX,goalX+1):[];
   const fillD=gapPts.length>1
     ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(goalX)},${H-padB} L${sx(currentX)},${H-padB} Z`
@@ -161,12 +156,17 @@ function ROICurve({ score }: { score:number }) {
   const [hov,setHov]=useState<{x:number;y:number;geo:number}|null>(null);
 
   const stages=[
-    {label:'Fragmented', range:'0–30',  x:10,  color:'#EF4444'},
-    {label:'Emerging',   range:'30–55', x:32,  color:'#F59E0B'},
-    {label:'Competitive',range:'55–72', x:58,  color:'#3B82F6'},
-    {label:'Leader',     range:'72–85', x:76,  color:'#10B981'},
-    {label:'Authority',  range:'85+',   x:93,  color:'#7C3AED'},
+    {label:'Fragmented', range:'0–30',  cx:15,  color:'#EF4444'},
+    {label:'Emerging',   range:'30–55', cx:42,  color:'#F59E0B'},
+    {label:'Competitive',range:'55–72', cx:63,  color:'#3B82F6'},
+    {label:'Leader',     range:'72–85', cx:78,  color:'#10B981'},
+    {label:'Authority',  range:'85+',   cx:93,  color:'#7C3AED'},
   ];
+
+  // Dot labels: offset to avoid overlap
+  const youLabelY = sy(score)-14;
+  const goalLabelY = sy(70)-14;
+  const authLabelY = sy(80)-14;
 
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0',position:'relative' as const}}>
@@ -201,43 +201,31 @@ function ROICurve({ score }: { score:number }) {
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
 
-        {/* X-axis numeric ticks: 0,20,40,60,80,100 */}
+        {/* X-axis numeric ticks */}
         {[0,20,40,60,80,100].map(v=>(
           <g key={v}>
             <line x1={sx(v)} y1={H-padB} x2={sx(v)} y2={H-padB+4} stroke="#D1D5DB" strokeWidth="1"/>
-            <text x={sx(v)} y={H-padB+13} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
+            <text x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
 
         {/* X-axis label */}
-        <text x={(padL+W-padR)/2} y={H-padB+26} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
-
-        {/* Stage legend row below x-axis label */}
-        {stages.map((s,i)=>(
-          <g key={i}>
-            <text x={sx(s.x)} y={H-padB+42} textAnchor="middle" style={{fontSize:8,fill:s.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{s.label}</text>
-            <text x={sx(s.x)} y={H-padB+52} textAnchor="middle" style={{fontSize:7,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.range}</text>
-          </g>
-        ))}
+        <text x={(padL+W-padR)/2} y={H-padB+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
 
         {/* Y-axis label */}
         <text x={12} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,12,${(padT+H-padB)/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
 
-        {/* Current dot */}
+        {/* Current dot + label */}
         <circle cx={sx(currentX)} cy={sy(score)} r={8} fill="#F59E0B" stroke="white" strokeWidth="2"/>
-        <text x={sx(currentX)} y={sy(score)-14} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
+        <text x={sx(currentX)-12} y={youLabelY} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
 
-        {/* Goal dot */}
+        {/* Goal dot + label */}
         <circle cx={sx(goalX)} cy={sy(70)} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
-        <text x={sx(goalX)} y={sy(70)-13} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Goal (70) — Sweet Spot</text>
+        <text x={sx(goalX)+8} y={goalLabelY} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Goal (70) — Sweet Spot</text>
 
-        {/* Projected dot */}
-        <circle cx={sx(projectedX)} cy={sy(projected)} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
-        <text x={sx(projectedX)} y={sy(projected)-13} textAnchor="middle" style={{fontSize:9,fill:'#10B981',fontFamily:'Inter,sans-serif',fontWeight:700}}>Projected ({projected})</text>
-
-        {/* Authority dot */}
+        {/* Authority dot + label */}
         <circle cx={sx(authX)} cy={sy(80)} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
-        <text x={sx(authX)+2} y={sy(80)-13} textAnchor="middle" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80) — Dim. Returns</text>
+        <text x={sx(authX)+10} y={authLabelY} textAnchor="middle" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80) — Dim. Returns</text>
 
         {/* Hover */}
         {hov&&(
@@ -250,12 +238,12 @@ function ROICurve({ score }: { score:number }) {
         )}
       </svg>
 
-      {/* Legend */}
-      <div style={{display:'flex',gap:20,justifyContent:'center',padding:'6px 0 10px',flexWrap:'wrap' as const}}>
-        {[{color:'#F59E0B',label:`You (${score})`},{color:'#EF4444',label:'Goal (70) Sweet Spot'},{color:'#10B981',label:`Projected (${projected})`},{color:'#7C3AED',label:'Authority (80) Dim. Returns'}].map((l,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:6}}>
-            <div style={{width:9,height:9,borderRadius:'50%',background:l.color}}/>
-            <span style={{fontSize:'0.7rem',color:'#6B7280'}}>{l.label}</span>
+      {/* Stage legend replacing old dot legend */}
+      <div style={{display:'flex',justifyContent:'space-around',padding:'6px 16px 12px',flexWrap:'wrap' as const}}>
+        {stages.map((s,i)=>(
+          <div key={i} style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:2}}>
+            <span style={{fontSize:'0.75rem',fontWeight:700,color:s.color}}>{s.label}</span>
+            <span style={{fontSize:'0.68rem',color:'#9CA3AF'}}>{s.range}</span>
           </div>
         ))}
       </div>
@@ -338,7 +326,6 @@ Sort the array: HIGH IMPACT items first, then MEDIUM IMPACT, then LOW-MEDIUM IMP
     <div>
       {/* ROI curve */}
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
-        <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:2}}>The ROI Curve: Where You Are vs Where You Need to Be</div>
         <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>GEO optimization follows an S-curve. Below 70, each point of effort produces outsized returns. Above 80, diminishing returns begin.</div>
         <ROICurve score={geo}/>
         {/* 3 stat cards */}
