@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL = 'openai/gpt-4o';
+const MODEL = 'openai/gpt-5.4';
 
 async function callAI(messages: { role: string; content: string }[], temperature = 0.2, max_tokens = 2048) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
