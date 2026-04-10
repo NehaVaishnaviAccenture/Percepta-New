@@ -502,7 +502,6 @@ function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors }:
   const [hovCell,setHovCell]=useState<string|null>(null);
   // FIX: use buildRadarDims for consistent, signal-driven dimension values
   const myDims = buildRadarDims(sent, prom, vis, cit, sov);
-  const dimKeys = myDims.map(d => d.key ?? d.label);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
     {name:brandName,isYou:true,scores:myDims.map(d=>d.val)},
