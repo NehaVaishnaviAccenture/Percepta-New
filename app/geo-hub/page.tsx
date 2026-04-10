@@ -1045,15 +1045,15 @@ export default function GeoHub() {
                 const base = sources.length > 0 ? sources : allSourcesToClassify.map((s:any, i:number) => ({
                   rank: i+1, domain: s.domain, citation_share: s.citation_share, category: classifyDomain(s.domain).label
                 }));
-                // Prepend brand's own domain as Owned Media if not already present
-                const hasBrandDomain = base.some((s:any) => brandDomain && (s.domain||'').includes(brandDomain.replace('www.','')));
+                const brandKey = brandDomain.replace('www.','').split('.')[0];
+                const hasBrandDomain = base.some((s:any) => (s.domain||'').replace('www.','').includes(brandKey));
                 if (brandDomain && !hasBrandDomain) {
                   const ownedEntry = { rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true };
                   return [ownedEntry, ...base].map((s:any, i:number) => ({ ...s, rank: i+1 }));
                 }
                 return base.map((s:any) => ({
                   ...s,
-                  isOwned: brandDomain && (s.domain||'').includes(brandDomain.replace('www.','')),
+                  isOwned: brandKey && (s.domain||'').replace('www.','').includes(brandKey),
                 }));
               };
               const displaySources = buildDisplaySources();
@@ -1095,7 +1095,8 @@ export default function GeoHub() {
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %',''].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{displaySources.map((s:any,i:number)=>{
-                        const isOwned = s.isOwned || (brandDomain && (s.domain||'').replace('www.','').includes(brandDomain.replace('www.','')));
+                        const brandKey2 = brandDomain.replace('www.','').split('.')[0];
+                        const isOwned = s.isOwned || (brandKey2 && (s.domain||'').replace('www.','').includes(brandKey2));
                         const cls = isOwned ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                         const bw=Math.min(s.citation_share,100);
                         const isExp=expandedDomain===s.domain;
