@@ -136,17 +136,51 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score:number }) {
-  const W=700,H=260,padL=52,padR=24,padT=20,padB=40;
-  const pts=Array.from({length:101},(_,x)=>({x,y:Math.round(95*(1-Math.exp(-x/28)))}));
+  const W=700,H=280,padL=52,padR=32,padT=24,padB=64;
+  // X-axis: 5 maturity stages mapped to x positions 0-100
+  const stages=[
+    {label:'Fragmented', x:0,  geoRange:[0,30],  color:'#EF4444'},
+    {label:'Emerging',   x:25, geoRange:[30,55], color:'#F59E0B'},
+    {label:'Competitive',x:50, geoRange:[55,72], color:'#3B82F6'},
+    {label:'Leader',     x:75, geoRange:[72,85], color:'#10B981'},
+    {label:'Authority',  x:100,geoRange:[85,100],color:'#7C3AED'},
+  ];
+  // S-curve: slow start, fast middle, diminishing returns
+  // Maps x (0-100) → GEO score using a logistic-like curve
+  const curve=(x:number)=>Math.round(5+90/(1+Math.exp(-0.09*(x-45))));
+  const pts=Array.from({length:101},(_,x)=>({x,y:curve(x)}));
+
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+(100-v)/100*(H-padT-padB);
-  const pathD=pts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ');
-  const currentY=pts[score]?.y??0;
-  const sweetY=pts[70]?.y??0;
+
+  // Find where current score sits on X axis (inverse of curve)
+  const scoreToX=(s:number)=>{
+    let best=0,bestDiff=999;
+    pts.forEach(p=>{const d=Math.abs(p.y-s);if(d<bestDiff){bestDiff=d;best=p.x;}});
+    return best;
+  };
+  const currentX=scoreToX(score);
   const projected=Math.min(score+22,95);
-  const projY=pts[projected]?.y??0;
-  const fillD=`${pts.slice(score,71).map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(70)},${sy(0)+H-padB} L${sx(score)},${sy(0)+H-padB} Z`;
-  const [hov,setHov]=useState<{x:number;y:number;val:number}|null>(null);
+  const projectedX=scoreToX(projected);
+  const sweetX=scoreToX(70);
+
+  const pathD=pts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ');
+
+  // Shaded gap between current and competitive threshold (~70)
+  const gapPts=pts.slice(currentX,sweetX+1);
+  const fillD=gapPts.length>1
+    ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(sweetX)},${H-padB} L${sx(currentX)},${H-padB} Z`
+    :'';
+
+  const [hov,setHov]=useState<{x:number;y:number;geo:number;stage:string}|null>(null);
+
+  // Stage band boundaries on x-axis
+  const stageBands=stages.map((s,i)=>({
+    ...s,
+    x0:i===0?0:(stages[i-1].x+s.x)/2,
+    x1:i===stages.length-1?100:(s.x+stages[i+1].x)/2,
+  }));
+
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0',position:'relative' as const}}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}
@@ -154,46 +188,91 @@ function ROICurve({ score }: { score:number }) {
           const rect=(e.currentTarget as SVGElement).getBoundingClientRect();
           const mx=((e.clientX-rect.left)/rect.width)*W;
           const xi=Math.round((mx-padL)/(W-padL-padR)*100);
-          if(xi>=0&&xi<=100){const p=pts[xi];setHov({x:sx(xi),y:sy(p.y),val:p.y});}
+          if(xi>=0&&xi<=100){
+            const geo=pts[xi]?.y??0;
+            const stage=stages.reduce((a,b)=>Math.abs(b.x-xi)<Math.abs(a.x-xi)?b:a).label;
+            setHov({x:sx(xi),y:sy(geo),geo,stage});
+          }
         }}
         onMouseLeave={()=>setHov(null)}>
-        {/* grid */}
-        {[0,25,50,75,100].map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        {/* gap fill */}
-        {score<70&&<path d={fillD} fill="#EDE9FE" opacity="0.6"/>}
-        {/* threshold line */}
-        <line x1={sx(70)} y1={padT} x2={sx(70)} y2={H-padB} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
-        <text x={sx(70)+4} y={padT+10} style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Efficiency Threshold (70)</text>
-        {/* curve */}
+
+        {/* Y-axis grid lines */}
+        {[0,25,50,75,100].map(v=>(
+          <g key={v}>
+            <line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/>
+            <text x={padL-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
+          </g>
+        ))}
+
+        {/* Stage band background shading */}
+        {stageBands.map((s,i)=>(
+          <rect key={i} x={sx(s.x0)} y={padT} width={sx(s.x1)-sx(s.x0)} height={H-padT-padB}
+            fill={s.color} opacity={0.04}/>
+        ))}
+
+        {/* Stage divider lines */}
+        {stageBands.slice(1).map((s,i)=>(
+          <line key={i} x1={sx(s.x0)} y1={padT} x2={sx(s.x0)} y2={H-padB}
+            stroke="#E5E7EB" strokeWidth="1" strokeDasharray="3,3"/>
+        ))}
+
+        {/* Gap fill */}
+        {fillD&&score<70&&<path d={fillD} fill="#EDE9FE" opacity="0.5"/>}
+
+        {/* Efficiency threshold horizontal line at GEO 70 */}
+        <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
+        <text x={W-padR+2} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
+
+        {/* S-curve */}
         <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5"/>
-        {/* axes */}
-        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
-        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
-        {/* x ticks */}
-        {[0,20,40,60,80,100].map(v=><text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>)}
-        <text x={(padL+W-padR)/2} y={H-4} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Effort / Investment</text>
+
+        {/* Axes */}
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
+        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
+
+        {/* X-axis stage labels */}
+        {stages.map((s,i)=>(
+          <g key={i}>
+            <line x1={sx(s.x)} y1={H-padB} x2={sx(s.x)} y2={H-padB+5} stroke={s.color} strokeWidth="2"/>
+            <text x={sx(s.x)} y={H-padB+16} textAnchor="middle" style={{fontSize:10,fill:s.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{s.label}</text>
+            <text x={sx(s.x)} y={H-padB+28} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.geoRange[0]}–{s.geoRange[1]}</text>
+          </g>
+        ))}
+
+        {/* Y-axis label */}
         <text x={12} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,12,${(padT+H-padB)/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
-        {/* key dots */}
-        <circle cx={sx(score)} cy={sy(currentY)} r={7} fill="#F59E0B"/>
-        <text x={sx(score)} y={sy(currentY)-12} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>Current ({score})</text>
-        <circle cx={sx(70)} cy={sy(sweetY)} r={7} fill="#EF4444"/>
-        <text x={sx(70)} y={sy(sweetY)-12} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Sweet Spot (70)</text>
-        <circle cx={sx(projected)} cy={sy(projY)} r={7} fill="#10B981"/>
-        <text x={sx(projected)} y={sy(projY)-12} textAnchor="middle" style={{fontSize:9,fill:'#10B981',fontFamily:'Inter,sans-serif',fontWeight:700}}>Projected ({projected})</text>
-        <circle cx={sx(80)} cy={sy(pts[80]?.y??0)} r={7} fill="#7C3AED"/>
-        <text x={sx(80)} y={sy(pts[80]?.y??0)-12} textAnchor="middle" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80+)</text>
-        {/* hover */}
-        {hov&&<g>
-          <line x1={hov.x} y1={padT} x2={hov.x} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="3,3"/>
-          <rect x={hov.x+8} y={hov.y-22} width={110} height={28} rx={6} fill="#1F2937"/>
-          <text x={hov.x+63} y={hov.y-8} textAnchor="middle" style={{fontSize:10,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>GEO Score: {hov.val}</text>
-          <circle cx={hov.x} cy={hov.y} r={4} fill="#7C3AED"/>
-        </g>}
+
+        {/* Key dots */}
+        <circle cx={sx(currentX)} cy={sy(score)} r={8} fill="#F59E0B" stroke="white" strokeWidth="2"/>
+        <text x={sx(currentX)} y={sy(score)-14} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
+
+        <circle cx={sx(sweetX)} cy={sy(70)} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
+        <text x={sx(sweetX)+2} y={sy(70)-13} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Target (70)</text>
+
+        <circle cx={sx(projectedX)} cy={sy(projected)} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
+        <text x={sx(projectedX)} y={sy(projected)-13} textAnchor="middle" style={{fontSize:9,fill:'#10B981',fontFamily:'Inter,sans-serif',fontWeight:700}}>Projected ({projected})</text>
+
+        <circle cx={sx(100)} cy={sy(pts[100]?.y??95)} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+
+        {/* Hover tooltip */}
+        {hov&&(
+          <g>
+            <line x1={hov.x} y1={padT} x2={hov.x} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="3,3"/>
+            <rect x={Math.min(hov.x+8,W-padR-130)} y={hov.y-28} width={124} height={36} rx={6} fill="#1F2937"/>
+            <text x={Math.min(hov.x+8,W-padR-130)+62} y={hov.y-14} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{hov.stage}</text>
+            <text x={Math.min(hov.x+8,W-padR-130)+62} y={hov.y-2} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO Score: {hov.geo}</text>
+            <circle cx={hov.x} cy={hov.y} r={4} fill="#7C3AED"/>
+          </g>
+        )}
       </svg>
-      {/* legend */}
-      <div style={{display:'flex',gap:20,justifyContent:'center',padding:'8px 0 12px',flexWrap:'wrap' as const}}>
-        {[{color:'#F59E0B',label:`Current (${score})`},{color:'#EF4444',label:'Sweet Spot (70)'},{color:'#10B981',label:`Projected (${projected})`},{color:'#7C3AED',label:'Authority (80+)'}].map((l,i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:6}}><div style={{width:10,height:10,borderRadius:'50%',background:l.color}}/><span style={{fontSize:'0.75rem',color:'#374151'}}>{l.label}</span></div>
+
+      {/* Legend */}
+      <div style={{display:'flex',gap:20,justifyContent:'center',padding:'6px 0 10px',flexWrap:'wrap' as const}}>
+        {[{color:'#F59E0B',label:`You (${score})`},{color:'#EF4444',label:'Target (70)'},{color:'#10B981',label:`Projected (${projected})`},{color:'#7C3AED',label:'Authority Zone'}].map((l,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:6}}>
+            <div style={{width:10,height:10,borderRadius:'50%',background:l.color}}/>
+            <span style={{fontSize:'0.75rem',color:'#374151'}}>{l.label}</span>
+          </div>
         ))}
       </div>
     </div>
