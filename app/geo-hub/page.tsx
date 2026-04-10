@@ -42,78 +42,14 @@ function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
-// ─── FIX 1: Visibility recalc ─────────────────────────────────────────────────
-// OLD: recalcVisibility(rd, name) || result.visibility
-//   → if 0 mentions found, 0 is falsy → falls back to API value silently
-//   → only checked response_preview (truncated snippet), missing full-response text
-// NEW: check ALL text fields per response, only fall back when rd is empty
-function recalcVisibility(rd: any[], brandName: string): number {
-  if (!rd || rd.length === 0) return -1; // sentinel: no data, caller uses API value
-  const bl = brandName.toLowerCase();
-  // Build aliases: "capital one", "capitalone", "capital-one", "capital"
-  const aliases = [
-    bl,
-    bl.replace(/\s+/g, ''),
-    bl.replace(/\s+/g, '-'),
-    bl.split(' ')[0],
-    // Also strip common suffixes like "financial", "bank", "inc", "corp"
-    bl.replace(/\s+(financial|bank|inc|corp|co|ltd|llc)\.?$/i, '').trim(),
-  ].filter((a, i, arr) => a.length > 2 && arr.indexOf(a) === i);
-
-  const mentions = rd.filter(r => {
-    // Check every text field available on the response object
-    const haystack = [
-      r.response_preview,
-      r.response_text,
-      r.response,
-      r.full_response,
-      r.content,
-      r.answer,
-      r.query, // brand sometimes appears in the query echo
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase();
-    return aliases.some(a => haystack.includes(a));
-  }).length;
-
-  return Math.round((mentions / rd.length) * 100);
-}
-
-// ─── FIX 2: Sentiment should only be measured on responses where brand appeared ─
-// Computes effective sentiment: raw sent score adjusted downward proportionally
-// to visibility. A brand visible in 30% of responses cannot have a "real" sentiment
-// of 80 — 70% of responses have no signal, which are neutral at best.
-// Formula: effectiveSent = (visibilityRate * rawSent) + ((1 - visibilityRate) * 50)
-// 50 = neutral baseline for undetected responses
-function effectiveSentiment(rawSent: number, visScore: number): number {
-  const visRate = Math.min(visScore, 100) / 100;
-  const neutral = 50;
-  return Math.round(visRate * rawSent + (1 - visRate) * neutral);
-}
-
-// ─── FIX 3: Recompute GEO score client-side using correct weighted formula ────
-// Weights: Visibility 30%, Sentiment 20%, Prominence 20%, Citation 15%, SOV 15%
-// Uses effectiveSentiment so a high raw sentiment with low visibility is penalised
-function computeGeoScore(vis: number, sent: number, prom: number, cit: number, sov: number): number {
-  const effSent = effectiveSentiment(sent, vis);
-  const raw = 0.30 * vis + 0.20 * effSent + 0.20 * prom + 0.15 * cit + 0.15 * sov;
-  return Math.round(Math.min(Math.max(raw, 0), 100));
-}
-
-// ─── FIX 4: Sentiment radar dimensions use independent signals, not all-from-sent ─
-// OLD: Brand Authority = sent*0.85, Trust = sent*0.7 … all mechanical multipliers
-//      of the same number — adds zero information
-// NEW: each dimension uses the most relevant raw signal available
 function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number) {
-  const effSent = effectiveSentiment(sent, vis);
   return [
-    { label: 'Positivity',      val: effSent },                                   // tone quality, visibility-adjusted
-    { label: 'Brand Authority', val: Math.round((cit * 0.6 + prom * 0.4)) },      // citation + prominence
-    { label: 'Trust',           val: Math.round((effSent * 0.5 + cit * 0.5)) },   // blend of tone + citation authority
-    { label: 'Market Relevance',val: Math.round((vis * 0.5 + sov * 0.5)) },       // how often surfaced for relevant queries
-    { label: 'Message Clarity', val: Math.round((prom * 0.6 + effSent * 0.4)) },  // early placement = clear message
-    { label: 'Recommendation',  val: Math.round((sov * 0.55 + prom * 0.45)) },    // SOV + prominence = recommendation rate
+    { label: 'Positivity',      val: sent },
+    { label: 'Brand Authority', val: Math.round((cit * 0.6 + prom * 0.4)) },
+    { label: 'Trust',           val: Math.round((sent * 0.5 + cit * 0.5)) },
+    { label: 'Market Relevance',val: Math.round((vis * 0.5 + sov * 0.5)) },
+    { label: 'Message Clarity', val: Math.round((prom * 0.6 + sent * 0.4)) },
+    { label: 'Recommendation',  val: Math.round((sov * 0.55 + prom * 0.45)) },
   ];
 }
 
@@ -401,9 +337,7 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
 function SankeyChart({ result }: { result:any }) {
   const [hov,setHov]=useState<number|null>(null);
   const vis=result.visibility??0,cit=result.citation_share??0,sent=result.sentiment??0,prom=result.prominence??0,sov=result.share_of_voice??0,geo=result.overall_geo_score??0;
-  // FIX: show effective sentiment in the Sankey flow, not raw sent
-  const effSent = effectiveSentiment(sent, vis);
-  const inputs=[{label:'Visibility',value:vis,color:'#7C3AED',weight:30},{label:'Sentiment',value:effSent,color:'#10B981',weight:20},{label:'Prominence',value:prom,color:'#3B82F6',weight:20},{label:'Citation',value:cit,color:'#F59E0B',weight:15},{label:'Share of Voice',value:sov,color:'#EF4444',weight:15}];
+  const inputs=[{label:'Visibility',value:vis,color:'#7C3AED',weight:30},{label:'Sentiment',value:sent,color:'#10B981',weight:20},{label:'Prominence',value:prom,color:'#3B82F6',weight:20},{label:'Citation',value:cit,color:'#F59E0B',weight:15},{label:'Share of Voice',value:sov,color:'#EF4444',weight:15}];
   const W=500,H=330,lx=175,rx=415,nw=22,gH=140,gCY=H/2,nH=30,gap=20,totalH=inputs.length*nH+(inputs.length-1)*gap,startY=(H-totalH)/2;
   const nodes=inputs.map((n,i)=>({...n,y:startY+i*(nH+gap)}));
   return (
@@ -652,29 +586,17 @@ export default function GeoHub() {
           <div style={{padding:'28px 40px 60px'}}>
 
             {activeTab===0&&(()=>{
-              const apiGeo = result.overall_geo_score;
-              const rd = result.responses_detail || [];
-              const apiVis = result.visibility;
+              const geo = result.overall_geo_score;
+              const vis = result.visibility;
               const cit = result.citation_share;
               const rawSent = result.sentiment;
               const prom = result.prominence;
               const sov = result.share_of_voice;
               const avgRank = result.avg_rank;
-
-              // FIX 1: Visibility — use recalc only when rd has data; check for 0 explicitly
-              const recalcedVis = recalcVisibility(rd, result.brand_name || '');
-              const vis = recalcedVis >= 0 ? recalcedVis : apiVis;
-
-              // FIX 2: Effective sentiment — penalise raw sentiment by visibility rate
-              const effSent = effectiveSentiment(rawSent, vis);
-
-              // FIX 3: Recomputed GEO score using corrected inputs
-              const recomputedGeo = computeGeoScore(vis, rawSent, prom, cit, sov);
-              // Use recomputed score; if it differs significantly from API, show both
-              const geo = recomputedGeo;
+              const effSent = rawSent; // use API sentiment directly
               const badge = scoreBadge(geo);
 
-              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${effSent}).`;
+              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
 
               return (
                 <div>
@@ -712,7 +634,7 @@ export default function GeoHub() {
                     />
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <GapCards result={{...result, overall_geo_score: geo, visibility: vis, sentiment: effSent}}/>
+                  <GapCards result={result}/>
                 </div>
               );
             })()}
@@ -720,13 +642,11 @@ export default function GeoHub() {
             {activeTab===1&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
               const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
-              // Check if API ranks are duplicated (unreliable) — if so, derive from GEO order
-              const apiRanks=top.map(c=>String(c.Rank).replace(/^#+/,'')).filter(r=>r&&r!=='N/A'&&r!=='null');
-              const hasDuplicateRanks=new Set(apiRanks).size < apiRanks.length;
-              const resolvedRank=(c:any,i:number)=>{
-                if(hasDuplicateRanks) return `#${i+1}`;
-                const r=String(c.Rank||'').replace(/^#+/,'');
-                return r&&r!=='N/A'&&r!=='null'?`#${r}`:'—';
+              // Display API avg_rank as-is (it means avg mention position within responses, not GEO leaderboard position)
+              const resolvedRank=(c:any)=>{
+                const r=String(c.Rank||'').replace(/^#+/,'').trim();
+                if(!r||r==='N/A'||r==='null'||r==='undefined') return '—';
+                return `#${r}`;
               };
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
@@ -763,7 +683,7 @@ export default function GeoHub() {
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sen}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sov}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{resolvedRank(c,i)}</td>
+                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{resolvedRank(c)}</td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -791,8 +711,8 @@ export default function GeoHub() {
             {activeTab===3&&(()=>{
               const rawSent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
               const cit=result.citation_share,sov=result.share_of_voice;
-              const effSent = effectiveSentiment(rawSent, vis);
-              const smood=effSent>=70?'AI speaks favorably about your brand':effSent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing';
+              const effSent = rawSent;
+              const smood=rawSent>=70?'AI speaks favorably about your brand':rawSent>=45?'AI tone is neutral — room to improve':'AI tone is negative or missing';
               const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
                 <div>
