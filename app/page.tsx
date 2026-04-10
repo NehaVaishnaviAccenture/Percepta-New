@@ -56,12 +56,12 @@ export default function Overview() {
           ✦ &nbsp;AI-Powered Brand Intelligence &nbsp;·&nbsp; Powered by Accenture
         </div>
         <div style={{ fontSize: '4.6rem', fontWeight: 900, lineHeight: 1.0, letterSpacing: '-3px', marginBottom: 20 }}>
-          <span style={{ color: '#111827' }}>Your Brand&apos;s </span>
-          <span style={{ color: '#7C3AED' }}>GEO</span>
-          <span style={{ color: '#111827' }}> Score</span>
+          <span style={{ color: '#111827' }}>How does AI </span>
+          <span style={{ color: '#7C3AED' }}>see</span>
+          <span style={{ color: '#111827' }}> your brand?</span>
         </div>
         <p style={{ fontSize: '1.1rem', color: '#9CA3AF', maxWidth: 620, margin: '0 auto 36px', lineHeight: 1.75, fontWeight: 400 }}>
-          The Percepta GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, and other major AI engines.
+          Enter any brand URL and get a full GEO analysis — frequency, prominence, sentiment, competitor gaps, and exactly what to fix.
         </p>
         <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap' }}>
           <Link href="/geo-hub" style={{
@@ -70,7 +70,7 @@ export default function Overview() {
             borderRadius: 50, padding: '18px 36px', fontSize: '1.05rem',
             fontWeight: 700, textDecoration: 'none',
           }}>
-            Get Your GEO Score &nbsp;→
+            Get Started &nbsp;→
           </Link>
           <a href="#how" style={{
             display: 'inline-flex', alignItems: 'center', gap: 8,
