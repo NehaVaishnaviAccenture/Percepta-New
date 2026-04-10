@@ -99,26 +99,30 @@ const INDUSTRY_DATA: Record<string, any> = {
   fin: {
     name: 'financial services / credit cards',
     queries: [
-      ['General Consumer', 'What is the best credit card for travel rewards in 2025?'],
-      ['General Consumer', 'Which bank offers the best rewards checking account?'],
-      ['General Consumer', 'What credit card should I get for everyday cash back?'],
-      ['General Consumer', 'Best credit cards with no annual fee right now'],
-      ['General Consumer', 'Which bank is best for first-time credit card applicants?'],
-      ['Expert Recommendation', 'Top credit cards recommended by financial experts'],
-      ['Expert Recommendation', 'What is the best bank for online banking and mobile app?'],
-      ['Expert Recommendation', 'Which credit card has the best sign-up bonus?'],
-      ['Expert Recommendation', 'Best credit cards for people with good credit scores'],
-      ['Expert Recommendation', 'What bank should I choose for savings and checking?'],
-      ['Product Comparison', 'Which credit card is best for dining and restaurants?'],
-      ['Product Comparison', 'Top recommended credit cards for business expenses'],
-      ['Product Comparison', 'What are the most trusted banks in the US?'],
-      ['Product Comparison', 'Best credit cards for balance transfers with low interest'],
-      ['Product Comparison', 'Which bank has the lowest fees for everyday banking?'],
-      ['Affluent / High Net Worth', 'What credit card do financial advisors recommend most?'],
-      ['Affluent / High Net Worth', 'Best cards for earning points on groceries and gas'],
-      ['Affluent / High Net Worth', 'Which banks are best for customer service?'],
-      ['Affluent / High Net Worth', 'Top credit cards for international travelers with no foreign fees'],
-      ['Affluent / High Net Worth', 'What is the best overall credit card for 2025?'],
+      // General consumer — broad coverage
+      ['General Consumer', 'What is the best credit card for everyday use in 2025?'],
+      ['General Consumer', 'Which credit card has the best cash back rewards?'],
+      ['General Consumer', 'What is the best no annual fee credit card?'],
+      ['General Consumer', 'Best credit card for someone building or rebuilding credit'],
+      ['General Consumer', 'Which bank is best for everyday checking and savings?'],
+      // Travel segment — where Chase/Amex lead
+      ['Travel & Rewards', 'What is the best credit card for travel rewards in 2025?'],
+      ['Travel & Rewards', 'Which credit card has the best sign-up bonus right now?'],
+      ['Travel & Rewards', 'Best credit cards for international travel with no foreign fees'],
+      ['Travel & Rewards', 'Top credit cards for earning points on dining and travel'],
+      ['Travel & Rewards', 'What is the best premium travel credit card?'],
+      // Cash back segment — where Capital One, Citi, Discover compete
+      ['Cash Back', 'What is the best cash back credit card with no annual fee?'],
+      ['Cash Back', 'Which credit card gives the most cash back on groceries?'],
+      ['Cash Back', 'Best flat rate cash back credit card for all purchases'],
+      ['Cash Back', 'Top credit cards for cash back on gas and everyday spending'],
+      ['Cash Back', 'Best cash back cards recommended by financial experts'],
+      // Comparison & expert
+      ['Expert Recommendation', 'What are the most trusted credit card companies in the US?'],
+      ['Expert Recommendation', 'Which bank offers the best overall credit card lineup?'],
+      ['Expert Recommendation', 'Best credit cards for people with good but not excellent credit'],
+      ['Expert Recommendation', 'Top recommended credit cards for young adults and students'],
+      ['Expert Recommendation', 'Which credit card company has the best customer service?'],
     ],
     comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA'],
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com' },
@@ -215,14 +219,17 @@ function scoreCompetitor(name: string, responses: any[]): any {
   const total = responses.length || 20;
   const mentionRate = Math.round((mentions / total) * 100);
 
-  // Brand awareness baseline — reflects real-world AI knowledge breadth
-  // These are NOT competitive rankings, just awareness tier (how well-known is this brand to AI)
+  // Brand awareness baseline — reflects real-world AI knowledge breadth and brand size
+  // Tier 1 (55-60): Top 3-4 issuers by cardholder count and AI mention frequency
+  // Tier 2 (45-50): Major national banks/issuers with broad product range
+  // Tier 3 (30-40): Regional or specialist issuers
+  // Tier 4 (20-25): Niche or B2B-focused issuers
   const awareness: Record<string, number> = {
-    chase: 55, 'american express': 50, 'capital one': 45, citi: 40,
-    discover: 38, 'bank of america': 35, 'wells fargo': 32, usaa: 28,
-    synchrony: 22, barclays: 20,
-    tesla: 55, toyota: 52, bmw: 48, honda: 45, ford: 42,
-    mercedes: 40, hyundai: 35, kia: 30, nissan: 28, volkswagen: 30,
+    chase: 60, 'american express': 58, 'capital one': 56, citi: 54,
+    discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35,
+    synchrony: 25, barclays: 22,
+    tesla: 58, toyota: 55, bmw: 50, honda: 48, ford: 45,
+    mercedes: 44, hyundai: 38, kia: 33, nissan: 30, volkswagen: 32,
   };
   const baseline = awareness[nl] || 20;
 
