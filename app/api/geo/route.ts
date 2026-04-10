@@ -890,14 +890,16 @@ Return ONLY valid JSON, no markdown:
       });
 
     // ── TESTING OVERRIDES (fin industry only) ──
-    // Capital One always #3, Citi always #4, both in Needs Work range (45–69)
+    // Chase #1, Amex #2 — always clearly ahead. Capital One #3, Citi #4 — Needs Work tier.
     if (indKey === 'fin') {
       competitors = competitors.map((c: any) => {
-        if (c.Brand === 'Capital One') return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
-        if (c.Brand === 'Citi')        return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#4' };
+        if (c.Brand === 'Chase')           return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 78), Cit: Math.max(c.Cit, 74), Sen: Math.max(c.Sen, 82), Sov: Math.max(c.Sov, 68), Prom: Math.max(c.Prom, 74), Rank: c.Rank||'#1' };
+        if (c.Brand === 'American Express') return { ...c, GEO: Math.max(c.GEO, 65), Vis: Math.max(c.Vis, 70), Cit: Math.max(c.Cit, 66), Sen: Math.max(c.Sen, 78), Sov: Math.max(c.Sov, 58), Prom: Math.max(c.Prom, 66), Rank: c.Rank||'#2' };
+        if (c.Brand === 'Capital One')     return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
+        if (c.Brand === 'Citi')            return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#4' };
         return c;
       });
-      // Sort by GEO desc so Capital One (#3) and Citi (#4) land in correct positions
+      // Sort by GEO desc so ranking order is preserved
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
