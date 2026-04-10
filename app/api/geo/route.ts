@@ -476,14 +476,14 @@ export async function POST(req: NextRequest) {
     // FIX BUG 1+2+3: Visibility = real mention count across ALL 20 responses
     // Check all alias variants, not just exact brand name
     const mentionedQAs = allQA.filter(p =>
-      aliases.some(a => p.a.toLowerCase().includes(a))
+      aliases.some(a => (p.a || '').toLowerCase().includes(a))
     );
     const mentions = mentionedQAs.length;
     const visibility = Math.round((mentions / 20) * 100);
 
     // Compute avg_rank from actual response text — never let AI hallucinate this
     const positions = allQA
-      .map(p => getBrandPosition(p.a, brand))
+      .map(p => getBrandPosition(p.a || '', brand))
       .filter(p => p > 0);
     const computedAvgRank = positions.length
       ? `#${Math.round(positions.reduce((a, b) => a + b, 0) / positions.length)}`
@@ -518,7 +518,7 @@ export async function POST(req: NextRequest) {
       // FIX BUG 1: Pass ALL 20 responses with context of which ones included the brand
       // This forces AI to score relative to total queries, not cherry-picked subset
       const allContext = allQA.map((p, i) =>
-        `Q${i + 1} [${aliases.some(a => p.a.toLowerCase().includes(a)) ? 'BRAND MENTIONED' : 'not mentioned'}]: ${p.a.slice(0, 200)}`
+        `Q${i + 1} [${aliases.some(a => (p.a || '').toLowerCase().includes(a)) ? 'BRAND MENTIONED' : 'not mentioned'}]: ${(p.a || '').slice(0, 200)}`
       ).join('\n');
 
       // FIX BUG 2+3: Prompt explicitly anchors all scores to the full 20-query context
@@ -562,9 +562,9 @@ Return ONLY valid JSON, no markdown:
     const responsesDetail = allQA.map(p => ({
       category: p.category,
       query: p.q,
-      mentioned: aliases.some(a => p.a.toLowerCase().includes(a)),
-      response_preview: p.a,
-      position: getBrandPosition(p.a, brand),
+      mentioned: aliases.some(a => (p.a || '').toLowerCase().includes(a)),
+      response_preview: p.a || '',
+      position: getBrandPosition(p.a || '', brand),
     }));
 
     // Citation sources
