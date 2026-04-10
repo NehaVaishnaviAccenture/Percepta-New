@@ -128,7 +128,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score: number }) {
-  const W = 700, H = 280, padL = 52, padR = 28, padT = 36, padB = 72;
+  const W = 700, H = 280, padL = 52, padR = 28, padT = 36, padB = 52;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const curve = (x: number) => Math.round(5 + 90 / (1 + Math.exp(-0.09 * (x - 45))));
@@ -179,7 +179,7 @@ function ROICurve({ score }: { score: number }) {
             <text x={sx(v)} y={padT+plotH+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
-        <text x={(padL+W-padR)/2} y={padT+plotH+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
+        <text x={(padL+W-padR)/2} y={padT+plotH+22} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
         <text x={12} y={padT+plotH/2} textAnchor="middle" transform={`rotate(-90,12,${padT+plotH/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('you')} onMouseLeave={()=>setHov(null)}>
           <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2"/>
@@ -202,8 +202,7 @@ function ROICurve({ score }: { score: number }) {
           const cx2 = padL + (i+0.5)*(plotW/stages.length);
           return (
             <g key={i}>
-              <text x={cx2} y={padT+plotH+50} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>{s.label}</text>
-              <text x={cx2} y={padT+plotH+62} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.range}</text>
+              <text x={cx2} y={padT+plotH+36} textAnchor="middle" style={{fontSize:7,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>{s.label} <tspan style={{fontWeight:400,fill:'#9CA3AF'}}>{s.range}</tspan></text>
             </g>
           );
         })}
