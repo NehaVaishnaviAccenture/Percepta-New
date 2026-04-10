@@ -87,11 +87,17 @@ function extractBrand(pageData: any): string {
   return dk.charAt(0).toUpperCase() + dk.slice(1);
 }
 
+
 function getIndustry(domain: string): string {
-  const finKws = ['capital', 'chase', 'amex', 'citi', 'discover', 'bank', 'credit', 'card', 'finance', 'fargo', 'visa', 'master', 'barclays', 'synchrony', 'usaa', 'wellsfargo'];
-  const autoKws = ['toyota', 'ford', 'honda', 'bmw', 'tesla', 'vw', 'volkswagen', 'auto', 'car', 'motor', 'hyundai', 'kia', 'nissan', 'mercedes', 'audi'];
-  if (finKws.some(k => domain.includes(k))) return 'fin';
-  if (autoKws.some(k => domain.includes(k))) return 'auto';
+  const d = domain.toLowerCase();
+  if (['capital','chase','amex','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate'].some(k=>d.includes(k))) return 'fin';
+  if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
+  if (['marriott','hilton','hyatt','holiday','sheraton','westin','ritz','airbnb','booking','expedia','hotel','resort'].some(k=>d.includes(k))) return 'hotel';
+  if (['netflix','spotify','hulu','disney','hbo','streaming','music','entertainment','media','paramount','peacock'].some(k=>d.includes(k))) return 'media';
+  if (['shopify','amazon','ebay','etsy','walmart','target','bestbuy','retail','shop','store','ecommerce','homedepot','kroger'].some(k=>d.includes(k))) return 'retail';
+  if (['salesforce','hubspot','oracle','sap','workday','servicenow','adobe','software','saas','cloud','microsoft','google','ibm','intel','cisco'].some(k=>d.includes(k))) return 'tech';
+  if (['nike','adidas','underarmour','lululemon','sport','fitness','athletic','puma','reebok','asics','brooks','hoka'].some(k=>d.includes(k))) return 'sport';
+  if (['pharma','drug','medicine','health','hospital','clinic','medical','cvs','walgreen','insurance','anthem','aetna','cigna','humana','kaiser'].some(k=>d.includes(k))) return 'health';
   return 'gen';
 }
 
@@ -99,90 +105,263 @@ const INDUSTRY_DATA: Record<string, any> = {
   fin: {
     name: 'financial services / credit cards',
     queries: [
-      // General consumer — broad coverage
-      ['General Consumer', 'What is the best credit card for everyday use in 2025?'],
-      ['General Consumer', 'Which credit card has the best cash back rewards?'],
-      ['General Consumer', 'What is the best no annual fee credit card?'],
-      ['General Consumer', 'Best credit card for someone building or rebuilding credit'],
-      ['General Consumer', 'Which bank is best for everyday checking and savings?'],
-      // Travel segment — where Chase/Amex lead
-      ['Travel & Rewards', 'What is the best credit card for travel rewards in 2025?'],
-      ['Travel & Rewards', 'Which credit card has the best sign-up bonus right now?'],
-      ['Travel & Rewards', 'Best credit cards for international travel with no foreign fees'],
-      ['Travel & Rewards', 'Top credit cards for earning points on dining and travel'],
-      ['Travel & Rewards', 'What is the best premium travel credit card?'],
-      // Cash back segment — where Capital One, Citi, Discover compete
-      ['Cash Back', 'What is the best cash back credit card with no annual fee?'],
-      ['Cash Back', 'Which credit card gives the most cash back on groceries?'],
-      ['Cash Back', 'Best flat rate cash back credit card for all purchases'],
-      ['Cash Back', 'Top credit cards for cash back on gas and everyday spending'],
-      ['Cash Back', 'Best cash back cards recommended by financial experts'],
-      // Comparison & expert
-      ['Expert Recommendation', 'What are the most trusted credit card companies in the US?'],
-      ['Expert Recommendation', 'Which bank offers the best overall credit card lineup?'],
-      ['Expert Recommendation', 'Best credit cards for people with good but not excellent credit'],
-      ['Expert Recommendation', 'Top recommended credit cards for young adults and students'],
+      ['General Consumer', 'What are the best credit cards available right now?'],
+      ['General Consumer', 'Which credit card companies are most recommended?'],
+      ['General Consumer', 'What is the best credit card for everyday purchases?'],
+      ['General Consumer', 'Which banks offer the best credit cards overall?'],
+      ['General Consumer', 'What credit card should I get for my first card?'],
+      ['Cash Back', 'What is the best flat rate cash back credit card?'],
+      ['Cash Back', 'Best no annual fee cash back credit card'],
+      ['Cash Back', 'Which credit card gives the best rewards on everyday spending?'],
+      ['Cash Back', 'Best credit card for cash back on groceries and gas'],
+      ['Cash Back', 'What is the simplest cash back card with no category tracking?'],
+      ['Travel & Rewards', 'Best travel credit card for occasional travelers'],
+      ['Travel & Rewards', 'Which credit card is best for earning miles and points?'],
+      ['Travel & Rewards', 'Best credit card with no foreign transaction fees'],
+      ['Travel & Rewards', 'Top credit cards for hotel and flight rewards'],
+      ['Travel & Rewards', 'Best mid-tier travel credit card worth the annual fee?'],
+      ['Credit Building', 'Best credit card for building credit with no credit history'],
+      ['Credit Building', 'What is the best secured credit card?'],
+      ['Credit Building', 'Best credit card for fair or average credit score'],
       ['Expert Recommendation', 'Which credit card company has the best customer service?'],
+      ['Expert Recommendation', 'What are the most trusted credit card issuers in America?'],
     ],
     comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA'],
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com' },
     label: 'Financial Services',
+    awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22 },
   },
   auto: {
     name: 'automotive',
     queries: [
-      ['General Consumer', 'What is the best car to buy in 2025?'],
-      ['General Consumer', 'Which electric vehicle has the longest range?'],
-      ['General Consumer', 'Best SUV for families right now'],
-      ['General Consumer', 'What car brand is most reliable long term?'],
-      ['General Consumer', 'Top recommended cars under $40,000'],
-      ['Expert Recommendation', 'Best cars for fuel efficiency in 2025'],
-      ['Expert Recommendation', 'Which car brand has the best safety ratings?'],
-      ['Expert Recommendation', 'What is the best luxury car for the money?'],
-      ['Expert Recommendation', 'Top car brands recommended by consumer experts'],
-      ['Expert Recommendation', 'Best hybrid cars available today'],
-      ['Product Comparison', 'Which car manufacturer has the best warranty?'],
-      ['Product Comparison', 'What cars are best for first-time buyers?'],
-      ['Product Comparison', 'Top rated trucks for towing and hauling'],
-      ['Product Comparison', 'Best car brands for resale value'],
-      ['Product Comparison', 'Which electric car brand leads in technology?'],
-      ['Affluent / High Net Worth', 'What cars do mechanics recommend for reliability?'],
-      ['Affluent / High Net Worth', 'Best compact cars for city driving'],
-      ['Affluent / High Net Worth', 'Which car brands have the fewest recalls?'],
-      ['Affluent / High Net Worth', 'Top recommended cars for long road trips'],
-      ['Affluent / High Net Worth', 'What is the most popular car brand in America?'],
+      ['General Consumer', 'What is the best car brand to buy from?'],
+      ['General Consumer', 'Which car brand is the most reliable overall?'],
+      ['General Consumer', 'What are the best car brands right now?'],
+      ['General Consumer', 'Which car manufacturer do experts recommend most?'],
+      ['General Consumer', 'Best car brands for long-term ownership and value'],
+      ['Reliability', 'Which car brand has the fewest problems and repairs?'],
+      ['Reliability', 'What car brand has the best reliability ratings?'],
+      ['Reliability', 'Best car brands for avoiding costly repairs'],
+      ['Reliability', 'Which cars hold their value best over time?'],
+      ['Reliability', 'Most dependable car brands according to consumer reports'],
+      ['Segment', 'Best SUV brands for families'],
+      ['Segment', 'What is the best electric vehicle brand?'],
+      ['Segment', 'Best luxury car brands for the money'],
+      ['Segment', 'Top car brands for fuel efficiency and hybrid options'],
+      ['Segment', 'Best affordable car brands under $35,000'],
+      ['Safety & Technology', 'Which car brand has the best safety ratings?'],
+      ['Safety & Technology', 'Best car brands for technology and driver assistance features'],
+      ['Safety & Technology', 'Which automaker leads in innovation?'],
+      ['Expert Recommendation', 'What car brand do mechanics recommend?'],
+      ['Expert Recommendation', 'Which car companies are growing fastest in popularity?'],
     ],
     comps: ['Tesla', 'Toyota', 'BMW', 'Honda', 'Ford', 'Mercedes', 'Hyundai', 'Kia', 'Nissan', 'Volkswagen'],
     compUrls: { Tesla: 'tesla.com', Toyota: 'toyota.com', BMW: 'bmw.com', Honda: 'honda.com', Ford: 'ford.com', Mercedes: 'mercedes-benz.com', Hyundai: 'hyundai.com', Kia: 'kia.com', Nissan: 'nissanusa.com', Volkswagen: 'vw.com' },
     label: 'Automotive',
+    awareness: { tesla: 58, toyota: 55, bmw: 50, honda: 48, ford: 45, mercedes: 44, hyundai: 38, kia: 33, nissan: 30, volkswagen: 32 },
+  },
+  hotel: {
+    name: 'hotels and hospitality',
+    queries: [
+      ['General Consumer', 'What are the best hotel chains in the world?'],
+      ['General Consumer', 'Which hotel brand offers the best value for money?'],
+      ['General Consumer', 'What is the most recommended hotel chain for travelers?'],
+      ['General Consumer', 'Best hotel loyalty programs worth joining'],
+      ['General Consumer', 'Which hotel brands are most trusted by travelers?'],
+      ['Luxury', 'What are the best luxury hotel brands?'],
+      ['Luxury', 'Which hotel chain has the best high-end properties?'],
+      ['Luxury', 'Best hotel brands for a premium travel experience'],
+      ['Value', 'Best mid-range hotel chains with consistent quality'],
+      ['Value', 'Which hotel brand offers the best amenities for the price?'],
+      ['Loyalty', 'Which hotel loyalty program gives the best rewards?'],
+      ['Loyalty', 'Best hotel points program for free nights'],
+      ['Loyalty', 'Which hotel brand has the most locations worldwide?'],
+      ['Expert Recommendation', 'What hotel chains do frequent travelers recommend most?'],
+      ['Expert Recommendation', 'Best hotel brands for customer service and consistency'],
+      ['Family & Leisure', 'Best hotel brands for family vacations'],
+      ['Family & Leisure', 'Which hotel chains are best for weekend getaways?'],
+      ['Family & Leisure', 'Top hotel brands with the best pools and amenities'],
+      ['Business Travel', 'Best hotel chains for business travelers'],
+      ['Business Travel', 'Which hotel brand is most recommended for corporate stays?'],
+    ],
+    comps: ['Marriott', 'Hilton', 'Hyatt', 'IHG', 'Wyndham', 'Best Western', 'Radisson', 'Accor', 'Four Seasons', 'Ritz-Carlton'],
+    compUrls: { Marriott: 'marriott.com', Hilton: 'hilton.com', Hyatt: 'hyatt.com', IHG: 'ihg.com', Wyndham: 'wyndhamhotels.com', 'Best Western': 'bestwestern.com', Radisson: 'radissonhotels.com', Accor: 'accor.com', 'Four Seasons': 'fourseasons.com', 'Ritz-Carlton': 'ritzcarlton.com' },
+    label: 'Hospitality',
+    awareness: { marriott: 58, hilton: 56, hyatt: 48, ihg: 42, wyndham: 38, 'best western': 34, radisson: 30, accor: 32, 'four seasons': 45, 'ritz-carlton': 44 },
+  },
+  media: {
+    name: 'streaming and entertainment',
+    queries: [
+      ['General Consumer', 'What is the best streaming service right now?'],
+      ['General Consumer', 'Which streaming platform has the best content?'],
+      ['General Consumer', 'What streaming service is most worth paying for?'],
+      ['General Consumer', 'Best streaming services for movies and TV shows'],
+      ['General Consumer', 'Which streaming platform do most people recommend?'],
+      ['Content Quality', 'Which streaming service has the best original shows?'],
+      ['Content Quality', 'Best streaming platform for movies'],
+      ['Content Quality', 'What streaming service has the most content?'],
+      ['Content Quality', 'Best streaming services for family and kids content'],
+      ['Content Quality', 'Which platform has the best documentaries and series?'],
+      ['Value', 'Best streaming service for the price'],
+      ['Value', 'Which streaming service has the best free or cheap tier?'],
+      ['Value', 'Most affordable streaming services with good content'],
+      ['Music', 'What is the best music streaming service?'],
+      ['Music', 'Which music app has the best sound quality and library?'],
+      ['Expert Recommendation', 'What streaming services do critics recommend most?'],
+      ['Expert Recommendation', 'Best streaming platforms for binge-watching'],
+      ['Expert Recommendation', 'Which streaming service is growing fastest?'],
+      ['Expert Recommendation', 'Best streaming services recommended by entertainment experts'],
+      ['Expert Recommendation', 'What is the most popular streaming platform right now?'],
+    ],
+    comps: ['Netflix', 'Disney+', 'HBO Max', 'Amazon Prime Video', 'Apple TV+', 'Hulu', 'Peacock', 'Paramount+', 'Spotify', 'Apple Music'],
+    compUrls: { Netflix: 'netflix.com', 'Disney+': 'disneyplus.com', 'HBO Max': 'max.com', 'Amazon Prime Video': 'primevideo.com', 'Apple TV+': 'apple.com/tv', Hulu: 'hulu.com', Peacock: 'peacocktv.com', 'Paramount+': 'paramountplus.com', Spotify: 'spotify.com', 'Apple Music': 'music.apple.com' },
+    label: 'Streaming & Entertainment',
+    awareness: { netflix: 62, 'disney+': 58, 'hbo max': 52, 'amazon prime video': 54, 'apple tv+': 46, hulu: 48, peacock: 38, 'paramount+': 36, spotify: 56, 'apple music': 48 },
+  },
+  retail: {
+    name: 'retail and e-commerce',
+    queries: [
+      ['General Consumer', 'What is the best online store for shopping?'],
+      ['General Consumer', 'Which retailer has the best prices and selection?'],
+      ['General Consumer', 'Best retailers for fast and reliable delivery'],
+      ['General Consumer', 'Which stores are most trusted for online shopping?'],
+      ['General Consumer', 'Best shopping apps and websites recommended by consumers'],
+      ['Value', 'Which retailer has the best deals and discounts?'],
+      ['Value', 'Best stores for everyday low prices'],
+      ['Value', 'Which retail brand offers the best overall value?'],
+      ['Loyalty', 'Best retail loyalty and rewards programs'],
+      ['Loyalty', 'Which store membership is worth the annual fee?'],
+      ['Category', 'Best stores for electronics and tech products'],
+      ['Category', 'Top retailers for home goods and furniture'],
+      ['Category', 'Best online stores for clothing and fashion'],
+      ['Category', 'Which retailer is best for groceries and household items?'],
+      ['Category', 'Best stores for sports and outdoor gear'],
+      ['Expert Recommendation', 'Which retailers have the best return policies?'],
+      ['Expert Recommendation', 'Most trusted retailers for quality products'],
+      ['Expert Recommendation', 'Which retail brands have the best customer service?'],
+      ['Expert Recommendation', 'Best retailers recommended by consumer advocates'],
+      ['Expert Recommendation', 'Which retail companies are growing most right now?'],
+    ],
+    comps: ['Amazon', 'Walmart', 'Target', 'Costco', 'Best Buy', 'eBay', 'Etsy', 'Shopify', 'Home Depot', 'Kroger'],
+    compUrls: { Amazon: 'amazon.com', Walmart: 'walmart.com', Target: 'target.com', Costco: 'costco.com', 'Best Buy': 'bestbuy.com', eBay: 'ebay.com', Etsy: 'etsy.com', Shopify: 'shopify.com', 'Home Depot': 'homedepot.com', Kroger: 'kroger.com' },
+    label: 'Retail & E-Commerce',
+    awareness: { amazon: 65, walmart: 60, target: 55, costco: 52, 'best buy': 46, ebay: 48, etsy: 42, shopify: 38, 'home depot': 44, kroger: 38 },
+  },
+  tech: {
+    name: 'technology and software',
+    queries: [
+      ['General Consumer', 'What are the best technology companies right now?'],
+      ['General Consumer', 'Which tech companies are most trusted and reliable?'],
+      ['General Consumer', 'Best software companies recommended by professionals'],
+      ['General Consumer', 'Which tech brands lead in innovation?'],
+      ['General Consumer', 'Most recommended tech companies for businesses'],
+      ['Software & SaaS', 'Best CRM software for businesses'],
+      ['Software & SaaS', 'Which cloud platform is most recommended?'],
+      ['Software & SaaS', 'Best project management and productivity software'],
+      ['Software & SaaS', 'Top enterprise software companies'],
+      ['Software & SaaS', 'Best marketing automation platforms'],
+      ['Consumer Tech', 'Which smartphone brand is the best?'],
+      ['Consumer Tech', 'Best laptop brands for professionals'],
+      ['Consumer Tech', 'Which tech company makes the most reliable products?'],
+      ['Consumer Tech', 'Best consumer electronics brands overall'],
+      ['Consumer Tech', 'Top tech brands recommended for home and work'],
+      ['AI & Innovation', 'Which tech companies are leading in AI?'],
+      ['AI & Innovation', 'Best technology companies for innovation and R&D'],
+      ['Expert Recommendation', 'Most trusted software companies for enterprises'],
+      ['Expert Recommendation', 'Which tech companies have the best customer support?'],
+      ['Expert Recommendation', 'Top tech brands recommended by IT professionals'],
+    ],
+    comps: ['Apple', 'Microsoft', 'Google', 'Amazon', 'Salesforce', 'Adobe', 'Oracle', 'SAP', 'IBM', 'Cisco'],
+    compUrls: { Apple: 'apple.com', Microsoft: 'microsoft.com', Google: 'google.com', Amazon: 'amazon.com', Salesforce: 'salesforce.com', Adobe: 'adobe.com', Oracle: 'oracle.com', SAP: 'sap.com', IBM: 'ibm.com', Cisco: 'cisco.com' },
+    label: 'Technology',
+    awareness: { apple: 65, microsoft: 63, google: 64, amazon: 60, salesforce: 52, adobe: 50, oracle: 46, sap: 44, ibm: 48, cisco: 45 },
+  },
+  sport: {
+    name: 'sports and fitness brands',
+    queries: [
+      ['General Consumer', 'What are the best athletic wear brands?'],
+      ['General Consumer', 'Which sportswear brand is most recommended?'],
+      ['General Consumer', 'Best fitness and workout clothing brands'],
+      ['General Consumer', 'Which sports brand makes the best running shoes?'],
+      ['General Consumer', 'Most trusted athletic brands overall'],
+      ['Performance', 'Best sports brands for serious athletes'],
+      ['Performance', 'Which athletic brand has the best performance gear?'],
+      ['Performance', 'Top brands for runners and gym goers'],
+      ['Performance', 'Best sportswear brands for high-intensity training'],
+      ['Performance', 'Which brand makes the most durable athletic wear?'],
+      ['Lifestyle', 'Best casual athletic wear brands for everyday use'],
+      ['Lifestyle', 'Which sportswear brand is most stylish and fashionable?'],
+      ['Lifestyle', 'Top athleisure brands recommended by fitness enthusiasts'],
+      ['Value', 'Best affordable sportswear brands with good quality'],
+      ['Value', 'Which athletic brand offers the best value for money?'],
+      ['Expert Recommendation', 'What sports brands do athletes recommend most?'],
+      ['Expert Recommendation', 'Best athletic brands for sustainability and ethics'],
+      ['Expert Recommendation', 'Which sports brands are growing most in popularity?'],
+      ['Expert Recommendation', 'Most innovative athletic wear companies right now'],
+      ['Expert Recommendation', 'Best sports brands recommended by fitness experts'],
+    ],
+    comps: ['Nike', 'Adidas', 'Under Armour', 'Lululemon', 'New Balance', 'Puma', 'Reebok', 'Asics', 'Brooks', 'Hoka'],
+    compUrls: { Nike: 'nike.com', Adidas: 'adidas.com', 'Under Armour': 'underarmour.com', Lululemon: 'lululemon.com', 'New Balance': 'newbalance.com', Puma: 'puma.com', Reebok: 'reebok.com', Asics: 'asics.com', Brooks: 'brooksrunning.com', Hoka: 'hoka.com' },
+    label: 'Sports & Fitness',
+    awareness: { nike: 65, adidas: 62, 'under armour': 52, lululemon: 50, 'new balance': 46, puma: 44, reebok: 40, asics: 38, brooks: 34, hoka: 36 },
+  },
+  health: {
+    name: 'healthcare and insurance',
+    queries: [
+      ['General Consumer', 'What are the best health insurance companies?'],
+      ['General Consumer', 'Which healthcare companies are most trusted?'],
+      ['General Consumer', 'Best health insurance plans recommended by consumers'],
+      ['General Consumer', 'Which pharmacy chains are most convenient and trusted?'],
+      ['General Consumer', 'Most recommended health and wellness companies'],
+      ['Insurance', 'Which health insurance company has the best coverage?'],
+      ['Insurance', 'Best health insurance for individuals and families'],
+      ['Insurance', 'Which insurance companies have the best customer service?'],
+      ['Insurance', 'Most affordable health insurance with good coverage'],
+      ['Insurance', 'Best health insurance networks and provider access'],
+      ['Pharmacy', 'Which pharmacy chain is most recommended?'],
+      ['Pharmacy', 'Best pharmacies for prescription pricing and service'],
+      ['Pharmacy', 'Top pharmacy chains for convenience and delivery'],
+      ['Expert Recommendation', 'What health insurance do doctors recommend?'],
+      ['Expert Recommendation', 'Most trusted healthcare companies according to experts'],
+      ['Expert Recommendation', 'Best healthcare companies for employee benefits'],
+      ['Expert Recommendation', 'Which health insurance companies pay claims fastest?'],
+      ['Expert Recommendation', 'Top rated healthcare brands by patient satisfaction'],
+      ['Wellness', 'Best health and wellness companies for preventive care'],
+      ['Wellness', 'Which healthcare brands lead in digital health innovation?'],
+    ],
+    comps: ['UnitedHealth', 'Anthem', 'Aetna', 'Cigna', 'Humana', 'CVS Health', 'Walgreens', 'Kaiser', 'Blue Cross', 'Centene'],
+    compUrls: { UnitedHealth: 'uhc.com', Anthem: 'anthem.com', Aetna: 'aetna.com', Cigna: 'cigna.com', Humana: 'humana.com', 'CVS Health': 'cvs.com', Walgreens: 'walgreens.com', Kaiser: 'kp.org', 'Blue Cross': 'bcbs.com', Centene: 'centene.com' },
+    label: 'Healthcare',
+    awareness: { unitedhealth: 55, anthem: 50, aetna: 52, cigna: 50, humana: 46, 'cvs health': 54, walgreens: 52, kaiser: 48, 'blue cross': 50, centene: 35 },
   },
   gen: {
     name: 'consumer brands',
     queries: [
-      ['General Consumer', 'What are the most trusted brands in the US right now?'],
-      ['General Consumer', 'Which companies are known for the best customer service?'],
-      ['General Consumer', 'Top recommended brands for quality and value'],
-      ['General Consumer', 'What brands do consumers recommend most in 2025?'],
-      ['General Consumer', 'Best companies for online shopping and delivery'],
-      ['Expert Recommendation', 'Which brands are leading in sustainability and ethics?'],
-      ['Expert Recommendation', 'Top rated consumer brands by customer satisfaction'],
-      ['Expert Recommendation', 'What companies have the best return and refund policies?'],
-      ['Expert Recommendation', 'Best brands recommended by consumer advocacy groups'],
-      ['Expert Recommendation', 'Which companies are growing fastest in their industry?'],
-      ['Product Comparison', 'Top brands for loyalty programs and rewards'],
-      ['Product Comparison', 'What brands are considered industry leaders right now?'],
-      ['Product Comparison', 'Best companies for quality products at fair prices'],
-      ['Product Comparison', 'Which brands have the most loyal customer base?'],
-      ['Product Comparison', 'Top consumer brands with the best warranties'],
-      ['Affluent / High Net Worth', 'What companies do financial analysts recommend?'],
-      ['Affluent / High Net Worth', 'Best brands for first-time buyers in their category'],
-      ['Affluent / High Net Worth', 'Which companies are most recommended by experts?'],
-      ['Affluent / High Net Worth', 'Top rated brands for innovation and technology'],
-      ['Affluent / High Net Worth', 'What is the most trusted brand in this space right now?'],
+      ['General Consumer', 'What are the most trusted brands right now?'],
+      ['General Consumer', 'Which companies are most recommended by consumers?'],
+      ['General Consumer', 'Best brands for quality and value overall'],
+      ['General Consumer', 'Which companies have the best reputation?'],
+      ['General Consumer', 'What brands do people recommend most?'],
+      ['Expert Recommendation', 'Which brands are leading in their industry?'],
+      ['Expert Recommendation', 'Most trusted companies according to consumer reviews'],
+      ['Expert Recommendation', 'Best brands for customer service and support'],
+      ['Expert Recommendation', 'Which companies are most innovative right now?'],
+      ['Expert Recommendation', 'Top brands recommended by industry experts'],
+      ['Product Quality', 'Best brands for reliable and high-quality products'],
+      ['Product Quality', 'Which companies have the best warranties and guarantees?'],
+      ['Product Quality', 'Most consistent brands for product quality'],
+      ['Product Quality', 'Best companies for first-time buyers'],
+      ['Product Quality', 'Which brands offer the best value for money?'],
+      ['Loyalty & Trust', 'Which companies have the most loyal customers?'],
+      ['Loyalty & Trust', 'Best brands for loyalty programs and rewards'],
+      ['Loyalty & Trust', 'Most ethical and sustainable companies right now'],
+      ['Loyalty & Trust', 'Which brands are growing fastest in popularity?'],
+      ['Loyalty & Trust', 'What is the most trusted brand in this space?'],
     ],
     comps: [],
     compUrls: {},
     label: 'General',
+    awareness: {},
   },
 };
 
@@ -197,20 +376,27 @@ function getBrandPosition(text: string, brand: string): number {
 }
 
 // ── Competitor scoring: blends actual response data with brand awareness baseline ──
-// The 20 queries are category-specific and may not surface all brands equally.
-// A brand like Synchrony is real and has AI presence, but won't appear in
-// "best travel card" queries. We blend: 70% actual response data + 30% awareness baseline.
-function scoreCompetitor(name: string, responses: any[]): any {
+function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<string,number>): any {
   const nl = name.toLowerCase();
   const aliases: Record<string, string[]> = {
     'american express': ['american express', 'amex'],
     'bank of america': ['bank of america', 'bofa'],
     'wells fargo': ['wells fargo'],
     'capital one': ['capital one'],
+    'best western': ['best western'],
+    'four seasons': ['four seasons'],
+    'ritz-carlton': ['ritz-carlton', 'ritz carlton'],
+    'hbo max': ['hbo max', 'max', 'hbo'],
+    'amazon prime video': ['amazon prime video', 'prime video'],
+    'apple tv+': ['apple tv+', 'apple tv'],
+    'apple music': ['apple music'],
+    'under armour': ['under armour'],
+    'new balance': ['new balance'],
+    'cvs health': ['cvs health', 'cvs'],
+    'blue cross': ['blue cross', 'bcbs'],
   };
   const terms = aliases[nl] || [nl];
 
-  // Actual mention data from the 20 responses
   const mentionedResponses = responses.filter(r => {
     const text = (r.response_preview || r.response || r.full_response || '').toLowerCase();
     return terms.some(t => text.includes(t));
@@ -219,47 +405,22 @@ function scoreCompetitor(name: string, responses: any[]): any {
   const total = responses.length || 20;
   const mentionRate = Math.round((mentions / total) * 100);
 
-  // Brand awareness baseline — reflects real-world AI knowledge breadth and brand size
-  // Tier 1 (55-60): Top 3-4 issuers by cardholder count and AI mention frequency
-  // Tier 2 (45-50): Major national banks/issuers with broad product range
-  // Tier 3 (30-40): Regional or specialist issuers
-  // Tier 4 (20-25): Niche or B2B-focused issuers
-  const awareness: Record<string, number> = {
-    chase: 60, 'american express': 58, 'capital one': 56, citi: 54,
-    discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35,
-    synchrony: 25, barclays: 22,
-    tesla: 58, toyota: 55, bmw: 50, honda: 48, ford: 45,
-    mercedes: 44, hyundai: 38, kia: 33, nissan: 30, volkswagen: 32,
-  };
-  const baseline = awareness[nl] || 20;
+  const baseline = awarenessMap[nl] || 20;
 
-  // Blend: if brand appeared in responses, actual data dominates; if 0 mentions, use baseline
   const cv = mentions > 0
     ? Math.round(mentionRate * 0.7 + baseline * 0.3)
-    : Math.round(baseline * 0.5); // brand exists but wasn't surfaced by these specific queries
+    : Math.round(baseline * 0.5);
 
-  // Position data for brands that appeared
   const positions = mentionedResponses
     .map(r => getBrandPosition(r.response_preview || r.response || '', name))
     .filter(p => p > 0);
   const avgPos = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : 3.5;
 
-  // Prominence: 100 = always mentioned first, lower for later positions
   const cp = Math.round(Math.max(10, Math.min(85, 95 - (avgPos - 1) * 15)));
-
-  // Citation share: blend of mention rate and prominence, capped reasonably
   const cc = Math.round(Math.min(85, cv * 0.65 + cp * 0.25 + (mentions > 0 ? 5 : 0)));
-
-  // Sentiment: proxy — brands mentioned early and often tend to be described positively
-  // Base of 45 (neutral) + bonuses for appearing and position quality
   const cs = Math.round(Math.min(88, 45 + (mentions > 0 ? 20 : 0) + cp * 0.25));
-
-  // Share of voice: scaled to mention rate
   const csov = Math.round(Math.min(80, cv * 0.75 + (mentions > 0 ? 8 : 0)));
-
-  // GEO formula: vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15
   const geo = Math.round(cv * 0.30 + cs * 0.20 + cp * 0.20 + cc * 0.15 + csov * 0.15);
-
   const avgRank = positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
 
   return { Brand: name, GEO: geo, Vis: cv, Cit: cc, Sen: cs, Sov: csov, Prom: cp, Rank: avgRank };
@@ -404,7 +565,7 @@ Return ONLY valid JSON, no markdown:
     const competitors = ind.comps
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
-        const s = scoreCompetitor(c, responsesDetail);
+        const s = scoreCompetitor(c, responsesDetail, ind.awareness || {});
         return { ...s, URL: ind.compUrls[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
