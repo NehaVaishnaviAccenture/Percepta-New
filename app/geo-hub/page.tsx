@@ -107,7 +107,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
         <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
-        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you're not yet the brand AI leads with or recommends first.
+        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you&apos;re not yet the brand AI leads with or recommends first.
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
@@ -123,68 +123,113 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score: number }) {
-  const W = 720, H = 390, padL = 52, padR = 28, padT = 54, padB = 80;
+  const W = 720, H = 360, padL = 52, padR = 28, padT = 54, padB = 56;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const curve = (x: number) => Math.round(5 + 90 / (1 + Math.exp(-0.09 * (x - 45))));
   const pts = Array.from({ length: 101 }, (_, x) => ({ x, y: curve(x) }));
   const sx = (v: number) => padL + (v / 100) * plotW;
   const sy = (v: number) => padT + ((100 - v) / 100) * plotH;
   const scoreToX = (s: number) => { let best = 0, bestDiff = 999; pts.forEach(p => { const d = Math.abs(p.y - s); if (d < bestDiff) { bestDiff = d; best = p.x; } }); return best; };
+
   const currentX = scoreToX(score), goalX = scoreToX(70), authX = scoreToX(80);
   const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
   const gapPts = score < 70 ? pts.slice(currentX, goalX + 1) : [];
   const fillD = gapPts.length > 1 ? `${gapPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')} L${sx(goalX)},${padT + plotH} L${sx(currentX)},${padT + plotH} Z` : '';
   const [hov, setHov] = useState<string | null>(null);
+
   const youCX = sx(currentX), youCY = sy(score);
   const goalCX = sx(goalX), goalCY = sy(70);
   const authCX = sx(authX), authCY = sy(80);
+
+  // Stage legend data — centered in the bottom strip
   const stages = [
-    { label: 'Fragmented', range: '0–30', color: '#EF4444', pos: 0.10 },
-    { label: 'Emerging', range: '30–55', color: '#F59E0B', pos: 0.34 },
+    { label: 'Fragmented', range: '0–30', color: '#EF4444', pos: 0.08 },
+    { label: 'Emerging', range: '30–55', color: '#F59E0B', pos: 0.32 },
     { label: 'Competitive', range: '55–72', color: '#3B82F6', pos: 0.57 },
     { label: 'Leader', range: '72–85', color: '#10B981', pos: 0.76 },
-    { label: 'Authority', range: '85+', color: '#7C3AED', pos: 0.92 },
+    { label: 'Authority', range: '85+', color: '#7C3AED', pos: 0.93 },
   ];
+
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        <text x={W/2} y={20} textAnchor="middle" style={{fontSize:13,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>Where You Are vs Where You Need to Be</text>
-        <text x={W/2} y={36} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>GEO follows an S-curve. Below 70, effort produces outsized returns. Above 80, diminishing returns begin.</text>
-        {[0,25,50,75,100].map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.45"/>}
-        <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
-        <text x={W-padR+4} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
-        <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5"/>
-        <line x1={padL} y1={padT+plotH} x2={W-padR} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
-        <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
-        {[0,20,40,60,80,100].map(v=><g key={v}><line x1={sx(v)} y1={padT+plotH} x2={sx(v)} y2={padT+plotH+4} stroke="#D1D5DB" strokeWidth="1"/><text x={sx(v)} y={padT+plotH+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        <text x={(padL+W-padR)/2} y={padT+plotH+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
-        <text x={12} y={padT+plotH/2} textAnchor="middle" transform={`rotate(-90,12,${padT+plotH/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
-        {/* YOU — PURPLE */}
-        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('you')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2"/>
-          <text x={youCX} y={youCY-14} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#5B21B6',fontFamily:'Inter,sans-serif'}}>You ({score})</text>
-          {hov==='you'&&<><rect x={youCX-52} y={youCY+13} width={104} height={20} rx={4} fill="#1F2937"/><text x={youCX} y={youCY+24} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: {score}</text></>}
+
+        {/* Title */}
+        <text x={W / 2} y={20} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
+        <text x={W / 2} y={36} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO follows an S-curve. Below 70, effort produces outsized returns. Above 80, diminishing returns begin.</text>
+
+        {/* Y grid */}
+        {[0, 25, 50, 75, 100].map(v => (
+          <g key={v}>
+            <line x1={padL} y1={sy(v)} x2={W - padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1" />
+            <text x={padL - 6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+          </g>
+        ))}
+
+        {/* Gap fill */}
+        {fillD && <path d={fillD} fill="#EDE9FE" opacity="0.45" />}
+
+        {/* Threshold at 70 */}
+        <line x1={padL} y1={sy(70)} x2={W - padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4" />
+        <text x={W - padR + 4} y={sy(70)} dominantBaseline="middle" style={{ fontSize: 8, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>70</text>
+
+        {/* S-curve */}
+        <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5" />
+
+        {/* Axes */}
+        <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
+        <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
+
+        {/* X ticks */}
+        {[0, 20, 40, 60, 80, 100].map(v => (
+          <g key={v}>
+            <line x1={sx(v)} y1={padT + plotH} x2={sx(v)} y2={padT + plotH + 4} stroke="#D1D5DB" strokeWidth="1" />
+            <text x={sx(v)} y={padT + plotH + 14} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+          </g>
+        ))}
+        <text x={(padL + W - padR) / 2} y={padT + plotH + 26} textAnchor="middle" style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}>GEO Maturity</text>
+        <text x={12} y={padT + plotH / 2} textAnchor="middle" transform={`rotate(-90,12,${padT + plotH / 2})`} style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>GEO Score</text>
+
+        {/* YOU — PURPLE — label above */}
+        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('you')} onMouseLeave={() => setHov(null)}>
+          <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2" />
+          <text x={youCX} y={youCY - 14} textAnchor="middle" style={{ fontSize: 9, fontWeight: 700, fill: '#5B21B6', fontFamily: 'Inter,sans-serif' }}>You ({score})</text>
+          {hov === 'you' && <>
+            <rect x={youCX - 52} y={youCY + 13} width={104} height={20} rx={4} fill="#1F2937" />
+            <text x={youCX} y={youCY + 24} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: {score}</text>
+          </>}
         </g>
-        {/* GOAL — AMBER — label LEFT */}
-        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2"/>
-          <text x={goalCX-14} y={goalCY-14} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#92400E',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
-          <text x={goalCX-14} y={goalCY-3} textAnchor="end" style={{fontSize:8,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>"The Sweet Spot"</text>
-          {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
+
+        {/* GOAL — AMBER — label to the LEFT */}
+        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('goal')} onMouseLeave={() => setHov(null)}>
+          <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2" />
+          <text x={goalCX - 14} y={goalCY - 14} textAnchor="end" style={{ fontSize: 9, fontWeight: 700, fill: '#92400E', fontFamily: 'Inter,sans-serif' }}>Goal (70)</text>
+          <text x={goalCX - 14} y={goalCY - 3} textAnchor="end" style={{ fontSize: 8, fill: '#92400E', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>&quot;The Sweet Spot&quot;</text>
+          {hov === 'goal' && <>
+            <rect x={goalCX - 118} y={goalCY + 10} width={104} height={20} rx={4} fill="#1F2937" />
+            <text x={goalCX - 66} y={goalCY + 21} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: 70</text>
+          </>}
         </g>
-        {/* AUTHORITY — GREEN — label RIGHT */}
-        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
-          <text x={authCX+14} y={authCY-14} textAnchor="start" style={{fontSize:9,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
-          <text x={authCX+14} y={authCY-3} textAnchor="start" style={{fontSize:8,fill:'#065F46',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Diminishing Returns</text>
-          {hov==='auth'&&<><rect x={authCX+14} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX+66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
+
+        {/* AUTHORITY — GREEN — label to the LEFT */}
+        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('auth')} onMouseLeave={() => setHov(null)}>
+          <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2" />
+          <text x={authCX - 14} y={authCY - 14} textAnchor="end" style={{ fontSize: 9, fontWeight: 700, fill: '#065F46', fontFamily: 'Inter,sans-serif' }}>Authority (80)</text>
+          <text x={authCX - 14} y={authCY - 3} textAnchor="end" style={{ fontSize: 8, fill: '#065F46', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>Diminishing Returns</text>
+          {hov === 'auth' && <>
+            <rect x={authCX - 118} y={authCY + 10} width={104} height={20} rx={4} fill="#1F2937" />
+            <text x={authCX - 66} y={authCY + 21} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: 80</text>
+          </>}
         </g>
-        {/* Stage legend */}
-        {stages.map((s,i)=><g key={i}>
-          <text x={padL+s.pos*plotW} y={padT+plotH+48} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>{s.label}</text>
-          <text x={padL+s.pos*plotW} y={padT+plotH+61} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.range}</text>
-        </g>)}
+
+        {/* Stage legend — centered, small, below x-axis label */}
+        {stages.map((s, i) => (
+          <g key={i}>
+            <text x={padL + s.pos * plotW} y={padT + plotH + 40} textAnchor="middle" style={{ fontSize: 8, fontWeight: 700, fill: s.color, fontFamily: 'Inter,sans-serif' }}>{s.label}</text>
+            <text x={padL + s.pos * plotW} y={padT + plotH + 50} textAnchor="middle" style={{ fontSize: 7, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{s.range}</text>
+          </g>
+        ))}
+
       </svg>
     </div>
   );
@@ -240,7 +285,7 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
         </div>
       </div>
       <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Top 5 Gaps to Fill — Ranked by Impact on Rank & Conversions</div>
-      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what's broken, why, and how to fix it — with projected rank and conversion impact.</div>
+      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what&apos;s broken, why, and how to fix it — with projected rank and conversion impact.</div>
       {loading&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:32,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}><div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Analysing {result.brand_name}&apos;s strategic gaps…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}
       {!loading&&gaps.map((g,i)=>{
         const isOpen=expanded===i,pct=Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100);
@@ -359,7 +404,7 @@ function RadarChart({ sent, prom, vis }: { sent:number; prom:number; vis:number 
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
-        {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/> ;})}
+        {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;})}
         {dims.map((d,i)=>{const lp=pt(i,R+26);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);return<text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;})}
         <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text><circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text></g>
       </svg>
