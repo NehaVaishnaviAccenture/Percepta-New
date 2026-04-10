@@ -646,6 +646,8 @@ Order: High first, then Medium, then Low.`;
 export default function GeoHub() {
   const [url,setUrl]=useState('');
   const [loading,setLoading]=useState(false);
+  const [loadingStep,setLoadingStep]=useState(0);
+  const [loadingProgress,setLoadingProgress]=useState(0);
   const [result,setResult]=useState<any>(null);
   const [error,setError]=useState('');
   const [activeTab,setActiveTab]=useState(0);
@@ -661,8 +663,37 @@ export default function GeoHub() {
 
   async function runAnalysis(){
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
-    setError('');setLoading(true);
-    try{const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});const data=await res.json();if(data.error)setError(data.error);else{setResult(data);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}}catch(e:any){setError(e.message);}
+    setError('');setLoading(true);setLoadingStep(0);setLoadingProgress(0);
+
+    // Animate progress steps over ~18 seconds to match API timing
+    const steps = [
+      {step:0, progress:5,  delay:200},
+      {step:1, progress:12, delay:1500},
+      {step:2, progress:25, delay:3500},
+      {step:3, progress:40, delay:5500},
+      {step:4, progress:55, delay:7500},
+      {step:5, progress:68, delay:9500},
+      {step:6, progress:78, delay:11500},
+      {step:7, progress:88, delay:13500},
+      {step:8, progress:95, delay:15500},
+    ];
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    steps.forEach(({step,progress,delay})=>{
+      timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));
+    });
+
+    try{
+      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+      const data=await res.json();
+      timers.forEach(t=>clearTimeout(t));
+      setLoadingProgress(100);
+      await new Promise(r=>setTimeout(r,400));
+      if(data.error)setError(data.error);
+      else{setResult(data);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+    }catch(e:any){
+      timers.forEach(t=>clearTimeout(t));
+      setError(e.message);
+    }
     setLoading(false);
   }
 
@@ -696,6 +727,98 @@ export default function GeoHub() {
             </div>
             {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
           </div>
+
+          {/* ── Loading Screen ── */}
+          {loading&&(()=>{
+            const brandName = url.replace(/https?:\/\/(www\.)?/,'').split('/')[0].split('.')[0];
+            const displayName = brandName.charAt(0).toUpperCase()+brandName.slice(1);
+            const steps = [
+              {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata', cat:null},
+              {icon:'🤖', label:'Launching 50 AI queries', detail:'Firing all query batches simultaneously across 5 categories', cat:null},
+              {icon:'💳', label:'Running General Consumer queries', detail:'10 broad brand awareness questions', cat:'General Consumer'},
+              {icon:'💰', label:'Running category-specific queries', detail:'Cash Back · Travel & Rewards · Credit Building', cat:'Cash Back'},
+              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all 50 AI responses for ${displayName} references`, cat:null},
+              {icon:'📊', label:'Scoring sentiment & prominence', detail:'Analysing tone and position in each response', cat:null},
+              {icon:'🏆', label:'Benchmarking competitors', detail:'Scoring Chase · Amex · Citi · Discover and 6 others', cat:null},
+              {icon:'🔗', label:'Building citation network', detail:'Mapping sources and share of voice', cat:null},
+              {icon:'✨', label:'Calculating GEO Score', detail:'Applying weighted formula across all signals', cat:null},
+            ];
+            const currentStep = steps[Math.min(loadingStep, steps.length-1)];
+            const completedSteps = steps.slice(0, loadingStep);
+
+            return (
+              <div style={{marginTop:32,background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'36px 40px',overflow:'hidden'}}>
+                <style>{`
+                  @keyframes spin{to{transform:rotate(360deg)}}
+                  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+                  @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+                `}</style>
+
+                {/* Header */}
+                <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:28}}>
+                  <div style={{width:48,height:48,borderRadius:'50%',background:'linear-gradient(135deg,#7C3AED,#9333EA)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0}}>🔍</div>
+                  <div>
+                    <div style={{fontSize:'1.2rem',fontWeight:800,color:'#111827'}}>Analysing {displayName}</div>
+                    <div style={{fontSize:'0.82rem',color:'#9CA3AF',marginTop:2}}>{url}</div>
+                  </div>
+                  <div style={{marginLeft:'auto',textAlign:'right' as const}}>
+                    <div style={{fontSize:'2rem',fontWeight:900,color:'#7C3AED',lineHeight:1}}>{loadingProgress}%</div>
+                    <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>complete</div>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div style={{background:'#F3F4F6',borderRadius:50,height:8,marginBottom:28,overflow:'hidden'}}>
+                  <div style={{background:'linear-gradient(90deg,#7C3AED,#9333EA)',height:8,borderRadius:50,width:`${loadingProgress}%`,transition:'width 0.8s ease',position:'relative' as const}}>
+                    <div style={{position:'absolute' as const,right:0,top:0,width:20,height:8,background:'rgba(255,255,255,0.4)',borderRadius:50,animation:'pulse 1s infinite'}}/>
+                  </div>
+                </div>
+
+                {/* Current step */}
+                <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:12,animation:'slideIn 0.3s ease'}}>
+                  <div style={{width:32,height:32,borderRadius:'50%',background:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',flexShrink:0,boxShadow:'0 2px 8px rgba(124,58,237,0.15)'}}>{currentStep.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#7C3AED'}}>{currentStep.label}</div>
+                    <div style={{fontSize:'0.76rem',color:'#9CA3AF',marginTop:2}}>{currentStep.detail}</div>
+                  </div>
+                  <div style={{width:20,height:20,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
+                </div>
+
+                {/* Completed steps */}
+                <div style={{display:'flex',flexDirection:'column' as const,gap:8,marginBottom:24}}>
+                  {completedSteps.map((s,i)=>(
+                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,opacity:0.7}}>
+                      <div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>✓</div>
+                      <span style={{fontSize:'0.82rem',color:'#6B7280'}}>{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Category progress pills */}
+                <div style={{borderTop:'1px solid #F3F4F6',paddingTop:20}}>
+                  <div style={{fontSize:'0.72rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:12}}>Query Categories</div>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap' as const}}>
+                    {[
+                      {label:'General Consumer', queries:10, activeAt:2},
+                      {label:'Cash Back', queries:10, activeAt:3},
+                      {label:'Travel & Rewards', queries:10, activeAt:4},
+                      {label:'Credit Building', queries:10, activeAt:5},
+                      {label:'Expert Recommendation', queries:10, activeAt:6},
+                    ].map((cat,i)=>{
+                      const done = loadingStep > cat.activeAt;
+                      const active = loadingStep === cat.activeAt;
+                      return (
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:done?'#D1FAE5':active?'#EDE9FE':'#F9FAFB',borderRadius:50,padding:'5px 12px',border:`1px solid ${done?'#6EE7B7':active?'#DDD6FE':'#E5E7EB'}`,transition:'all 0.3s'}}>
+                          <span style={{fontSize:'0.7rem',fontWeight:600,color:done?'#065F46':active?'#7C3AED':'#9CA3AF'}}>{done?'✓ ':active?'● ':''}{cat.label}</span>
+                          <span style={{fontSize:'0.65rem',color:done?'#10B981':active?'#9CA3AF':'#D1D5DB'}}>{cat.queries}q</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       ):(
         <div>
