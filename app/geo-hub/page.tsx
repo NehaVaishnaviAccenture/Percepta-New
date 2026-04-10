@@ -323,7 +323,6 @@ Sort the array: HIGH IMPACT items first, then MEDIUM IMPACT, then LOW-MEDIUM IMP
     <div>
       {/* ROI curve */}
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
-        <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>GEO optimization follows an S-curve. Below 70, each point of effort produces outsized returns. Above 80, diminishing returns begin.</div>
         <ROICurve score={geo}/>
         {/* stat cards */}
         {/* 3 stat cards */}
