@@ -10,10 +10,10 @@ const bands = [
 ];
 
 const METRIC_TIPS: Record<string,string> = {
-  'visibility score': 'measures how often your brand appears in ai-generated responses across key industry queries.',
-  'citation score': 'reflects how authoritatively ai models reference your brand compared to competitors.',
-  'sentiment score': 'captures the tone and favorability of ai responses when your brand is mentioned.',
-  'avg rank': 'your average mention position across all ai responses where your brand appeared.',
+  'visibility score': 'Measures how often your brand appears in AI-generated responses across key industry queries.',
+  'citation score': 'Reflects how authoritatively AI models reference your brand compared to competitors.',
+  'sentiment score': 'Captures the tone and favorability of AI responses when your brand is mentioned.',
+  'avg rank': 'Your average mention position across all AI responses where your brand appeared.',
 };
 
 const RADAR_TIPS: Record<string,string> = {
@@ -123,112 +123,96 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score: number }) {
-  const W = 720, H = 360, padL = 52, padR = 28, padT = 54, padB = 56;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const W = 700, H = 400, padL = 52, padR = 28, padT = 48, padB = 90;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
   const curve = (x: number) => Math.round(5 + 90 / (1 + Math.exp(-0.09 * (x - 45))));
   const pts = Array.from({ length: 101 }, (_, x) => ({ x, y: curve(x) }));
   const sx = (v: number) => padL + (v / 100) * plotW;
   const sy = (v: number) => padT + ((100 - v) / 100) * plotH;
-  const scoreToX = (s: number) => { let best = 0, bestDiff = 999; pts.forEach(p => { const d = Math.abs(p.y - s); if (d < bestDiff) { bestDiff = d; best = p.x; } }); return best; };
-
+  const scoreToX = (s: number) => {
+    let best = 0, bestDiff = 999;
+    pts.forEach(p => { const d = Math.abs(p.y - s); if (d < bestDiff) { bestDiff = d; best = p.x; } });
+    return best;
+  };
   const currentX = scoreToX(score), goalX = scoreToX(70), authX = scoreToX(80);
   const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
   const gapPts = score < 70 ? pts.slice(currentX, goalX + 1) : [];
-  const fillD = gapPts.length > 1 ? `${gapPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')} L${sx(goalX)},${padT + plotH} L${sx(currentX)},${padT + plotH} Z` : '';
+  const fillD = gapPts.length > 1
+    ? `${gapPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')} L${sx(goalX)},${padT + plotH} L${sx(currentX)},${padT + plotH} Z`
+    : '';
   const [hov, setHov] = useState<string | null>(null);
-
   const youCX = sx(currentX), youCY = sy(score);
   const goalCX = sx(goalX), goalCY = sy(70);
   const authCX = sx(authX), authCY = sy(80);
-
-  // Stage legend data — centered in the bottom strip
   const stages = [
-    { label: 'Fragmented', range: '0–30', color: '#EF4444', pos: 0.08 },
-    { label: 'Emerging', range: '30–55', color: '#F59E0B', pos: 0.32 },
-    { label: 'Competitive', range: '55–72', color: '#3B82F6', pos: 0.57 },
-    { label: 'Leader', range: '72–85', color: '#10B981', pos: 0.76 },
-    { label: 'Authority', range: '85+', color: '#7C3AED', pos: 0.93 },
+    { label: 'Fragmented', range: '0–30', color: '#EF4444' },
+    { label: 'Emerging', range: '30–55', color: '#F59E0B' },
+    { label: 'Competitive', range: '55–72', color: '#3B82F6' },
+    { label: 'Leader', range: '72–85', color: '#10B981' },
+    { label: 'Authority', range: '85+', color: '#7C3AED' },
   ];
-
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-
-        {/* Title */}
-        <text x={W / 2} y={28} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
-
+        {/* Title only — no subtitle */}
+        <text x={W/2} y={22} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
         {/* Y grid */}
-        {[0, 25, 50, 75, 100].map(v => (
+        {[0,25,50,75,100].map(v=>(
           <g key={v}>
-            <line x1={padL} y1={sy(v)} x2={W - padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1" />
-            <text x={padL - 6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+            <line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/>
+            <text x={padL-6} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
-
         {/* Gap fill */}
-        {fillD && <path d={fillD} fill="#EDE9FE" opacity="0.45" />}
-
-        {/* Threshold at 70 */}
-        <line x1={padL} y1={sy(70)} x2={W - padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4" />
-        <text x={W - padR + 4} y={sy(70)} dominantBaseline="middle" style={{ fontSize: 8, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>70</text>
-
-        {/* S-curve */}
-        <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5" />
-
+        {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.45"/>}
+        {/* Threshold */}
+        <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
+        <text x={W-padR+4} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
+        {/* Curve */}
+        <path d={pathD} fill="none" stroke="#7C3AED" strokeWidth="2.5"/>
         {/* Axes */}
-        <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
-        <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
-
+        <line x1={padL} y1={padT+plotH} x2={W-padR} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
+        <line x1={padL} y1={padT} x2={padL} y2={padT+plotH} stroke="#D1D5DB" strokeWidth="1.5"/>
         {/* X ticks */}
-        {[0, 20, 40, 60, 80, 100].map(v => (
+        {[0,20,40,60,80,100].map(v=>(
           <g key={v}>
-            <line x1={sx(v)} y1={padT + plotH} x2={sx(v)} y2={padT + plotH + 4} stroke="#D1D5DB" strokeWidth="1" />
-            <text x={sx(v)} y={padT + plotH + 14} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+            <line x1={sx(v)} y1={padT+plotH} x2={sx(v)} y2={padT+plotH+4} stroke="#D1D5DB" strokeWidth="1"/>
+            <text x={sx(v)} y={padT+plotH+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
-        <text x={(padL + W - padR) / 2} y={padT + plotH + 26} textAnchor="middle" style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}>GEO Maturity</text>
-        <text x={12} y={padT + plotH / 2} textAnchor="middle" transform={`rotate(-90,12,${padT + plotH / 2})`} style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>GEO Score</text>
-
-        {/* YOU — PURPLE — label above */}
-        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('you')} onMouseLeave={() => setHov(null)}>
-          <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2" />
-          <text x={youCX} y={youCY - 14} textAnchor="middle" style={{ fontSize: 9, fontWeight: 700, fill: '#5B21B6', fontFamily: 'Inter,sans-serif' }}>You ({score})</text>
-          {hov === 'you' && <>
-            <rect x={youCX - 52} y={youCY + 13} width={104} height={20} rx={4} fill="#1F2937" />
-            <text x={youCX} y={youCY + 24} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: {score}</text>
-          </>}
+        <text x={(padL+W-padR)/2} y={padT+plotH+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
+        <text x={12} y={padT+plotH/2} textAnchor="middle" transform={`rotate(-90,12,${padT+plotH/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
+        {/* YOU — purple — label below */}
+        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('you')} onMouseLeave={()=>setHov(null)}>
+          <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+          <text x={youCX} y={youCY+20} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#5B21B6',fontFamily:'Inter,sans-serif'}}>You ({score})</text>
+          {hov==='you'&&<><rect x={youCX-52} y={youCY+32} width={104} height={20} rx={4} fill="#1F2937"/><text x={youCX} y={youCY+43} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: {score}</text></>}
         </g>
-
-        {/* GOAL — AMBER — label to the LEFT */}
-        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('goal')} onMouseLeave={() => setHov(null)}>
-          <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2" />
-          <text x={goalCX - 14} y={goalCY - 14} textAnchor="end" style={{ fontSize: 9, fontWeight: 700, fill: '#92400E', fontFamily: 'Inter,sans-serif' }}>Goal (70)</text>
-          <text x={goalCX - 14} y={goalCY - 3} textAnchor="end" style={{ fontSize: 8, fill: '#92400E', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>&quot;The Sweet Spot&quot;</text>
-          {hov === 'goal' && <>
-            <rect x={goalCX - 118} y={goalCY + 10} width={104} height={20} rx={4} fill="#1F2937" />
-            <text x={goalCX - 66} y={goalCY + 21} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: 70</text>
-          </>}
+        {/* GOAL — amber — label LEFT */}
+        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
+          <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2"/>
+          <text x={goalCX-14} y={goalCY-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#92400E',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
+          <text x={goalCX-14} y={goalCY-5} textAnchor="end" style={{fontSize:8,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>&quot;The Sweet Spot&quot;</text>
+          {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
         </g>
-
-        {/* AUTHORITY — GREEN — label to the LEFT */}
-        <g style={{ cursor: 'pointer' }} onMouseEnter={() => setHov('auth')} onMouseLeave={() => setHov(null)}>
-          <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2" />
-          <text x={authCX - 14} y={authCY - 14} textAnchor="end" style={{ fontSize: 9, fontWeight: 700, fill: '#065F46', fontFamily: 'Inter,sans-serif' }}>Authority (80)</text>
-          <text x={authCX - 14} y={authCY - 3} textAnchor="end" style={{ fontSize: 8, fill: '#065F46', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>Diminishing Returns</text>
-          {hov === 'auth' && <>
-            <rect x={authCX - 118} y={authCY + 10} width={104} height={20} rx={4} fill="#1F2937" />
-            <text x={authCX - 66} y={authCY + 21} textAnchor="middle" style={{ fontSize: 9, fill: 'white', fontWeight: 700, fontFamily: 'Inter,sans-serif' }}>GEO Score: 80</text>
-          </>}
+        {/* AUTHORITY — green — label LEFT */}
+        <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
+          <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
+          <text x={authCX-14} y={authCY-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
+          <text x={authCX-14} y={authCY-5} textAnchor="end" style={{fontSize:8,fill:'#065F46',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Diminishing Returns</text>
+          {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
-
-        {/* Stage legend — centered, small, below x-axis label */}
-        {stages.map((s, i) => (
-          <g key={i}>
-            <text x={padL + s.pos * plotW} y={padT + plotH + 40} textAnchor="middle" style={{ fontSize: 8, fontWeight: 700, fill: s.color, fontFamily: 'Inter,sans-serif' }}>{s.label}</text>
-            <text x={padL + s.pos * plotW} y={padT + plotH + 50} textAnchor="middle" style={{ fontSize: 7, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{s.range}</text>
-          </g>
-        ))}
-
+        {/* Stage legend — 5 equal slots, centered */}
+        {stages.map((s,i)=>{
+          const cx2 = padL + (i+0.5)*(plotW/stages.length);
+          return (
+            <g key={i}>
+              <text x={cx2} y={padT+plotH+50} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:s.color,fontFamily:'Inter,sans-serif'}}>{s.label}</text>
+              <text x={cx2} y={padT+plotH+62} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{s.range}</text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -244,7 +228,7 @@ function GapCards({ result }: { result:any }) {
     const topComp=(result.competitors||[])[0]?.Brand||'top competitor';
     const topCompGEO=(result.competitors||[])[0]?.GEO||'unknown';
     const topCompSOV=(result.competitors||[])[0]?.Sov||'unknown';
-    const prompt=`You are a senior GEO strategist at Accenture. Analyze this brand and generate exactly 5 strategic gaps ranked by impact on AI rank and conversions. These gaps must go BEYOND basic metrics.
+    const prompt=`You are a senior GEO strategist at Accenture. Analyze this brand and generate exactly 5 strategic gaps ranked by impact on AI rank and conversions.
 
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Prominence: ${result.prominence}
@@ -255,26 +239,39 @@ Strengths: ${(result.strengths_list||[]).join('; ')}
 Issues: ${(result.improvements_list||[]).join('; ')}
 
 Use EXACTLY these 5 gap types in order:
-1. Primary Recommendation Rate — how often AI leads with this brand vs just mentions it
-2. Share of Voice vs #1 competitor — specific gap vs ${topComp} with real percentages
-3. Earned Media Authority — which trusted 3rd-party sources AI pulls from and how the brand ranks there
-4. Segment Depth — which audience segments AI does NOT associate with this brand at all
-5. Answer Completeness — whether the brand content is structured for AI extraction
+1. Primary Recommendation Rate
+2. Share of Voice vs #1 competitor — specific gap vs ${topComp}
+3. Earned Media Authority
+4. Segment Depth
+5. Answer Completeness
 
 Return ONLY valid JSON array, no markdown, no backticks. Each object:
-{"title":"gap type: specific finding","impact":"HIGH IMPACT"|"MEDIUM IMPACT"|"LOW-MEDIUM IMPACT","effort":"Low"|"Medium"|"High"|"Low-Medium","currentMetric":number,"targetMetric":number,"color":"#EF4444 for HIGH, #F59E0B for MEDIUM, #7C3AED for LOW-MEDIUM","currentState":"2-3 sentences with real numbers","rootCause":"2-3 sentences","howToFix":"3-4 specific sentences","rankImpact":"specific projected improvement","conversionImpact":"specific projected uplift"}
+{"title":"gap type: specific finding","impact":"HIGH IMPACT"|"MEDIUM IMPACT"|"LOW-MEDIUM IMPACT","effort":"Low"|"Medium"|"High"|"Low-Medium","currentMetric":number,"targetMetric":number,"currentState":"2-3 sentences","rootCause":"2-3 sentences","howToFix":"3-4 sentences","rankImpact":"specific improvement","conversionImpact":"specific uplift"}
 Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
-      .then(r=>r.json()).then(data=>{const text=data.response||'';const clean=text.replace(/```json|```/g,'').trim();const parsed=JSON.parse(clean);const order:Record<string,number>={'HIGH IMPACT':0,'MEDIUM IMPACT':1,'LOW-MEDIUM IMPACT':2};parsed.sort((a:any,b:any)=>(order[a.impact]??3)-(order[b.impact]??3));setGaps(parsed);}).catch(()=>setGaps([])).finally(()=>setLoading(false));
+      .then(r=>r.json()).then(data=>{
+        const text=data.response||'';
+        const clean=text.replace(/```json|```/g,'').trim();
+        const parsed=JSON.parse(clean);
+        const order:Record<string,number>={'HIGH IMPACT':0,'MEDIUM IMPACT':1,'LOW-MEDIUM IMPACT':2};
+        parsed.sort((a:any,b:any)=>(order[a.impact]??3)-(order[b.impact]??3));
+        setGaps(parsed);
+      }).catch(()=>setGaps([])).finally(()=>setLoading(false));
   },[]);
-  const geo=result.overall_geo_score??0,projected=Math.min(geo+22,95);
+
+  const geo=result.overall_geo_score??0, projected=Math.min(geo+22,95);
   const gapColors=['#F59E0B','#10B981','#7C3AED','#EC4899','#3B82F6'];
+
   return (
     <div>
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
         <ROICurve score={geo}/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
-          {[{label:'Current GEO Score',val:geo,color:'#F59E0B',sub:scoreBadge(geo).label+' — '+(geo<70?'below':'above')+' efficiency threshold'},{label:'Projected GEO Score',val:projected,color:'#10B981',sub:'After fixing all 5 gaps below'},{label:'Score Unlock',val:`+${projected-geo} pts`,color:'#7C3AED',sub:'Estimated gain from prioritized gap closure'}].map((c,i)=>(
+          {[
+            {label:'Current GEO Score',val:geo,color:'#F59E0B',sub:scoreBadge(geo).label+' — '+(geo<70?'below':'above')+' efficiency threshold'},
+            {label:'Projected GEO Score',val:projected,color:'#10B981',sub:'After fixing all 5 gaps below'},
+            {label:'Score Unlock',val:`+${projected-geo} pts`,color:'#7C3AED',sub:'Estimated gain from prioritized gap closure'},
+          ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
               <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>{c.label}</div>
               <div style={{fontSize:'2.4rem',fontWeight:900,color:c.color,lineHeight:1}}>{c.val}</div>
@@ -284,20 +281,34 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
         </div>
       </div>
       <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Top 5 Gaps to Fill — Ranked by Impact on Rank & Conversions</div>
-      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what&apos;s broken, why, and how to fix it — with projected rank and conversion impact.</div>
-      {loading&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:32,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}><div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Analysing {result.brand_name}&apos;s strategic gaps…<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>}
+      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what&apos;s broken, why, and how to fix it.</div>
+      {loading&&(
+        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:32,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}>
+          <div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
+          Analysing {result.brand_name}&apos;s strategic gaps…
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      )}
       {!loading&&gaps.map((g,i)=>{
-        const isOpen=expanded===i,pct=Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100);
+        const isOpen=expanded===i, pct=Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100);
         const impactColor=g.impact==='HIGH IMPACT'?'#EF4444':g.impact==='MEDIUM IMPACT'?'#F59E0B':'#7C3AED';
         const impactBg=g.impact==='HIGH IMPACT'?'#FEE2E2':g.impact==='MEDIUM IMPACT'?'#FEF3C7':'#EDE9FE';
         const dotColor=gapColors[i];
         return (
           <div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',marginBottom:10,overflow:'hidden'}}>
             <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 20px',cursor:'pointer'}} onClick={()=>setExpanded(isOpen?null:i)}>
-              <div style={{width:34,height:34,borderRadius:'50%',background:dotColor+'22',border:`2px solid ${dotColor}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><span style={{fontSize:'0.75rem',fontWeight:800,color:dotColor}}>#{i+1}</span></div>
+              <div style={{width:34,height:34,borderRadius:'50%',background:dotColor+'22',border:`2px solid ${dotColor}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <span style={{fontSize:'0.75rem',fontWeight:800,color:dotColor}}>#{i+1}</span>
+              </div>
               <div style={{flex:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' as const}}><span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{g.title}</span><span style={{background:impactBg,color:impactColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span></div>
-                <div style={{display:'flex',gap:16,marginTop:4,flexWrap:'wrap' as const}}><span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⚡ Effort: {g.effort}</span><span style={{fontSize:'0.72rem',fontWeight:600,color:dotColor}}>Score target: {g.currentMetric} → {g.targetMetric}</span></div>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' as const}}>
+                  <span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{g.title}</span>
+                  <span style={{background:impactBg,color:impactColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span>
+                </div>
+                <div style={{display:'flex',gap:16,marginTop:4,flexWrap:'wrap' as const}}>
+                  <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⚡ Effort: {g.effort}</span>
+                  <span style={{fontSize:'0.72rem',fontWeight:600,color:dotColor}}>Score target: {g.currentMetric} → {g.targetMetric}</span>
+                </div>
               </div>
               <span style={{color:'#9CA3AF',fontSize:'1rem'}}>{isOpen?'∧':'›'}</span>
             </div>
@@ -307,12 +318,18 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
                   <div><div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>Current State</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.currentState}</div></div>
                   <div><div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>Root Cause</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.rootCause}</div></div>
                 </div>
-                <div style={{background:'#F5F3FF',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 16px',marginBottom:14}}><div style={{fontSize:'0.78rem',fontWeight:700,color:'#7C3AED',marginBottom:6}}>🔧 How to Fix It</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.howToFix}</div></div>
+                <div style={{background:'#F5F3FF',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 16px',marginBottom:14}}>
+                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'#7C3AED',marginBottom:6}}>🔧 How to Fix It</div>
+                  <div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.howToFix}</div>
+                </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
                   <div style={{background:'#F0FDF4',borderRadius:10,border:'1px solid #6EE7B7',padding:'12px 16px'}}><div style={{fontSize:'0.78rem',fontWeight:700,color:'#10B981',marginBottom:6}}>📈 Rank Impact</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.65}}>{g.rankImpact}</div></div>
                   <div style={{background:'#FFFBEB',borderRadius:10,border:'1px solid #FCD34D',padding:'12px 16px'}}><div style={{fontSize:'0.78rem',fontWeight:700,color:'#92400E',marginBottom:6}}>💰 Conversion Impact</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.65}}>{g.conversionImpact}</div></div>
                 </div>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:'#9CA3AF',marginBottom:6}}><span>Current metric: {g.currentMetric}</span><span style={{color:dotColor,fontWeight:700}}>Target: {g.targetMetric}</span></div>
+                <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:'#9CA3AF',marginBottom:6}}>
+                  <span>Current metric: {g.currentMetric}</span>
+                  <span style={{color:dotColor,fontWeight:700}}>Target: {g.targetMetric}</span>
+                </div>
                 <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}><div style={{background:dotColor,height:6,borderRadius:50,width:`${pct}%`,transition:'width 0.5s'}}/></div>
               </div>
             )}
@@ -476,8 +493,6 @@ function PriorityActionsTable({ result }: { result:any }) {
     if(fetched)return;setFetched(true);setLoading(true);
     const prompt=`You are a GEO strategist. Generate a JSON array of 5-7 specific implementable priority actions for this brand.
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
-Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Citation: ${result.citation_share}
-SOV: ${result.share_of_voice}, Prominence: ${result.prominence}, Avg Rank: ${result.avg_rank}
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
 Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Comparison Page"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
 Order: High first, then Medium, then Low.`;
@@ -698,7 +713,7 @@ export default function GeoHub() {
                       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:8}}>Brands and sources co-cited with {result.brand_name}</div>
                       {(()=>{
                         const brand=result.brand_name||'Brand',comps=(result.competitors||[]).slice(0,3),srcs=sources.slice(0,3);
-                        const W=340,H=260,cx=W/2,cy=H/2;
+                        const W2=340,H2=260,cx=W2/2,cy=H2/2;
                         type N2={id:string;x:number;y:number;label:string;full:string;r:number;fill:string;stroke:string;type:string;pct?:number};
                         const ns:N2[]=[];
                         ns.push({id:'brand',x:cx,y:cy,label:brand.length>10?brand.slice(0,9)+'…':brand,full:brand,r:38,fill:'#7C3AED',stroke:'#7C3AED',type:'brand'});
@@ -707,10 +722,10 @@ export default function GeoHub() {
                         const sA=srcs.map((_:any,i:number)=>-Math.PI*0.15+(i/Math.max(srcs.length-1,1))*Math.PI*0.45);
                         srcs.forEach((s:any,i:number)=>{const dom=(s.domain||'').split('.')[0];ns.push({id:`s${i}`,x:cx+110*Math.cos(sA[i]),y:cy-78*Math.sin(sA[i]),label:dom.slice(0,9),full:s.domain,pct:s.citation_share,r:22,fill:'#6EE7B7',stroke:'#10B981',type:'source'});});
                         const ctr=ns[0];
-                        return <svg viewBox={`0 0 ${W} ${H}`} style={{width:'90%',display:'block',margin:'0 auto'}}>
+                        return <svg viewBox={`0 0 ${W2} ${H2}`} style={{width:'90%',display:'block',margin:'0 auto'}}>
                           {ns.slice(1).map(n=><line key={n.id} x1={ctr.x} y1={ctr.y} x2={n.x} y2={n.y} stroke={n.type==='competitor'?'#C4B5FD':'#6EE7B7'} strokeWidth="1.5" opacity="0.7"/>)}
-                          {ns.map(n=>{const isH=hovNode===n.id,tipW=140,tipH=n.pct!=null?40:30,tx=Math.min(Math.max(n.x-tipW/2,2),W-tipW-2),ty=n.y-n.r-tipH-8<2?n.y+n.r+8:n.y-n.r-tipH-8;return<g key={n.id} onMouseEnter={()=>setHovNode(n.id)} onMouseLeave={()=>setHovNode(null)} style={{cursor:'pointer'}}>{isH&&<circle cx={n.x} cy={n.y} r={n.r+6} fill={n.stroke} opacity="0.2"/>}<circle cx={n.x} cy={n.y} r={n.r} fill={n.fill} stroke={isH?n.stroke:'none'} strokeWidth="2"/>{n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}{n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:800,pointerEvents:'none'}}>{n.pct}%</text>}{n.type!=='brand'&&<text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>}{isH&&<g><rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/><text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>{n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}{n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}</g>}</g>;})}
-                          {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=><g key={i} transform={`translate(${W/2-108+i*78},${H-10})`}><circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:8,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>)}
+                          {ns.map(n=>{const isH=hovNode===n.id,tipW=140,tipH=n.pct!=null?40:30,tx=Math.min(Math.max(n.x-tipW/2,2),W2-tipW-2),ty=n.y-n.r-tipH-8<2?n.y+n.r+8:n.y-n.r-tipH-8;return<g key={n.id} onMouseEnter={()=>setHovNode(n.id)} onMouseLeave={()=>setHovNode(null)} style={{cursor:'pointer'}}>{isH&&<circle cx={n.x} cy={n.y} r={n.r+6} fill={n.stroke} opacity="0.2"/>}<circle cx={n.x} cy={n.y} r={n.r} fill={n.fill} stroke={isH?n.stroke:'none'} strokeWidth="2"/>{n.type==='brand'&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>{n.label}</text>}{n.type==='source'&&n.pct!=null&&<text x={n.x} y={n.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#065F46',fontFamily:'Inter,sans-serif',fontWeight:800,pointerEvents:'none'}}>{n.pct}%</text>}{n.type!=='brand'&&<text x={n.x} y={n.y+n.r+12} textAnchor="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:500,pointerEvents:'none'}}>{n.label}</text>}{isH&&<g><rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/><text x={tx+tipW/2} y={ty+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.full?.length>20?n.full.slice(0,19)+'…':n.full}</text>{n.pct!=null&&<text x={tx+tipW/2} y={ty+28} textAnchor="middle" style={{fontSize:9,fill:'#6EE7B7',fontFamily:'Inter,sans-serif',fontWeight:600}}>Citation share: {n.pct}%</text>}{n.type==='competitor'&&<text x={tx+tipW/2} y={ty+22} textAnchor="middle" style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Co-cited competitor</text>}</g>}</g>;})}
+                          {[{fill:'#7C3AED',label:'Your Brand'},{fill:'#C4B5FD',label:'Competitors'},{fill:'#6EE7B7',label:'Sources'}].map((l,i)=><g key={i} transform={`translate(${W2/2-108+i*78},${H2-10})`}><circle cx={5} cy={0} r={5} fill={l.fill}/><text x={13} y={0} dominantBaseline="middle" style={{fontSize:8,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>)}
                         </svg>;
                       })()}
                     </div>
@@ -752,7 +767,7 @@ export default function GeoHub() {
                     <div style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>Sorted by rank.</div></div>
+                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div></div>
                     <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>{cats.map(c=><option key={c}>{c}</option>)}</select>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
@@ -810,7 +825,14 @@ export default function GeoHub() {
                   <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
                 </div>
                 <div style={{display:'flex',flexDirection:'column' as const,gap:14}}>
-                  {[{q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines. It combines visibility, sentiment, citation authority, share of voice, and prominence into one actionable number.'},{q:'Why does 70 matter?',a:'70 is the efficiency threshold — the point where AI models have accumulated enough high-quality, consistent signals about your brand to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand begins to become a default recommendation.'},{q:'How is the GEO Score calculated?',a:'The score is a weighted composite of 5 signals: Visibility (30%) — how often you appear across AI queries; Sentiment (20%) — the tone AI uses when describing you; Prominence (20%) — how early in responses you appear; Citation Share (15%) — how authoritative your citations are; Share of Voice (15%) — your share of all brand mentions in AI responses.'},{q:'How often is the score updated?',a:"The GEO Score is calculated in real-time each time you run an analysis. Unlike competitors who cache results, every Percepta analysis queries live AI engines with fresh prompts — so your score always reflects the current state of AI responses, not last month's data."},{q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all in AI responses. Prominence measures where it appears — position 1 (mentioned first) vs position 5 (buried mid-list). A brand can have high visibility but low prominence if it always appears at the bottom of AI lists. Both matter for conversions.'},{q:'How do I improve my GEO Score?',a:"The Top 5 Gaps section on the GEO Score tab identifies your highest-impact opportunities ranked by effect on rank and conversions. Generally: build authoritative content that answers specific queries, earn placements on sources AI trusts (NerdWallet, Forbes, etc.), improve your prominence by restructuring content for AI extraction, and expand coverage across audience segments where you're currently invisible."}].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
+                  {[
+                    {q:'What is a GEO Score?',a:'The GEO Score is a single 0–100 number that measures how often and how favorably your brand is cited in AI-generated responses — across ChatGPT, Gemini, Perplexity, and other major AI engines.'},
+                    {q:'Why does 70 matter?',a:'70 is the efficiency threshold — where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},
+                    {q:'How is the GEO Score calculated?',a:'Visibility (30%), Sentiment (20%), Prominence (20%), Citation Share (15%), Share of Voice (15%).'},
+                    {q:'How often is the score updated?',a:"The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data."},
+                    {q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all. Prominence measures where — position 1 vs position 5. Both matter for conversions.'},
+                    {q:'How do I improve my GEO Score?',a:"The Top 5 Gaps section on the GEO Score tab identifies your highest-impact opportunities. Build authoritative content, earn placements on sources AI trusts, restructure content for AI extraction, and expand coverage across segments where you're currently invisible."},
+                  ].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
                 </div>
               </div>
             ))()}
