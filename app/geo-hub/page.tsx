@@ -104,7 +104,7 @@ function GeoGauge({ score, brand }: { score:number; brand:string }) {
 
 function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
   const scoreBands = [
-    { range:'0–44', label:'Poor', color:'#991B1B', bg:'#FFF1F2', border:'#FCA5A5', desc:'Rarely mentioned. AI doesn\'t have enough signals to surface you reliably.' },
+    { range:'0–44', label:'Poor', color:'#991B1B', bg:'#FFF1F2', border:'#FCA5A5', desc:'Rarely mentioned. AI lacks enough signals to surface you reliably.' },
     { range:'45–69', label:'Needs Work', color:'#92400E', bg:'#FFFBEB', border:'#FCD34D', desc:'Appears in lists but not as a primary recommendation. Missing key signals.' },
     { range:'70–79', label:'Good', color:'#1E40AF', bg:'#EFF6FF', border:'#93C5FD', desc:'AI crosses the confidence threshold. Frequent top-3 placements begin.' },
     { range:'80–100', label:'Excellent', color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7', desc:'Dominant brand signal. AI leads with you as the primary recommendation.' },
@@ -115,11 +115,8 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
         <span style={{color:'#7C3AED',fontSize:'1rem'}}>↗</span>
         <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
-      <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 8px'}}>
-        Think of the GEO Score like a credit score for AI. Below 50 (where <strong>{brand}</strong> sits today at <strong>{score}</strong>), AI engines lack enough high-confidence data points to consistently feature your brand. You might appear in a list, but you won't be the one AI describes in detail or recommends first.
-      </p>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
-        <strong style={{color:'#7C3AED'}}>70 is the efficiency threshold</strong> — the point where AI models have enough high-quality, consistent signals to place your brand at the top of responses with statistical confidence. Below this, AI treats your brand as optional. Above it, your brand becomes a default recommendation.
+        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you're not yet the brand AI leads with or recommends first.
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
@@ -135,7 +132,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
 }
 
 function ROICurve({ score }: { score:number }) {
-  const W=700,H=320,padL=52,padR=32,padT=24,padB=50;
+  const W=700,H=300,padL=52,padR=40,padT=32,padB=44;
   const curve=(x:number)=>Math.round(5+90/(1+Math.exp(-0.09*(x-45))));
   const pts=Array.from({length:101},(_,x)=>({x,y:curve(x)}));
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
@@ -150,23 +147,22 @@ function ROICurve({ score }: { score:number }) {
 
   const gapPts=score<70?pts.slice(currentX,goalX+1):[];
   const fillD=gapPts.length>1
-    ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(goalX)},${H-padB} L${sx(currentX)},${H-padB} Z`
-    :'';
+    ?`${gapPts.map((p,i)=>`${i===0?'M':'L'}${sx(p.x)},${sy(p.y)}`).join(' ')} L${sx(goalX)},${H-padB} L${sx(currentX)},${H-padB} Z`:'';
 
   const [hov,setHov]=useState<{x:number;y:number;geo:number}|null>(null);
 
-  const stages=[
-    {label:'Fragmented', range:'0–30',  cx:15,  color:'#EF4444'},
-    {label:'Emerging',   range:'30–55', cx:42,  color:'#F59E0B'},
-    {label:'Competitive',range:'55–72', cx:63,  color:'#3B82F6'},
-    {label:'Leader',     range:'72–85', cx:78,  color:'#10B981'},
-    {label:'Authority',  range:'85+',   cx:93,  color:'#7C3AED'},
-  ];
+  // stagger labels vertically to avoid overlap
+  const youCX=sx(currentX), youCY=sy(score);
+  const goalCX=sx(goalX),   goalCY=sy(70);
+  const authCX=sx(authX),   authCY=sy(80);
 
-  // Dot labels: offset to avoid overlap
-  const youLabelY = sy(score)-14;
-  const goalLabelY = sy(70)-14;
-  const authLabelY = sy(80)-14;
+  const stages=[
+    {label:'Fragmented', range:'0–30',  color:'#EF4444'},
+    {label:'Emerging',   range:'30–55', color:'#F59E0B'},
+    {label:'Competitive',range:'55–72', color:'#3B82F6'},
+    {label:'Leader',     range:'72–85', color:'#10B981'},
+    {label:'Authority',  range:'85+',   color:'#7C3AED'},
+  ];
 
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0',position:'relative' as const}}>
@@ -188,9 +184,9 @@ function ROICurve({ score }: { score:number }) {
         ))}
 
         {/* Gap fill */}
-        {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.5"/>}
+        {fillD&&<path d={fillD} fill="#EDE9FE" opacity="0.4"/>}
 
-        {/* Efficiency threshold at 70 */}
+        {/* Threshold line at 70 */}
         <line x1={padL} y1={sy(70)} x2={W-padR} y2={sy(70)} stroke="#7C3AED" strokeWidth="1.5" strokeDasharray="5,4"/>
         <text x={W-padR+4} y={sy(70)} dominantBaseline="middle" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>70</text>
 
@@ -201,33 +197,34 @@ function ROICurve({ score }: { score:number }) {
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
 
-        {/* X-axis numeric ticks */}
+        {/* X-axis ticks */}
         {[0,20,40,60,80,100].map(v=>(
           <g key={v}>
             <line x1={sx(v)} y1={H-padB} x2={sx(v)} y2={H-padB+4} stroke="#D1D5DB" strokeWidth="1"/>
-            <text x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
+            <text x={sx(v)} y={H-padB+13} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>
           </g>
         ))}
-
-        {/* X-axis label */}
-        <text x={(padL+W-padR)/2} y={H-padB+28} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
-
-        {/* Y-axis label */}
+        <text x={(padL+W-padR)/2} y={H-padB+27} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
         <text x={12} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,12,${(padT+H-padB)/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
 
-        {/* Current dot + label */}
-        <circle cx={sx(currentX)} cy={sy(score)} r={8} fill="#F59E0B" stroke="white" strokeWidth="2"/>
-        <text x={sx(currentX)-12} y={youLabelY} textAnchor="middle" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
+        {/* --- You dot --- */}
+        <circle cx={youCX} cy={youCY} r={8} fill="#F59E0B" stroke="white" strokeWidth="2"/>
+        {/* label above-left */}
+        <text x={youCX-10} y={youCY-16} textAnchor="end" style={{fontSize:9,fill:'#92400E',fontFamily:'Inter,sans-serif',fontWeight:700}}>You ({score})</text>
 
-        {/* Goal dot + label */}
-        <circle cx={sx(goalX)} cy={sy(70)} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
-        <text x={sx(goalX)+8} y={goalLabelY} textAnchor="middle" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Goal (70) — Sweet Spot</text>
+        {/* --- Goal dot --- */}
+        <circle cx={goalCX} cy={goalCY} r={7} fill="#EF4444" stroke="white" strokeWidth="2"/>
+        {/* label: two lines above-right */}
+        <text x={goalCX+12} y={goalCY-18} textAnchor="start" style={{fontSize:9,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontWeight:700}}>Goal (70)</text>
+        <text x={goalCX+12} y={goalCY-7} textAnchor="start" style={{fontSize:8,fill:'#EF4444',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>"The Sweet Spot"</text>
 
-        {/* Authority dot + label */}
-        <circle cx={sx(authX)} cy={sy(80)} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
-        <text x={sx(authX)+10} y={authLabelY} textAnchor="middle" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80) — Dim. Returns</text>
+        {/* --- Authority dot --- */}
+        <circle cx={authCX} cy={authCY} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+        {/* label: two lines above-right */}
+        <text x={authCX+12} y={authCY-18} textAnchor="start" style={{fontSize:9,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontWeight:700}}>Authority (80)</text>
+        <text x={authCX+12} y={authCY-7} textAnchor="start" style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Diminishing Returns</text>
 
-        {/* Hover */}
+        {/* Hover tooltip */}
         {hov&&(
           <g>
             <line x1={hov.x} y1={padT} x2={hov.x} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="3,3"/>
@@ -238,12 +235,12 @@ function ROICurve({ score }: { score:number }) {
         )}
       </svg>
 
-      {/* Stage legend replacing old dot legend */}
-      <div style={{display:'flex',justifyContent:'space-around',padding:'6px 16px 12px',flexWrap:'wrap' as const}}>
+      {/* Stage legend — centered */}
+      <div style={{display:'flex',justifyContent:'center',gap:28,padding:'8px 0 12px',flexWrap:'wrap' as const}}>
         {stages.map((s,i)=>(
-          <div key={i} style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:2}}>
-            <span style={{fontSize:'0.75rem',fontWeight:700,color:s.color}}>{s.label}</span>
-            <span style={{fontSize:'0.68rem',color:'#9CA3AF'}}>{s.range}</span>
+          <div key={i} style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:1}}>
+            <span style={{fontSize:'0.72rem',fontWeight:700,color:s.color}}>{s.label}</span>
+            <span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>{s.range}</span>
           </div>
         ))}
       </div>
@@ -328,6 +325,7 @@ Sort the array: HIGH IMPACT items first, then MEDIUM IMPACT, then LOW-MEDIUM IMP
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
         <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>GEO optimization follows an S-curve. Below 70, each point of effort produces outsized returns. Above 80, diminishing returns begin.</div>
         <ROICurve score={geo}/>
+        {/* stat cards */}
         {/* 3 stat cards */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           <div style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
