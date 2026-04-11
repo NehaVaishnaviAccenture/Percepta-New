@@ -261,7 +261,9 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
       }).catch(()=>setGaps([])).finally(()=>setLoading(false));
   },[]);
 
-  const geo=result.overall_geo_score??0, projected=Math.min(geo+22,95);
+  const geo=result.overall_geo_score??0;
+  const maxGain = geo >= 80 ? 10 : geo >= 70 ? 12 : 22;
+  const projected=Math.min(geo + maxGain, 95);
   const gapColors=['#F59E0B','#10B981','#7C3AED','#EC4899','#3B82F6'];
 
   return (
@@ -1005,6 +1007,12 @@ export default function GeoHub() {
 
               // Real URLs per known domain — earned + institution + owned
               const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
+              // Strict match — domain key must equal the brand key exactly, not just contain it
+              // This prevents "jpmorganchase" matching "chase"
+              const domainMatchesBrand = (domain: string) => {
+                const dk = domain.replace('www.','').split('.')[0].toLowerCase();
+                return dk === brandKey3 || dk.startsWith(brandKey3) || brandKey3.startsWith(dk.replace(/[^a-z]/g,''));
+              };
               const OWNED_URLS: Record<string,string[]> = {
                 'capitalone': ['https://www.capitalone.com/credit-cards/','https://www.capitalone.com/credit-cards/venture/','https://www.capitalone.com/credit-cards/quicksilver/','https://www.capitalone.com/credit-cards/savor/','https://www.capitalone.com/credit-cards/secured/'],
                 'chase':      ['https://www.chase.com/personal/credit-cards','https://www.chase.com/personal/credit-cards/sapphire','https://www.chase.com/personal/credit-cards/freedom','https://www.chase.com/personal/credit-cards/ink-business','https://www.chase.com/personal/credit-cards/amazon'],
@@ -1076,15 +1084,14 @@ export default function GeoHub() {
                 const base = sources.length > 0 ? sources : allSourcesToClassify.map((s:any, i:number) => ({
                   rank: i+1, domain: s.domain, citation_share: s.citation_share, category: classifyDomain(s.domain).label
                 }));
-                const brandKey = brandDomain.replace('www.','').split('.')[0];
-                const hasBrandDomain = base.some((s:any) => (s.domain||'').replace('www.','').includes(brandKey));
+                const hasBrandDomain = base.some((s:any) => domainMatchesBrand(s.domain||''));
                 if (brandDomain && !hasBrandDomain) {
                   const ownedEntry = { rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true };
                   return [ownedEntry, ...base].map((s:any, i:number) => ({ ...s, rank: i+1 }));
                 }
                 return base.map((s:any) => ({
                   ...s,
-                  isOwned: brandKey && (s.domain||'').replace('www.','').includes(brandKey),
+                  isOwned: domainMatchesBrand(s.domain||''),
                 }));
               };
               const displaySources = buildDisplaySources();
@@ -1126,8 +1133,7 @@ export default function GeoHub() {
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','CITATION SHARE %',''].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{displaySources.map((s:any,i:number)=>{
-                        const brandKey2 = brandDomain.replace('www.','').split('.')[0];
-                        const isOwned = s.isOwned || (brandKey2 && (s.domain||'').replace('www.','').includes(brandKey2));
+                        const isOwned = s.isOwned || domainMatchesBrand(s.domain||'');
                         const cls = isOwned ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                         const bw=Math.min(s.citation_share,100);
                         const isExp=expandedDomain===s.domain;
