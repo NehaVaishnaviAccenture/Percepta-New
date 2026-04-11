@@ -56,7 +56,7 @@ function extractBrand(pageData: any): string {
     chase: 'Chase', vw: 'Volkswagen', volkswagen: 'Volkswagen', bmw: 'BMW',
     amex: 'American Express', americanexpress: 'American Express',
     bofa: 'Bank of America', bankofamerica: 'Bank of America',
-    wellsfargo: 'Wells Fargo', usaa: 'USAA', capitalone: 'Capital One',
+    wellsfargo: 'Wells Fargo', wells: 'Wells Fargo', usaa: 'USAA', capitalone: 'Capital One',
     discover: 'Discover', citi: 'Citi', citibank: 'Citi', barclays: 'Barclays',
     synchrony: 'Synchrony', toyota: 'Toyota', ford: 'Ford', honda: 'Honda',
     tesla: 'Tesla', hyundai: 'Hyundai', kia: 'Kia', nissan: 'Nissan',
@@ -66,12 +66,18 @@ function extractBrand(pageData: any): string {
     spotify: 'Spotify', adobe: 'Adobe', salesforce: 'Salesforce',
     walmart: 'Walmart', target: 'Target', nike: 'Nike', adidas: 'Adidas',
   };
-  const domain = (pageData.domain || '').toLowerCase().replace('www.', '');
+  const domain = (pageData.domain || pageData.url || '').toLowerCase().replace('www.', '');
   const dk = domain.split('.')[0];
+  // Always try domain key first — most reliable
   if (D2B[dk]) return D2B[dk];
   for (const [k, v] of Object.entries(D2B)) { if (dk.includes(k)) return v; }
+  // Also check the original URL string directly
+  const urlStr = (pageData.url || '').toLowerCase();
+  for (const [k, v] of Object.entries(D2B)) { if (urlStr.includes(k + '.') || urlStr.includes('/' + k)) return v; }
+  // Skip generic/redirect page titles
   const title = pageData.title || '';
-  if (title) {
+  const genericTitles = ['thanks for visiting', 'page not found', '404', 'access denied', 'redirecting', 'just a moment', 'attention required', 'error'];
+  if (title && !genericTitles.some(g => title.toLowerCase().includes(g))) {
     for (const sep of ['|', '–', '-', '·']) {
       if (title.includes(sep)) {
         const segs = title.split(sep).map((s: string) => s.trim()).reverse();
