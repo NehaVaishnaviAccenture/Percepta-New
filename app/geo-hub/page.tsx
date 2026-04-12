@@ -606,19 +606,20 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
   // Top 20 competitors by Vis, include citation for bubble size
   const top20 = competitors.slice(0,20);
   const all=[{label:brand,x:vis,y:sent,cit:cit,isYou:true},...top20.map(c=>({label:c.Brand,x:c.Vis,y:c.Sen??c.Sent??0,cit:c.Cit??30,isYou:false}))];
-  const W=780,H=380,padL=52,padR=110,padT=28,padB=52;
+  const W=800,H=400,padL=52,padR=20,padT=28,padB=52;
   const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
   const xMin=Math.max(0,Math.min(...xVals)-8),xMax=Math.max(...xVals)+12,yMin=Math.max(0,Math.min(...yVals)-8),yMax=Math.min(100,Math.max(...yVals)+12);
   const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
   const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
   const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length),avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
-  // Bubble radius: min 5, max 18, scaled by citation score
+  // Bubble radius: gentle scaling so no bubble dwarfs others
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
   const bubbleR=(c:number,isYou:boolean)=>{
-    if(isYou) return Math.round(6+((c-citMin)/(citMax-citMin+1))*12);
-    return Math.round(5+((c-citMin)/(citMax-citMin+1))*13);
+    const t=(c-citMin)/Math.max(citMax-citMin,1);
+    if(isYou) return Math.round(9+t*9);   // 9–18 for you
+    return Math.round(6+t*9);              // 6–15 for competitors
   };
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
@@ -631,13 +632,12 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         {all.map((a,i)=>{
           const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i,r=bubbleR(a.cit,a.isYou);
-          const shortName=a.label.length>10?a.label.slice(0,9)+'…':a.label;
           const tipW=160,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-padR-tipW),ty=cy2>padT+70?cy2-tipH-10:cy2+r+8;
           return<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
             {isH&&<circle cx={cx2} cy={cy2} r={r+5} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.12"/>}
             <circle cx={cx2} cy={cy2} r={r} fill={a.isYou?'#7C3AED':'#CBD5E1'} stroke={a.isYou?'#5B21B6':'#9CA3AF'} strokeWidth={a.isYou?2:1}/>
-            {/* Label to the right of bubble, small, grey */}
-            <text x={cx2+r+4} y={cy2} dominantBaseline="middle" style={{fontSize:9,fill:a.isYou?'#5B21B6':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:a.isYou?700:400,pointerEvents:'none'}}>{shortName}</text>
+            {/* Full name label — positioned right of bubble, never truncated */}
+            <text x={cx2+r+5} y={cy2} dominantBaseline="middle" style={{fontSize:9,fill:a.isYou?'#5B21B6':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:a.isYou?700:400,pointerEvents:'none'}}>{a.label}</text>
             {isH&&<g>
               <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
               <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
