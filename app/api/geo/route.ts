@@ -165,10 +165,10 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which credit card has the lowest interest rates?'],
       ['Expert Recommendation', 'What credit card do most Americans use and recommend?'],
     ],
-    comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'Penfed', 'TD Bank', 'Regions', 'Ally', 'Marcus', 'Chime', 'SoFi', 'Apple Card', 'PayPal Credit'],
-    compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', Penfed: 'penfed.org', 'TD Bank': 'td.com', Regions: 'regions.com', Ally: 'ally.com', Marcus: 'marcus.com', Chime: 'chime.com', SoFi: 'sofi.com', 'Apple Card': 'apple.com/apple-card', 'PayPal Credit': 'paypal.com' },
+    comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'PenFed', 'TD Bank', 'US Bank', 'Regions Bank', 'Citizens Bank', 'Truist', 'Fifth Third', 'KeyBank', 'Huntington'],
+    compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', 'PenFed': 'penfed.org', 'TD Bank': 'td.com', 'US Bank': 'usbank.com', 'Regions Bank': 'regions.com', 'Citizens Bank': 'citizensbank.com', Truist: 'truist.com', 'Fifth Third': '53.com', KeyBank: 'key.com', Huntington: 'huntington.com' },
     label: 'Financial Services',
-    awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, penfed: 18, 'td bank': 22, regions: 16, ally: 26, marcus: 20, chime: 24, sofi: 22, 'apple card': 30, 'paypal credit': 28 },
+    awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, 'penfed': 16, 'td bank': 20, 'us bank': 24, 'regions bank': 14, 'citizens bank': 16, truist: 18, 'fifth third': 14, keybank: 12, huntington: 13 },
   },
   auto: {
     name: 'automotive',
@@ -926,24 +926,24 @@ Return ONLY valid JSON, no markdown:
           return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
         if (c.Brand === 'Navy Federal')
           return { ...c, GEO: Math.min(c.GEO, 30), Rank: 'N/A' };
-        if (c.Brand === 'Penfed')
-          return { ...c, GEO: Math.min(c.GEO, 18), Rank: 'N/A' };
+        if (c.Brand === 'PenFed')
+          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
         if (c.Brand === 'TD Bank')
           return { ...c, GEO: Math.min(c.GEO, 22), Rank: 'N/A' };
-        if (c.Brand === 'Regions')
-          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
-        if (c.Brand === 'Ally')
-          return { ...c, GEO: Math.min(c.GEO, 28), Rank: 'N/A' };
-        if (c.Brand === 'Marcus')
-          return { ...c, GEO: Math.min(c.GEO, 20), Rank: 'N/A' };
-        if (c.Brand === 'Chime')
+        if (c.Brand === 'US Bank')
           return { ...c, GEO: Math.min(c.GEO, 26), Rank: 'N/A' };
-        if (c.Brand === 'SoFi')
-          return { ...c, GEO: Math.min(c.GEO, 24), Rank: 'N/A' };
-        if (c.Brand === 'Apple Card')
-          return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
-        if (c.Brand === 'PayPal Credit')
-          return { ...c, GEO: Math.min(c.GEO, 22), Rank: 'N/A' };
+        if (c.Brand === 'Regions Bank')
+          return { ...c, GEO: Math.min(c.GEO, 14), Rank: 'N/A' };
+        if (c.Brand === 'Citizens Bank')
+          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
+        if (c.Brand === 'Truist')
+          return { ...c, GEO: Math.min(c.GEO, 18), Rank: 'N/A' };
+        if (c.Brand === 'Fifth Third')
+          return { ...c, GEO: Math.min(c.GEO, 14), Rank: 'N/A' };
+        if (c.Brand === 'KeyBank')
+          return { ...c, GEO: Math.min(c.GEO, 12), Rank: 'N/A' };
+        if (c.Brand === 'Huntington')
+          return { ...c, GEO: Math.min(c.GEO, 13), Rank: 'N/A' };
         return c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
