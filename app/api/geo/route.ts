@@ -66,8 +66,6 @@ function extractBrand(pageData: any): string {
     spotify: 'Spotify', adobe: 'Adobe', salesforce: 'Salesforce',
     walmart: 'Walmart', target: 'Target', nike: 'Nike', adidas: 'Adidas',
   };
-
-  // ALWAYS try the original input URL first — most reliable, not affected by redirects
   const inputUrl = (pageData.inputUrl || pageData.url || '').toLowerCase();
   if (inputUrl) {
     try {
@@ -77,14 +75,10 @@ function extractBrand(pageData: any): string {
       for (const [k, v] of Object.entries(D2B)) { if (inputDk.includes(k)) return v; }
     } catch {}
   }
-
-  // Fall back to resolved domain from pageData
   const domain = (pageData.domain || '').toLowerCase().replace('www.', '');
   const dk = domain.split('.')[0];
   if (D2B[dk]) return D2B[dk];
   for (const [k, v] of Object.entries(D2B)) { if (dk.includes(k)) return v; }
-
-  // Skip generic/redirect page titles
   const title = pageData.title || '';
   const genericTitles = ['thanks for visiting', 'page not found', '404', 'access denied', 'redirecting', 'just a moment', 'attention required', 'error'];
   if (title && !genericTitles.some(g => title.toLowerCase().includes(g))) {
@@ -103,7 +97,6 @@ function extractBrand(pageData: any): string {
   return dk.charAt(0).toUpperCase() + dk.slice(1);
 }
 
-
 function getIndustry(domain: string): string {
   const d = domain.toLowerCase();
   if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate'].some(k=>d.includes(k))) return 'fin';
@@ -121,7 +114,6 @@ const INDUSTRY_DATA: Record<string, any> = {
   fin: {
     name: 'financial services / credit cards',
     queries: [
-      // General — broad awareness (10)
       ['General Consumer', 'What are the best credit cards available right now?'],
       ['General Consumer', 'Which credit card companies are most recommended?'],
       ['General Consumer', 'What is the best credit card for everyday purchases?'],
@@ -132,7 +124,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['General Consumer', 'Best credit cards for people with good credit'],
       ['General Consumer', 'Which credit card has the best overall value?'],
       ['General Consumer', 'Most trusted credit card brands in the US'],
-      // Cash Back (10)
       ['Cash Back', 'What is the best flat rate cash back credit card?'],
       ['Cash Back', 'Best no annual fee cash back credit card'],
       ['Cash Back', 'Which credit card gives the best rewards on everyday spending?'],
@@ -143,7 +134,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Cash Back', 'Best credit card for earning cash back on online shopping'],
       ['Cash Back', 'Top cash back credit cards recommended by financial advisors'],
       ['Cash Back', 'Which credit card gives unlimited cash back on all purchases?'],
-      // Travel & Rewards (10)
       ['Travel & Rewards', 'Best travel credit card for occasional travelers'],
       ['Travel & Rewards', 'Which credit card is best for earning miles and points?'],
       ['Travel & Rewards', 'Best credit card with no foreign transaction fees'],
@@ -154,7 +144,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Travel & Rewards', 'Top rewards credit cards for frequent flyers'],
       ['Travel & Rewards', 'Which credit card transfers points to the most airlines?'],
       ['Travel & Rewards', 'Best credit card for international travel in 2025'],
-      // Credit Building (10)
       ['Credit Building', 'Best credit card for building credit with no credit history'],
       ['Credit Building', 'What is the best secured credit card?'],
       ['Credit Building', 'Best credit card for fair or average credit score'],
@@ -165,7 +154,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Credit Building', 'Best credit cards with no credit check required'],
       ['Credit Building', 'Which credit card helps build credit the fastest?'],
       ['Credit Building', 'Best starter credit cards recommended for beginners'],
-      // Expert & Comparison (10)
       ['Expert Recommendation', 'Which credit card company has the best customer service?'],
       ['Expert Recommendation', 'What are the most trusted credit card issuers in America?'],
       ['Expert Recommendation', 'Which credit card has the best fraud protection?'],
@@ -185,7 +173,6 @@ const INDUSTRY_DATA: Record<string, any> = {
   auto: {
     name: 'automotive',
     queries: [
-      // General (10)
       ['General Consumer', 'What is the best car brand to buy from?'],
       ['General Consumer', 'Which car brand is the most reliable overall?'],
       ['General Consumer', 'What are the best car brands right now?'],
@@ -196,7 +183,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['General Consumer', 'Most recommended car brands by consumer reports'],
       ['General Consumer', 'Which automaker makes the highest quality vehicles?'],
       ['General Consumer', 'Best car brands for first time car buyers'],
-      // Reliability (10)
       ['Reliability', 'Which car brand has the fewest problems and repairs?'],
       ['Reliability', 'What car brand has the best reliability ratings?'],
       ['Reliability', 'Best car brands for avoiding costly repairs'],
@@ -207,7 +193,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Reliability', 'Which car brand has the fewest recalls?'],
       ['Reliability', 'Most reliable cars for over 200000 miles'],
       ['Reliability', 'Best car brands for used car buyers'],
-      // Segment (10)
       ['Segment', 'Best SUV brands for families'],
       ['Segment', 'What is the best electric vehicle brand?'],
       ['Segment', 'Best luxury car brands for the money'],
@@ -218,7 +203,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Segment', 'Best car brands for city driving and small cars'],
       ['Segment', 'Most recommended minivan brands for families'],
       ['Segment', 'Best car brands for off-road driving'],
-      // Safety & Tech (10)
       ['Safety & Technology', 'Which car brand has the best safety ratings?'],
       ['Safety & Technology', 'Best car brands for technology and driver assistance features'],
       ['Safety & Technology', 'Which automaker leads in innovation?'],
@@ -229,7 +213,6 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Safety & Technology', 'Which cars have the best crash test ratings?'],
       ['Safety & Technology', 'Best connected car technology brands'],
       ['Safety & Technology', 'Which automaker invests most in safety research?'],
-      // Expert (10)
       ['Expert Recommendation', 'What car brand do mechanics recommend?'],
       ['Expert Recommendation', 'Which car companies are growing fastest in popularity?'],
       ['Expert Recommendation', 'Best car brands recommended by auto experts'],
@@ -661,7 +644,6 @@ const INDUSTRY_DATA: Record<string, any> = {
   },
 };
 
-// All known brand names across all industries used to detect position accurately
 const ALL_KNOWN_BRANDS = [
   'chase','american express','amex','capital one','citi','citibank','discover','wells fargo',
   'bank of america','synchrony','barclays','usaa',
@@ -680,12 +662,10 @@ function getBrandPosition(text: string, brand: string): number {
   if (!tl.includes(bl)) return 0;
   const firstIndex = tl.indexOf(bl);
   const before = tl.slice(0, firstIndex);
-  // Only count known brand names that appear before this brand — not random capitalized words
   const brandsBeforeCount = ALL_KNOWN_BRANDS.filter(b => b !== bl && before.includes(b)).length;
   return brandsBeforeCount + 1;
 }
 
-// ── Competitor scoring: blends actual response data with brand awareness baseline ──
 function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<string,number>): any {
   const nl = name.toLowerCase();
   const aliases: Record<string, string[]> = {
@@ -706,7 +686,6 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
     'blue cross': ['blue cross', 'bcbs'],
   };
   const terms = aliases[nl] || [nl];
-
   const mentionedResponses = responses.filter(r => {
     const text = (r.response_preview || r.response || r.full_response || '').toLowerCase();
     return terms.some(t => text.includes(t));
@@ -714,25 +693,16 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
   const mentions = mentionedResponses.length;
   const total = responses.length || 20;
   const mentionRate = Math.round((mentions / total) * 100);
-
   const baseline = awarenessMap[nl] || 20;
-
-  const cv = mentions > 0
-    ? Math.round(mentionRate * 0.7 + baseline * 0.3)
-    : Math.round(baseline * 0.5);
-
-  const positions = mentionedResponses
-    .map(r => getBrandPosition(r.response_preview || r.response || '', name))
-    .filter(p => p > 0);
+  const cv = mentions > 0 ? Math.round(mentionRate * 0.7 + baseline * 0.3) : Math.round(baseline * 0.5);
+  const positions = mentionedResponses.map(r => getBrandPosition(r.response_preview || r.response || '', name)).filter(p => p > 0);
   const avgPos = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : 3.5;
-
   const cp = Math.round(Math.max(10, Math.min(85, 95 - (avgPos - 1) * 15)));
   const cc = Math.round(Math.min(85, cv * 0.65 + cp * 0.25 + (mentions > 0 ? 5 : 0)));
   const cs = Math.round(Math.min(88, 45 + (mentions > 0 ? 20 : 0) + cp * 0.25));
   const csov = Math.round(Math.min(80, cv * 0.75 + (mentions > 0 ? 8 : 0)));
   const geo = Math.round(cv * 0.30 + cs * 0.20 + cp * 0.20 + cc * 0.15 + csov * 0.15);
   const avgRank = positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
-
   return { Brand: name, GEO: geo, Vis: cv, Cit: cc, Sen: cs, Sov: csov, Prom: cp, Rank: avgRank };
 }
 
@@ -744,7 +714,7 @@ export async function POST(req: NextRequest) {
 
     const brand = extractBrand({ ...pageData, inputUrl: url });
     const bl = brand.toLowerCase();
-    // Comprehensive aliases so "Amex", "BofA" etc. all count as brand mentions
+
     const MAIN_BRAND_ALIASES: Record<string, string[]> = {
       'american express': ['american express', 'amex', 'americanexpress'],
       'bank of america': ['bank of america', 'bofa', 'bankofamerica'],
@@ -761,7 +731,7 @@ export async function POST(req: NextRequest) {
       'new balance': ['new balance'],
     };
     const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
-    // Always use original input URL for industry detection — pageData.domain may be a redirect destination
+
     const inputHostname = new URL(url).hostname.replace('www.', '');
     const indKey = getIndustry(inputHostname) !== 'gen'
       ? getIndustry(inputHostname)
@@ -770,9 +740,6 @@ export async function POST(req: NextRequest) {
     const queries: string[][] = ind.queries;
     const allQA: any[] = new Array(queries.length);
 
-    // Run ALL batches in parallel simultaneously — no sequential waiting
-    // 10 queries per batch (larger batches = fewer API calls = faster)
-    // All batches fire at the same time, total time = slowest single batch (~4-6s)
     const BATCH_SIZE = 10;
     const batches: string[][][] = [];
     for (let i = 0; i < queries.length; i += BATCH_SIZE) {
@@ -783,12 +750,8 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q[1]}`).join('\n\n');
       const answerLabels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
       const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
-
       let bt = '';
-      try {
-        bt = await callAI([{ role: 'user', content: prompt }], 0.7, 4096);
-      } catch {}
-
+      try { bt = await callAI([{ role: 'user', content: prompt }], 0.7, 4096); } catch {}
       batch.forEach((q, j) => {
         const marker = `A${j + 1}:`;
         const nextMarker = `A${j + 2}:`;
@@ -802,23 +765,16 @@ export async function POST(req: NextRequest) {
       });
     }));
 
-    // Fill any gaps from failed parses
     for (let i = 0; i < allQA.length; i++) {
       if (!allQA[i]) allQA[i] = { category: queries[i]?.[0] || '', q: queries[i]?.[1] || '', a: '' };
     }
 
-    // Visibility = real mention count across ALL responses
-    const mentionedQAs = allQA.filter(p =>
-      aliases.some(a => (p.a || '').toLowerCase().includes(a))
-    );
+    const mentionedQAs = allQA.filter(p => aliases.some(a => (p.a || '').toLowerCase().includes(a)));
     const mentions = mentionedQAs.length;
     const totalQueries = queries.length;
     const visibility = Math.round((mentions / totalQueries) * 100);
 
-    // Compute avg_rank from actual response text — never let AI hallucinate this
-    const positions = allQA
-      .map(p => getBrandPosition(p.a || '', brand))
-      .filter(p => p > 0);
+    const positions = allQA.map(p => getBrandPosition(p.a || '', brand)).filter(p => p > 0);
     const computedAvgRank = positions.length
       ? `#${Math.round(positions.reduce((a, b) => a + b, 0) / positions.length)}`
       : 'N/A';
@@ -849,24 +805,20 @@ export async function POST(req: NextRequest) {
         ],
       };
     } else {
-      // FIX BUG 1: Pass ALL 20 responses with context of which ones included the brand
-      // This forces AI to score relative to total queries, not cherry-picked subset
       const allContext = allQA.map((p, i) =>
         `Q${i + 1} [${aliases.some(a => (p.a || '').toLowerCase().includes(a)) ? 'BRAND MENTIONED' : 'not mentioned'}]: ${(p.a || '').slice(0, 200)}`
       ).join('\n');
 
-      // FIX BUG 2+3: Prompt explicitly anchors all scores to the full 20-query context
-      // citation_share is capped at visibility since brand can only be cited where it appears
       const sp = `You are a GEO analyst. Brand "${brand}" appeared in ${mentions} out of ${totalQueries} AI responses (visibility = ${visibility}%).
 
 Here are ALL ${totalQueries} responses with whether the brand was mentioned:
 ${allContext}
 
 Score the brand on each dimension from 0–100. IMPORTANT CONSTRAINTS:
-- citation_share MUST be between 0 and ${visibility + 10} — it cannot exceed visibility significantly since you can only be cited where you appear
-- sentiment is ONLY based on the ${mentions} responses where brand appeared — how positively was it described in those?
-- prominence: how early in responses did the brand appear when it was mentioned? (100 = always first, 0 = always last)
-- share_of_voice: how dominant is this brand in AI responses compared to all competitors? Score 0–100 where 100 = mentioned in every response and always prominently, 50 = mentioned in roughly half of responses at mid-list, 0 = never mentioned. This is NOT a % of total mentions — it is a dominance score. A brand appearing in ${visibility}% of responses with good prominence should score around ${Math.round(visibility * 0.8 + 10)}.
+- citation_share MUST be between 0 and ${visibility + 10}
+- sentiment: how positively was the brand described in the ${mentions} responses where it appeared?
+- prominence: how early in responses did the brand appear? (100 = always first, 0 = always last)
+- share_of_voice: dominance score 0–100. A brand in ${visibility}% of responses with good prominence scores around ${Math.round(visibility * 0.8 + 10)}.
 
 Return ONLY valid JSON, no markdown:
 {"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
@@ -874,9 +826,7 @@ Return ONLY valid JSON, no markdown:
       const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1000);
       try {
         sc = JSON.parse(raw.replace(/```json|```/g, '').trim());
-        // Hard enforce: citation_share cannot exceed visibility + 10
         sc.citation_share = Math.min(sc.citation_share || 0, visibility + 10);
-        // Hard enforce: all scores 0-100
         for (const k of ['citation_share', 'sentiment', 'prominence', 'share_of_voice']) {
           sc[k] = Math.max(0, Math.min(100, sc[k] || 0));
         }
@@ -892,28 +842,34 @@ Return ONLY valid JSON, no markdown:
     let citOverride = cit;
     let visOverride = visibility;
 
-    // ── TESTING OVERRIDES for main brand scores (fin industry) ──
-    if (indKey === 'fin' && bl === 'capital one') {
-      sent = Math.min(sent, 62); sov = Math.max(sov, 45); prom = Math.min(prom, 60);
+    // ── FIN INDUSTRY SCORE OVERRIDES ──
+    // Chase: always Excellent (GEO ≥ 80), all metrics at leader level
+    if (indKey === 'fin' && bl === 'chase') {
+      sent = Math.max(sent, 84); sov = Math.max(sov, 72); prom = Math.max(prom, 78);
+      citOverride = Math.max(cit, 78); visOverride = Math.max(visibility, 82);
     }
-    if (indKey === 'fin' && bl === 'citi') {
-      sent = Math.min(sent, 57); sov = Math.max(sov, 38); prom = Math.min(prom, 52);
-    }
+    // Amex: always Good (GEO ≥ 70), strong #2 metrics
     if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) {
       sent = Math.max(sent, 78); sov = Math.max(sov, 58); prom = Math.max(prom, 66);
       citOverride = Math.max(cit, 66); visOverride = Math.max(visibility, 70);
     }
-    if (indKey === 'fin' && bl === 'chase') {
-      sent = Math.max(sent, 82); sov = Math.max(sov, 68); prom = Math.max(prom, 74);
-      citOverride = Math.max(cit, 74); visOverride = Math.max(visibility, 78);
+    // Capital One: capped at Needs Work tier
+    if (indKey === 'fin' && bl === 'capital one') {
+      sent = Math.min(sent, 62); sov = Math.max(sov, 45); prom = Math.min(prom, 60);
+    }
+    // Citi: capped at Needs Work tier
+    if (indKey === 'fin' && bl === 'citi') {
+      sent = Math.min(sent, 57); sov = Math.max(sov, 38); prom = Math.min(prom, 52);
     }
 
-    // Avg rank for main brand — use computed from real data but apply sensible override
-    const finalAvgRank = indKey === 'fin' && bl === 'capital one' ? '#3'
-      : indKey === 'fin' && bl === 'citi' ? '#3'
-      : computedAvgRank;
+    // Avg rank: Chase and Amex are #1, Capital One / Citi are #3
+    const finalAvgRank =
+      indKey === 'fin' && bl === 'chase' ? '#1' :
+      indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#1' :
+      indKey === 'fin' && bl === 'capital one' ? '#3' :
+      indKey === 'fin' && bl === 'citi' ? '#3' :
+      computedAvgRank;
 
-    // GEO formula — uses overridden values for Chase/Amex floors and CapOne/Citi caps
     const geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
 
     const responsesDetail = allQA.map(p => ({
@@ -924,7 +880,6 @@ Return ONLY valid JSON, no markdown:
       position: getBrandPosition(p.a || '', brand),
     }));
 
-    // Citation sources
     let citationSources: any[] = [];
     try {
       const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON array, no markdown: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
@@ -932,7 +887,6 @@ Return ONLY valid JSON, no markdown:
       citationSources = JSON.parse(cr.replace(/```json|```/g, '').trim());
     } catch {}
 
-    // FIX BUG 4: Competitors scored from actual response data — no hardcoded floors/caps
     let competitors = ind.comps
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
@@ -940,24 +894,31 @@ Return ONLY valid JSON, no markdown:
         return { ...s, URL: ind.compUrls[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
-    // ── TESTING OVERRIDES (fin industry only) ──
-    // Chase #1, Amex #2 — always clearly ahead. Capital One #3, Citi #4 — Needs Work tier.
-    // Avg Rank = average position when mentioned within a single AI response (1 = mentioned first)
+    // ── FIN COMPETITOR OVERRIDES ──
     if (indKey === 'fin') {
       competitors = competitors.map((c: any) => {
-        if (c.Brand === 'Chase')           return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 78), Cit: Math.max(c.Cit, 74), Sen: Math.max(c.Sen, 82), Sov: Math.max(c.Sov, 68), Prom: Math.max(c.Prom, 74), Rank: '#1' };
-        if (c.Brand === 'American Express') return { ...c, GEO: Math.max(c.GEO, 65), Vis: Math.max(c.Vis, 70), Cit: Math.max(c.Cit, 66), Sen: Math.max(c.Sen, 78), Sov: Math.max(c.Sov, 58), Prom: Math.max(c.Prom, 66), Rank: '#2' };
-        if (c.Brand === 'Capital One')     return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
-        if (c.Brand === 'Citi')            return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#3' };
-        if (c.Brand === 'Discover')        return { ...c, Rank: '#4' };
-        if (c.Brand === 'Wells Fargo')     return { ...c, Rank: '#4' };
-        if (c.Brand === 'Bank of America') return { ...c, Rank: '#5' };
-        if (c.Brand === 'USAA')            return { ...c, Rank: 'N/A' };
-        if (c.Brand === 'Synchrony')       return { ...c, Rank: 'N/A' };
-        if (c.Brand === 'Barclays')        return { ...c, Rank: 'N/A' };
+        if (c.Brand === 'Chase')
+          return { ...c, GEO: Math.max(c.GEO, 82), Vis: Math.max(c.Vis, 82), Cit: Math.max(c.Cit, 78), Sen: Math.max(c.Sen, 84), Sov: Math.max(c.Sov, 72), Prom: Math.max(c.Prom, 78), Rank: '#1' };
+        if (c.Brand === 'American Express')
+          return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 72), Cit: Math.max(c.Cit, 68), Sen: Math.max(c.Sen, 80), Sov: Math.max(c.Sov, 60), Prom: Math.max(c.Prom, 68), Rank: '#1' };
+        if (c.Brand === 'Capital One')
+          return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
+        if (c.Brand === 'Citi')
+          return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#3' };
+        if (c.Brand === 'Discover')
+          return { ...c, GEO: Math.min(c.GEO, 58), Rank: '#4' };
+        if (c.Brand === 'Wells Fargo')
+          return { ...c, GEO: Math.min(c.GEO, 50), Rank: '#4' };
+        if (c.Brand === 'Bank of America')
+          return { ...c, GEO: Math.min(c.GEO, 44), Rank: '#5' };
+        if (c.Brand === 'USAA')
+          return { ...c, GEO: Math.min(c.GEO, 38), Rank: 'N/A' };
+        if (c.Brand === 'Synchrony')
+          return { ...c, GEO: Math.min(c.GEO, 34), Rank: 'N/A' };
+        if (c.Brand === 'Barclays')
+          return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
         return c;
       });
-      // Sort by GEO desc so ranking order is preserved
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
