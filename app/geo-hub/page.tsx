@@ -601,24 +601,51 @@ function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number;
   return <div>{all.map((a,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}><div style={{width:18,fontSize:'0.8rem',color:a.isYou?'#7C3AED':'#9CA3AF',fontWeight:a.isYou?700:400}}>{i+1}</div><div style={{width:140,fontSize:'0.84rem',color:'#374151',fontWeight:a.isYou?700:400}}>{a.Brand}{a.isYou&&<span style={{marginLeft:6,fontSize:'0.68rem',background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontWeight:700}}>← You</span>}</div><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:8,overflow:'hidden'}}><div style={{background:a.isYou?'#7C3AED':'#D1D5DB',height:8,borderRadius:50,width:`${(a.Vis/max)*100}%`}}/></div><div style={{width:32,fontSize:'0.85rem',fontWeight:700,color:a.isYou?'#7C3AED':'#374151',textAlign:'right' as const}}>{a.Vis}</div></div>)}</div>;
 }
 
-function ScatterPlot({ brand, vis, sent, competitors }: { brand:string; vis:number; sent:number; competitors:any[] }) {
+function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis:number; sent:number; cit:number; competitors:any[] }) {
   const [hov,setHov]=useState<number|null>(null);
-  const all=[{label:brand,x:vis,y:sent,isYou:true},...competitors.map(c=>({label:c.Brand,x:c.Vis,y:c.Sen??c.Sent??0,isYou:false}))];
-  const W=700,H=320,padL=52,padR=24,padT=24,padB=48;
+  // Top 20 competitors by Vis, include citation for bubble size
+  const top20 = competitors.slice(0,20);
+  const all=[{label:brand,x:vis,y:sent,cit:cit,isYou:true},...top20.map(c=>({label:c.Brand,x:c.Vis,y:c.Sen??c.Sent??0,cit:c.Cit??30,isYou:false}))];
+  const W=780,H=380,padL=52,padR=110,padT=28,padB=52;
   const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
-  const xMin=Math.max(0,Math.min(...xVals)-10),xMax=Math.max(...xVals)+10,yMin=Math.max(0,Math.min(...yVals)-10),yMax=Math.min(100,Math.max(...yVals)+10);
-  const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR),sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
+  const xMin=Math.max(0,Math.min(...xVals)-8),xMax=Math.max(...xVals)+12,yMin=Math.max(0,Math.min(...yVals)-8),yMax=Math.min(100,Math.max(...yVals)+12);
+  const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
+  const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
   const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length),avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
+  // Bubble radius: min 5, max 18, scaled by citation score
+  const citVals=all.map(a=>a.cit);
+  const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
+  const bubbleR=(c:number,isYou:boolean)=>{
+    if(isYou) return Math.round(6+((c-citMin)/(citMax-citMin+1))*12);
+    return Math.round(5+((c-citMin)/(citMax-citMin+1))*13);
+  };
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block'}}>
+      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score</div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
         <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
         <line x1={padL} y1={sy(avgY)} x2={W-padR} y2={sy(avgY)} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
-        {all.map((a,i)=>{const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i;return<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>{isH&&<circle cx={cx2} cy={cy2} r={11} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.15"/>}<circle cx={cx2} cy={cy2} r={a.isYou?8:6} fill={a.isYou?'#7C3AED':'#CBD5E1'}/>{isH&&(()=>{const tx=Math.min(Math.max(cx2-60,padL),W-padR-130),ty=cy2>padT+60?cy2-56:cy2+14;return<g><rect x={tx} y={ty} width={130} height={40} rx={6} fill="white" stroke="#E5E7EB" strokeWidth="1"/><text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{a.label}</text><text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment: {a.y} · Visibility: {a.x}</text></g>;})()}</g>;})}
+        {all.map((a,i)=>{
+          const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i,r=bubbleR(a.cit,a.isYou);
+          const shortName=a.label.length>10?a.label.slice(0,9)+'…':a.label;
+          const tipW=160,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-padR-tipW),ty=cy2>padT+70?cy2-tipH-10:cy2+r+8;
+          return<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+            {isH&&<circle cx={cx2} cy={cy2} r={r+5} fill={a.isYou?'#7C3AED':'#6B7280'} opacity="0.12"/>}
+            <circle cx={cx2} cy={cy2} r={r} fill={a.isYou?'#7C3AED':'#CBD5E1'} stroke={a.isYou?'#5B21B6':'#9CA3AF'} strokeWidth={a.isYou?2:1}/>
+            {/* Label to the right of bubble, small, grey */}
+            <text x={cx2+r+4} y={cy2} dominantBaseline="middle" style={{fontSize:9,fill:a.isYou?'#5B21B6':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:a.isYou?700:400,pointerEvents:'none'}}>{shortName}</text>
+            {isH&&<g>
+              <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
+              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
+              <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: {a.x} · Sentiment: {a.y}</text>
+              <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation: {a.cit}</text>
+            </g>}
+          </g>;
+        })}
         {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
         <text x={(padL+W-padR)/2} y={H-6} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
@@ -877,7 +904,7 @@ export default function GeoHub() {
               };
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
-              const bW=680,bH=140,bPad=32,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
+              const bW=Math.max(680,top.length*68),bH=140,bPad=32,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
               return (
                 <div>
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors — {result.ind_label}</div>
@@ -890,11 +917,12 @@ export default function GeoHub() {
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                     <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score Comparison</div>
                     <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Hover over any brand to see full metrics</div>
-                    <svg viewBox={`0 0 ${bW} ${bH+44}`} style={{width:'100%',display:'block'}} onMouseLeave={()=>setHovBar(null)}>
+                    <div style={{overflowX:'auto' as const}}>
+                    <svg viewBox={`0 0 ${Math.max(bW, top.length*68)} ${bH+44}`} style={{width:'100%',minWidth:top.length*68,display:'block'}} onMouseLeave={()=>setHovBar(null)}>
                       {[0,25,50,75,100].map(v=><g key={v}><line x1={bPad} y1={bH-(v/100)*bMH} x2={bW-bPad} y2={bH-(v/100)*bMH} stroke="#F3F4F6" strokeWidth="1"/><text x={bPad-4} y={bH-(v/100)*bMH} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
                       {top.map((c:any,i:number)=>{const bx=bPad+i*gW+gW*0.08,bw2=gW*0.26,gh=((c.GEO||0)/100)*bMH,vh=((c.Vis||0)/100)*bMH,ch=((c.Cit||0)/100)*bMH,isY=c.isYou,isH=hovBar===i,tipY=bH-Math.max(gh,vh,ch)-44;return(<g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}><rect x={bx} y={bH-gh} width={bw2} height={gh} fill={isY?'#1F2937':'#9CA3AF'} rx={2}/><rect x={bx+bw2+2} y={bH-vh} width={bw2} height={vh} fill={isY?'#7C3AED':'#A5B4FC'} rx={2}/><rect x={bx+bw2*2+4} y={bH-ch} width={bw2} height={ch} fill={isY?'#C4B5FD':'#E9D5FF'} rx={2}/><text x={bx+bw2*1.5} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#7C3AED':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>{isH&&<g><rect x={Math.min(bx-5,bW-145)} y={tipY} width={140} height={38} rx={6} fill="#1F2937"/><text x={Math.min(bx-5,bW-145)+70} y={tipY+13} textAnchor="middle" style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text><text x={Math.min(bx-5,bW-145)+70} y={tipY+27} textAnchor="middle" style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO} · Vis: {c.Vis} · Cit: {c.Cit}</text></g>}</g>);})}
-                      <g transform={`translate(${bW/2-100},${bH+28})`}>{[{color:'#1F2937',label:'GEO'},{color:'#7C3AED',label:'Visibility'},{color:'#C4B5FD',label:'Citations'}].map((l,i)=><g key={i} transform={`translate(${i*88},0)`}><rect x={0} y={-5} width={10} height={10} fill={l.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>)}</g>
-                    </svg>
+                      <g transform={`translate(${Math.max(bW,top.length*68)/2-100},${bH+28})`}>{[{color:'#1F2937',label:'GEO'},{color:'#7C3AED',label:'Visibility'},{color:'#C4B5FD',label:'Citations'}].map((l,i)=><g key={i} transform={`translate(${i*88},0)`}><rect x={0} y={-5} width={10} height={10} fill={l.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{l.label}</text></g>)}</g>
+                    </svg></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -930,7 +958,7 @@ export default function GeoHub() {
                     <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}><VisibilityBars brand={result.brand_name} vis={vis} competitors={result.competitors||[]}/></div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility — Market Positioning</div><div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div><ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} competitors={result.competitors||[]}/></div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility — Market Positioning</div><div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div><ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]}/></div>
                 </div>
               );
             })()}
@@ -1023,14 +1051,29 @@ export default function GeoHub() {
               Object.keys(catMap).forEach(k=>{ catMap[k]=Math.min(Math.round(catMap[k]),100); });
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED','Other':'#6B7280','Social':'#F59E0B','Institution':'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
+              // Merge aliases: jpmorganchase.com -> treated as owned if brand is chase
+              const DOMAIN_ALIASES: Record<string,string> = {
+                'jpmorganchase.com': 'chase.com',
+              };
               const buildDisplaySources = () => {
                 const base = sources.length > 0 ? sources : allSourcesToClassify.map((s:any, i:number) => ({rank: i+1, domain: s.domain, citation_share: s.citation_share, category: classifyDomain(s.domain).label}));
-                const hasBrandDomain = base.some((s:any) => domainMatchesBrand(s.domain||''));
-                if (brandDomain && !hasBrandDomain) {
-                  const ownedEntry = { rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true };
-                  return [ownedEntry, ...base].map((s:any, i:number) => ({ ...s, rank: i+1 }));
-                }
-                return base.map((s:any) => ({ ...s, isOwned: domainMatchesBrand(s.domain||'') }));
+                // Merge aliased domains into their canonical brand domain
+                const merged: any[] = [];
+                const seen = new Set<string>();
+                base.forEach((s:any) => {
+                  const aliasTarget = DOMAIN_ALIASES[(s.domain||'').toLowerCase()];
+                  if (aliasTarget && (domainMatchesBrand(aliasTarget) || aliasTarget === brandDomain)) {
+                    // Find existing owned entry and add citation share to it
+                    const existing = merged.find(m => m.domain === brandDomain || domainMatchesBrand(m.domain||''));
+                    if (existing) { existing.citation_share = Math.min(100, (existing.citation_share||0) + (s.citation_share||0)); }
+                    // Skip the aliased domain from appearing separately
+                    return;
+                  }
+                  if (!seen.has(s.domain)) { seen.add(s.domain); merged.push({...s}); }
+                });
+                const hasBrandDomain = merged.some((s:any) => domainMatchesBrand(s.domain||''));
+                let result2 = hasBrandDomain ? merged : [{ rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true }, ...merged];
+                return result2.map((s:any, i:number) => ({ ...s, rank: i+1, isOwned: domainMatchesBrand(s.domain||'') }));
               };
               const displaySources = buildDisplaySources();
               return (
@@ -1107,7 +1150,7 @@ export default function GeoHub() {
                 if(item.position===0 && item.brands_mentioned?.length>0) return item.brands_mentioned[0];
                 return null;
               };
-              const sorted=[...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;}).slice(0,20);
+              const sorted=[...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
