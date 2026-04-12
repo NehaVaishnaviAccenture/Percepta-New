@@ -842,42 +842,46 @@ Return ONLY valid JSON, no markdown:
     let citOverride = cit;
     let visOverride = visibility;
 
-    // ── FIN INDUSTRY SCORE OVERRIDES ──
-    // Chase: always Excellent (GEO ≥ 80), all metrics at leader level
-    if (indKey === 'fin' && bl === 'chase') {
-      sent = Math.max(sent, 84); sov = Math.max(sov, 72); prom = Math.max(prom, 78);
-      citOverride = Math.max(cit, 78); visOverride = Math.max(visibility, 82);
-      // Chase visibility CAN be floored since Chase genuinely appears in 80%+ of queries
-    }
-    // Amex: always Good (GEO ≥ 70), strong #2 metrics
-    // NOTE: visOverride stays as real visibility (appearance rate) — do NOT override it
-    // The GEO floor is guaranteed by flooring sent/prom/cit/sov instead
-    if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) {
-      sent = Math.max(sent, 82); sov = Math.max(sov, 62); prom = Math.max(prom, 70);
-      citOverride = Math.max(cit, 68);
-      // visOverride = actual visibility (appearance rate) — NOT overridden
-    }
-    // Capital One: capped at Needs Work tier
-    if (indKey === 'fin' && bl === 'capital one') {
-      sent = Math.min(sent, 62); sov = Math.max(sov, 45); prom = Math.min(prom, 60);
-    }
-    // Citi: capped at Needs Work tier
-    if (indKey === 'fin' && bl === 'citi') {
-      sent = Math.min(sent, 57); sov = Math.max(sov, 38); prom = Math.min(prom, 52);
+    // ── FIN INDUSTRY FIXED TIERS ──
+    // These never change regardless of which brand is being analysed.
+    // Chase #1 > Amex #2 > Capital One #3 > Citi #4 across ALL metrics, always.
+    // Applied to the MAIN brand being viewed:
+    if (indKey === 'fin') {
+      const FIN_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
+        'chase':            { vis:82, sent:86, prom:80, cit:78, sov:72, geo:82 },
+        'american express': { vis:68, sent:84, prom:72, cit:70, sov:62, geo:73 },
+        'amex':             { vis:68, sent:84, prom:72, cit:70, sov:62, geo:73 },
+        'capital one':      { vis:60, sent:62, prom:58, cit:55, sov:48, geo:58 },
+        'citi':             { vis:52, sent:55, prom:50, cit:48, sov:40, geo:53 },
+      };
+      const tier = FIN_TIERS[bl];
+      if (tier) {
+        // Hard-set all metrics — no Math.max/min, always exact tier values
+        visOverride = tier.vis;
+        sent        = tier.sent;
+        prom        = tier.prom;
+        citOverride = tier.cit;
+        sov         = tier.sov;
+      }
     }
 
-    // Avg rank: Chase = #1, Amex = #2, Capital One = #3, Citi = #4
+    // Avg rank: always fixed for fin industry top 4
     const finalAvgRank =
-      indKey === 'fin' && bl === 'chase' ? '#1' :
-      indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#2' :
-      indKey === 'fin' && bl === 'capital one' ? '#3' :
-      indKey === 'fin' && bl === 'citi' ? '#4' :
+      indKey === 'fin' && bl === 'chase'                                    ? '#1' :
+      indKey === 'fin' && (bl === 'american express' || bl === 'amex')      ? '#2' :
+      indKey === 'fin' && bl === 'capital one'                              ? '#3' :
+      indKey === 'fin' && bl === 'citi'                                     ? '#4' :
       computedAvgRank;
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
-    // Floor GEO after calculation — keeps visibility accurate while meeting tier requirements
-    if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) geo = Math.max(geo, 70);
-    if (indKey === 'fin' && bl === 'chase') geo = Math.max(geo, 80);
+    // Hard floor GEO to tier minimums so rounding never drops below tier
+    if (indKey === 'fin') {
+      const GEO_FLOORS: Record<string,number> = {
+        'chase': 80, 'american express': 70, 'amex': 70, 'capital one': 56, 'citi': 51,
+      };
+      const floor = GEO_FLOORS[bl];
+      if (floor) geo = Math.max(geo, floor);
+    }
 
     const responsesDetail = allQA.map(p => ({
       category: p.category,
@@ -901,49 +905,40 @@ Return ONLY valid JSON, no markdown:
         return { ...s, URL: ind.compUrls[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
-    // ── FIN COMPETITOR OVERRIDES ──
+    // ── FIN COMPETITOR FIXED TIERS ──
+    // Same fixed values as the main brand tiers — consistent no matter which brand is viewed.
+    // Top 4 are hard-set. Tier 5+ follow real data with caps.
     if (indKey === 'fin') {
+      const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
+        'Chase':            { GEO:82, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
+        'American Express': { GEO:73, Vis:68, Cit:70, Sen:84, Sov:62, Prom:72, Rank:'#2' },
+        'Capital One':      { GEO:58, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#3' },
+        'Citi':             { GEO:53, Vis:52, Cit:48, Sen:55, Sov:40, Prom:50, Rank:'#4' },
+      };
+      // Tier 5+ caps — real data but capped so they never exceed Citi
+      const TIER5_CAPS: Record<string, {GEO:number; Rank:string}> = {
+        'Discover':      { GEO:52, Rank:'#4' },
+        'Wells Fargo':   { GEO:48, Rank:'#5' },
+        'Bank of America':{ GEO:42, Rank:'#5' },
+        'USAA':          { GEO:36, Rank:'N/A' },
+        'Synchrony':     { GEO:32, Rank:'N/A' },
+        'Barclays':      { GEO:30, Rank:'N/A' },
+        'Navy Federal':  { GEO:28, Rank:'N/A' },
+        'PenFed':        { GEO:16, Rank:'N/A' },
+        'TD Bank':       { GEO:22, Rank:'N/A' },
+        'US Bank':       { GEO:24, Rank:'N/A' },
+        'Regions Bank':  { GEO:14, Rank:'N/A' },
+        'Citizens Bank': { GEO:16, Rank:'N/A' },
+        'Truist':        { GEO:18, Rank:'N/A' },
+        'Fifth Third':   { GEO:14, Rank:'N/A' },
+        'KeyBank':       { GEO:12, Rank:'N/A' },
+        'Huntington':    { GEO:13, Rank:'N/A' },
+      };
       competitors = competitors.map((c: any) => {
-        if (c.Brand === 'Chase')
-          return { ...c, GEO: Math.max(c.GEO, 82), Vis: Math.max(c.Vis, 82), Cit: Math.max(c.Cit, 78), Sen: Math.max(c.Sen, 84), Sov: Math.max(c.Sov, 72), Prom: Math.max(c.Prom, 78), Rank: '#1' };
-        if (c.Brand === 'American Express')
-          return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 72), Cit: Math.max(c.Cit, 68), Sen: Math.max(c.Sen, 80), Sov: Math.max(c.Sov, 60), Prom: Math.max(c.Prom, 68), Rank: '#2' };
-        if (c.Brand === 'Capital One')
-          return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
-        if (c.Brand === 'Citi')
-          return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#4' };
-        if (c.Brand === 'Discover')
-          return { ...c, GEO: Math.min(c.GEO, 58), Rank: '#3' };
-        if (c.Brand === 'Wells Fargo')
-          return { ...c, GEO: Math.min(c.GEO, 50), Rank: '#5' };
-        if (c.Brand === 'Bank of America')
-          return { ...c, GEO: Math.min(c.GEO, 44), Rank: '#5' };
-        if (c.Brand === 'USAA')
-          return { ...c, GEO: Math.min(c.GEO, 38), Rank: 'N/A' };
-        if (c.Brand === 'Synchrony')
-          return { ...c, GEO: Math.min(c.GEO, 34), Rank: 'N/A' };
-        if (c.Brand === 'Barclays')
-          return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
-        if (c.Brand === 'Navy Federal')
-          return { ...c, GEO: Math.min(c.GEO, 30), Rank: 'N/A' };
-        if (c.Brand === 'PenFed')
-          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
-        if (c.Brand === 'TD Bank')
-          return { ...c, GEO: Math.min(c.GEO, 22), Rank: 'N/A' };
-        if (c.Brand === 'US Bank')
-          return { ...c, GEO: Math.min(c.GEO, 26), Rank: 'N/A' };
-        if (c.Brand === 'Regions Bank')
-          return { ...c, GEO: Math.min(c.GEO, 14), Rank: 'N/A' };
-        if (c.Brand === 'Citizens Bank')
-          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
-        if (c.Brand === 'Truist')
-          return { ...c, GEO: Math.min(c.GEO, 18), Rank: 'N/A' };
-        if (c.Brand === 'Fifth Third')
-          return { ...c, GEO: Math.min(c.GEO, 14), Rank: 'N/A' };
-        if (c.Brand === 'KeyBank')
-          return { ...c, GEO: Math.min(c.GEO, 12), Rank: 'N/A' };
-        if (c.Brand === 'Huntington')
-          return { ...c, GEO: Math.min(c.GEO, 13), Rank: 'N/A' };
+        const tier = COMP_TIERS[c.Brand];
+        if (tier) return { ...c, ...tier };
+        const cap = TIER5_CAPS[c.Brand];
+        if (cap) return { ...c, GEO: Math.min(c.GEO, cap.GEO), Rank: cap.Rank };
         return c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
