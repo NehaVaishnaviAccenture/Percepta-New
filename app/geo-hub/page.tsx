@@ -608,23 +608,27 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
     {label:brand, x:vis, y:sent, cit:cit, isYou:true, isTopComp:false},
     ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:ci===0}))
   ];
-  const W=900,H=420,padL=52,padR=130,padT=28,padB=52;
+  const W=920,H=440,padL=52,padR=30,padT=28,padB=52;
   const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
-  const xMin=Math.max(0,Math.min(...xVals)-8),xMax=Math.max(...xVals)+8,yMin=Math.max(0,Math.min(...yVals)-8),yMax=Math.min(100,Math.max(...yVals)+12);
+  const xMin=Math.max(0,Math.min(...xVals)-5),xMax=Math.max(...xVals)+10,yMin=Math.max(0,Math.min(...yVals)-5),yMax=Math.min(100,Math.max(...yVals)+10);
   const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
   const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
   const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length),avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
-  const bubbleR=(c:number)=>Math.round(8+((c-citMin)/Math.max(citMax-citMin,1))*5);
-  // Only always-show labels for: you, #1 competitor, top 4 by visibility
-  const topVisByVis = [...all].sort((a,b)=>b.x-a.x).slice(0,4).map(a=>a.label);
-  const alwaysLabel = (a:{label:string;isYou:boolean;isTopComp:boolean}) =>
-    a.isYou || a.isTopComp || topVisByVis.includes(a.label);
+  const bubbleR=(c:number)=>Math.round(7+((c-citMin)/Math.max(citMax-citMin,1))*5);
+  // Pre-place labels: alternate above/below, stagger by x-zone crowding
+  const placements = all.map((a,i)=>{
+    const cx2=sx(a.x), cy2=sy(a.y), r=bubbleR(a.cit);
+    const crowdedBefore = all.slice(0,i).filter(b=>Math.abs(sx(b.x)-cx2)<26).length;
+    const above = i%2===0;
+    const offset = above ? -(r+12+crowdedBefore*10) : (r+12+crowdedBefore*10);
+    return {cx2, cy2, r, ly:cy2+offset, above};
+  });
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
-      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score · #1 competitor in blue · Hover any bubble for details</div>
+      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score · #1 competitor in blue · Hover for name & metrics</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
         <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
@@ -632,25 +636,26 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         {all.map((a,i)=>{
-          const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i,r=bubbleR(a.cit);
-          const showLabel = alwaysLabel(a) || isH;
-          const fillColor = a.isYou ? '#7C3AED' : a.isTopComp ? '#EFF6FF' : '#CBD5E1';
-          const strokeColor = a.isYou ? '#5B21B6' : a.isTopComp ? '#3B82F6' : '#9CA3AF';
-          const strokeW = a.isYou ? 2 : a.isTopComp ? 2.5 : 1;
-          // Important labels: slightly bigger font; small brands: 7px
-          const labelFontSize = (a.isYou || a.isTopComp) ? 10 : 7.5;
-          const labelColor = a.isYou ? '#5B21B6' : a.isTopComp ? '#1E40AF' : '#6B7280';
-          const labelWeight = (a.isYou || a.isTopComp) ? 700 : 400;
-          const tipW=170,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-tipW-4),ty=cy2>padT+70?cy2-tipH-10:cy2+r+8;
-          return<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
-            {isH&&<circle cx={cx2} cy={cy2} r={r+5} fill={strokeColor} opacity="0.12"/>}
-            <circle cx={cx2} cy={cy2} r={r} fill={fillColor} stroke={strokeColor} strokeWidth={strokeW}/>
-            {showLabel&&<text
-              x={cx2+r+4}
-              y={cy2}
-              dominantBaseline="middle"
-              style={{fontSize:labelFontSize,fill:labelColor,fontFamily:'Inter,sans-serif',fontWeight:labelWeight,pointerEvents:'none'}}
-            >{a.label}{a.isTopComp?' ★':''}</text>}
+          const {cx2,cy2,r}=placements[i];
+          const isH=hov===i;
+          const fill=a.isYou?'#7C3AED':a.isTopComp?'#EFF6FF':'#CBD5E1';
+          const stroke=a.isYou?'#5B21B6':a.isTopComp?'#3B82F6':'#9CA3AF';
+          return <g key={`b${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+            {isH&&<circle cx={cx2} cy={cy2} r={r+4} fill={stroke} opacity="0.1"/>}
+            <circle cx={cx2} cy={cy2} r={r} fill={fill} stroke={stroke} strokeWidth={a.isYou?2:a.isTopComp?2:1}/>
+          </g>;
+        })}
+        {all.map((a,i)=>{
+          const {cx2,cy2,r,ly,above}=placements[i];
+          const isH=hov===i;
+          const labelColor=a.isYou?'#5B21B6':a.isTopComp?'#1E40AF':'#6B7280';
+          const fs=a.isYou?11:a.isTopComp?10:7;
+          const fw=(a.isYou||a.isTopComp)?700:400;
+          const leaderY=above?cy2-r:cy2+r;
+          const tipW=170,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-tipW-4),ty=cy2>padT+70?cy2-tipH-14:cy2+r+10;
+          return <g key={`l${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
+            <line x1={cx2} y1={leaderY} x2={cx2} y2={above?ly+4:ly-4} stroke={labelColor} strokeWidth="0.7" strokeDasharray="2,2" opacity="0.45"/>
+            <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:labelColor,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}{a.isTopComp?' ★':''}</text>
             {isH&&<g>
               <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
               <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1)':a.isYou?' (You)':''}</text>
