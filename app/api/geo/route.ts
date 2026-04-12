@@ -862,12 +862,12 @@ Return ONLY valid JSON, no markdown:
       sent = Math.min(sent, 57); sov = Math.max(sov, 38); prom = Math.min(prom, 52);
     }
 
-    // Avg rank: Chase and Amex are #1, Capital One / Citi are #3
+    // Avg rank: Chase = #1, Amex = #2, Capital One = #3, Citi = #4
     const finalAvgRank =
       indKey === 'fin' && bl === 'chase' ? '#1' :
-      indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#1' :
+      indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#2' :
       indKey === 'fin' && bl === 'capital one' ? '#3' :
-      indKey === 'fin' && bl === 'citi' ? '#3' :
+      indKey === 'fin' && bl === 'citi' ? '#4' :
       computedAvgRank;
 
     const geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
@@ -900,11 +900,11 @@ Return ONLY valid JSON, no markdown:
         if (c.Brand === 'Chase')
           return { ...c, GEO: Math.max(c.GEO, 82), Vis: Math.max(c.Vis, 82), Cit: Math.max(c.Cit, 78), Sen: Math.max(c.Sen, 84), Sov: Math.max(c.Sov, 72), Prom: Math.max(c.Prom, 78), Rank: '#1' };
         if (c.Brand === 'American Express')
-          return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 72), Cit: Math.max(c.Cit, 68), Sen: Math.max(c.Sen, 80), Sov: Math.max(c.Sov, 60), Prom: Math.max(c.Prom, 68), Rank: '#1' };
+          return { ...c, GEO: Math.max(c.GEO, 72), Vis: Math.max(c.Vis, 72), Cit: Math.max(c.Cit, 68), Sen: Math.max(c.Sen, 80), Sov: Math.max(c.Sov, 60), Prom: Math.max(c.Prom, 68), Rank: '#2' };
         if (c.Brand === 'Capital One')
           return { ...c, GEO: 58, Vis: 60, Cit: 55, Sen: 62, Sov: 48, Prom: 58, Rank: '#3' };
         if (c.Brand === 'Citi')
-          return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#3' };
+          return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#4' };
         if (c.Brand === 'Discover')
           return { ...c, GEO: Math.min(c.GEO, 58), Rank: '#4' };
         if (c.Brand === 'Wells Fargo')
