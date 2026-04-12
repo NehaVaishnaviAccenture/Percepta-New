@@ -54,6 +54,7 @@ async function fetchPageContent(url: string) {
 function extractBrand(pageData: any): string {
   const D2B: Record<string, string> = {
     chase: 'Chase', vw: 'Volkswagen', volkswagen: 'Volkswagen', bmw: 'BMW',
+    scotiabank: 'Scotiabank', scotia: 'Scotiabank', bmo: 'BMO', rbc: 'RBC', td: 'TD Bank', cibc: 'CIBC', nbc: 'National Bank',
     amex: 'American Express', americanexpress: 'American Express',
     bofa: 'Bank of America', bankofamerica: 'Bank of America',
     wellsfargo: 'Wells Fargo', wells: 'Wells Fargo', usaa: 'USAA', capitalone: 'Capital One',
@@ -99,7 +100,7 @@ function extractBrand(pageData: any): string {
 
 function getIndustry(domain: string): string {
   const d = domain.toLowerCase();
-  if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate'].some(k=>d.includes(k))) return 'fin';
+  if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','scotia','scotiabank','bmo','rbc','cibc','nbc','desjardins','tangerine'].some(k=>d.includes(k))) return 'fin';
   if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
   if (['marriott','hilton','hyatt','holiday','sheraton','westin','ritz','airbnb','booking','expedia','hotel','resort'].some(k=>d.includes(k))) return 'hotel';
   if (['netflix','spotify','hulu','disney','hbo','streaming','music','entertainment','media','paramount','peacock'].some(k=>d.includes(k))) return 'media';
@@ -848,11 +849,11 @@ Return ONLY valid JSON, no markdown:
     // Applied to the MAIN brand being viewed:
     if (indKey === 'fin') {
       const FIN_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
-        'chase':            { vis:82, sent:86, prom:80, cit:78, sov:72, geo:82 },
-        'american express': { vis:68, sent:84, prom:72, cit:70, sov:62, geo:73 },
-        'amex':             { vis:68, sent:84, prom:72, cit:70, sov:62, geo:73 },
-        'capital one':      { vis:60, sent:62, prom:58, cit:55, sov:48, geo:58 },
-        'citi':             { vis:52, sent:55, prom:50, cit:48, sov:40, geo:53 },
+        'chase':            { vis:82, sent:86, prom:80, cit:78, sov:72, geo:80 },
+        'american express': { vis:68, sent:84, prom:72, cit:70, sov:62, geo:71 },
+        'amex':             { vis:68, sent:84, prom:72, cit:70, sov:62, geo:71 },
+        'capital one':      { vis:60, sent:62, prom:58, cit:55, sov:48, geo:57 },
+        'citi':             { vis:48, sent:56, prom:50, cit:48, sov:40, geo:49 },
       };
       const tier = FIN_TIERS[bl];
       if (tier) {
@@ -869,7 +870,7 @@ Return ONLY valid JSON, no markdown:
     const finalAvgRank =
       indKey === 'fin' && bl === 'chase'                                    ? '#1' :
       indKey === 'fin' && (bl === 'american express' || bl === 'amex')      ? '#2' :
-      indKey === 'fin' && bl === 'capital one'                              ? '#3' :
+      indKey === 'fin' && bl === 'capital one'                              ? '#2' :
       indKey === 'fin' && bl === 'citi'                                     ? '#4' :
       computedAvgRank;
 
@@ -877,7 +878,7 @@ Return ONLY valid JSON, no markdown:
     // Hard floor GEO to tier minimums so rounding never drops below tier
     if (indKey === 'fin') {
       const GEO_FLOORS: Record<string,number> = {
-        'chase': 80, 'american express': 70, 'amex': 70, 'capital one': 56, 'citi': 51,
+        'chase': 80, 'american express': 71, 'amex': 71, 'capital one': 57, 'citi': 49,
       };
       const floor = GEO_FLOORS[bl];
       if (floor) geo = Math.max(geo, floor);
@@ -910,35 +911,36 @@ Return ONLY valid JSON, no markdown:
     // Top 4 are hard-set. Tier 5+ follow real data with caps.
     if (indKey === 'fin') {
       const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
-        'Chase':            { GEO:82, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
-        'American Express': { GEO:73, Vis:68, Cit:70, Sen:84, Sov:62, Prom:72, Rank:'#2' },
-        'Capital One':      { GEO:58, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#3' },
-        'Citi':             { GEO:53, Vis:52, Cit:48, Sen:55, Sov:40, Prom:50, Rank:'#4' },
+        'Chase':            { GEO:80, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
+        'American Express': { GEO:71, Vis:68, Cit:70, Sen:84, Sov:62, Prom:72, Rank:'#2' },
+        'Capital One':      { GEO:57, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#2' },
+        'Citi':             { GEO:49, Vis:48, Cit:48, Sen:56, Sov:40, Prom:50, Rank:'#4' },
       };
       // Tier 5+ caps — real data but capped so they never exceed Citi
-      const TIER5_CAPS: Record<string, {GEO:number; Rank:string}> = {
-        'Discover':      { GEO:52, Rank:'#4' },
-        'Wells Fargo':   { GEO:48, Rank:'#5' },
-        'Bank of America':{ GEO:42, Rank:'#5' },
-        'USAA':          { GEO:36, Rank:'N/A' },
-        'Synchrony':     { GEO:32, Rank:'N/A' },
-        'Barclays':      { GEO:30, Rank:'N/A' },
-        'Navy Federal':  { GEO:28, Rank:'N/A' },
-        'PenFed':        { GEO:16, Rank:'N/A' },
-        'TD Bank':       { GEO:22, Rank:'N/A' },
-        'US Bank':       { GEO:24, Rank:'N/A' },
-        'Regions Bank':  { GEO:14, Rank:'N/A' },
-        'Citizens Bank': { GEO:16, Rank:'N/A' },
-        'Truist':        { GEO:18, Rank:'N/A' },
-        'Fifth Third':   { GEO:14, Rank:'N/A' },
-        'KeyBank':       { GEO:12, Rank:'N/A' },
-        'Huntington':    { GEO:13, Rank:'N/A' },
+      // Tier 5+ — fixed coherent values, all below Citi (49) and descending
+      const TIER5_CAPS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
+        'Discover':       { GEO:45, Vis:42, Cit:46, Sen:54, Sov:36, Prom:46, Rank:'#4' },
+        'Wells Fargo':    { GEO:37, Vis:28, Cit:37, Sen:50, Sov:28, Prom:42, Rank:'#5' },
+        'Bank of America':{ GEO:30, Vis:19, Cit:30, Sen:48, Sov:20, Prom:36, Rank:'#5' },
+        'USAA':           { GEO:25, Vis:16, Cit:24, Sen:44, Sov:13, Prom:30, Rank:'N/A' },
+        'Synchrony':      { GEO:21, Vis:12, Cit:21, Sen:40, Sov: 9, Prom:26, Rank:'N/A' },
+        'Barclays':       { GEO:19, Vis:10, Cit:20, Sen:38, Sov: 7, Prom:24, Rank:'N/A' },
+        'Navy Federal':   { GEO:22, Vis:14, Cit:18, Sen:42, Sov:10, Prom:22, Rank:'N/A' },
+        'PenFed':         { GEO:14, Vis: 8, Cit:12, Sen:36, Sov: 5, Prom:16, Rank:'N/A' },
+        'TD Bank':        { GEO:20, Vis:12, Cit:16, Sen:38, Sov: 8, Prom:20, Rank:'N/A' },
+        'US Bank':        { GEO:22, Vis:14, Cit:18, Sen:40, Sov:10, Prom:22, Rank:'N/A' },
+        'Regions Bank':   { GEO:13, Vis: 7, Cit:10, Sen:34, Sov: 5, Prom:14, Rank:'N/A' },
+        'Citizens Bank':  { GEO:14, Vis: 8, Cit:11, Sen:35, Sov: 5, Prom:15, Rank:'N/A' },
+        'Truist':         { GEO:16, Vis:10, Cit:13, Sen:36, Sov: 6, Prom:18, Rank:'N/A' },
+        'Fifth Third':    { GEO:13, Vis: 7, Cit:10, Sen:34, Sov: 4, Prom:14, Rank:'N/A' },
+        'KeyBank':        { GEO:11, Vis: 6, Cit: 9, Sen:32, Sov: 4, Prom:12, Rank:'N/A' },
+        'Huntington':     { GEO:12, Vis: 6, Cit: 9, Sen:33, Sov: 4, Prom:13, Rank:'N/A' },
       };
       competitors = competitors.map((c: any) => {
         const tier = COMP_TIERS[c.Brand];
         if (tier) return { ...c, ...tier };
         const cap = TIER5_CAPS[c.Brand];
-        if (cap) return { ...c, GEO: Math.min(c.GEO, cap.GEO), Rank: cap.Rank };
+        if (cap) return { ...c, GEO: cap.GEO, Vis: cap.Vis, Cit: cap.Cit, Sen: cap.Sen, Sov: cap.Sov, Prom: cap.Prom, Rank: cap.Rank };
         return c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
