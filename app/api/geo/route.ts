@@ -66,14 +66,24 @@ function extractBrand(pageData: any): string {
     spotify: 'Spotify', adobe: 'Adobe', salesforce: 'Salesforce',
     walmart: 'Walmart', target: 'Target', nike: 'Nike', adidas: 'Adidas',
   };
-  const domain = (pageData.domain || pageData.url || '').toLowerCase().replace('www.', '');
+
+  // ALWAYS try the original input URL first — most reliable, not affected by redirects
+  const inputUrl = (pageData.inputUrl || pageData.url || '').toLowerCase();
+  if (inputUrl) {
+    try {
+      const inputHost = new URL(inputUrl.startsWith('http') ? inputUrl : 'https://' + inputUrl).hostname.replace('www.', '');
+      const inputDk = inputHost.split('.')[0];
+      if (D2B[inputDk]) return D2B[inputDk];
+      for (const [k, v] of Object.entries(D2B)) { if (inputDk.includes(k)) return v; }
+    } catch {}
+  }
+
+  // Fall back to resolved domain from pageData
+  const domain = (pageData.domain || '').toLowerCase().replace('www.', '');
   const dk = domain.split('.')[0];
-  // Always try domain key first — most reliable
   if (D2B[dk]) return D2B[dk];
   for (const [k, v] of Object.entries(D2B)) { if (dk.includes(k)) return v; }
-  // Also check the original URL string directly
-  const urlStr = (pageData.url || '').toLowerCase();
-  for (const [k, v] of Object.entries(D2B)) { if (urlStr.includes(k + '.') || urlStr.includes('/' + k)) return v; }
+
   // Skip generic/redirect page titles
   const title = pageData.title || '';
   const genericTitles = ['thanks for visiting', 'page not found', '404', 'access denied', 'redirecting', 'just a moment', 'attention required', 'error'];
@@ -732,10 +742,14 @@ export async function POST(req: NextRequest) {
     const pageData = await fetchPageContent(url);
     if (!pageData.ok) return NextResponse.json({ error: (pageData as any).error }, { status: 400 });
 
-    const brand = extractBrand(pageData);
+    const brand = extractBrand({ ...pageData, inputUrl: url });
     const bl = brand.toLowerCase();
     const aliases: string[] = [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
-    const indKey = getIndustry((pageData as any).domain || '');
+    // Always use original input URL for industry detection — pageData.domain may be a redirect destination
+    const inputHostname = new URL(url).hostname.replace('www.', '');
+    const indKey = getIndustry(inputHostname) !== 'gen'
+      ? getIndustry(inputHostname)
+      : getIndustry((pageData as any).domain || inputHostname);
     const ind = INDUSTRY_DATA[indKey];
     const queries: string[][] = ind.queries;
     const allQA: any[] = new Array(queries.length);
