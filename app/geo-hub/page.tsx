@@ -604,44 +604,27 @@ function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number;
 function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis:number; sent:number; cit:number; competitors:any[] }) {
   const [hov,setHov]=useState<number|null>(null);
   const top20 = competitors.slice(0,20);
-  // isTopComp = first competitor (highest GEO) gets special highlight
   const all=[
     {label:brand, x:vis, y:sent, cit:cit, isYou:true, isTopComp:false},
     ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:ci===0}))
   ];
-  // Wide canvas with generous right padding so labels never clip
-  const W=900,H=420,padL=52,padR=140,padT=28,padB=52;
+  const W=900,H=420,padL=52,padR=130,padT=28,padB=52;
   const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
   const xMin=Math.max(0,Math.min(...xVals)-8),xMax=Math.max(...xVals)+8,yMin=Math.max(0,Math.min(...yVals)-8),yMax=Math.min(100,Math.max(...yVals)+12);
   const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
   const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
   const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length),avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
-  // Uniform bubble size with very gentle citation scaling — prevents extreme disparity
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
-  const bubbleR=(c:number,isYou:boolean)=>{
-    const t=(c-citMin)/Math.max(citMax-citMin,1);
-    // Very narrow range: 8–13px so no bubble is 3x another
-    return Math.round(8+t*5);
-  };
-  // Smart label collision: pre-compute adjusted Y for each label
-  // Group bubbles by proximity and offset labels to avoid overlap
-  const labelPositions = all.map((a,i)=>{
-    const cx2=sx(a.x), cy2=sy(a.y);
-    const r=bubbleR(a.cit,a.isYou);
-    // Find all earlier bubbles that are close on x-axis
-    const nearby = all.slice(0,i).filter(b=>{
-      const bx=sx(b.x), by=sy(b.y);
-      return Math.abs(bx-cx2) < 30;
-    });
-    // Stack vertically: each nearby bubble pushes label down by 13px
-    const yOffset = nearby.length * 13;
-    return {cx2, cy2, r, yOffset};
-  });
+  const bubbleR=(c:number)=>Math.round(8+((c-citMin)/Math.max(citMax-citMin,1))*5);
+  // Only always-show labels for: you, #1 competitor, top 4 by visibility
+  const topVisByVis = [...all].sort((a,b)=>b.x-a.x).slice(0,4).map(a=>a.label);
+  const alwaysLabel = (a:{label:string;isYou:boolean;isTopComp:boolean}) =>
+    a.isYou || a.isTopComp || topVisByVis.includes(a.label);
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
-      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score · #1 competitor highlighted in blue</div>
+      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score · #1 competitor in blue · Hover any bubble for details</div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
         <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
@@ -649,28 +632,28 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
         {all.map((a,i)=>{
-          const {cx2,cy2,r,yOffset}=labelPositions[i];
-          const isH=hov===i;
-          // Color logic: you=purple, #1 competitor=blue outline, others=grey
+          const cx2=sx(a.x),cy2=sy(a.y),isH=hov===i,r=bubbleR(a.cit);
+          const showLabel = alwaysLabel(a) || isH;
           const fillColor = a.isYou ? '#7C3AED' : a.isTopComp ? '#EFF6FF' : '#CBD5E1';
           const strokeColor = a.isYou ? '#5B21B6' : a.isTopComp ? '#3B82F6' : '#9CA3AF';
           const strokeW = a.isYou ? 2 : a.isTopComp ? 2.5 : 1;
+          // Important labels: slightly bigger font; small brands: 7px
+          const labelFontSize = (a.isYou || a.isTopComp) ? 10 : 7.5;
           const labelColor = a.isYou ? '#5B21B6' : a.isTopComp ? '#1E40AF' : '#6B7280';
-          const labelWeight = (a.isYou||a.isTopComp) ? 700 : 400;
+          const labelWeight = (a.isYou || a.isTopComp) ? 700 : 400;
           const tipW=170,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-tipW-4),ty=cy2>padT+70?cy2-tipH-10:cy2+r+8;
           return<g key={i} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
             {isH&&<circle cx={cx2} cy={cy2} r={r+5} fill={strokeColor} opacity="0.12"/>}
             <circle cx={cx2} cy={cy2} r={r} fill={fillColor} stroke={strokeColor} strokeWidth={strokeW}/>
-            {/* Label right of bubble, stacked vertically when crowded */}
-            <text
-              x={cx2+r+5}
-              y={cy2+yOffset}
+            {showLabel&&<text
+              x={cx2+r+4}
+              y={cy2}
               dominantBaseline="middle"
-              style={{fontSize:9,fill:labelColor,fontFamily:'Inter,sans-serif',fontWeight:labelWeight,pointerEvents:'none'}}
-            >{a.label}{a.isTopComp ? ' ★' : ''}</text>
+              style={{fontSize:labelFontSize,fill:labelColor,fontFamily:'Inter,sans-serif',fontWeight:labelWeight,pointerEvents:'none'}}
+            >{a.label}{a.isTopComp?' ★':''}</text>}
             {isH&&<g>
               <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
-              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1 Competitor)':a.isYou?' (You)':''}</text>
+              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1)':a.isYou?' (You)':''}</text>
               <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: {a.x} · Sentiment: {a.y}</text>
               <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation: {a.cit}</text>
             </g>}
@@ -926,7 +909,7 @@ export default function GeoHub() {
 
             {activeTab===1&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
-              const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
+              const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).slice(0,9).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
               const resolvedRank=(c:any)=>{
                 const r=String(c.Rank||'').replace(/^#+/,'').trim();
                 if(!r||r==='N/A'||r==='null'||r==='undefined') return '—';
