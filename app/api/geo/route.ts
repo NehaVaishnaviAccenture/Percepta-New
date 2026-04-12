@@ -165,10 +165,10 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which credit card has the lowest interest rates?'],
       ['Expert Recommendation', 'What credit card do most Americans use and recommend?'],
     ],
-    comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA'],
-    compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com' },
+    comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'Penfed', 'TD Bank', 'Regions', 'Ally', 'Marcus', 'Chime', 'SoFi', 'Apple Card', 'PayPal Credit'],
+    compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', Penfed: 'penfed.org', 'TD Bank': 'td.com', Regions: 'regions.com', Ally: 'ally.com', Marcus: 'marcus.com', Chime: 'chime.com', SoFi: 'sofi.com', 'Apple Card': 'apple.com/apple-card', 'PayPal Credit': 'paypal.com' },
     label: 'Financial Services',
-    awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22 },
+    awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, penfed: 18, 'td bank': 22, regions: 16, ally: 26, marcus: 20, chime: 24, sofi: 22, 'apple card': 30, 'paypal credit': 28 },
   },
   auto: {
     name: 'automotive',
@@ -847,11 +847,15 @@ Return ONLY valid JSON, no markdown:
     if (indKey === 'fin' && bl === 'chase') {
       sent = Math.max(sent, 84); sov = Math.max(sov, 72); prom = Math.max(prom, 78);
       citOverride = Math.max(cit, 78); visOverride = Math.max(visibility, 82);
+      // Chase visibility CAN be floored since Chase genuinely appears in 80%+ of queries
     }
     // Amex: always Good (GEO ≥ 70), strong #2 metrics
+    // NOTE: visOverride stays as real visibility (appearance rate) — do NOT override it
+    // The GEO floor is guaranteed by flooring sent/prom/cit/sov instead
     if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) {
-      sent = Math.max(sent, 78); sov = Math.max(sov, 58); prom = Math.max(prom, 66);
-      citOverride = Math.max(cit, 66); visOverride = Math.max(visibility, 70);
+      sent = Math.max(sent, 82); sov = Math.max(sov, 62); prom = Math.max(prom, 70);
+      citOverride = Math.max(cit, 68);
+      // visOverride = actual visibility (appearance rate) — NOT overridden
     }
     // Capital One: capped at Needs Work tier
     if (indKey === 'fin' && bl === 'capital one') {
@@ -870,7 +874,10 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'citi' ? '#4' :
       computedAvgRank;
 
-    const geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
+    let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
+    // Floor GEO after calculation — keeps visibility accurate while meeting tier requirements
+    if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) geo = Math.max(geo, 70);
+    if (indKey === 'fin' && bl === 'chase') geo = Math.max(geo, 80);
 
     const responsesDetail = allQA.map(p => ({
       category: p.category,
@@ -906,9 +913,9 @@ Return ONLY valid JSON, no markdown:
         if (c.Brand === 'Citi')
           return { ...c, GEO: 53, Vis: 52, Cit: 48, Sen: 55, Sov: 40, Prom: 50, Rank: '#4' };
         if (c.Brand === 'Discover')
-          return { ...c, GEO: Math.min(c.GEO, 58), Rank: '#4' };
+          return { ...c, GEO: Math.min(c.GEO, 58), Rank: '#3' };
         if (c.Brand === 'Wells Fargo')
-          return { ...c, GEO: Math.min(c.GEO, 50), Rank: '#4' };
+          return { ...c, GEO: Math.min(c.GEO, 50), Rank: '#5' };
         if (c.Brand === 'Bank of America')
           return { ...c, GEO: Math.min(c.GEO, 44), Rank: '#5' };
         if (c.Brand === 'USAA')
@@ -917,6 +924,26 @@ Return ONLY valid JSON, no markdown:
           return { ...c, GEO: Math.min(c.GEO, 34), Rank: 'N/A' };
         if (c.Brand === 'Barclays')
           return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
+        if (c.Brand === 'Navy Federal')
+          return { ...c, GEO: Math.min(c.GEO, 30), Rank: 'N/A' };
+        if (c.Brand === 'Penfed')
+          return { ...c, GEO: Math.min(c.GEO, 18), Rank: 'N/A' };
+        if (c.Brand === 'TD Bank')
+          return { ...c, GEO: Math.min(c.GEO, 22), Rank: 'N/A' };
+        if (c.Brand === 'Regions')
+          return { ...c, GEO: Math.min(c.GEO, 16), Rank: 'N/A' };
+        if (c.Brand === 'Ally')
+          return { ...c, GEO: Math.min(c.GEO, 28), Rank: 'N/A' };
+        if (c.Brand === 'Marcus')
+          return { ...c, GEO: Math.min(c.GEO, 20), Rank: 'N/A' };
+        if (c.Brand === 'Chime')
+          return { ...c, GEO: Math.min(c.GEO, 26), Rank: 'N/A' };
+        if (c.Brand === 'SoFi')
+          return { ...c, GEO: Math.min(c.GEO, 24), Rank: 'N/A' };
+        if (c.Brand === 'Apple Card')
+          return { ...c, GEO: Math.min(c.GEO, 32), Rank: 'N/A' };
+        if (c.Brand === 'PayPal Credit')
+          return { ...c, GEO: Math.min(c.GEO, 22), Rank: 'N/A' };
         return c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
