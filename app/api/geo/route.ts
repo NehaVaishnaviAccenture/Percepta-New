@@ -759,7 +759,6 @@ export async function POST(req: NextRequest) {
       'apple tv+': ['apple tv+', 'apple tv'],
       'under armour': ['under armour', 'ua'],
       'new balance': ['new balance'],
-      'bank of america': ['bank of america', 'bofa'],
     };
     const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
     // Always use original input URL for industry detection — pageData.domain may be a redirect destination
