@@ -604,68 +604,112 @@ function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number;
 function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis:number; sent:number; cit:number; competitors:any[] }) {
   const [hov,setHov]=useState<number|null>(null);
   const top20 = competitors.slice(0,20);
-  const all=[
+  const raw=[
     {label:brand, x:vis, y:sent, cit:cit, isYou:true, isTopComp:false},
     ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:ci===0}))
   ];
-  const W=920,H=440,padL=52,padR=30,padT=28,padB=52;
-  const xVals=all.map(a=>a.x),yVals=all.map(a=>a.y);
-  const xMin=Math.max(0,Math.min(...xVals)-5),xMax=Math.max(...xVals)+10,yMin=Math.max(0,Math.min(...yVals)-5),yMax=Math.min(100,Math.max(...yVals)+10);
+
+  // ── Spread crowded bubbles: jitter x slightly so no two overlap ──
+  // Group by x-value proximity, then fan them out horizontally
+  const all = raw.map((a,i)=>{
+    if(a.isYou || a.isTopComp) return {...a, jx:a.x, jy:a.y};
+    // Find how many earlier non-key bubbles share the same tight x-zone
+    const sameZone = raw.slice(0,i).filter(b=>!b.isYou&&!b.isTopComp&&Math.abs(b.x-a.x)<=4);
+    const jitter = sameZone.length * 4; // spread 4 units per duplicate
+    return {...a, jx:a.x + jitter, jy:a.y};
+  });
+
+  const W=960,H=460,padL=56,padR=30,padT=32,padB=56;
+  const xVals=all.map(a=>a.jx),yVals=all.map(a=>a.jy);
+  const xMin=Math.max(0,Math.min(...xVals)-6),xMax=Math.max(...xVals)+14;
+  const yMin=Math.max(0,Math.min(...yVals)-6),yMax=Math.min(100,Math.max(...yVals)+14);
   const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
   const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
-  const avgX=Math.round(all.reduce((s,a)=>s+a.x,0)/all.length),avgY=Math.round(all.reduce((s,a)=>s+a.y,0)/all.length);
+  const avgX=Math.round(raw.reduce((s,a)=>s+a.x,0)/raw.length);
+  const avgY=Math.round(raw.reduce((s,a)=>s+a.y,0)/raw.length);
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
-  const bubbleR=(c:number)=>Math.round(7+((c-citMin)/Math.max(citMax-citMin,1))*5);
-  // Pre-place labels: alternate above/below, stagger by x-zone crowding
+  const bR=(c:number)=>Math.round(7+((c-citMin)/Math.max(citMax-citMin,1))*5);
+
+  // ── Label placement: above/below alternating, stagger by crowding ──
   const placements = all.map((a,i)=>{
-    const cx2=sx(a.x), cy2=sy(a.y), r=bubbleR(a.cit);
-    const crowdedBefore = all.slice(0,i).filter(b=>Math.abs(sx(b.x)-cx2)<26).length;
+    const cx2=sx(a.jx), cy2=sy(a.jy), r=bR(a.cit);
+    const zoneBefore = all.slice(0,i).filter(b=>Math.abs(sx(b.jx)-cx2)<24).length;
     const above = i%2===0;
-    const offset = above ? -(r+12+crowdedBefore*10) : (r+12+crowdedBefore*10);
-    return {cx2, cy2, r, ly:cy2+offset, above};
+    const offset = above ? -(r+11+zoneBefore*9) : (r+11+zoneBefore*9);
+    return {cx2, cy2, r, ly:Math.max(padT+6, Math.min(H-padB-6, cy2+offset)), above};
   });
+
+  // Quadrant corner labels
+  const midX=sx(avgX), midY=sy(avgY);
+  const qLabels=[
+    {x:padL+8, y:padT+14, text:'High Sentiment · Low Visibility', color:'#9CA3AF'},
+    {x:W-padR-8, y:padT+14, text:'High Sentiment · High Visibility', color:'#7C3AED', anchor:'end'},
+    {x:padL+8, y:H-padB-8, text:'Low Sentiment · Low Visibility', color:'#9CA3AF'},
+    {x:W-padR-8, y:H-padB-8, text:'Low Sentiment · High Visibility', color:'#9CA3AF', anchor:'end'},
+  ];
+
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
-      <div style={{fontSize:'0.7rem',color:'#9CA3AF',padding:'4px 12px 0',textAlign:'right' as const}}>Bubble size = Citation Score · #1 competitor in blue · Hover for name & metrics</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 14px 0'}}>
+        <div style={{fontSize:'0.72rem',color:'#6B7280',display:'flex',alignItems:'center',gap:12}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#7C3AED"/></svg> You</span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> #1 Competitor ★</span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#CBD5E1"/></svg> Others</span>
+          <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>· Bubble size = Citation Score · <strong style={{color:'#374151'}}>Hover any bubble to see data</strong></span>
+        </div>
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
+        {/* Quadrant shading */}
+        <rect x={padL} y={padT} width={midX-padL} height={midY-padT} fill="#F0FDF4" opacity="0.35"/>
+        <rect x={midX} y={padT} width={W-padR-midX} height={midY-padT} fill="#F5F3FF" opacity="0.45"/>
+        <rect x={padL} y={midY} width={midX-padL} height={H-padB-midY} fill="#F9FAFB" opacity="0.5"/>
+        <rect x={midX} y={midY} width={W-padR-midX} height={H-padB-midY} fill="#FFF7ED" opacity="0.3"/>
+        {/* Grid lines */}
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        <line x1={sx(avgX)} y1={padT} x2={sx(avgX)} y2={H-padB} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
-        <line x1={padL} y1={sy(avgY)} x2={W-padR} y2={sy(avgY)} stroke="#C4B5FD" strokeWidth="1" strokeDasharray="5,4"/>
-        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
-        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#E5E7EB" strokeWidth="1"/>
+        {/* Avg crosshairs */}
+        <line x1={midX} y1={padT} x2={midX} y2={H-padB} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
+        <line x1={padL} y1={midY} x2={W-padR} y2={midY} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
+        {/* Axes */}
+        <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
+        <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
+        {/* Quadrant corner labels */}
+        {qLabels.map((q,i)=><text key={i} x={q.x} y={q.y} textAnchor={(q as any).anchor||'start'} style={{fontSize:8,fill:q.color,fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>{q.text}</text>)}
+        {/* Bubbles */}
         {all.map((a,i)=>{
           const {cx2,cy2,r}=placements[i];
           const isH=hov===i;
           const fill=a.isYou?'#7C3AED':a.isTopComp?'#EFF6FF':'#CBD5E1';
           const stroke=a.isYou?'#5B21B6':a.isTopComp?'#3B82F6':'#9CA3AF';
           return <g key={`b${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
-            {isH&&<circle cx={cx2} cy={cy2} r={r+4} fill={stroke} opacity="0.1"/>}
+            {isH&&<circle cx={cx2} cy={cy2} r={r+4} fill={stroke} opacity="0.12"/>}
             <circle cx={cx2} cy={cy2} r={r} fill={fill} stroke={stroke} strokeWidth={a.isYou?2:a.isTopComp?2:1}/>
           </g>;
         })}
+        {/* Labels with leader lines */}
         {all.map((a,i)=>{
           const {cx2,cy2,r,ly,above}=placements[i];
           const isH=hov===i;
-          const labelColor=a.isYou?'#5B21B6':a.isTopComp?'#1E40AF':'#6B7280';
+          const lc=a.isYou?'#5B21B6':a.isTopComp?'#1E40AF':'#6B7280';
           const fs=a.isYou?11:a.isTopComp?10:7;
           const fw=(a.isYou||a.isTopComp)?700:400;
           const leaderY=above?cy2-r:cy2+r;
-          const tipW=170,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL),W-tipW-4),ty=cy2>padT+70?cy2-tipH-14:cy2+r+10;
+          const tipW=176,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL+2),W-padR-tipW-2),ty=cy2>padT+70?cy2-tipH-14:cy2+r+10;
           return <g key={`l${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
-            <line x1={cx2} y1={leaderY} x2={cx2} y2={above?ly+4:ly-4} stroke={labelColor} strokeWidth="0.7" strokeDasharray="2,2" opacity="0.45"/>
-            <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:labelColor,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}{a.isTopComp?' ★':''}</text>
+            <line x1={cx2} y1={leaderY} x2={cx2} y2={above?ly+3:ly-3} stroke={lc} strokeWidth="0.8" strokeDasharray="2,2" opacity="0.4"/>
+            <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:lc,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}{a.isTopComp?' ★':''}</text>
             {isH&&<g>
               <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
-              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1)':a.isYou?' (You)':''}</text>
+              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1 Competitor)':a.isYou?' (You)':''}</text>
               <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: {a.x} · Sentiment: {a.y}</text>
-              <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation: {a.cit}</text>
+              <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation Score: {a.cit}</text>
             </g>}
           </g>;
         })}
-        {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+14} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
-        <text x={(padL+W-padR)/2} y={H-6} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
+        {/* X-axis ticks */}
+        {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
+        <text x={(padL+W-padR)/2} y={H-8} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
       </svg>
     </div>
