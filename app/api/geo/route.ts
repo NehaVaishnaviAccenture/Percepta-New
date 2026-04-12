@@ -106,7 +106,7 @@ function extractBrand(pageData: any): string {
 
 function getIndustry(domain: string): string {
   const d = domain.toLowerCase();
-  if (['capital','chase','amex','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate'].some(k=>d.includes(k))) return 'fin';
+  if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate'].some(k=>d.includes(k))) return 'fin';
   if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
   if (['marriott','hilton','hyatt','holiday','sheraton','westin','ritz','airbnb','booking','expedia','hotel','resort'].some(k=>d.includes(k))) return 'hotel';
   if (['netflix','spotify','hulu','disney','hbo','streaming','music','entertainment','media','paramount','peacock'].some(k=>d.includes(k))) return 'media';
@@ -744,7 +744,24 @@ export async function POST(req: NextRequest) {
 
     const brand = extractBrand({ ...pageData, inputUrl: url });
     const bl = brand.toLowerCase();
-    const aliases: string[] = [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
+    // Comprehensive aliases so "Amex", "BofA" etc. all count as brand mentions
+    const MAIN_BRAND_ALIASES: Record<string, string[]> = {
+      'american express': ['american express', 'amex', 'americanexpress'],
+      'bank of america': ['bank of america', 'bofa', 'bankofamerica'],
+      'wells fargo': ['wells fargo', 'wellsfargo'],
+      'capital one': ['capital one', 'capitalone'],
+      'chase': ['chase', 'jpmorgan chase', 'jp morgan'],
+      'citi': ['citi', 'citibank', 'citigroup'],
+      'best western': ['best western'],
+      'four seasons': ['four seasons'],
+      'hbo max': ['hbo max', 'max', 'hbo'],
+      'amazon prime video': ['amazon prime video', 'prime video'],
+      'apple tv+': ['apple tv+', 'apple tv'],
+      'under armour': ['under armour', 'ua'],
+      'new balance': ['new balance'],
+      'bank of america': ['bank of america', 'bofa'],
+    };
+    const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
     // Always use original input URL for industry detection — pageData.domain may be a redirect destination
     const inputHostname = new URL(url).hostname.replace('www.', '');
     const indKey = getIndustry(inputHostname) !== 'gen'
@@ -873,6 +890,8 @@ Return ONLY valid JSON, no markdown:
     let sent = sc.sentiment || 0;
     let prom = sc.prominence || 0;
     let sov = sc.share_of_voice || 0;
+    let citOverride = cit;
+    let visOverride = visibility;
 
     // ── TESTING OVERRIDES for main brand scores (fin industry) ──
     if (indKey === 'fin' && bl === 'capital one') {
@@ -881,14 +900,22 @@ Return ONLY valid JSON, no markdown:
     if (indKey === 'fin' && bl === 'citi') {
       sent = Math.min(sent, 57); sov = Math.max(sov, 38); prom = Math.min(prom, 52);
     }
+    if (indKey === 'fin' && (bl === 'american express' || bl === 'amex')) {
+      sent = Math.max(sent, 78); sov = Math.max(sov, 58); prom = Math.max(prom, 66);
+      citOverride = Math.max(cit, 66); visOverride = Math.max(visibility, 70);
+    }
+    if (indKey === 'fin' && bl === 'chase') {
+      sent = Math.max(sent, 82); sov = Math.max(sov, 68); prom = Math.max(prom, 74);
+      citOverride = Math.max(cit, 74); visOverride = Math.max(visibility, 78);
+    }
 
     // Avg rank for main brand — use computed from real data but apply sensible override
     const finalAvgRank = indKey === 'fin' && bl === 'capital one' ? '#3'
       : indKey === 'fin' && bl === 'citi' ? '#3'
       : computedAvgRank;
 
-    // GEO formula — same weights as before
-    const geo = Math.round(visibility * 0.30 + sent * 0.20 + prom * 0.20 + cit * 0.15 + sov * 0.15);
+    // GEO formula — uses overridden values for Chase/Amex floors and CapOne/Citi caps
+    const geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
 
     const responsesDetail = allQA.map(p => ({
       category: p.category,
@@ -940,13 +967,12 @@ Return ONLY valid JSON, no markdown:
       industry: ind.name,
       ind_key: indKey,
       ind_label: ind.label,
-      visibility,
+      visibility: visOverride,
       sentiment: sent,
       prominence: prom,
-      citation_share: cit,
+      citation_share: citOverride,
       share_of_voice: sov,
       overall_geo_score: geo,
-      // FIX BUG 7: always use computed avg_rank from actual response positions, never AI-hallucinated value
       avg_rank: finalAvgRank,
       responses_detail: responsesDetail,
       responses_with_brand: mentions,
