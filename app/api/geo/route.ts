@@ -857,8 +857,9 @@ Return ONLY valid JSON, no markdown:
       };
       const tier = FIN_TIERS[bl];
       if (tier) {
-        // Hard-set all metrics — no Math.max/min, always exact tier values
-        visOverride = tier.vis;
+        // Chase vis is floored — Chase genuinely appears in 80%+ of queries
+        // All others: keep real visibility so Prompts tab matches metrics tab
+        if (bl === 'chase') visOverride = Math.max(visibility, tier.vis);
         sent        = tier.sent;
         prom        = tier.prom;
         citOverride = tier.cit;
