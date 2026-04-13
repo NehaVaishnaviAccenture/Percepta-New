@@ -114,6 +114,10 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
         Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you\'re not yet the brand AI leads with or recommends first.'}
       </p>
+      <div style={{background:'#F5F3FF',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 16px',marginBottom:14}}>
+        <div style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',marginBottom:4}}>Why 70 Threshold?</div>
+        <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.7}}>70 is like a 700 credit score—it&apos;s where you go from being considered to being chosen. It&apos;s also where most competitors sit, making it the right baseline.</div>
+      </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
           <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${b.border}`,padding:'10px 12px'}}>
@@ -708,7 +712,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
           </g>;
         })}
         {/* X-axis ticks */}
-        {[...Array(11)].map((_,i)=>{const v=i*10;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
+        {[...Array(19)].map((_,i)=>{const v=i*5;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
         <text x={(padL+W-padR)/2} y={H-8} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
       </svg>
@@ -951,15 +955,6 @@ export default function GeoHub() {
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace(/^#+/, '')}`} color="#3B82F6"/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                      <span style={{color:'#7C3AED',fontSize:'1rem'}}>💡</span>
-                      <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>Why does 70 matter?</span>
-                    </div>
-                    <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.8,margin:0}}>
-                      Think of 70 like a <strong>700 credit score</strong> — it&apos;s the threshold where you go from being <em>considered</em> to being <em>chosen</em>. Below 70, AI treats your brand as one option among many. Above 70, AI consistently leads with your brand as a primary recommendation. It&apos;s also where most top competitors sit, making it the right baseline to measure against — and the first milestone worth chasing.
-                    </p>
-                  </div>
                   <GapCards result={result}/>
                 </div>
               );
