@@ -45,7 +45,7 @@ async function fetchPageContent(url: string) {
         internalLinks.push({ url: new URL(href, url).toString(), path: href, label });
       }
     });
-    return { ok: true, url, domain, title, metaDesc, headings, hasSchema, hasAuthor, hasTable, hasList, wordCount, internalLinks };
+    return { ok: true, url, domain, title, metaDesc, headings, hasSchema, hasAuthor, hasTable, hasList, wordCount, internalLinks, inputUrl: url };
   } catch (e: any) {
     return { ok: false, error: e.message };
   }
@@ -101,7 +101,16 @@ function extractBrand(pageData: any): string {
 
 function getIndustry(domain: string, pageData?: any): string {
   const d = domain.toLowerCase();
-  // Check page content for LOB signals first
+  // Check URL path first — most reliable signal
+  const urlPath = ((pageData as any)?.url || '').toLowerCase();
+  const pathRetailSignals = ['/bank','/banking','/checking','/savings','/deposits','/cd','/money-market','/personal-banking'];
+  const pathCreditSignals = ['/credit-card','/creditcard','/rewards-card','/cash-back'];
+  const pathIsRetail = pathRetailSignals.some(k => urlPath.includes(k));
+  const pathIsCredit = pathCreditSignals.some(k => urlPath.includes(k));
+  const isFin = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'].some(k=>d.includes(k));
+  if (isFin && pathIsRetail) return 'fin_retail_bank';
+  if (isFin && pathIsCredit) return 'fin';
+  // Fallback: check page content
   if (pageData) {
     const pageText = [
       ...(pageData.headings || []),
@@ -112,9 +121,8 @@ function getIndustry(domain: string, pageData?: any): string {
     const isRetailBank = retailBankKeywords.some(k => pageText.includes(k));
     const creditKeywords = ['credit card','rewards card','cash back','apr','signup bonus','annual fee','travel rewards','credit limit','balance transfer'];
     const isCredit = creditKeywords.some(k => pageText.includes(k));
-    const isFin = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'].some(k=>d.includes(k));
     if (isFin && isRetailBank && !isCredit) return 'fin_retail_bank';
-    if (isFin && isRetailBank && isCredit) return 'fin'; // both present → default to credit
+    if (isFin && isRetailBank && isCredit) return 'fin';
   }
   if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','scotia','scotiabank','bmo','rbc','cibc','nbc','desjardins','tangerine','navyfederal','penfed','truist','regions','huntington','keybank','53','td.com'].some(k=>d.includes(k))) return 'fin';
   if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
