@@ -213,15 +213,32 @@ function ROICurve({ score }: { score: number }) {
 }
 
 const REC_CATEGORIES: Record<string,{label:string;color:string;bg:string}> = {
-  'Comparison Page':  {label:'Comparison Page',  color:'#3B82F6', bg:'#EFF6FF'},
-  'Content Page':     {label:'Content Page',     color:'#8B5CF6', bg:'#F5F3FF'},
-  'FAQ Build':        {label:'FAQ Build',        color:'#10B981', bg:'#ECFDF5'},
-  'Structured Data':  {label:'Structured Data',  color:'#F59E0B', bg:'#FFFBEB'},
-  'Citation Push':    {label:'Citation Push',    color:'#EC4899', bg:'#FDF2F8'},
-  'PR / Earned Media':{label:'PR / Earned Media',color:'#6366F1', bg:'#EEF2FF'},
-  'Technical SEO':    {label:'Technical SEO',   color:'#14B8A6', bg:'#F0FDFA'},
-  'Schema Markup':    {label:'Schema Markup',   color:'#F97316', bg:'#FFF7ED'},
-  'Content Strategy': {label:'Content Strategy',color:'#7C3AED', bg:'#F5F3FF'},
+  // Content Layer
+  'Comparison Page':   {label:'Comparison Page',   color:'#3B82F6', bg:'#EFF6FF'},
+  'Content Page':      {label:'Content Page',      color:'#8B5CF6', bg:'#F5F3FF'},
+  'FAQ Build':         {label:'FAQ Build',         color:'#10B981', bg:'#ECFDF5'},
+  'How-To Guide':      {label:'How-To Guide',      color:'#0EA5E9', bg:'#F0F9FF'},
+  'Product Explainer': {label:'Product Explainer', color:'#6366F1', bg:'#EEF2FF'},
+  'Best-Of List':      {label:'Best-Of List',      color:'#8B5CF6', bg:'#F5F3FF'},
+  'Use Case Page':     {label:'Use Case Page',     color:'#06B6D4', bg:'#ECFEFF'},
+  'Content Strategy':  {label:'Content Strategy',  color:'#7C3AED', bg:'#F5F3FF'},
+  // Authority Layer
+  'PR / Earned Media': {label:'PR / Earned Media', color:'#EC4899', bg:'#FDF2F8'},
+  'Citation Push':     {label:'Citation Push',     color:'#F43F5E', bg:'#FFF1F2'},
+  'Review Platform':   {label:'Review Platform',   color:'#F59E0B', bg:'#FFFBEB'},
+  'Forum Presence':    {label:'Forum Presence',    color:'#D97706', bg:'#FEF3C7'},
+  'Wikipedia / Entity':{label:'Wikipedia / Entity',color:'#64748B', bg:'#F1F5F9'},
+  'Influencer / Creator':{label:'Influencer / Creator',color:'#A855F7',bg:'#FAF5FF'},
+  // Technical Layer
+  'Structured Data':   {label:'Structured Data',   color:'#F97316', bg:'#FFF7ED'},
+  'Schema Markup':     {label:'Schema Markup',     color:'#EA580C', bg:'#FFF7ED'},
+  'Entity Optimization':{label:'Entity Optimization',color:'#0F766E',bg:'#F0FDFA'},
+  'Technical SEO':     {label:'Technical SEO',     color:'#14B8A6', bg:'#F0FDFA'},
+  'Internal Linking':  {label:'Internal Linking',  color:'#0369A1', bg:'#F0F9FF'},
+  // Distribution Layer
+  'Syndication':       {label:'Syndication',       color:'#7C3AED', bg:'#EDE9FE'},
+  'Data Feed':         {label:'Data Feed',         color:'#059669', bg:'#ECFDF5'},
+  'API Presence':      {label:'API Presence',      color:'#1D4ED8', bg:'#EFF6FF'},
 };
 
 function GeoSummary({ result }: { result:any }) {
@@ -255,16 +272,17 @@ function GeoSummary({ result }: { result:any }) {
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
     const prompt = `You are a sharp GEO strategist. Return a JSON object with:
-- "rows": array of exactly 6 objects in this order: first 3 are insights, last 3 are recommendations.
-  Each object:
+- "rows": array of exactly 10 objects. First 5 are insights, last 5 are recommendations.
+  Each object has:
   {
     "type": "insight" | "recommendation",
-    "category": for insights use "Data Signal" | "Competitive Gap" | "Visibility Gap" | "Sentiment Gap" | "Citation Gap". For recommendations use exactly one of: "Comparison Page" | "Content Page" | "FAQ Build" | "Structured Data" | "Citation Push" | "PR / Earned Media" | "Technical SEO" | "Schema Markup",
-    "text": one sharp sentence. Insights: open with a specific number, name brand + competitor directly. Recommendations: start with a verb, name a specific platform (NerdWallet/Bankrate/Forbes/Google), be LOB-specific,
+    "category": insights use: "Data Signal"|"Competitive Gap"|"Visibility Gap"|"Sentiment Gap"|"Citation Gap"|"Earned Media Gap"|"Content Gap"|"Rank Signal". Recommendations use: "Comparison Page"|"Content Page"|"FAQ Build"|"How-To Guide"|"Product Explainer"|"Best-Of List"|"Use Case Page"|"Content Strategy"|"PR / Earned Media"|"Citation Push"|"Review Platform"|"Forum Presence"|"Wikipedia / Entity"|"Influencer / Creator"|"Structured Data"|"Schema Markup"|"Entity Optimization"|"Technical SEO"|"Internal Linking"|"Syndication"|"Data Feed"|"API Presence",
+    "title": 4-6 word action title for recommendations only (null for insights),
+    "text": one sharp sentence. Insights: open with a specific number, name brand + competitor. Recommendations: verb-first, platform-specific (NerdWallet/Bankrate/Forbes/Google), LOB-specific, max 25 words,
     "scoreNow": ${geo},
-    "scoreForecast": for insights = ${geo} (no change). For recommendations add only 2-4 pts realistically. Never more than +4 per item,
-    "impact": for insights = null. For recommendations = "HIGH" | "MEDIUM" | "LOW",
-    "agenticFlag": null OR one specific sentence about application/approval/data readiness (for recommendations only)
+    "scoreForecast": insights = ${geo}. Recommendations: +1 to +4 pts only per item. Be conservative,
+    "impact": insights = null. Recommendations = "HIGH"|"MEDIUM"|"LOW". Sort: HIGH first then MEDIUM then LOW,
+    "agenticFlag": null OR one short sentence on application/data/approval readiness (recommendations only, not required on all)
   }
 
 Brand: ${result.brand_name}
@@ -273,7 +291,7 @@ Industry: ${result.ind_label}
 GEO: ${geo} | Vis: ${vis} | Sent: ${sent} | Cit: ${cit} | SOV: ${sov} | Prom: ${prom}
 Top Competitor: ${topComp} (GEO: ${topCompGEO})
 
-CRITICAL: scoreForecast for recommendations must be +2 to +4 pts only. Return ONLY valid JSON, no markdown.`;
+CRITICAL: Exactly 5 insights then 5 recommendations. Sort recommendations HIGH→MEDIUM→LOW. Include at least one Earned Media Gap and one Content Gap insight. scoreForecast for recs: +1 to +4 only. Return ONLY valid JSON, no markdown.\`;
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
@@ -364,6 +382,9 @@ CRITICAL: scoreForecast for recommendations must be +2 to +4 pts only. Return ON
                     'Visibility Gap': {c:'#3B82F6',bg:'#EFF6FF'},
                     'Sentiment Gap':  {c:'#10B981',bg:'#ECFDF5'},
                     'Citation Gap':   {c:'#F59E0B',bg:'#FFFBEB'},
+                    'Earned Media Gap':{c:'#EC4899',bg:'#FDF2F8'},
+                    'Content Gap':    {c:'#6366F1',bg:'#EEF2FF'},
+                    'Rank Signal':    {c:'#14B8A6',bg:'#F0FDFA'},
                   };
                   const ic = insCatColors[insCat]||{c:'#7C3AED',bg:'#F5F3FF'};
                   const impColor = rec?.impact==='HIGH'?'#EF4444':rec?.impact==='MEDIUM'?'#F59E0B':'#7C3AED';
