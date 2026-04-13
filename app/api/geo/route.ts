@@ -108,18 +108,23 @@ function getIndustry(domain: string, pageData?: any): string {
   const isFin = finDomains.some(k => d.includes(k));
 
   if (isFin) {
-    // Priority order matters — specific signals checked before broad ones
-    const pathWealthSignals = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
+    // Priority order: most specific first, generic last
+    const pathWealthSignals   = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
     const pathCommercialSignals = ['/commercial','/corporate','/treasury','/institutional','/wholesale'];
-    // SMB checked BEFORE /banking/ — chase.com/business/banking must hit SMB not retail
-    const pathSmbSignals = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
-    const pathRetailSignals = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
-    const pathRetailGeneric = ['/bank','/banking']; // checked last
-    if (pathWealthSignals.some(k => urlPath.includes(k))) return 'fin_wealth';
+    const pathSmbSignals      = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
+    const pathAutoLoanSignals  = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
+    const pathMortgageSignals  = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
+    const pathRetailSignals    = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
+    const pathRetailGeneric    = ['/bank','/banking'];
+    const pathCreditSignals    = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
+    if (pathWealthSignals.some(k => urlPath.includes(k)))    return 'fin_wealth';
     if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
-    if (pathSmbSignals.some(k => urlPath.includes(k))) return 'fin_small_business';
-    if (pathRetailSignals.some(k => urlPath.includes(k))) return 'fin_retail_bank';
-    if (pathRetailGeneric.some(k => urlPath.includes(k))) return 'fin_retail_bank';
+    if (pathSmbSignals.some(k => urlPath.includes(k)))       return 'fin_small_business';
+    if (pathAutoLoanSignals.some(k => urlPath.includes(k)))  return 'fin_auto_loan';
+    if (pathMortgageSignals.some(k => urlPath.includes(k)))  return 'fin_mortgage';
+    if (pathRetailSignals.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
+    if (pathRetailGeneric.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
+    if (pathCreditSignals.some(k => urlPath.includes(k)))    return 'fin';
     return 'fin';
   }
 
@@ -331,6 +336,124 @@ const INDUSTRY_DATA: Record<string, any> = {
     comps: ['Chase Private Client', 'Bank of America Preferred', 'Wells Fargo Private', 'Morgan Stanley', 'Merrill Lynch', 'Schwab', 'Fidelity', 'Goldman Sachs Private', 'US Bank Wealth', 'Northern Trust'],
     compUrls: { 'Chase Private Client': 'chase.com/personal/private-client', 'Bank of America Preferred': 'bankofamerica.com/preferred-rewards', 'Wells Fargo Private': 'wellsfargo.com/the-private-bank', 'Morgan Stanley': 'morganstanley.com', 'Merrill Lynch': 'ml.com', 'Schwab': 'schwab.com', 'Fidelity': 'fidelity.com', 'Goldman Sachs Private': 'goldmansachs.com', 'US Bank Wealth': 'usbank.com/wealth-management', 'Northern Trust': 'northerntrust.com' },
     awareness: { 'chase private client': 52, 'bank of america preferred': 48, 'wells fargo private': 42, 'morgan stanley': 62, 'merrill lynch': 60, schwab: 58, fidelity: 64, 'goldman sachs private': 56, 'us bank wealth': 30, 'northern trust': 38 },
+  },
+  fin_auto_loan: {
+    name: 'auto financing',
+    label: 'Auto Loans & Financing',
+    queries: [
+      ['General', 'Best bank for auto loan financing'],
+      ['General', 'Which bank has the best car loan rates?'],
+      ['General', 'Best auto loans from banks vs credit unions'],
+      ['General', 'Which lender is best for financing a used car?'],
+      ['General', 'Best pre-approved auto loans from banks'],
+      ['General', 'Which bank has the lowest auto loan interest rates?'],
+      ['General', 'Best auto loan lenders recommended by consumers'],
+      ['General', 'Which bank is best for refinancing a car loan?'],
+      ['General', 'Best auto loans with no prepayment penalty'],
+      ['General', 'Which lender offers the best auto loan for good credit?'],
+      ['New Car', 'Best bank financing for a new car purchase'],
+      ['New Car', 'Which bank partners with car dealerships for financing?'],
+      ['New Car', 'Best auto loan rates for new cars in 2025'],
+      ['New Car', 'Which bank offers the best 0% APR auto financing?'],
+      ['New Car', 'Best banks for financing a luxury vehicle'],
+      ['New Car', 'Which lender is best for a new electric vehicle loan?'],
+      ['New Car', 'Best banks for financing a car with excellent credit'],
+      ['New Car', 'Which bank has the best auto loan terms for a $40K car?'],
+      ['New Car', 'Best banks for first-time car buyers'],
+      ['New Car', 'Which bank offers the best auto loan with no down payment?'],
+      ['Used Car', 'Best banks for used car loans'],
+      ['Used Car', 'Which bank has the best used car loan rates?'],
+      ['Used Car', 'Best lenders for buying a car from a private seller'],
+      ['Used Car', 'Which bank finances older vehicles with high mileage?'],
+      ['Used Car', 'Best auto loans for cars over 5 years old'],
+      ['Used Car', 'Which bank is best for financing a certified pre-owned vehicle?'],
+      ['Used Car', 'Best banks for used car loans with bad credit'],
+      ['Used Car', 'Which lender offers the best used car refinancing?'],
+      ['Used Car', 'Best auto loan rates for a car under $20K'],
+      ['Used Car', 'Which bank has the easiest used car loan approval?'],
+      ['Refinance', 'Best banks for refinancing an existing auto loan'],
+      ['Refinance', 'Which bank offers the lowest rate to refinance a car loan?'],
+      ['Refinance', 'Best auto refinance lenders of 2025'],
+      ['Refinance', 'Which bank is best for refinancing after credit improvement?'],
+      ['Refinance', 'Best cash-out auto refinance lenders'],
+      ['Expert Recommendation', 'Which bank do car dealers recommend for financing?'],
+      ['Expert Recommendation', 'Best auto loan lenders ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best auto loan customer service?'],
+      ['Expert Recommendation', 'Best banks for auto loans recommended by Bankrate'],
+      ['Expert Recommendation', 'Which lender is most transparent on auto loan terms?'],
+      ['Expert Recommendation', 'Best online banks for auto loan applications'],
+      ['Expert Recommendation', 'Which bank has the fastest auto loan approval?'],
+      ['Expert Recommendation', 'Best auto loan rates for military members'],
+      ['Expert Recommendation', 'Which bank is best for an auto loan with co-signer?'],
+      ['Expert Recommendation', 'Best banks for auto loans with flexible repayment terms'],
+      ['Comparison', 'Capital One auto vs Chase auto loan — which is better?'],
+      ['Comparison', 'Bank auto loan vs dealership financing — which saves more?'],
+      ['Comparison', 'Capital One Auto Navigator vs Ally Financial comparison'],
+      ['Comparison', 'Best bank auto loan vs credit union auto loan'],
+      ['Comparison', 'Which is better for auto financing — Capital One or Bank of America?'],
+    ],
+    comps: ['Ally Financial', 'Chase Auto', 'Bank of America Auto', 'Wells Fargo Auto', 'US Bank Auto', 'PenFed Auto', 'LightStream', 'myAutoloan', 'USAA Auto', 'CarMax Auto Finance'],
+    compUrls: { 'Ally Financial': 'ally.com/auto', 'Chase Auto': 'chase.com/personal/auto-loans', 'Bank of America Auto': 'bankofamerica.com/auto-loans', 'Wells Fargo Auto': 'wellsfargo.com/auto-loans', 'US Bank Auto': 'usbank.com/auto-loans', 'PenFed Auto': 'penfed.org/auto-loans', 'LightStream': 'lightstream.com', 'myAutoloan': 'myautoloan.com', 'USAA Auto': 'usaa.com/auto-loans', 'CarMax Auto Finance': 'carmax.com/car-financing' },
+    awareness: { 'ally financial': 58, 'chase auto': 52, 'bank of america auto': 48, 'wells fargo auto': 44, 'us bank auto': 36, 'penfed auto': 28, lightstream: 32, myautoloan: 18, 'usaa auto': 34, 'carmax auto finance': 38 },
+  },
+  fin_mortgage: {
+    name: 'mortgage & home loans',
+    label: 'Mortgage & Home Loans',
+    queries: [
+      ['General', 'Best bank for a mortgage in 2025'],
+      ['General', 'Which bank has the best mortgage rates right now?'],
+      ['General', 'Best mortgage lenders recommended by homebuyers'],
+      ['General', 'Which bank is easiest to get a mortgage from?'],
+      ['General', 'Best banks for first-time home buyers'],
+      ['General', 'Which lender has the best 30-year fixed mortgage rate?'],
+      ['General', 'Best banks for mortgage pre-approval'],
+      ['General', 'Which bank has the lowest closing costs on mortgages?'],
+      ['General', 'Best mortgage lenders for jumbo loans'],
+      ['General', 'Which bank is best for a FHA home loan?'],
+      ['Purchase', 'Best banks for buying a home in 2025'],
+      ['Purchase', 'Which bank has the best mortgage for first-time buyers?'],
+      ['Purchase', 'Best mortgage lenders for a $500K home loan'],
+      ['Purchase', 'Which bank offers the best down payment assistance programs?'],
+      ['Purchase', 'Best banks for conventional mortgage loans'],
+      ['Purchase', 'Which bank is best for a mortgage on an investment property?'],
+      ['Purchase', 'Best VA home loan lenders for veterans'],
+      ['Purchase', 'Which bank has the best digital mortgage application experience?'],
+      ['Purchase', 'Best banks for mortgages in high cost of living areas'],
+      ['Purchase', 'Which lender is best for buying a condo with a mortgage?'],
+      ['Refinance', 'Best banks for refinancing a mortgage in 2025'],
+      ['Refinance', 'Which bank offers the best rate for a cash-out refinance?'],
+      ['Refinance', 'Best mortgage refinance lenders recommended by homeowners'],
+      ['Refinance', 'Which bank has the lowest refinance closing costs?'],
+      ['Refinance', 'Best banks for refinancing an FHA loan to conventional'],
+      ['HELOC', 'Best banks for a home equity line of credit'],
+      ['HELOC', 'Which bank has the best HELOC rates right now?'],
+      ['HELOC', 'Best home equity loan lenders of 2025'],
+      ['HELOC', 'Which bank is best for a HELOC with no closing costs?'],
+      ['HELOC', 'Best banks for home equity loans for renovations'],
+      ['Expert Recommendation', 'Which mortgage lender do real estate agents recommend?'],
+      ['Expert Recommendation', 'Best mortgage lenders ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best mortgage customer service?'],
+      ['Expert Recommendation', 'Best mortgage lenders recommended by Bankrate'],
+      ['Expert Recommendation', 'Which bank closes mortgages the fastest?'],
+      ['Expert Recommendation', 'Best banks for self-employed mortgage applicants'],
+      ['Expert Recommendation', 'Which bank is best for mortgage with student loan debt?'],
+      ['Expert Recommendation', 'Best mortgage lenders for high debt-to-income ratio'],
+      ['Expert Recommendation', 'Which bank is most transparent on mortgage fees?'],
+      ['Expert Recommendation', 'Best online mortgage lenders vs traditional banks'],
+      ['Comparison', 'Chase mortgage vs Bank of America mortgage — which is better?'],
+      ['Comparison', 'Best bank mortgage vs mortgage broker — which saves more?'],
+      ['Comparison', 'Quicken Loans vs Chase vs Wells Fargo for mortgage'],
+      ['Comparison', 'Best bank for mortgage vs online lender like Rocket Mortgage'],
+      ['Comparison', 'Which bank beats Rocket Mortgage on rates and fees?'],
+      ['Comparison', 'Chase vs Citi mortgage — which has better terms?'],
+      ['Comparison', 'Best regional bank vs national bank for mortgage'],
+      ['Comparison', 'Bank of America vs Wells Fargo — which is better for mortgages?'],
+      ['Comparison', 'Which bank is better for mortgage — PNC or Chase?'],
+      ['Comparison', 'Capital One vs Chase vs Citi for home loans'],
+    ],
+    comps: ['Rocket Mortgage', 'Chase Mortgage', 'Bank of America Mortgage', 'Wells Fargo Mortgage', 'United Wholesale', 'loanDepot', 'Fairway Independent', 'PNC Mortgage', 'US Bank Mortgage', 'Citi Mortgage'],
+    compUrls: { 'Rocket Mortgage': 'rocketmortgage.com', 'Chase Mortgage': 'chase.com/personal/mortgage', 'Bank of America Mortgage': 'bankofamerica.com/mortgage', 'Wells Fargo Mortgage': 'wellsfargo.com/mortgage', 'United Wholesale': 'uwm.com', 'loanDepot': 'loandepot.com', 'Fairway Independent': 'fairwayindependentmc.com', 'PNC Mortgage': 'pnc.com/mortgage', 'US Bank Mortgage': 'usbank.com/home-loans', 'Citi Mortgage': 'citi.com/mortgage' },
+    awareness: { 'rocket mortgage': 68, 'chase mortgage': 56, 'bank of america mortgage': 52, 'wells fargo mortgage': 48, 'united wholesale': 38, loandepot: 42, 'fairway independent': 28, 'pnc mortgage': 32, 'us bank mortgage': 30, 'citi mortgage': 36 },
   },
   fin_commercial: {
     name: 'commercial banking',
@@ -1330,6 +1453,8 @@ Return ONLY valid JSON, no markdown:
           if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
           return 'Retail Banking — Checking, Savings & CDs';
         }
+        if ((indKey as string) === 'fin_auto_loan') return 'Auto Loans & Financing';
+        if ((indKey as string) === 'fin_mortgage') return 'Mortgage & Home Loans';
         if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
         if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
         if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
