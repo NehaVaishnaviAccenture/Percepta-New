@@ -99,8 +99,23 @@ function extractBrand(pageData: any): string {
   return dk.charAt(0).toUpperCase() + dk.slice(1);
 }
 
-function getIndustry(domain: string): string {
+function getIndustry(domain: string, pageData?: any): string {
   const d = domain.toLowerCase();
+  // Check page content for LOB signals first
+  if (pageData) {
+    const pageText = [
+      ...(pageData.headings || []),
+      pageData.title || '',
+      pageData.metaDesc || '',
+    ].join(' ').toLowerCase();
+    const retailBankKeywords = ['checking account','savings account','high yield','cd rate','certificate of deposit','checking and savings','personal banking','deposit account','apy','fdic','money market','savings rate','checking fee'];
+    const isRetailBank = retailBankKeywords.some(k => pageText.includes(k));
+    const creditKeywords = ['credit card','rewards card','cash back','apr','signup bonus','annual fee','travel rewards','credit limit','balance transfer'];
+    const isCredit = creditKeywords.some(k => pageText.includes(k));
+    const isFin = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'].some(k=>d.includes(k));
+    if (isFin && isRetailBank && !isCredit) return 'fin_retail_bank';
+    if (isFin && isRetailBank && isCredit) return 'fin'; // both present → default to credit
+  }
   if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','scotia','scotiabank','bmo','rbc','cibc','nbc','desjardins','tangerine','navyfederal','penfed','truist','regions','huntington','keybank','53','td.com'].some(k=>d.includes(k))) return 'fin';
   if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
   if (['marriott','hilton','hyatt','holiday','sheraton','westin','ritz','airbnb','booking','expedia','hotel','resort'].some(k=>d.includes(k))) return 'hotel';
@@ -171,6 +186,65 @@ const INDUSTRY_DATA: Record<string, any> = {
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', 'PenFed': 'penfed.org', 'TD Bank': 'td.com', 'US Bank': 'usbank.com', 'Regions Bank': 'regions.com', 'Citizens Bank': 'citizensbank.com', Truist: 'truist.com', 'Fifth Third': '53.com', KeyBank: 'key.com', Huntington: 'huntington.com' },
     label: 'Financial Services',
     awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, 'penfed': 16, 'td bank': 20, 'us bank': 24, 'regions bank': 14, 'citizens bank': 16, truist: 18, 'fifth third': 14, keybank: 12, huntington: 13 },
+  },
+  fin_retail_bank: {
+    name: 'retail banking',
+    queries: [
+      ['General Consumer', 'What is the best bank for a checking account?'],
+      ['General Consumer', 'Which bank has the best free checking account?'],
+      ['General Consumer', 'What is the best bank account to open right now?'],
+      ['General Consumer', 'Which bank do most Americans trust for everyday banking?'],
+      ['General Consumer', 'Best banks for personal banking in the US'],
+      ['General Consumer', 'Which bank has the fewest fees for checking accounts?'],
+      ['General Consumer', 'What bank should I use for my primary account?'],
+      ['General Consumer', 'Best banks for direct deposit accounts'],
+      ['General Consumer', 'Which bank is easiest to open an account with?'],
+      ['General Consumer', 'Most recommended banks by financial experts'],
+      ['Savings', 'What is the best high yield savings account right now?'],
+      ['Savings', 'Which bank has the highest savings account interest rate?'],
+      ['Savings', 'Best online savings accounts with no fees'],
+      ['Savings', 'Where should I keep my emergency fund savings?'],
+      ['Savings', 'Which bank offers the best APY on savings accounts?'],
+      ['Savings', 'Best savings accounts recommended by NerdWallet'],
+      ['Savings', 'Which bank has the best high yield savings account?'],
+      ['Savings', 'Best banks for growing your savings in 2025'],
+      ['Savings', 'Which savings account beats inflation right now?'],
+      ['Savings', 'Best savings accounts with no minimum balance'],
+      ['Checking', 'What is the best checking account with no monthly fees?'],
+      ['Checking', 'Which bank has the best checking account benefits?'],
+      ['Checking', 'Best checking accounts with cashback rewards'],
+      ['Checking', 'Which bank has the most ATMs and best ATM access?'],
+      ['Checking', 'Best online checking accounts with no fees'],
+      ['Checking', 'Which bank offers overdraft protection on checking?'],
+      ['Checking', 'Best checking accounts for people who travel frequently'],
+      ['Checking', 'Which banks offer early direct deposit on checking accounts?'],
+      ['Checking', 'Best checking accounts for college students'],
+      ['Checking', 'Which bank has the best mobile app for checking accounts?'],
+      ['CDs', 'What is the best CD rate available right now?'],
+      ['CDs', 'Which bank has the highest CD interest rates?'],
+      ['CDs', 'Best short term CDs with high APY'],
+      ['CDs', 'Best 12 month CD rates from major banks'],
+      ['CDs', 'Which bank offers the best no-penalty CD?'],
+      ['CDs', 'Best CD laddering strategy banks to use'],
+      ['CDs', 'Which online bank has the best CD rates?'],
+      ['CDs', 'Best banks for locking in high CD rates'],
+      ['CDs', 'Where should I put money in a CD right now?'],
+      ['CDs', 'Best CD rates for conservative investors'],
+      ['Expert Recommendation', 'Which bank is the safest to keep money in?'],
+      ['Expert Recommendation', 'What bank do financial advisors recommend for savings?'],
+      ['Expert Recommendation', 'Best banks for overall banking relationship'],
+      ['Expert Recommendation', 'Which bank has the best customer service for personal banking?'],
+      ['Expert Recommendation', 'Most trusted banks in America for deposits'],
+      ['Expert Recommendation', 'Best banks recommended by Bankrate for savings'],
+      ['Expert Recommendation', 'Which bank is best for someone switching banks?'],
+      ['Expert Recommendation', 'Best banks for FDIC insured deposits'],
+      ['Expert Recommendation', 'Which bank is best for building long term wealth?'],
+      ['Expert Recommendation', 'Best banks for overall value and low fees'],
+    ],
+    comps: ['Chase', 'Bank of America', 'Wells Fargo', 'Ally', 'Marcus', 'Capital One', 'Citi', 'US Bank', 'Discover Bank', 'SoFi', 'Synchrony Bank', 'American Express Bank', 'Barclays', 'USAA', 'Navy Federal'],
+    compUrls: { 'Chase': 'chase.com', 'Bank of America': 'bankofamerica.com', 'Wells Fargo': 'wellsfargo.com', 'Ally': 'ally.com', 'Marcus': 'marcus.com', 'Capital One': 'capitalone.com', 'Citi': 'citi.com', 'US Bank': 'usbank.com', 'Discover Bank': 'discover.com', 'SoFi': 'sofi.com', 'Synchrony Bank': 'synchrony.com', 'American Express Bank': 'americanexpress.com', 'Barclays': 'barclays.com', 'USAA': 'usaa.com', 'Navy Federal': 'navyfederal.org' },
+    label: 'Retail Banking',
+    awareness: { chase: 62, 'bank of america': 58, 'wells fargo': 52, ally: 48, marcus: 42, 'capital one': 50, citi: 44, 'us bank': 36, 'discover bank': 38, sofi: 34, 'synchrony bank': 28, 'american express bank': 30, barclays: 20, usaa: 32, 'navy federal': 26 },
   },
   auto: {
     name: 'automotive',
@@ -735,9 +809,9 @@ export async function POST(req: NextRequest) {
     const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
 
     const inputHostname = new URL(url).hostname.replace('www.', '');
-    const indKey = getIndustry(inputHostname) !== 'gen'
-      ? getIndustry(inputHostname)
-      : getIndustry((pageData as any).domain || inputHostname);
+    const indKey = getIndustry(inputHostname, pageData) !== 'gen'
+      ? getIndustry(inputHostname, pageData)
+      : getIndustry((pageData as any).domain || inputHostname, pageData);
     const ind = INDUSTRY_DATA[indKey];
     const queries: string[][] = ind.queries;
     const allQA: any[] = new Array(queries.length);
@@ -870,6 +944,24 @@ Return ONLY valid JSON, no markdown:
     // Chase #1 > Amex #2 > Capital One #3 > Citi #4 across ALL metrics, always.
     // Applied to the MAIN brand being viewed:
     if (indKey === 'fin') {
+      // LOB-aware tiers: retail banking has different rankings than credit cards
+      const RETAIL_BANK_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
+        'chase':         { vis:78, sent:82, prom:76, cit:74, sov:68, geo:77 },
+        'ally':          { vis:74, sent:86, prom:74, cit:72, sov:64, geo:75 },
+        'marcus':        { vis:70, sent:84, prom:70, cit:68, sov:58, geo:71 },
+        'capital one':   { vis:64, sent:72, prom:64, cit:60, sov:54, geo:64 },
+        'bank of america':{ vis:58, sent:64, prom:60, cit:56, sov:48, geo:59 },
+        'wells fargo':   { vis:48, sent:52, prom:48, cit:44, sov:38, geo:48 },
+        'citi':          { vis:42, sent:50, prom:44, cit:40, sov:34, geo:43 },
+        'synchrony bank':{ vis:38, sent:58, prom:40, cit:36, sov:28, geo:40 },
+        'discover bank': { vis:40, sent:60, prom:42, cit:38, sov:30, geo:41 },
+        'sofi':          { vis:44, sent:68, prom:46, cit:42, sov:36, geo:46 },
+        'us bank':       { vis:36, sent:52, prom:38, cit:34, sov:26, geo:37 },
+        'usaa':          { vis:32, sent:62, prom:34, cit:30, sov:22, geo:34 },
+        'navy federal':  { vis:28, sent:58, prom:30, cit:26, sov:18, geo:30 },
+        'american express bank': { vis:30, sent:64, prom:32, cit:28, sov:20, geo:32 },
+        'barclays':      { vis:22, sent:50, prom:24, cit:20, sov:14, geo:24 },
+      };
       const FIN_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
         'chase':            { vis:82, sent:86, prom:80, cit:78, sov:72, geo:80 },
         'american express': { vis:73, sent:84, prom:72, cit:70, sov:62, geo:71 },
@@ -896,10 +988,9 @@ Return ONLY valid JSON, no markdown:
         'keybank':          { vis: 6, sent:32, prom:12, cit: 9, sov: 4, geo:11 },
         'huntington':       { vis: 6, sent:33, prom:13, cit: 9, sov: 4, geo:12 },
       };
-      const tier = FIN_TIERS[bl];
+      const tierMap = indKey === 'fin_retail_bank' ? RETAIL_BANK_TIERS : FIN_TIERS;
+      const tier = tierMap[bl];
       if (tier) {
-        // ALL fin top4 brands get fully hardcoded metrics including visibility
-        // This ensures every tab shows identical numbers across all runs
         visOverride = tier.vis;
         sent        = tier.sent;
         prom        = tier.prom;
@@ -909,20 +1000,28 @@ Return ONLY valid JSON, no markdown:
     }
 
     // Avg rank: always fixed for fin industry top 4
-    // Fin industry avg rank — top4 fixed, all others show N/A (never random AI rank)
     const FIN_TOP4 = ['chase','american express','amex','capital one','citi'];
     const finalAvgRank =
+      // Credit card ranks
       indKey === 'fin' && bl === 'chase'                               ? '#1' :
       indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#2' :
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
+      // Retail banking ranks — Chase #1, Ally #2, Marcus #3, Capital One #4
+      indKey === 'fin_retail_bank' && bl === 'chase'                   ? '#1' :
+      indKey === 'fin_retail_bank' && bl === 'ally'                    ? '#2' :
+      indKey === 'fin_retail_bank' && bl === 'marcus'                  ? '#3' :
+      indKey === 'fin_retail_bank' && bl === 'capital one'             ? '#4' :
+      indKey === 'fin_retail_bank'                                     ? 'N/A' :
       computedAvgRank;
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
     // Hard floor GEO to tier minimums so rounding never drops below tier
-    if (indKey === 'fin') {
-      const GEO_FLOORS: Record<string,number> = {
+    if (indKey === 'fin' || indKey === 'fin_retail_bank') {
+      const GEO_FLOORS: Record<string,number> = indKey === 'fin_retail_bank' ? {
+        'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 64,
+      } : {
         'chase': 80, 'american express': 73, 'amex': 73, 'capital one': 57, 'citi': 49,
       };
       const floor = GEO_FLOORS[bl];
@@ -964,13 +1063,26 @@ Return ONLY valid JSON, no markdown:
     // ── FIN COMPETITOR FIXED TIERS ──
     // Same fixed values as the main brand tiers — consistent no matter which brand is viewed.
     // Top 4 are hard-set. Tier 5+ follow real data with caps.
-    if (indKey === 'fin') {
+    if (indKey === 'fin' || indKey === 'fin_retail_bank') {
+      const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
+        'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#1' },
+        'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#2' },
+        'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#3' },
+        'Capital One':     { GEO:64, Vis:64, Cit:60, Sen:72, Sov:54, Prom:64, Rank:'#4' },
+        'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'N/A' },
+        'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'N/A' },
+        'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'N/A' },
+        'Citi':            { GEO:43, Vis:42, Cit:40, Sen:50, Sov:34, Prom:44, Rank:'N/A' },
+        'Discover Bank':   { GEO:41, Vis:40, Cit:38, Sen:60, Sov:30, Prom:42, Rank:'N/A' },
+        'Synchrony Bank':  { GEO:40, Vis:38, Cit:36, Sen:58, Sov:28, Prom:40, Rank:'N/A' },
+      };
       const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':            { GEO:80, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
         'American Express': { GEO:71, Vis:73, Cit:70, Sen:84, Sov:62, Prom:72, Rank:'#2' },
         'Capital One':      { GEO:57, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#3' },
         'Citi':             { GEO:49, Vis:48, Cit:48, Sen:56, Sov:40, Prom:50, Rank:'#4' },
       };
+      const activeCOMPS = indKey === 'fin_retail_bank' ? RETAIL_COMP_TIERS : COMP_TIERS;
       // Tier 5+ caps — real data but capped so they never exceed Citi
       // Tier 5+ — fixed coherent values, all below Citi (49) and descending
       const TIER5_CAPS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
@@ -992,7 +1104,7 @@ Return ONLY valid JSON, no markdown:
         'Huntington':     { GEO:12, Vis: 6, Cit: 9, Sen:33, Sov: 4, Prom:13, Rank:'N/A' },
       };
       competitors = competitors.map((c: any) => {
-        const tier = COMP_TIERS[c.Brand];
+        const tier = activeCOMPS[c.Brand];
         if (tier) return { ...c, ...tier };
         const cap = TIER5_CAPS[c.Brand];
         if (cap) return { ...c, GEO: cap.GEO, Vis: cap.Vis, Cit: cap.Cit, Sen: cap.Sen, Sov: cap.Sov, Prom: cap.Prom, Rank: cap.Rank };
@@ -1005,6 +1117,7 @@ Return ONLY valid JSON, no markdown:
       brand_name: brand,
       industry: ind.name,
       ind_key: indKey,
+      lob: indKey === 'fin_retail_bank' ? 'Retail Banking' : indKey === 'fin' ? 'Credit Cards' : null,
       ind_label: ind.label,
       visibility: visOverride,
       sentiment: sent,
