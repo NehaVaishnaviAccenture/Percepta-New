@@ -1016,10 +1016,10 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
-      // Retail banking ranks — Chase #1, Ally #2, Capital One #2, Marcus #3
+      // Retail banking ranks — Capital One #1 (360 Checking), Chase #1, Ally #2, Marcus #3
       (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#1' :
       (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#2' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#2' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#1' :
       (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#3' :
       (indKey as string) === 'fin_retail_bank'                                     ? 'N/A' :
       computedAvgRank;
@@ -1076,7 +1076,7 @@ Return ONLY valid JSON, no markdown:
         'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#1' },
         'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#2' },
         'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#3' },
-        'Capital One':     { GEO:64, Vis:64, Cit:60, Sen:72, Sov:54, Prom:64, Rank:'#2' },
+        'Capital One':     { GEO:79, Vis:80, Cit:80, Sen:88, Sov:74, Prom:78, Rank:'#1' },
         'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'N/A' },
         'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'N/A' },
         'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'N/A' },
