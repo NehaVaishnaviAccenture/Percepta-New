@@ -215,106 +215,65 @@ function ROICurve({ score }: { score: number }) {
   );
 }
 
-function GapCards({ result }: { result:any }) {
-  const [gaps,setGaps]=useState<any[]>([]);
+function GeoSummary({ result }: { result:any }) {
+  const [data,setData]=useState<any>(null);
   const [loading,setLoading]=useState(false);
-  const [expanded,setExpanded]=useState<number|null>(null);
   const [fetched,setFetched]=useState(false);
 
+  const geo = result.overall_geo_score ?? 0;
+  const vis = result.visibility ?? 0;
+  const sent = result.sentiment ?? 0;
+  const cit = result.citation_share ?? 0;
+  const sov = result.share_of_voice ?? 0;
+  const prom = result.prominence ?? 0;
+  const lob = result.lob || null;
+  const isLeader = geo >= 80;
+  const maxGain = geo >= 80 ? 5 : geo >= 70 ? 10 : 22;
+  const projected = Math.min(geo + maxGain, 97);
+  const badge = scoreBadge(geo);
+  const topComp = (result.competitors||[])[0]?.Brand || 'top competitor';
+  const topCompGEO = (result.competitors||[])[0]?.GEO || 0;
+
   useEffect(()=>{
-    if(fetched)return;setFetched(true);setLoading(true);
-    const geo=result.overall_geo_score??0;
-    const isLeader = geo >= 80;
-    const topComp=(result.competitors||[])[0]?.Brand||'top competitor';
-    const topCompGEO=(result.competitors||[])[0]?.GEO||'unknown';
-    const topCompSOV=(result.competitors||[])[0]?.Sov||'unknown';
-    const secondComp=(result.competitors||[])[1]?.Brand||'second competitor';
-    const secondCompGEO=(result.competitors||[])[1]?.GEO||'unknown';
+    if(fetched) return;
+    setFetched(true);
+    setLoading(true);
+    const lobContext = lob ? `Line of Business: ${lob}.` : '';
+    const prompt = `You are a sharp GEO strategist. Generate a JSON object with exactly:
+- "insights": array of exactly 3 strings. Each insight is ONE sentence, starts with a specific number from the data, names the brand and a competitor directly, states a fact not an opinion.
+- "recommendations": array of exactly 3 objects with fields: "title" (5-7 words), "action" (2 sentences, starts with a verb, names specific platforms like NerdWallet/Bankrate/Forbes, LOB-specific), "impact" (one of: "HIGH"|"MEDIUM"|"LOW"), "agenticFlag" (null OR one of: "Application flow has X steps — agents may abandon"|"Product page lacks structured data — AI cannot parse terms programmatically"|"Rate terms not machine-readable — agentic comparison will fail").
 
-    const prompt=`You are a blunt GEO analyst at Accenture. Generate exactly 5 strategic gaps. Write like a doctor giving a diagnosis — state facts, use numbers, be direct. No hedging words like "should", "may", "could", "appears". Every sentence is a statement of fact.
+Brand: ${result.brand_name}
+${lobContext}
+Industry: ${result.ind_label}
+GEO Score: ${geo} | Visibility: ${vis} | Sentiment: ${sent} | Citation: ${cit} | SOV: ${sov} | Prominence: ${prom}
+Top Competitor: ${topComp} (GEO: ${topCompGEO})
+Leader: ${isLeader}
 
-Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
-Visibility: ${result.visibility}, Sentiment: ${result.sentiment}, Prominence: ${result.prominence}
-Citation Share: ${result.citation_share}, Share of Voice: ${result.share_of_voice}, Avg Rank: ${result.avg_rank}
-Top Competitor: ${topComp} (GEO: ${topCompGEO}, SOV: ${topCompSOV})
-Second Competitor: ${secondComp} (GEO: ${secondCompGEO})
-Brand position: ${isLeader ? `${result.brand_name} IS THE CATEGORY LEADER — already #1 in GEO score. ALL gaps must be framed as defending dominance and extending authority, NOT catching up to anyone.` : `${result.brand_name} is NOT the category leader — gaps are about closing the distance to #1.`}
+CRITICAL: insights must open with a number. Recommendations must be specific to ${lob || result.ind_label} — not generic. At least 1 recommendation must have an agenticFlag that is specific to banking/financial services application experience.
 
-${isLeader
-  ? `CRITICAL: Since ${result.brand_name} is the #1 brand, every gap title and description MUST reflect a leader defending and widening its lead — never frame it as being behind or needing to catch up.`
-  : ''}
-
-Use EXACTLY these 5 gap types with EXACTLY these title formats:
-
-1. Title MUST be: "${isLeader
-  ? `Authority Depth: ${result.brand_name} leads overall but lacks dominance in key sub-segments`
-  : `Primary Recommendation Rate: AI recognizes ${result.brand_name}, rarely recommends it first`}"
-2. Title MUST be: "${isLeader
-  ? `Segment Lock-out: ${result.brand_name} at ${result.share_of_voice}% SOV — ${secondComp} at GEO ${secondCompGEO} is the closest threat`
-  : `Share of Voice: You're at ${result.share_of_voice}% of AI mentions — ${topComp} is at ${topCompSOV}%`}"
-3. Title MUST be: "Earned Media: ${result.citation_share}% of citations are from 3rd-party sites you don't control"
-4. Title MUST be: "${isLeader
-  ? `Content Moat: ${result.brand_name} is cited broadly but lacks deep expert-level pages AI prefers`
-  : `Segment Depth: Only [X] of [Y] product segments are AI-visible`}" — for non-leaders estimate X and Y from data
-5. Title MUST be: "Answer Completeness: AI mentions ${result.brand_name} but skips the full reasoning"
-
-Return ONLY valid JSON array, no markdown, no backticks. Each object:
-{
-  "title": "use the EXACT title format above",
-  "impact": "HIGH IMPACT" | "MEDIUM IMPACT" | "LOW-MEDIUM IMPACT",
-  "effort": "Low" | "Medium" | "High" | "Low-Medium",
-  "currentMetric": number,
-  "targetMetric": number,
-  "currentState": "2 sentences. Open with a specific number. ${isLeader ? `Frame as a leader defending dominance, not catching up.` : `Name ${result.brand_name} and ${topComp} directly.`} No vague language.",
-  "rootCause": "2 sentences. State the exact structural reason. No corporate speak.",
-  "howToFix": "2 sentences. Start with a verb. Name specific platforms (NerdWallet, Bankrate, Forbes). Concrete actions only.",
-  "rankImpact": "1 sentence. State a specific rank or score movement as fact.",
-  "conversionImpact": "1 sentence. State a specific business outcome as fact."
-}
-Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
+Return ONLY valid JSON, no markdown, no backticks.`;
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
-      .then(r=>r.json()).then(data=>{
-        const text=data.response||'';
-        const clean=text.replace(/```json|```/g,'').trim();
-        const parsed=JSON.parse(clean);
-        const order:Record<string,number>={'HIGH IMPACT':0,'MEDIUM IMPACT':1,'LOW-MEDIUM IMPACT':2};
-        parsed.sort((a:any,b:any)=>(order[a.impact]??3)-(order[b.impact]??3));
-        setGaps(parsed);
-      }).catch(()=>setGaps([])).finally(()=>setLoading(false));
+      .then(r=>r.json()).then(d=>{
+        const clean = (d.response||'').replace(/```json|```/g,'').trim();
+        setData(JSON.parse(clean));
+      }).catch(()=>setData(null)).finally(()=>setLoading(false));
   },[]);
 
-  const geo=result.overall_geo_score??0;
-  const isLeader = geo >= 80;
-  // Leaders have tiny marginal room; Good tier has moderate; below is larger
-  const maxGain = geo >= 80 ? 5 : geo >= 70 ? 10 : 22;
-  const projected=Math.min(geo + maxGain, 97);
-  const gapColors=['#F59E0B','#10B981','#7C3AED','#EC4899','#3B82F6'];
+  const impactColor = (i:string) => i==='HIGH'?'#EF4444':i==='MEDIUM'?'#F59E0B':'#7C3AED';
+  const impactBg = (i:string) => i==='HIGH'?'#FEE2E2':i==='MEDIUM'?'#FEF3C7':'#EDE9FE';
 
   return (
     <div>
+      {/* S-curve lives inside ROICurve which is called from GapCards — keep score cards here */}
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
         <ROICurve score={geo}/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
-            {
-              label:'Current GEO Score',
-              val:geo,
-              color:'#F59E0B',
-              sub: scoreBadge(geo).label + (geo>=80?' — Category leader':geo>=70?' — Above efficiency threshold':' — Below efficiency threshold')
-            },
-            {
-              label:'Projected GEO Score',
-              val:projected,
-              color:'#10B981',
-              sub: isLeader ? 'After closing remaining authority gaps' : 'After fixing all 5 gaps below'
-            },
-            {
-              label: isLeader ? 'Score Defend' : 'Score Unlock',
-              val:`+${projected-geo} pts`,
-              color:'#7C3AED',
-              sub: isLeader ? 'Estimated gain from authority extension' : 'Estimated gain from prioritized gap closure'
-            },
+            { label:'Current GEO Score', val:geo, color: geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub: badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold') },
+            { label:'Forecasted GEO Score', val:projected, color:'#10B981', sub: isLeader?'After closing authority gaps':'After acting on recommendations below' },
+            { label: isLeader?'Score Defend':'Score Unlock', val:`+${projected-geo} pts`, color:'#7C3AED', sub:'Estimated gain from prioritised actions' },
           ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
               <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>{c.label}</div>
@@ -324,62 +283,61 @@ Sort: HIGH IMPACT first, then MEDIUM, then LOW-MEDIUM.`;
           ))}
         </div>
       </div>
-      <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Top 5 Gaps to Fill — Ranked by Impact on Rank & Conversions</div>
-      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Click any gap to see exactly what&apos;s broken, why, and how to fix it.</div>
-      {loading&&(
-        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:32,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}>
-          <div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
-          Analysing {result.brand_name}&apos;s strategic gaps…
-          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+
+      {/* ── INSIGHTS ── */}
+      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+          <span style={{fontSize:'1rem'}}>💡</span>
+          <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>GEO Insights</span>
+          {lob&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{lob}</span>}
         </div>
-      )}
-      {!loading&&gaps.map((g,i)=>{
-        const isOpen=expanded===i, pct=Math.min(100,Math.max(0,Math.round((g.currentMetric/Math.max(g.targetMetric,1))*100)));
-        const impactColor=g.impact==='HIGH IMPACT'?'#EF4444':g.impact==='MEDIUM IMPACT'?'#F59E0B':'#7C3AED';
-        const impactBg=g.impact==='HIGH IMPACT'?'#FEE2E2':g.impact==='MEDIUM IMPACT'?'#FEF3C7':'#EDE9FE';
-        const dotColor=gapColors[i];
-        return (
-          <div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',marginBottom:10,overflow:'hidden'}}>
-            <div style={{display:'flex',alignItems:'center',gap:14,padding:'16px 20px',cursor:'pointer'}} onClick={()=>setExpanded(isOpen?null:i)}>
-              <div style={{width:34,height:34,borderRadius:'50%',background:dotColor+'22',border:`2px solid ${dotColor}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                <span style={{fontSize:'0.75rem',fontWeight:800,color:dotColor}}>#{i+1}</span>
+        {loading&&<div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/><style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>Generating insights…</div>}
+        {!loading&&data?.insights?.map((ins:string,i:number)=>(
+          <div key={i} style={{display:'flex',gap:12,marginBottom:10,padding:'12px 16px',background:'#F8FAFC',borderRadius:10,border:'1px solid #E5E7EB'}}>
+            <span style={{color:'#7C3AED',fontWeight:700,fontSize:'0.9rem',flexShrink:0}}>0{i+1}</span>
+            <span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.7}}>{ins}</span>
+          </div>
+        ))}
+        {!loading&&!data&&<div style={{fontSize:'0.84rem',color:'#9CA3AF'}}>Insights will appear after analysis completes.</div>}
+      </div>
+
+      {/* ── RECOMMENDATIONS ── */}
+      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+          <span style={{fontSize:'1rem'}}>🎯</span>
+          <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>Recommendations</span>
+          <span style={{fontSize:'0.75rem',color:'#9CA3AF',marginLeft:4}}>Ranked by impact</span>
+        </div>
+        {loading&&<div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Generating recommendations…</div>}
+        {!loading&&data?.recommendations?.map((rec:any,i:number)=>(
+          <div key={i} style={{borderRadius:12,border:'1px solid #E5E7EB',marginBottom:12,overflow:'hidden'}}>
+            <div style={{display:'flex',alignItems:'flex-start',gap:14,padding:'14px 18px',background:'#FAFAFA'}}>
+              <div style={{width:32,height:32,borderRadius:'50%',background:impactBg(rec.impact),border:`2px solid ${impactColor(rec.impact)}`,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <span style={{fontSize:'0.7rem',fontWeight:800,color:impactColor(rec.impact)}}>#{i+1}</span>
               </div>
               <div style={{flex:1}}>
-                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap' as const}}>
-                  <span style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{g.title}</span>
-                  <span style={{background:impactBg,color:impactColor,borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{g.impact}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' as const,marginBottom:4}}>
+                  <span style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>{rec.title}</span>
+                  <span style={{background:impactBg(rec.impact),color:impactColor(rec.impact),borderRadius:50,padding:'1px 9px',fontSize:'0.66rem',fontWeight:700}}>{rec.impact}</span>
                 </div>
-                <div style={{display:'flex',gap:16,marginTop:4,flexWrap:'wrap' as const}}>
-                  <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>⚡ Effort: {g.effort}</span>
-                  <span style={{fontSize:'0.72rem',fontWeight:600,color:dotColor}}>Score target: {g.currentMetric} → {g.targetMetric}</span>
-                </div>
+                <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.7}}>{rec.action}</div>
               </div>
-              <span style={{color:'#9CA3AF',fontSize:'1rem'}}>{isOpen?'∧':'›'}</span>
             </div>
-            {isOpen&&(
-              <div style={{borderTop:'1px solid #F3F4F6',padding:'20px 20px 16px'}}>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:14}}>
-                  <div><div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>Current State</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.currentState}</div></div>
-                  <div><div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>Root Cause</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.rootCause}</div></div>
+            {rec.agenticFlag&&(
+              <div style={{padding:'10px 18px 12px 64px',background:'#FFF7ED',borderTop:'1px solid #FCD34D'}}>
+                <div style={{display:'flex',alignItems:'flex-start',gap:8}}>
+                  <span style={{fontSize:'0.8rem'}}>🤖</span>
+                  <div>
+                    <span style={{fontSize:'0.68rem',fontWeight:700,color:'#92400E',letterSpacing:'.06em',textTransform:'uppercase' as const}}>Agentic Readiness Flag  </span>
+                    <span style={{fontSize:'0.78rem',color:'#92400E'}}>{rec.agenticFlag}</span>
+                  </div>
                 </div>
-                <div style={{background:'#F5F3FF',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 16px',marginBottom:14}}>
-                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'#7C3AED',marginBottom:6}}>🔧 How to Fix It</div>
-                  <div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{g.howToFix}</div>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
-                  <div style={{background:'#F0FDF4',borderRadius:10,border:'1px solid #6EE7B7',padding:'12px 16px'}}><div style={{fontSize:'0.78rem',fontWeight:700,color:'#10B981',marginBottom:6}}>📈 Rank Impact</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.65}}>{g.rankImpact}</div></div>
-                  <div style={{background:'#FFFBEB',borderRadius:10,border:'1px solid #FCD34D',padding:'12px 16px'}}><div style={{fontSize:'0.78rem',fontWeight:700,color:'#92400E',marginBottom:6}}>💰 Conversion Impact</div><div style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.65}}>{g.conversionImpact}</div></div>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.72rem',color:'#9CA3AF',marginBottom:6}}>
-                  <span>Current metric: {g.currentMetric}</span>
-                  <span style={{color:dotColor,fontWeight:700}}>Target: {g.targetMetric}</span>
-                </div>
-                <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}><div style={{background:dotColor,height:6,borderRadius:50,width:`${pct}%`,transition:'width 0.5s'}}/></div>
               </div>
             )}
           </div>
-        );
-      })}
+        ))}
+        {!loading&&!data&&<div style={{fontSize:'0.84rem',color:'#9CA3AF'}}>Recommendations will appear after analysis completes.</div>}
+      </div>
     </div>
   );
 }
@@ -931,6 +889,9 @@ export default function GeoHub() {
                 const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,rank:'N/A'}};
                 const t=CFT[result.brand_name];
                 if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
+                // preserve lob label if set by API
+                if(!result.lob && result.ind_key==='fin') result.lob='Credit Cards';
+                if(!result.lob && result.ind_key==='fin_retail_bank') result.lob='Retail Banking';
               }
               return null;
             })()}
@@ -963,7 +924,7 @@ export default function GeoHub() {
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace(/^#+/, '')}`} color="#3B82F6"/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <GapCards result={result}/>
+                  <GeoSummary result={result}/>
                 </div>
               );
             })()}
