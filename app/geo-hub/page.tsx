@@ -246,6 +246,12 @@ function GeoSummary({ result }: { result:any }) {
   useEffect(()=>{
     if(fetched) return;
     setFetched(true);
+    // Check sessionStorage cache first — prevents reload on tab switch
+    try {
+      const cacheKey = `geo_summary_${result.brand_name}_${geo}`;
+      const cached = sessionStorage.getItem(cacheKey);
+      if(cached){ setData(JSON.parse(cached)); return; }
+    } catch{}
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
     const prompt = `You are a sharp GEO strategist. Return a JSON object with:
@@ -272,7 +278,9 @@ CRITICAL: scoreForecast for recommendations must be +2 to +4 pts only. Return ON
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
         const clean = (d.response||'').replace(/```json|```/g,'').trim();
-        setData(JSON.parse(clean));
+        const parsed = JSON.parse(clean);
+        setData(parsed);
+        try{ sessionStorage.setItem(`geo_summary_${result.brand_name}_${geo}`, JSON.stringify(parsed)); }catch{}
       }).catch(()=>setData(null)).finally(()=>setLoading(false));
   },[]);
 
@@ -324,77 +332,108 @@ CRITICAL: scoreForecast for recommendations must be +2 to +4 pts only. Return ON
         )}
 
         {!loading&&data?.rows&&(
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'0.82rem'}}>
             <thead>
-              <tr style={{background:'#F8FAFC',borderBottom:'2px solid #E5E7EB'}}>
-                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:36}}>#</th>
-                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:160}}>TYPE</th>
-                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em'}}>INSIGHT / RECOMMENDATION</th>
-                <th style={{padding:'10px 14px',textAlign:'center' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:130}}>GEO SCORE</th>
-                <th style={{padding:'10px 14px',textAlign:'center' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:90}}>IMPACT</th>
+              <tr style={{background:'#F3F4F6'}}>
+                {[
+                  {label:'#',       w:40},
+                  {label:'Category',w:160},
+                  {label:'Insight', w:'30%'},
+                  {label:'Recommendation', w:'30%'},
+                  {label:'GEO Forecast', w:150},
+                  {label:'Impact',  w:90},
+                ].map(h=>(
+                  <th key={h.label} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',fontWeight:700,color:'#6B7280',letterSpacing:'.07em',borderBottom:'2px solid #E5E7EB',width:h.w}}>{h.label.toUpperCase()}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {data.rows.map((row:any,i:number)=>{
-                const isRec = row.type === 'recommendation';
-                const delta = isRec ? (row.scoreForecast - row.scoreNow) : 0;
-                const cat = isRec
-                  ? (REC_CATEGORIES[row.category] || {label:row.category||'Action',color:'#6B7280',bg:'#F9FAFB'})
-                  : {label:row.category||'Insight', color:insightCatColor[row.category]||'#7C3AED', bg:insightCatBg[row.category]||'#F5F3FF'};
-                const rowBg = i===3 ? '#FFFDF5' : 'white'; // subtle separator at rec section start
-                return (
-                  <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:rowBg,borderLeft:i>=3?`3px solid ${impactColor(row.impact||'LOW')}`:'3px solid transparent'}}>
-                    {/* # */}
-                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
-                      <div style={{width:26,height:26,borderRadius:'50%',background:isRec?impactBg(row.impact||'LOW'):'#F3F4F6',border:`1.5px solid ${isRec?impactColor(row.impact||'LOW'):'#E5E7EB'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <span style={{fontSize:'0.68rem',fontWeight:800,color:isRec?impactColor(row.impact||'LOW'):'#9CA3AF'}}>{i+1}</span>
-                      </div>
-                    </td>
-                    {/* TYPE */}
-                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
-                      <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
-                        <span style={{fontSize:'0.62rem',fontWeight:700,padding:'2px 8px',borderRadius:50,background:isRec?'#F5F3FF':'#F0FDF4',color:isRec?'#7C3AED':'#065F46',display:'inline-block',width:'fit-content'}}>{isRec?'Action':'Insight'}</span>
-                        <span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'2px 8px',fontSize:'0.62rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{cat.label}</span>
-                      </div>
-                    </td>
-                    {/* TEXT */}
-                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
-                      {isRec&&<div style={{fontSize:'0.84rem',fontWeight:700,color:'#111827',marginBottom:4}}>{row.title||''}</div>}
-                      <div style={{fontSize:'0.82rem',color:isRec?'#6B7280':'#374151',lineHeight:1.7}}>{row.text}</div>
-                      {row.agenticFlag&&(
-                        <div style={{display:'flex',alignItems:'flex-start',gap:6,marginTop:8,padding:'6px 10px',background:'#FFF7ED',borderRadius:6,border:'1px solid #FCD34D'}}>
-                          <span style={{fontSize:'0.75rem',flexShrink:0}}>🤖</span>
-                          <span style={{fontSize:'0.72rem',fontWeight:600,color:'#92400E'}}>Agentic Flag: </span>
-                          <span style={{fontSize:'0.72rem',color:'#92400E',marginLeft:4}}>{row.agenticFlag}</span>
+              {(()=>{
+                // Pair insights with recommendations for same-row display
+                const insights = data.rows.filter((r:any)=>r.type==='insight');
+                const recs = data.rows.filter((r:any)=>r.type==='recommendation');
+                const rowCount = Math.max(insights.length, recs.length);
+                return Array.from({length:rowCount},(_,i)=>{
+                  const ins = insights[i];
+                  const rec = recs[i];
+                  const cat = rec ? (REC_CATEGORIES[rec.category]||{label:rec.category||'Action',color:'#6B7280',bg:'#F9FAFB'}) : null;
+                  const insCat = ins?.category || 'Data Signal';
+                  const insCatColors:Record<string,{c:string;bg:string}> = {
+                    'Data Signal':    {c:'#7C3AED',bg:'#F5F3FF'},
+                    'Competitive Gap':{c:'#EF4444',bg:'#FEE2E2'},
+                    'Visibility Gap': {c:'#3B82F6',bg:'#EFF6FF'},
+                    'Sentiment Gap':  {c:'#10B981',bg:'#ECFDF5'},
+                    'Citation Gap':   {c:'#F59E0B',bg:'#FFFBEB'},
+                  };
+                  const ic = insCatColors[insCat]||{c:'#7C3AED',bg:'#F5F3FF'};
+                  const impColor = rec?.impact==='HIGH'?'#EF4444':rec?.impact==='MEDIUM'?'#F59E0B':'#7C3AED';
+                  const impBg = rec?.impact==='HIGH'?'#FEE2E2':rec?.impact==='MEDIUM'?'#FEF3C7':'#EDE9FE';
+                  const delta = rec ? (rec.scoreForecast - rec.scoreNow) : 0;
+                  return (
+                    <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'white':'#FAFAFA'}}>
+                      {/* # */}
+                      <td style={{padding:'14px 14px',verticalAlign:'middle' as const}}>
+                        <div style={{width:28,height:28,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.72rem',fontWeight:800,color:'#7C3AED'}}>{i+1}</div>
+                      </td>
+                      {/* Category */}
+                      <td style={{padding:'14px 14px',verticalAlign:'middle' as const}}>
+                        <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
+                          {ins&&<span style={{background:ic.bg,color:ic.c,borderRadius:50,padding:'2px 9px',fontSize:'0.63rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{insCat}</span>}
+                          {rec&&cat&&<span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'2px 9px',fontSize:'0.63rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{cat.label}</span>}
                         </div>
-                      )}
-                    </td>
-                    {/* GEO SCORE */}
-                    <td style={{padding:'14px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
-                      {isRec?(
-                        <div style={{display:'inline-flex',flexDirection:'column' as const,alignItems:'center',background:'#F8FAFC',borderRadius:10,border:'1px solid #E5E7EB',padding:'8px 14px',gap:2}}>
-                          <div style={{display:'flex',alignItems:'center',gap:5}}>
-                            <span style={{fontSize:'0.9rem',fontWeight:700,color:'#9CA3AF'}}>{row.scoreNow}</span>
-                            <span style={{fontSize:'0.8rem',color:'#9CA3AF'}}>→</span>
-                            <span style={{fontSize:'1.2rem',fontWeight:900,color:'#10B981'}}>{row.scoreForecast}</span>
+                      </td>
+                      {/* Insight */}
+                      <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
+                        {ins?(
+                          <span style={{fontSize:'0.81rem',color:'#374151',lineHeight:1.65}}>{ins.text}</span>
+                        ):(
+                          <span style={{color:'#D1D5DB',fontSize:'0.75rem'}}>—</span>
+                        )}
+                      </td>
+                      {/* Recommendation */}
+                      <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
+                        {rec?(
+                          <div>
+                            <div style={{fontSize:'0.81rem',fontWeight:700,color:'#111827',marginBottom:3}}>{rec.title||''}</div>
+                            <div style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.6}}>{rec.text}</div>
+                            {rec.agenticFlag&&(
+                              <div style={{marginTop:6,padding:'4px 8px',background:'#FFF7ED',borderRadius:5,border:'1px solid #FCD34D',display:'flex',gap:5,alignItems:'flex-start'}}>
+                                <span style={{fontSize:'0.7rem'}}>🤖</span>
+                                <span style={{fontSize:'0.68rem',color:'#92400E'}}>{rec.agenticFlag}</span>
+                              </div>
+                            )}
                           </div>
-                          {delta>0&&<span style={{fontSize:'0.66rem',fontWeight:800,color:'#10B981',background:'#D1FAE5',borderRadius:50,padding:'1px 7px'}}>+{delta} pts</span>}
-                        </div>
-                      ):(
-                        <span style={{fontSize:'1.1rem',fontWeight:800,color:'#374151'}}>{row.scoreNow}</span>
-                      )}
-                    </td>
-                    {/* IMPACT */}
-                    <td style={{padding:'14px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
-                      {isRec?(
-                        <span style={{background:impactBg(row.impact||'LOW'),color:impactColor(row.impact||'LOW'),borderRadius:50,padding:'3px 10px',fontSize:'0.66rem',fontWeight:700,whiteSpace:'nowrap' as const}}>{row.impact}</span>
-                      ):(
-                        <span style={{fontSize:'0.72rem',color:'#D1D5DB'}}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        ):(
+                          <span style={{color:'#D1D5DB',fontSize:'0.75rem'}}>—</span>
+                        )}
+                      </td>
+                      {/* GEO Forecast */}
+                      <td style={{padding:'14px 14px',verticalAlign:'middle' as const,textAlign:'center' as const}}>
+                        {rec?(
+                          <div style={{display:'inline-flex',flexDirection:'column' as const,alignItems:'center',gap:3,background:'#F0FDF4',border:'1px solid #6EE7B7',borderRadius:10,padding:'8px 12px'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:5}}>
+                              <span style={{fontSize:'0.88rem',fontWeight:700,color:'#9CA3AF'}}>{rec.scoreNow}</span>
+                              <span style={{color:'#9CA3AF'}}>→</span>
+                              <span style={{fontSize:'1.15rem',fontWeight:900,color:'#10B981'}}>{rec.scoreForecast}</span>
+                            </div>
+                            {delta>0&&<span style={{fontSize:'0.65rem',fontWeight:800,color:'#10B981',background:'#D1FAE5',borderRadius:50,padding:'1px 7px'}}>+{delta} pts</span>}
+                          </div>
+                        ):(
+                          <span style={{fontSize:'0.88rem',fontWeight:700,color:'#374151'}}>{ins?.scoreNow??geo}</span>
+                        )}
+                      </td>
+                      {/* Impact */}
+                      <td style={{padding:'14px 14px',verticalAlign:'middle' as const,textAlign:'center' as const}}>
+                        {rec?(
+                          <span style={{background:impBg,color:impColor,borderRadius:50,padding:'3px 10px',fontSize:'0.66rem',fontWeight:700,whiteSpace:'nowrap' as const}}>{rec.impact}</span>
+                        ):(
+                          <span style={{color:'#D1D5DB',fontSize:'0.75rem'}}>—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         )}
@@ -772,109 +811,6 @@ Order: High first, then Medium, then Low.`;
 }
 
 
-function ShareButton({ result }: { result:any }) {
-  const [open,setOpen]=useState(false);
-  const [copied,setCopied]=useState(false);
-
-  const exportCSV = () => {
-    const rows:string[][] = [
-      ['Tab','Metric','Value'],
-      ['GEO Score','Brand',result.brand_name||''],
-      ['GEO Score','GEO Score',String(result.overall_geo_score||0)],
-      ['GEO Score','Visibility',String(result.visibility||0)],
-      ['GEO Score','Sentiment',String(result.sentiment||0)],
-      ['GEO Score','Citation Share',String(result.citation_share||0)],
-      ['GEO Score','Share of Voice',String(result.share_of_voice||0)],
-      ['GEO Score','Prominence',String(result.prominence||0)],
-      ['GEO Score','Avg Rank',String(result.avg_rank||'')],
-      ['GEO Score','Industry',String(result.ind_label||'')],
-      ['GEO Score','LOB',String(result.lob||'')],
-      ['','',''],
-      ['Competitors','Brand','GEO Score,Visibility,Citations,Sentiment,SOV,Rank'],
-      ...((result.competitors||[]).map((c:any)=>['Competitors',c.Brand||'',[c.GEO,c.Vis,c.Cit,c.Sen,c.Sov,c.Rank].join(',')])),
-      ['','',''],
-      ['Prompts','Query','Category,Appeared,Position'],
-      ...((result.responses_detail||[]).map((r:any)=>['Prompts',r.query||'',[r.category,r.mentioned?'Yes':'No',r.position||0].join(',')])),
-      ['','',''],
-      ['Citations','Domain','Category,Citation Share'],
-      ...((result.citation_sources||[]).map((s:any)=>['Citations',s.domain||'',[s.category,s.citation_share].join(',')])),
-    ];
-    const csv = rows.map(r=>r.map(v=>JSON.stringify(v||'')).join(',')).join('\n');
-    const blob = new Blob([csv],{type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href=url; a.download=`geo-scorecard-${(result.brand_name||'brand').toLowerCase().replace(/ /g,'-')}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-    setOpen(false);
-  };
-
-  const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(result,null,2)],{type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href=url; a.download=`geo-scorecard-${(result.brand_name||'brand').toLowerCase().replace(/ /g,'-')}.json`;
-    a.click(); URL.revokeObjectURL(url);
-    setOpen(false);
-  };
-
-  const shareEmail = () => {
-    const subject = encodeURIComponent(`GEO Scorecard — ${result.brand_name}`);
-    const body = encodeURIComponent(
-      `GEO Scorecard Results for ${result.brand_name}\n\n` +
-      `GEO Score: ${result.overall_geo_score}\n` +
-      `Industry: ${result.ind_label}${result.lob?' ('+result.lob+')':''}\n` +
-      `Visibility: ${result.visibility} | Sentiment: ${result.sentiment} | Citations: ${result.citation_share}\n` +
-      `Share of Voice: ${result.share_of_voice} | Avg Rank: ${result.avg_rank}\n\n` +
-      `Top Competitors:\n` +
-      (result.competitors||[]).slice(0,5).map((c:any)=>`  ${c.Brand}: GEO ${c.GEO}`).join('\n') +
-      `\n\nGenerated by PerceptaGEO — perceptageo.com`
-    );
-    window.open(`mailto:?subject=${subject}&body=${body}`);
-    setOpen(false);
-  };
-
-  const copyLink = () => {
-    const summary = `${result.brand_name} GEO Score: ${result.overall_geo_score}/100 (${result.ind_label}${result.lob?' — '+result.lob:''}) — perceptageo.com`;
-    navigator.clipboard.writeText(summary).then(()=>{ setCopied(true); setTimeout(()=>setCopied(false),2000); });
-  };
-
-  return (
-    <div style={{position:'relative' as const}}>
-      <button onClick={()=>setOpen(!open)} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:8,color:'#374151',fontSize:'0.78rem',fontWeight:600,padding:'6px 14px',cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-        Share / Export
-      </button>
-      {open&&(
-        <>
-          <div onClick={()=>setOpen(false)} style={{position:'fixed' as const,inset:0,zIndex:40}}/>
-          <div style={{position:'absolute' as const,right:0,top:'calc(100% + 6px)',background:'white',border:'1px solid #E5E7EB',borderRadius:12,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',zIndex:50,minWidth:220,overflow:'hidden'}}>
-            <div style={{padding:'8px 0'}}>
-              <div style={{padding:'6px 16px 4px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em'}}>SHARE</div>
-              <button onClick={shareEmail} style={{width:'100%',padding:'10px 16px',background:'none',border:'none',textAlign:'left' as const,fontSize:'0.84rem',color:'#374151',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m2 7 10 7 10-7"/></svg>
-                Send via Email
-              </button>
-              <button onClick={copyLink} style={{width:'100%',padding:'10px 16px',background:'none',border:'none',textAlign:'left' as const,fontSize:'0.84rem',color:'#374151',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                {copied?'✓ Copied!':'Copy Summary'}
-              </button>
-              <div style={{borderTop:'1px solid #F3F4F6',margin:'6px 0'}}/>
-              <div style={{padding:'6px 16px 4px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em'}}>EXPORT RAW DATA</div>
-              <button onClick={exportCSV} style={{width:'100%',padding:'10px 16px',background:'none',border:'none',textAlign:'left' as const,fontSize:'0.84rem',color:'#374151',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                Download CSV (Excel)
-              </button>
-              <button onClick={exportJSON} style={{width:'100%',padding:'10px 16px',background:'none',border:'none',textAlign:'left' as const,fontSize:'0.84rem',color:'#374151',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-                Download JSON (Raw Data)
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 export default function GeoHub() {
   const [url,setUrl]=useState('');
@@ -1031,7 +967,6 @@ export default function GeoHub() {
             {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
             <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
               <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
-              <ShareButton result={result}/>
             </div>
           </div>
 
