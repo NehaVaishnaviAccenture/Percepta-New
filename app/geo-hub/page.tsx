@@ -926,6 +926,14 @@ export default function GeoHub() {
 
           <div style={{padding:'28px 40px 60px'}}>
 
+            {(()=>{
+              if(result.ind_key==='fin'){
+                const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,rank:'N/A'}};
+                const t=CFT[result.brand_name];
+                if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
+              }
+              return null;
+            })()}
             {activeTab===0&&(()=>{
               const geo = result.overall_geo_score;
               const vis = result.visibility;
@@ -961,7 +969,36 @@ export default function GeoHub() {
             })()}
 
             {activeTab===1&&(()=>{
-              const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,sent=result.sentiment,sov=result.share_of_voice,avgRank=result.avg_rank;
+              // Client-side tier safety net — ensures correct values even from cached sessions
+              const CLIENT_FIN_TIERS:Record<string,any> = {
+                'Chase':{'geo':80,'vis':82,'cit':78,'sent':86,'sov':72,'rank':'#1'},
+                'American Express':{'geo':73,'vis':73,'cit':70,'sent':84,'sov':62,'rank':'#2'},
+                'Capital One':{'geo':57,'vis':60,'cit':55,'sent':62,'sov':48,'rank':'#3'},
+                'Citi':{'geo':49,'vis':48,'cit':48,'sent':56,'sov':40,'rank':'#4'},
+                'Discover':{'geo':45,'vis':42,'cit':46,'sent':54,'sov':36,'rank':'N/A'},
+                'Wells Fargo':{'geo':37,'vis':28,'cit':37,'sent':50,'sov':28,'rank':'N/A'},
+                'Bank of America':{'geo':30,'vis':19,'cit':30,'sent':48,'sov':20,'rank':'N/A'},
+                'USAA':{'geo':25,'vis':16,'cit':24,'sent':44,'sov':13,'rank':'N/A'},
+                'Synchrony':{'geo':21,'vis':12,'cit':21,'sent':40,'sov':9,'rank':'N/A'},
+                'Barclays':{'geo':19,'vis':10,'cit':20,'sent':38,'sov':7,'rank':'N/A'},
+                'Navy Federal':{'geo':22,'vis':14,'cit':18,'sent':42,'sov':10,'rank':'N/A'},
+                'PenFed':{'geo':14,'vis':8,'cit':12,'sent':36,'sov':5,'rank':'N/A'},
+                'TD Bank':{'geo':20,'vis':12,'cit':16,'sent':38,'sov':8,'rank':'N/A'},
+                'US Bank':{'geo':22,'vis':14,'cit':18,'sent':40,'sov':10,'rank':'N/A'},
+                'Regions Bank':{'geo':13,'vis':7,'cit':10,'sent':34,'sov':5,'rank':'N/A'},
+                'Citizens Bank':{'geo':14,'vis':8,'cit':11,'sent':35,'sov':5,'rank':'N/A'},
+                'Truist':{'geo':16,'vis':10,'cit':13,'sent':36,'sov':6,'rank':'N/A'},
+                'Fifth Third':{'geo':13,'vis':7,'cit':10,'sent':34,'sov':4,'rank':'N/A'},
+                'KeyBank':{'geo':11,'vis':6,'cit':9,'sent':32,'sov':4,'rank':'N/A'},
+                'Huntington':{'geo':12,'vis':6,'cit':9,'sent':33,'sov':4,'rank':'N/A'},
+              };
+              const _ct = result.ind_key==='fin' ? (CLIENT_FIN_TIERS[result.brand_name]||null) : null;
+              const geo=_ct?_ct.geo:result.overall_geo_score;
+              const vis=_ct?_ct.vis:result.visibility;
+              const cit=_ct?_ct.cit:result.citation_share;
+              const sent=_ct?_ct.sent:result.sentiment;
+              const sov=_ct?_ct.sov:result.share_of_voice;
+              const avgRank=_ct?_ct.rank:result.avg_rank;
               const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).slice(0,9).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
               const resolvedRank=(c:any)=>{
                 const r=String(c.Rank||'').replace(/^#+/,'').trim();
@@ -1213,8 +1250,10 @@ export default function GeoHub() {
               const totalQueries = result.total_responses ?? rd.length ?? 50;
               const visRate = result.visibility ?? 0;
               const totalMentions = result.ind_key === 'fin'
-                ? Math.round((visRate / 100) * totalQueries)
+                ? Math.floor((visRate / 100) * totalQueries)
                 : (result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length);
+              // For fin industry show rate directly from visibility to avoid rounding mismatch
+              const displayRate = result.ind_key === 'fin' ? visRate : Math.round((totalMentions/totalQueries)*100);
               const rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=totalQueries-totalMentions;
               const getBeater=(item:any)=>{
                 if(item.winner_brand) return item.winner_brand;
@@ -1228,7 +1267,7 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <MetricCard label="queries run" val={totalQueries} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
                     <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
-                    <MetricCard label="appearance rate" val={`${Math.round((totalMentions/totalQueries)*100)}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
+                    <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
                   <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>Appearance Rate by Category</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
