@@ -1271,6 +1271,37 @@ Return ONLY valid JSON, no markdown:
     // These never change regardless of which brand is being analysed.
     // Chase #1 > Amex #2 > Capital One #3 > Citi #4 across ALL metrics, always.
     // Applied to the MAIN brand being viewed:
+    // Auto loan main brand tiers
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
+        'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
+        'ally':        { vis:72, sent:78, prom:70, cit:66, sov:60, geo:70 },
+        'bank of america': { vis:58, sent:70, prom:60, cit:56, sov:46, geo:59 },
+        'wells fargo': { vis:52, sent:66, prom:54, cit:50, sov:42, geo:53 },
+        'citi':        { vis:46, sent:64, prom:48, cit:44, sov:36, geo:48 },
+      };
+      const autoTier = AUTO_MAIN_TIERS[bl];
+      if (autoTier) {
+        visOverride = autoTier.vis; sent = autoTier.sent; prom = autoTier.prom;
+        citOverride = autoTier.cit; sov = autoTier.sov;
+      }
+    }
+    // Mortgage main brand tiers
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
+        'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
+        'citi':        { vis:52, sent:66, prom:54, cit:50, sov:42, geo:54 },
+        'bank of america': { vis:65, sent:74, prom:64, cit:62, sov:55, geo:66 },
+        'wells fargo': { vis:60, sent:70, prom:58, cit:56, sov:50, geo:60 },
+      };
+      const mortTier = MORT_MAIN_TIERS[bl];
+      if (mortTier) {
+        visOverride = mortTier.vis; sent = mortTier.sent; prom = mortTier.prom;
+        citOverride = mortTier.cit; sov = mortTier.sov;
+      }
+    }
     if (indKey === 'fin') {
       // LOB-aware tiers: retail banking has different rankings than credit cards
       const RETAIL_BANK_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
@@ -1341,11 +1372,64 @@ Return ONLY valid JSON, no markdown:
       (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#2' :
       (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#3' :
       (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#4' :
-      (indKey as string) === 'fin_retail_bank'                                     ? 'N/A' :
+      (indKey as string) === 'fin_retail_bank'                          ? 'N/A' :
+      // Auto loan ranks
+      (indKey as string) === 'fin_auto_loan' && bl === 'ally'          ? '#1' :
+      (indKey as string) === 'fin_auto_loan' && bl === 'chase'         ? '#2' :
+      (indKey as string) === 'fin_auto_loan' && bl === 'capital one'   ? '#2' :
+      (indKey as string) === 'fin_auto_loan' && bl === 'bank of america' ? '#3' :
+      (indKey as string) === 'fin_auto_loan' && bl === 'wells fargo'   ? '#4' :
+      (indKey as string) === 'fin_auto_loan'                           ? 'N/A' :
+      // Mortgage ranks
+      (indKey as string) === 'fin_mortgage' && bl === 'chase'          ? '#1' :
+      (indKey as string) === 'fin_mortgage' && bl === 'bank of america' ? '#2' :
+      (indKey as string) === 'fin_mortgage' && bl === 'wells fargo'    ? '#3' :
+      (indKey as string) === 'fin_mortgage' && bl === 'citi'           ? '#4' :
+      (indKey as string) === 'fin_mortgage'                            ? 'N/A' :
       computedAvgRank;
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
     // Hard floor GEO to tier minimums so rounding never drops below tier
+    // ── AUTO LOAN COMPETITOR TIERS ──
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_COMP_TIERS: Record<string,any> = {
+        'Ally Financial':       { GEO:70, Vis:72, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#1' },
+        'Chase Auto':           { GEO:67, Vis:68, Cit:64, Sen:76, Sov:56, Prom:68, Rank:'#2' },
+        'Bank of America Auto': { GEO:59, Vis:58, Cit:56, Sen:70, Sov:46, Prom:60, Rank:'#3' },
+        'Wells Fargo Auto':     { GEO:53, Vis:52, Cit:50, Sen:66, Sov:42, Prom:54, Rank:'#4' },
+        'LightStream':          { GEO:48, Vis:44, Cit:42, Sen:72, Sov:34, Prom:46, Rank:'#5' },
+        'CarMax Auto Finance':  { GEO:44, Vis:40, Cit:38, Sen:66, Sov:30, Prom:42, Rank:'N/A' },
+        'USAA Auto':            { GEO:40, Vis:36, Cit:34, Sen:64, Sov:26, Prom:38, Rank:'N/A' },
+        'US Bank Auto':         { GEO:41, Vis:38, Cit:36, Sen:62, Sov:28, Prom:40, Rank:'N/A' },
+        'PenFed Auto':          { GEO:38, Vis:34, Cit:32, Sen:60, Sov:24, Prom:36, Rank:'N/A' },
+        'myAutoloan':           { GEO:27, Vis:22, Cit:20, Sen:54, Sov:14, Prom:24, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = AUTO_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+    // ── MORTGAGE COMPETITOR TIERS ──
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_COMP_TIERS: Record<string,any> = {
+        'Rocket Mortgage':        { GEO:78, Vis:80, Cit:74, Sen:82, Sov:70, Prom:76, Rank:'#1' },
+        'Chase Mortgage':         { GEO:72, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#2' },
+        'Bank of America Mortgage':{ GEO:66, Vis:65, Cit:62, Sen:74, Sov:55, Prom:64, Rank:'#3' },
+        'Wells Fargo Mortgage':   { GEO:60, Vis:60, Cit:56, Sen:70, Sov:50, Prom:58, Rank:'#4' },
+        'loanDepot':              { GEO:54, Vis:52, Cit:50, Sen:68, Sov:42, Prom:52, Rank:'#5' },
+        'United Wholesale':       { GEO:48, Vis:45, Cit:44, Sen:64, Sov:36, Prom:46, Rank:'N/A' },
+        'PNC Mortgage':           { GEO:44, Vis:42, Cit:40, Sen:62, Sov:32, Prom:42, Rank:'N/A' },
+        'US Bank Mortgage':       { GEO:42, Vis:40, Cit:38, Sen:60, Sov:30, Prom:40, Rank:'N/A' },
+        'Fairway Independent':    { GEO:38, Vis:36, Cit:34, Sen:58, Sov:26, Prom:36, Rank:'N/A' },
+        'Citi Mortgage':          { GEO:40, Vis:38, Cit:36, Sen:60, Sov:28, Prom:38, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = MORT_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 79,
@@ -1355,6 +1439,14 @@ Return ONLY valid JSON, no markdown:
       const floor = GEO_FLOORS[bl];
       if (floor) geo = Math.max(geo, floor);
     }
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_FLOORS: Record<string,number> = { 'ally':70,'chase':67,'capital one':62,'bank of america':59,'wells fargo':53 };
+      const f = AUTO_FLOORS[bl]; if (f) geo = Math.max(geo, f);
+    }
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_FLOORS: Record<string,number> = { 'chase':72,'bank of america':66,'wells fargo':60,'citi':54,'capital one':53 };
+      const f = MORT_FLOORS[bl]; if (f) geo = Math.max(geo, f);
+    }
 
     // ── FIN PROMPTS TAB CONSISTENCY ──
     // Override mention counts so Prompts tab matches hardcoded visibility exactly
@@ -1362,6 +1454,37 @@ Return ONLY valid JSON, no markdown:
     // This prevents different runs showing different appearance counts
     let mentionsDisplay = mentions;
     let totalQueriesDisplay = totalQueries;
+    // Auto loan main brand tiers
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
+        'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
+        'ally':        { vis:72, sent:78, prom:70, cit:66, sov:60, geo:70 },
+        'bank of america': { vis:58, sent:70, prom:60, cit:56, sov:46, geo:59 },
+        'wells fargo': { vis:52, sent:66, prom:54, cit:50, sov:42, geo:53 },
+        'citi':        { vis:46, sent:64, prom:48, cit:44, sov:36, geo:48 },
+      };
+      const autoTier = AUTO_MAIN_TIERS[bl];
+      if (autoTier) {
+        visOverride = autoTier.vis; sent = autoTier.sent; prom = autoTier.prom;
+        citOverride = autoTier.cit; sov = autoTier.sov;
+      }
+    }
+    // Mortgage main brand tiers
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
+        'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
+        'citi':        { vis:52, sent:66, prom:54, cit:50, sov:42, geo:54 },
+        'bank of america': { vis:65, sent:74, prom:64, cit:62, sov:55, geo:66 },
+        'wells fargo': { vis:60, sent:70, prom:58, cit:56, sov:50, geo:60 },
+      };
+      const mortTier = MORT_MAIN_TIERS[bl];
+      if (mortTier) {
+        visOverride = mortTier.vis; sent = mortTier.sent; prom = mortTier.prom;
+        citOverride = mortTier.cit; sov = mortTier.sov;
+      }
+    }
     if (indKey === 'fin') { // All fin brands get consistent visibility-based mention counts
       mentionsDisplay = Math.round((visOverride / 100) * totalQueries);
     }
@@ -1391,6 +1514,46 @@ Return ONLY valid JSON, no markdown:
     // ── FIN COMPETITOR FIXED TIERS ──
     // Same fixed values as the main brand tiers — consistent no matter which brand is viewed.
     // Top 4 are hard-set. Tier 5+ follow real data with caps.
+    // ── AUTO LOAN COMPETITOR TIERS ──
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_COMP_TIERS: Record<string,any> = {
+        'Ally Financial':       { GEO:70, Vis:72, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#1' },
+        'Chase Auto':           { GEO:67, Vis:68, Cit:64, Sen:76, Sov:56, Prom:68, Rank:'#2' },
+        'Bank of America Auto': { GEO:59, Vis:58, Cit:56, Sen:70, Sov:46, Prom:60, Rank:'#3' },
+        'Wells Fargo Auto':     { GEO:53, Vis:52, Cit:50, Sen:66, Sov:42, Prom:54, Rank:'#4' },
+        'LightStream':          { GEO:48, Vis:44, Cit:42, Sen:72, Sov:34, Prom:46, Rank:'#5' },
+        'CarMax Auto Finance':  { GEO:44, Vis:40, Cit:38, Sen:66, Sov:30, Prom:42, Rank:'N/A' },
+        'USAA Auto':            { GEO:40, Vis:36, Cit:34, Sen:64, Sov:26, Prom:38, Rank:'N/A' },
+        'US Bank Auto':         { GEO:41, Vis:38, Cit:36, Sen:62, Sov:28, Prom:40, Rank:'N/A' },
+        'PenFed Auto':          { GEO:38, Vis:34, Cit:32, Sen:60, Sov:24, Prom:36, Rank:'N/A' },
+        'myAutoloan':           { GEO:27, Vis:22, Cit:20, Sen:54, Sov:14, Prom:24, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = AUTO_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+    // ── MORTGAGE COMPETITOR TIERS ──
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_COMP_TIERS: Record<string,any> = {
+        'Rocket Mortgage':        { GEO:78, Vis:80, Cit:74, Sen:82, Sov:70, Prom:76, Rank:'#1' },
+        'Chase Mortgage':         { GEO:72, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#2' },
+        'Bank of America Mortgage':{ GEO:66, Vis:65, Cit:62, Sen:74, Sov:55, Prom:64, Rank:'#3' },
+        'Wells Fargo Mortgage':   { GEO:60, Vis:60, Cit:56, Sen:70, Sov:50, Prom:58, Rank:'#4' },
+        'loanDepot':              { GEO:54, Vis:52, Cit:50, Sen:68, Sov:42, Prom:52, Rank:'#5' },
+        'United Wholesale':       { GEO:48, Vis:45, Cit:44, Sen:64, Sov:36, Prom:46, Rank:'N/A' },
+        'PNC Mortgage':           { GEO:44, Vis:42, Cit:40, Sen:62, Sov:32, Prom:42, Rank:'N/A' },
+        'US Bank Mortgage':       { GEO:42, Vis:40, Cit:38, Sen:60, Sov:30, Prom:40, Rank:'N/A' },
+        'Fairway Independent':    { GEO:38, Vis:36, Cit:34, Sen:58, Sov:26, Prom:36, Rank:'N/A' },
+        'Citi Mortgage':          { GEO:40, Vis:38, Cit:36, Sen:60, Sov:28, Prom:38, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = MORT_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#2' },
@@ -1458,7 +1621,38 @@ Return ONLY valid JSON, no markdown:
         if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
         if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
         if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
-        if (indKey === 'fin') {
+        // Auto loan main brand tiers
+    if ((indKey as string) === 'fin_auto_loan') {
+      const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
+        'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
+        'ally':        { vis:72, sent:78, prom:70, cit:66, sov:60, geo:70 },
+        'bank of america': { vis:58, sent:70, prom:60, cit:56, sov:46, geo:59 },
+        'wells fargo': { vis:52, sent:66, prom:54, cit:50, sov:42, geo:53 },
+        'citi':        { vis:46, sent:64, prom:48, cit:44, sov:36, geo:48 },
+      };
+      const autoTier = AUTO_MAIN_TIERS[bl];
+      if (autoTier) {
+        visOverride = autoTier.vis; sent = autoTier.sent; prom = autoTier.prom;
+        citOverride = autoTier.cit; sov = autoTier.sov;
+      }
+    }
+    // Mortgage main brand tiers
+    if ((indKey as string) === 'fin_mortgage') {
+      const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
+        'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
+        'citi':        { vis:52, sent:66, prom:54, cit:50, sov:42, geo:54 },
+        'bank of america': { vis:65, sent:74, prom:64, cit:62, sov:55, geo:66 },
+        'wells fargo': { vis:60, sent:70, prom:58, cit:56, sov:50, geo:60 },
+      };
+      const mortTier = MORT_MAIN_TIERS[bl];
+      if (mortTier) {
+        visOverride = mortTier.vis; sent = mortTier.sent; prom = mortTier.prom;
+        citOverride = mortTier.cit; sov = mortTier.sov;
+      }
+    }
+    if (indKey === 'fin') {
           const u = url.toLowerCase();
           if (u.includes('/auto') || u.includes('/car') || u.includes('/vehicle')) return 'Auto Loans';
           if (u.includes('/mortgage') || u.includes('/home-loan') || u.includes('/heloc')) return 'Mortgage & Home Loans';
