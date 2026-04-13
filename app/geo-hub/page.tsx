@@ -271,34 +271,32 @@ function GeoSummary({ result }: { result:any }) {
     } catch{}
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
-    const prompt = `You are a sharp GEO strategist. Return a JSON object with:
-- "rows": array of exactly 10 objects. First 5 are insights, last 5 are recommendations.
-  Each object has:
-  {
-    "type": "insight" | "recommendation",
-    "category": insights use: "Data Signal"|"Competitive Gap"|"Visibility Gap"|"Sentiment Gap"|"Citation Gap"|"Earned Media Gap"|"Content Gap"|"Rank Signal". Recommendations use: "Comparison Page"|"Content Page"|"FAQ Build"|"How-To Guide"|"Product Explainer"|"Best-Of List"|"Use Case Page"|"Content Strategy"|"PR / Earned Media"|"Citation Push"|"Review Platform"|"Forum Presence"|"Wikipedia / Entity"|"Influencer / Creator"|"Structured Data"|"Schema Markup"|"Entity Optimization"|"Technical SEO"|"Internal Linking"|"Syndication"|"Data Feed"|"API Presence",
-    "title": 4-6 word action title for recommendations only (null for insights),
-    "text": one sharp sentence. Insights: open with a specific number, name brand + competitor. Recommendations: verb-first, platform-specific (NerdWallet/Bankrate/Forbes/Google), LOB-specific, max 25 words,
-    "scoreNow": ${geo},
-    "scoreForecast": insights = ${geo}. Recommendations: +1 to +4 pts only per item. Be conservative,
-    "impact": insights = null. Recommendations = "HIGH"|"MEDIUM"|"LOW". Sort: HIGH first then MEDIUM then LOW,
-    "agenticFlag": null OR one short sentence on application/data/approval readiness (recommendations only, not required on all)
-  }
-
-Brand: ${result.brand_name}
-${lobContext}
-Industry: ${result.ind_label}
-GEO: ${geo} | Vis: ${vis} | Sent: ${sent} | Cit: ${cit} | SOV: ${sov} | Prom: ${prom}
-Top Competitor: ${topComp} (GEO: ${topCompGEO})
-
-CRITICAL: Exactly 5 insights then 5 recommendations. Sort recommendations HIGH→MEDIUM→LOW. Include at least one Earned Media Gap and one Content Gap insight. scoreForecast for recs: +1 to +4 only. Return ONLY valid JSON, no markdown.\`;
+    const insightCats = 'Data Signal|Competitive Gap|Visibility Gap|Sentiment Gap|Citation Gap|Earned Media Gap|Content Gap|Rank Signal';
+    const recCats = 'Comparison Page|Content Page|FAQ Build|How-To Guide|Product Explainer|Best-Of List|Use Case Page|Content Strategy|PR / Earned Media|Citation Push|Review Platform|Forum Presence|Wikipedia / Entity|Influencer / Creator|Structured Data|Schema Markup|Entity Optimization|Technical SEO|Internal Linking|Syndication|Data Feed|API Presence';
+    const prompt = [
+      'You are a sharp GEO strategist. Return a JSON object with:',
+      '- "rows": array of exactly 10 objects. First 5 insights, last 5 recommendations.',
+      '  Each object: { "type":"insight"|"recommendation", "category": insights use: '+insightCats+'. Recommendations use: '+recCats+',',
+      '  "title": 4-6 word action title for recommendations only (null for insights),',
+      '  "text": one sharp sentence. Insights: open with a specific number, name brand+competitor. Recommendations: verb-first, platform-specific, LOB-specific, max 25 words,',
+      '  "scoreNow": '+String(geo)+',',
+      '  "scoreForecast": insights='+String(geo)+'. Recommendations: +1 to +4 pts max. Be conservative,',
+      '  "impact": insights=null. Recommendations="HIGH"|"MEDIUM"|"LOW". Sort HIGH first then MEDIUM then LOW,',
+      '  "agenticFlag": null OR one short sentence on application/data/approval readiness (recommendations only) }',
+      'Brand: '+result.brand_name,
+      lobContext,
+      'Industry: '+result.ind_label,
+      'GEO: '+String(geo)+' | Vis: '+String(vis)+' | Sent: '+String(sent)+' | Cit: '+String(cit)+' | SOV: '+String(sov)+' | Prom: '+String(prom),
+      'Top Competitor: '+topComp+' (GEO: '+String(topCompGEO)+')',
+      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Earned Media Gap and Content Gap insights. scoreForecast +1 to +4 only. Return ONLY valid JSON no markdown.',
+    ].join('\n');
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
-        const clean = (d.response||'').replace(/`{3}json|`{3}/g,'').trim();
-        const parsed = JSON.parse(clean);
+        const threeQ='`'+'`'+'`'; let clean1=(d.response||''); while(clean1.startsWith(threeQ))clean1=clean1.slice(3); while(clean1.endsWith(threeQ))clean1=clean1.slice(0,-3); clean1=clean1.replace('json','').trim();
+        const parsed = JSON.parse(clean1.trim());
         setData(parsed);
-        try{ sessionStorage.setItem(`geo_summary_${result.brand_name}_${geo}`, JSON.stringify(parsed)); }catch{}
+        try{ sessionStorage.setItem('geo_summary_'+result.brand_name+'_'+String(geo), JSON.stringify(parsed)); }catch{}
       }).catch(()=>setData(null)).finally(()=>setLoading(false));
   },[]);
 
@@ -814,7 +812,7 @@ Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
 Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Comparison Page"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
 Order: High first, then Medium, then Low.`;
-    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const text=data.response||'',clean=text.replace(/`{3}json|`{3}/g,'').trim();setActions(JSON.parse(clean));}).catch(()=>setActions([])).finally(()=>setLoading(false));
+    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const raw2=data.response||'';let cl2=raw2.replace('```json','').replace('```','').trim();setActions(JSON.parse(cl2));}).catch(()=>setActions([])).finally(()=>setLoading(false));
   },[]);
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
