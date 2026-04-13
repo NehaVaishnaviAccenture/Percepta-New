@@ -999,6 +999,11 @@ export default function GeoHub() {
                 // preserve lob label if set by API
                 if(!result.lob && result.ind_key==='fin') result.lob='Credit Cards';
                 if(!result.lob && result.ind_key==='fin_retail_bank') result.lob='Retail Banking';
+                if(!result.lob && result.ind_key==='fin_auto_loan') result.lob='Auto Loans & Financing';
+                if(!result.lob && result.ind_key==='fin_mortgage') result.lob='Mortgage & Home Loans';
+                if(!result.lob && result.ind_key==='fin_wealth') result.lob='Wealth Management';
+                if(!result.lob && result.ind_key==='fin_commercial') result.lob='Commercial Banking';
+                if(!result.lob && result.ind_key==='fin_small_business') result.lob='Small Business Banking';
               }
               return null;
             })()}
