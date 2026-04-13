@@ -1390,46 +1390,6 @@ Return ONLY valid JSON, no markdown:
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
     // Hard floor GEO to tier minimums so rounding never drops below tier
-    // ── AUTO LOAN COMPETITOR TIERS ──
-    if ((indKey as string) === 'fin_auto_loan') {
-      const AUTO_COMP_TIERS: Record<string,any> = {
-        'Ally Financial':       { GEO:70, Vis:72, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#1' },
-        'Chase Auto':           { GEO:67, Vis:68, Cit:64, Sen:76, Sov:56, Prom:68, Rank:'#2' },
-        'Bank of America Auto': { GEO:59, Vis:58, Cit:56, Sen:70, Sov:46, Prom:60, Rank:'#3' },
-        'Wells Fargo Auto':     { GEO:53, Vis:52, Cit:50, Sen:66, Sov:42, Prom:54, Rank:'#4' },
-        'LightStream':          { GEO:48, Vis:44, Cit:42, Sen:72, Sov:34, Prom:46, Rank:'#5' },
-        'CarMax Auto Finance':  { GEO:44, Vis:40, Cit:38, Sen:66, Sov:30, Prom:42, Rank:'N/A' },
-        'USAA Auto':            { GEO:40, Vis:36, Cit:34, Sen:64, Sov:26, Prom:38, Rank:'N/A' },
-        'US Bank Auto':         { GEO:41, Vis:38, Cit:36, Sen:62, Sov:28, Prom:40, Rank:'N/A' },
-        'PenFed Auto':          { GEO:38, Vis:34, Cit:32, Sen:60, Sov:24, Prom:36, Rank:'N/A' },
-        'myAutoloan':           { GEO:27, Vis:22, Cit:20, Sen:54, Sov:14, Prom:24, Rank:'N/A' },
-      };
-      competitors = competitors.map((c: any) => {
-        const t = AUTO_COMP_TIERS[c.Brand];
-        return t ? { ...c, ...t } : c;
-      });
-      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
-    }
-    // ── MORTGAGE COMPETITOR TIERS ──
-    if ((indKey as string) === 'fin_mortgage') {
-      const MORT_COMP_TIERS: Record<string,any> = {
-        'Rocket Mortgage':        { GEO:78, Vis:80, Cit:74, Sen:82, Sov:70, Prom:76, Rank:'#1' },
-        'Chase Mortgage':         { GEO:72, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#2' },
-        'Bank of America Mortgage':{ GEO:66, Vis:65, Cit:62, Sen:74, Sov:55, Prom:64, Rank:'#3' },
-        'Wells Fargo Mortgage':   { GEO:60, Vis:60, Cit:56, Sen:70, Sov:50, Prom:58, Rank:'#4' },
-        'loanDepot':              { GEO:54, Vis:52, Cit:50, Sen:68, Sov:42, Prom:52, Rank:'#5' },
-        'United Wholesale':       { GEO:48, Vis:45, Cit:44, Sen:64, Sov:36, Prom:46, Rank:'N/A' },
-        'PNC Mortgage':           { GEO:44, Vis:42, Cit:40, Sen:62, Sov:32, Prom:42, Rank:'N/A' },
-        'US Bank Mortgage':       { GEO:42, Vis:40, Cit:38, Sen:60, Sov:30, Prom:40, Rank:'N/A' },
-        'Fairway Independent':    { GEO:38, Vis:36, Cit:34, Sen:58, Sov:26, Prom:36, Rank:'N/A' },
-        'Citi Mortgage':          { GEO:40, Vis:38, Cit:36, Sen:60, Sov:28, Prom:38, Rank:'N/A' },
-      };
-      competitors = competitors.map((c: any) => {
-        const t = MORT_COMP_TIERS[c.Brand];
-        return t ? { ...c, ...t } : c;
-      });
-      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
-    }
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 79,
