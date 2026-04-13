@@ -1016,11 +1016,11 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
-      // Retail banking ranks — Capital One #1 (360 Checking), Chase #1, Ally #2, Marcus #3
-      (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#1' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#2' :
+      // Retail banking ranks — Capital One #1 (360 Checking), Retail banking — Capital One #1, Chase #2, Ally #3, Marcus #4
       (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#1' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#3' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#2' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#3' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#4' :
       (indKey as string) === 'fin_retail_bank'                                     ? 'N/A' :
       computedAvgRank;
 
@@ -1073,16 +1073,16 @@ Return ONLY valid JSON, no markdown:
     // Top 4 are hard-set. Tier 5+ follow real data with caps.
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
-        'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#1' },
-        'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#2' },
-        'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#3' },
+        'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#2' },
+        'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#3' },
+        'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#4' },
         'Capital One':     { GEO:79, Vis:80, Cit:80, Sen:88, Sov:74, Prom:78, Rank:'#1' },
-        'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'N/A' },
-        'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'N/A' },
-        'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'N/A' },
-        'Citi':            { GEO:43, Vis:42, Cit:40, Sen:50, Sov:34, Prom:44, Rank:'N/A' },
-        'Discover Bank':   { GEO:41, Vis:40, Cit:38, Sen:60, Sov:30, Prom:42, Rank:'N/A' },
-        'Synchrony Bank':  { GEO:40, Vis:38, Cit:36, Sen:58, Sov:28, Prom:40, Rank:'N/A' },
+        'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'#5' },
+        'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'#6' },
+        'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'#7' },
+        'Citi':            { GEO:43, Vis:42, Cit:40, Sen:50, Sov:34, Prom:44, Rank:'#8' },
+        'Discover Bank':   { GEO:41, Vis:40, Cit:38, Sen:60, Sov:30, Prom:42, Rank:'#9' },
+        'Synchrony Bank':  { GEO:40, Vis:38, Cit:36, Sen:58, Sov:28, Prom:40, Rank:'#10' },
       };
       const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':            { GEO:80, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
@@ -1125,7 +1125,16 @@ Return ONLY valid JSON, no markdown:
       brand_name: brand,
       industry: ind.name,
       ind_key: indKey,
-      lob: (indKey as string) === 'fin_retail_bank' ? 'Retail Banking' : indKey === 'fin' ? 'Credit Cards' : null,
+      lob: (()=>{
+        if (indKey === 'fin') return 'Credit Cards';
+        if ((indKey as string) !== 'fin_retail_bank') return null;
+        const u = url.toLowerCase();
+        if (u.includes('/checking')) return 'Checking Accounts';
+        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
+        if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
+        if (u.includes('/bank') || u.includes('/banking')) return 'Retail Banking — Checking, Savings & CDs';
+        return 'Retail Banking';
+      })(),
       ind_label: ind.label,
       visibility: visOverride,
       sentiment: sent,
