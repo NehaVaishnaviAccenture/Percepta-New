@@ -988,7 +988,7 @@ Return ONLY valid JSON, no markdown:
         'keybank':          { vis: 6, sent:32, prom:12, cit: 9, sov: 4, geo:11 },
         'huntington':       { vis: 6, sent:33, prom:13, cit: 9, sov: 4, geo:12 },
       };
-      const tierMap = indKey === 'fin_retail_bank' ? RETAIL_BANK_TIERS : FIN_TIERS;
+      const tierMap = (indKey as string) === 'fin_retail_bank' ? RETAIL_BANK_TIERS : FIN_TIERS;
       const tier = tierMap[bl];
       if (tier) {
         visOverride = tier.vis;
@@ -1009,17 +1009,17 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
       // Retail banking ranks — Chase #1, Ally #2, Marcus #3, Capital One #4
-      indKey === 'fin_retail_bank' && bl === 'chase'                   ? '#1' :
-      indKey === 'fin_retail_bank' && bl === 'ally'                    ? '#2' :
-      indKey === 'fin_retail_bank' && bl === 'marcus'                  ? '#3' :
-      indKey === 'fin_retail_bank' && bl === 'capital one'             ? '#4' :
-      indKey === 'fin_retail_bank'                                     ? 'N/A' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'chase'                   ? '#1' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'ally'                    ? '#2' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'marcus'                  ? '#3' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'capital one'             ? '#4' :
+      (indKey as string) === 'fin_retail_bank'                                     ? 'N/A' :
       computedAvgRank;
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
     // Hard floor GEO to tier minimums so rounding never drops below tier
-    if (indKey === 'fin' || indKey === 'fin_retail_bank') {
-      const GEO_FLOORS: Record<string,number> = indKey === 'fin_retail_bank' ? {
+    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
+      const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 64,
       } : {
         'chase': 80, 'american express': 73, 'amex': 73, 'capital one': 57, 'citi': 49,
@@ -1063,7 +1063,7 @@ Return ONLY valid JSON, no markdown:
     // ── FIN COMPETITOR FIXED TIERS ──
     // Same fixed values as the main brand tiers — consistent no matter which brand is viewed.
     // Top 4 are hard-set. Tier 5+ follow real data with caps.
-    if (indKey === 'fin' || indKey === 'fin_retail_bank') {
+    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#1' },
         'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#2' },
@@ -1082,7 +1082,7 @@ Return ONLY valid JSON, no markdown:
         'Capital One':      { GEO:57, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#3' },
         'Citi':             { GEO:49, Vis:48, Cit:48, Sen:56, Sov:40, Prom:50, Rank:'#4' },
       };
-      const activeCOMPS = indKey === 'fin_retail_bank' ? RETAIL_COMP_TIERS : COMP_TIERS;
+      const activeCOMPS = (indKey as string) === 'fin_retail_bank' ? RETAIL_COMP_TIERS : COMP_TIERS;
       // Tier 5+ caps — real data but capped so they never exceed Citi
       // Tier 5+ — fixed coherent values, all below Citi (49) and descending
       const TIER5_CAPS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
@@ -1117,7 +1117,7 @@ Return ONLY valid JSON, no markdown:
       brand_name: brand,
       industry: ind.name,
       ind_key: indKey,
-      lob: indKey === 'fin_retail_bank' ? 'Retail Banking' : indKey === 'fin' ? 'Credit Cards' : null,
+      lob: (indKey as string) === 'fin_retail_bank' ? 'Retail Banking' : indKey === 'fin' ? 'Credit Cards' : null,
       ind_label: ind.label,
       visibility: visOverride,
       sentiment: sent,
