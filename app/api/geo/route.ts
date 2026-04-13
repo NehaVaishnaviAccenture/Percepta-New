@@ -870,7 +870,7 @@ Return ONLY valid JSON, no markdown:
     const finalAvgRank =
       indKey === 'fin' && bl === 'chase'                                    ? '#1' :
       indKey === 'fin' && (bl === 'american express' || bl === 'amex')      ? '#2' :
-      indKey === 'fin' && bl === 'capital one'                              ? '#2' :
+      indKey === 'fin' && bl === 'capital one'                              ? '#3' :
       indKey === 'fin' && bl === 'citi'                                     ? '#4' :
       computedAvgRank;
 
@@ -913,7 +913,7 @@ Return ONLY valid JSON, no markdown:
       const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':            { GEO:80, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
         'American Express': { GEO:71, Vis:68, Cit:70, Sen:84, Sov:62, Prom:72, Rank:'#2' },
-        'Capital One':      { GEO:57, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#2' },
+        'Capital One':      { GEO:57, Vis:60, Cit:55, Sen:62, Sov:48, Prom:58, Rank:'#3' },
         'Citi':             { GEO:49, Vis:48, Cit:48, Sen:56, Sov:40, Prom:50, Rank:'#4' },
       };
       // Tier 5+ caps — real data but capped so they never exceed Citi
