@@ -1208,8 +1208,14 @@ export default function GeoHub() {
               const rd=result.responses_detail||[],cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
               const catStats:Record<string,{total:number;mentioned:number}>={};
               rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
-              const totalMentions=rd.filter((r:any)=>r.mentioned).length,rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=rd.filter((r:any)=>!r.mentioned).length;
-              const totalQueries = rd.length || 20;
+              // Derive totalMentions from visibility so it always matches GEO Score tab
+              // visibility = appearance rate %, so mentions = round(vis/100 * totalQueries)
+              const totalQueries = result.total_responses ?? rd.length ?? 50;
+              const visRate = result.visibility ?? 0;
+              const totalMentions = result.ind_key === 'fin'
+                ? Math.round((visRate / 100) * totalQueries)
+                : (result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length);
+              const rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=totalQueries-totalMentions;
               const getBeater=(item:any)=>{
                 if(item.winner_brand) return item.winner_brand;
                 if(item.top_brand && item.top_brand !== result.brand_name) return item.top_brand;
@@ -1228,10 +1234,8 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
                     {Object.entries(catStats).map(([c,v])=><div key={c} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:'0.8rem',fontWeight:600,color:'#111827',marginBottom:7}}>{c}</div><div style={{background:'#F3F4F6',borderRadius:50,height:5,marginBottom:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${Math.round((v.mentioned/Math.max(v.total,1))*100)}%`}}/></div><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{v.mentioned} of {v.total} queries</span><span style={{fontSize:'0.76rem',fontWeight:700,color:'#7C3AED'}}>{Math.round((v.mentioned/Math.max(v.total,1))*100)}%</span></div></div>)}
                   </div>
-                  <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'12px 20px',marginBottom:16,display:'flex',alignItems:'center',gap:24,flexWrap:'wrap' as const}}>
-                    <div style={{fontSize:'0.78rem',fontWeight:700,color:'#111827'}}>Query Summary</div>
-                    {[{label:'#1 Rank',val:rank1,color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7'},{label:'Top 3',val:top3,color:'#7C3AED',bg:'#F5F3FF',border:'#DDD6FE'},{label:'Appeared',val:totalMentions,color:'#3B82F6',bg:'#EFF6FF',border:'#93C5FD'},{label:'Not Mentioned',val:notMentioned,color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5'}].map((s,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:8,background:s.bg,border:`1px solid ${s.border}`,borderRadius:8,padding:'5px 14px'}}><span style={{fontSize:'1.1rem',fontWeight:900,color:s.color}}>{s.val}</span><span style={{fontSize:'0.72rem',color:s.color,fontWeight:600}}>{s.label}</span></div>)}
-                    <div style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
+                  <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
+                    <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                     <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div></div>
