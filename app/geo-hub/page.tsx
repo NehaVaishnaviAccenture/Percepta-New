@@ -630,7 +630,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
   const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
-  const bR=(c:number)=>Math.round(7+((c-citMin)/Math.max(citMax-citMin,1))*5);
+  const bR=(c:number)=>Math.round(4+((c-citMin)/Math.max(citMax-citMin,1))*7);
 
   // ── Label placement: above/below alternating, stagger by crowding ──
   const placements = all.map((a,i)=>{
@@ -917,7 +917,7 @@ export default function GeoHub() {
         <div>
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
             {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
-            <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{marginLeft:'auto',background:'none',border:'1px solid #E5E7EB',borderRadius:8,color:'#6B7280',fontSize:'0.78rem',padding:'6px 14px',cursor:'pointer',alignSelf:'center',flexShrink:0}}>← New Analysis</button>
+            <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{marginLeft:'auto',background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',alignSelf:'center',flexShrink:0,boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
           </div>
 
           <div style={{padding:'28px 40px 60px'}}>
@@ -951,6 +951,15 @@ export default function GeoHub() {
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace(/^#+/, '')}`} color="#3B82F6"/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
+                  <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                      <span style={{color:'#7C3AED',fontSize:'1rem'}}>💡</span>
+                      <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>Why does 70 matter?</span>
+                    </div>
+                    <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.8,margin:0}}>
+                      Think of 70 like a <strong>700 credit score</strong> — it&apos;s the threshold where you go from being <em>considered</em> to being <em>chosen</em>. Below 70, AI treats your brand as one option among many. Above 70, AI consistently leads with your brand as a primary recommendation. It&apos;s also where most top competitors sit, making it the right baseline to measure against — and the first milestone worth chasing.
+                    </p>
+                  </div>
                   <GapCards result={result}/>
                 </div>
               );
