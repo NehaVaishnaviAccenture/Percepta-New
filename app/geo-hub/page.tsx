@@ -114,10 +114,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
         Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you\'re not yet the brand AI leads with or recommends first.'}
       </p>
-      <div style={{background:'#F5F3FF',borderRadius:10,border:'1px solid #DDD6FE',padding:'12px 16px',marginBottom:14}}>
-        <div style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',marginBottom:4}}>Why 70 Threshold?</div>
-        <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.7}}>70 is like a 700 credit score—it&apos;s where you go from being considered to being chosen. It&apos;s also where most competitors sit, making it the right baseline.</div>
-      </div>
+
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
           <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${b.border}`,padding:'10px 12px'}}>
@@ -215,6 +212,19 @@ function ROICurve({ score }: { score: number }) {
   );
 }
 
+// Category types for recommendations
+const REC_CATEGORIES: Record<string,{label:string;color:string;bg:string}> = {
+  'Comparison Page': {label:'Comparison Page', color:'#3B82F6', bg:'#EFF6FF'},
+  'Content Page':    {label:'Content Page',    color:'#8B5CF6', bg:'#F5F3FF'},
+  'FAQ Build':       {label:'FAQ Build',       color:'#10B981', bg:'#ECFDF5'},
+  'Structured Data': {label:'Structured Data', color:'#F59E0B', bg:'#FFFBEB'},
+  'Citation Push':   {label:'Citation Push',   color:'#EC4899', bg:'#FDF2F8'},
+  'PR / Earned Media':{label:'PR / Earned Media',color:'#6366F1',bg:'#EEF2FF'},
+  'Technical SEO':   {label:'Technical SEO',  color:'#14B8A6', bg:'#F0FDFA'},
+  'Content Strategy':{label:'Content Strategy',color:'#7C3AED',bg:'#F5F3FF'},
+  'Schema Markup':   {label:'Schema Markup',  color:'#F97316', bg:'#FFF7ED'},
+};
+
 function GeoSummary({ result }: { result:any }) {
   const [data,setData]=useState<any>(null);
   const [loading,setLoading]=useState(false);
@@ -233,36 +243,33 @@ function GeoSummary({ result }: { result:any }) {
   const badge = scoreBadge(geo);
   const topComp = (result.competitors||[])[0]?.Brand || 'top competitor';
   const topCompGEO = (result.competitors||[])[0]?.GEO || 0;
+  const catKeys = Object.keys(REC_CATEGORIES);
 
   useEffect(()=>{
     if(fetched) return;
     setFetched(true);
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
-    // Score increments per item — small realistic gains that add up
-    const baseScore = geo;
-    const prompt = `You are a sharp GEO strategist. Generate a JSON object with exactly:
-- "rows": array of exactly 6 objects. Each row is either an insight or a recommendation.
-  First 3 rows are insights (type:"insight"). Last 3 rows are recommendations (type:"recommendation").
-  Each object has:
+    const prompt = `You are a sharp GEO strategist. Return a JSON object with:
+- "insights": array of exactly 3 strings. Each is ONE sharp sentence opening with a specific number, naming the brand and a competitor directly.
+- "recommendations": array of exactly 3 objects:
   {
-    "type": "insight" | "recommendation",
-    "text": "one sharp sentence. For insights: open with a specific number from the data, name brand and competitor. For recommendations: start with a verb, be LOB-specific, name a specific platform (NerdWallet/Bankrate/Forbes/Google).",
-    "scoreNow": number (current geo score = ${baseScore} for all rows),
-    "scoreForecast": number (for insights: same as scoreNow. For recommendations: add 2-5 points realistically — small gains only, never more than +5 per item, so all 3 together add up to roughly +${maxGain} pts total),
+    "category": one of exactly: "Comparison Page" | "Content Page" | "FAQ Build" | "Structured Data" | "Citation Push" | "PR / Earned Media" | "Technical SEO" | "Schema Markup",
+    "title": 5-7 word action title,
+    "action": 2 sentences, starts with a verb, names specific platforms (NerdWallet/Bankrate/Forbes/Google), LOB-specific,
+    "scoreNow": ${geo},
+    "scoreForecast": realistic number — add only 2-4 pts per item (never more than +4), e.g. ${geo}→${geo+2}, ${geo}→${geo+3}, ${geo}→${geo+4},
     "impact": "HIGH" | "MEDIUM" | "LOW",
-    "agenticFlag": null OR short string about application/approval/structured data readiness (for recommendations only)
+    "agenticFlag": null OR one short specific sentence about application/approval/structured data readiness for this LOB
   }
 
 Brand: ${result.brand_name}
 ${lobContext}
 Industry: ${result.ind_label}
-GEO Score: ${geo} | Visibility: ${vis} | Sentiment: ${sent} | Citation: ${cit} | SOV: ${sov} | Prominence: ${prom}
+GEO: ${geo} | Vis: ${vis} | Sent: ${sent} | Cit: ${cit} | SOV: ${sov} | Prom: ${prom}
 Top Competitor: ${topComp} (GEO: ${topCompGEO})
 
-CRITICAL for scoreForecast: Each recommendation should show a gain of 2-5 pts max. Be conservative — this builds credibility. E.g. if score is 57: rec1 → 59, rec2 → 61, rec3 → 63. NOT 57→70 in one step.
-
-Return ONLY valid JSON, no markdown.`;
+CRITICAL: scoreForecast must be conservative +2 to +4 pts only. Never jump more than +4 in one item. Category must exactly match one of the options listed. Return ONLY valid JSON.`;
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
@@ -281,9 +288,9 @@ Return ONLY valid JSON, no markdown.`;
         <ROICurve score={geo}/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
-            { label:'Current GEO Score', val:geo, color: geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub: badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold') },
-            { label:'Forecasted GEO Score', val:projected, color:'#10B981', sub: isLeader?'After closing authority gaps':'After acting on all recommendations' },
-            { label: isLeader?'Score Defend':'Score Unlock', val:`+${projected-geo} pts`, color:'#7C3AED', sub:'Estimated gain from prioritised actions' },
+            {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold')},
+            {label:'Forecasted GEO Score', val:projected, color:'#10B981', sub:isLeader?'After closing authority gaps':'After acting on all recommendations'},
+            {label:isLeader?'Score Defend':'Score Unlock', val:`+${projected-geo} pts`, color:'#7C3AED', sub:'Estimated gain from prioritised actions'},
           ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
               <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>{c.label}</div>
@@ -294,80 +301,87 @@ Return ONLY valid JSON, no markdown.`;
         </div>
       </div>
 
-      {/* ── ONE-PAGER TABLE ── */}
+      {/* ── TWO-COLUMN ONE-PAGER ── */}
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
           <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>GEO Analysis Summary</span>
           {lob&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{lob}</span>}
-          <span style={{marginLeft:'auto',fontSize:'0.72rem',color:'#9CA3AF'}}>Insights → Recommendations</span>
         </div>
 
         {loading&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem',padding:'20px 0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem',padding:'24px 0'}}>
             <div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             Generating analysis…
           </div>
         )}
 
-        {!loading&&data?.rows&&(
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
-            <thead>
-              <tr style={{background:'#F8FAFC'}}>
-                {['#','Insight / Recommendation','GEO Now','GEO Forecast','Impact'].map(h=>(
-                  <th key={h} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',borderBottom:'2px solid #E5E7EB',whiteSpace:'nowrap' as const}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data.rows.map((row:any,i:number)=>{
-                const isRec = row.type === 'recommendation';
-                const delta = row.scoreForecast - row.scoreNow;
+        {!loading&&data&&(
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+
+            {/* LEFT — Insights */}
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,paddingBottom:10,borderBottom:'2px solid #F3F4F6'}}>
+                <span style={{fontSize:'1rem'}}>💡</span>
+                <span style={{fontSize:'0.88rem',fontWeight:800,color:'#111827'}}>Insights</span>
+                <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>What the data shows</span>
+              </div>
+              {(data.insights||[]).map((ins:string,i:number)=>(
+                <div key={i} style={{display:'flex',gap:12,marginBottom:12,padding:'14px 16px',background:'#F8FAFC',borderRadius:10,border:'1px solid #E5E7EB',alignItems:'flex-start'}}>
+                  <span style={{width:24,height:24,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',fontWeight:800,color:'#7C3AED',flexShrink:0}}>0{i+1}</span>
+                  <span style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{ins}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* RIGHT — Recommendations */}
+            <div>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,paddingBottom:10,borderBottom:'2px solid #F3F4F6'}}>
+                <span style={{fontSize:'1rem'}}>🎯</span>
+                <span style={{fontSize:'0.88rem',fontWeight:800,color:'#111827'}}>Recommendations</span>
+                <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>What to do next</span>
+              </div>
+              {(data.recommendations||[]).map((rec:any,i:number)=>{
+                const cat = REC_CATEGORIES[rec.category] || {label:rec.category||'Action',color:'#6B7280',bg:'#F9FAFB'};
+                const delta = (rec.scoreForecast||0) - (rec.scoreNow||geo);
                 return (
-                  <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:isRec?'#FAFAF8':'white'}}>
-                    <td style={{padding:'13px 14px',verticalAlign:'top' as const}}>
-                      <div style={{width:28,height:28,borderRadius:'50%',background:isRec?impactBg(row.impact):'#F3F4F6',border:`1.5px solid ${isRec?impactColor(row.impact):'#E5E7EB'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <span style={{fontSize:'0.7rem',fontWeight:800,color:isRec?impactColor(row.impact):'#9CA3AF'}}>{i+1}</span>
-                      </div>
-                    </td>
-                    <td style={{padding:'13px 14px',verticalAlign:'top' as const}}>
-                      <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:row.agenticFlag?6:0}}>
-                        <span style={{fontSize:'0.68rem',fontWeight:700,padding:'1px 8px',borderRadius:50,background:isRec?'#F5F3FF':'#F0FDF4',color:isRec?'#7C3AED':'#065F46',flexShrink:0,marginTop:2}}>{isRec?'Action':'Insight'}</span>
-                        <span style={{fontSize:'0.84rem',color:'#111827',lineHeight:1.65}}>{row.text}</span>
-                      </div>
-                      {row.agenticFlag&&(
-                        <div style={{display:'flex',alignItems:'center',gap:6,marginTop:4,padding:'5px 10px',background:'#FFF7ED',borderRadius:6,border:'1px solid #FCD34D'}}>
-                          <span style={{fontSize:'0.75rem'}}>🤖</span>
-                          <span style={{fontSize:'0.72rem',fontWeight:600,color:'#92400E'}}>Agentic Flag: </span>
-                          <span style={{fontSize:'0.72rem',color:'#92400E'}}>{row.agenticFlag}</span>
+                  <div key={i} style={{marginBottom:12,borderRadius:10,border:'1px solid #E5E7EB',overflow:'hidden'}}>
+                    {/* Header */}
+                    <div style={{padding:'12px 14px',background:'#FAFAFA',display:'flex',alignItems:'flex-start',gap:10}}>
+                      <div style={{width:24,height:24,borderRadius:'50%',background:impactBg(rec.impact),border:`1.5px solid ${impactColor(rec.impact)}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',fontWeight:800,color:impactColor(rec.impact),flexShrink:0}}>#{i+1}</div>
+                      <div style={{flex:1}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const,marginBottom:4}}>
+                          <span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'1px 8px',fontSize:'0.64rem',fontWeight:700}}>{cat.label}</span>
+                          <span style={{background:impactBg(rec.impact),color:impactColor(rec.impact),borderRadius:50,padding:'1px 8px',fontSize:'0.64rem',fontWeight:700}}>{rec.impact}</span>
                         </div>
-                      )}
-                    </td>
-                    <td style={{padding:'13px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
-                      <span style={{fontSize:'1.1rem',fontWeight:800,color:'#374151'}}>{row.scoreNow}</span>
-                    </td>
-                    <td style={{padding:'13px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
-                      {isRec?(
-                        <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:2}}>
-                          <span style={{fontSize:'1.1rem',fontWeight:800,color:'#10B981'}}>{row.scoreForecast}</span>
-                          {delta>0&&<span style={{fontSize:'0.68rem',fontWeight:700,color:'#10B981'}}>+{delta} pts</span>}
+                        <div style={{fontSize:'0.84rem',fontWeight:700,color:'#111827',marginBottom:4}}>{rec.title}</div>
+                        <div style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.6}}>{rec.action}</div>
+                      </div>
+                      {/* Score forecast pill */}
+                      <div style={{flexShrink:0,textAlign:'center' as const,background:'white',border:'1px solid #E5E7EB',borderRadius:10,padding:'6px 10px',minWidth:70}}>
+                        <div style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:600,marginBottom:2}}>GEO</div>
+                        <div style={{display:'flex',alignItems:'center',gap:4,justifyContent:'center'}}>
+                          <span style={{fontSize:'0.88rem',fontWeight:700,color:'#9CA3AF'}}>{rec.scoreNow}</span>
+                          <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>→</span>
+                          <span style={{fontSize:'1rem',fontWeight:900,color:'#10B981'}}>{rec.scoreForecast}</span>
                         </div>
-                      ):(
-                        <span style={{fontSize:'0.78rem',color:'#9CA3AF'}}>—</span>
-                      )}
-                    </td>
-                    <td style={{padding:'13px 14px',verticalAlign:'top' as const}}>
-                      {isRec?(
-                        <span style={{background:impactBg(row.impact),color:impactColor(row.impact),borderRadius:50,padding:'2px 10px',fontSize:'0.66rem',fontWeight:700,whiteSpace:'nowrap' as const}}>{row.impact}</span>
-                      ):(
-                        <span style={{fontSize:'0.78rem',color:'#9CA3AF'}}>—</span>
-                      )}
-                    </td>
-                  </tr>
+                        {delta>0&&<div style={{fontSize:'0.64rem',fontWeight:700,color:'#10B981'}}>+{delta} pts</div>}
+                      </div>
+                    </div>
+                    {/* Agentic flag */}
+                    {rec.agenticFlag&&(
+                      <div style={{padding:'8px 14px',background:'#FFF7ED',borderTop:'1px solid #FCD34D',display:'flex',alignItems:'center',gap:6}}>
+                        <span style={{fontSize:'0.75rem'}}>🤖</span>
+                        <span style={{fontSize:'0.7rem',fontWeight:600,color:'#92400E'}}>Agentic Flag: </span>
+                        <span style={{fontSize:'0.7rem',color:'#92400E'}}>{rec.agenticFlag}</span>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+
+          </div>
         )}
 
         {!loading&&!data&&(
@@ -991,27 +1005,7 @@ export default function GeoHub() {
                     </div>
                   ))}
                 </div>
-                <div style={{borderTop:'1px solid #F3F4F6',paddingTop:20}}>
-                  <div style={{fontSize:'0.72rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:12}}>Query Categories</div>
-                  <div style={{display:'flex',gap:8,flexWrap:'wrap' as const}}>
-                    {[
-                      {label:'General Consumer', queries:10, activeAt:2},
-                      {label:'Cash Back', queries:10, activeAt:3},
-                      {label:'Travel & Rewards', queries:10, activeAt:4},
-                      {label:'Credit Building', queries:10, activeAt:5},
-                      {label:'Expert Recommendation', queries:10, activeAt:6},
-                    ].map((cat,i)=>{
-                      const done = loadingStep > cat.activeAt;
-                      const active = loadingStep === cat.activeAt;
-                      return (
-                        <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:done?'#D1FAE5':active?'#EDE9FE':'#F9FAFB',borderRadius:50,padding:'5px 12px',border:`1px solid ${done?'#6EE7B7':active?'#DDD6FE':'#E5E7EB'}`,transition:'all 0.3s'}}>
-                          <span style={{fontSize:'0.7rem',fontWeight:600,color:done?'#065F46':active?'#7C3AED':'#9CA3AF'}}>{done?'✓ ':active?'● ':''}{cat.label}</span>
-                          <span style={{fontSize:'0.65rem',color:done?'#10B981':active?'#9CA3AF':'#D1D5DB'}}>{cat.queries}q</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+
               </div>
             );
           })()}
@@ -1020,8 +1014,10 @@ export default function GeoHub() {
         <div>
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
             {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
-            <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{marginLeft:'auto',background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',alignSelf:'center',flexShrink:0,boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
+            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+              <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
               <ShareButton result={result}/>
+            </div>
           </div>
 
           <div style={{padding:'28px 40px 60px'}}>
