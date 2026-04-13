@@ -295,7 +295,7 @@ CRITICAL: Exactly 5 insights then 5 recommendations. Sort recommendations HIGH�
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
-        const clean = (d.response||'').replace(/```json|```/g,'').trim();
+        const clean = (d.response||'').replace(/`{3}json|`{3}/g,'').trim();
         const parsed = JSON.parse(clean);
         setData(parsed);
         try{ sessionStorage.setItem(`geo_summary_${result.brand_name}_${geo}`, JSON.stringify(parsed)); }catch{}
@@ -814,7 +814,7 @@ Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
 Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Comparison Page"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
 Order: High first, then Medium, then Low.`;
-    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const text=data.response||'',clean=text.replace(/```json|```/g,'').trim();setActions(JSON.parse(clean));}).catch(()=>setActions([])).finally(()=>setLoading(false));
+    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const text=data.response||'',clean=text.replace(/`{3}json|`{3}/g,'').trim();setActions(JSON.parse(clean));}).catch(()=>setActions([])).finally(()=>setLoading(false));
   },[]);
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
