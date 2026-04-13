@@ -336,7 +336,7 @@ function GeoSummary({ result }: { result:any }) {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
           <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>GEO Analysis Summary</span>
           {lob&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{lob}</span>}
-          <span style={{marginLeft:'auto',fontSize:'0.7rem',color:'#9CA3AF'}}>Rows 1–3: Insights · Rows 4–6: Recommendations</span>
+
         </div>
 
         {loading&&(
