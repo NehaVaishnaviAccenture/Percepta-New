@@ -101,15 +101,34 @@ function extractBrand(pageData: any): string {
 
 function getIndustry(domain: string, pageData?: any): string {
   const d = domain.toLowerCase();
-  // Check URL path first — most reliable signal
   const urlPath = ((pageData as any)?.url || '').toLowerCase();
+
+  // Step 1: Is this a known financial domain? Domain identity overrides path.
+  const finDomains = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'];
+  const isFin = finDomains.some(k => d.includes(k));
+
+  if (isFin) {
+    // Priority order matters — specific signals checked before broad ones
+    const pathWealthSignals = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
+    const pathCommercialSignals = ['/commercial','/corporate','/treasury','/institutional','/wholesale'];
+    // SMB checked BEFORE /banking/ — chase.com/business/banking must hit SMB not retail
+    const pathSmbSignals = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
+    const pathRetailSignals = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
+    const pathRetailGeneric = ['/bank','/banking']; // checked last
+    if (pathWealthSignals.some(k => urlPath.includes(k))) return 'fin_wealth';
+    if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
+    if (pathSmbSignals.some(k => urlPath.includes(k))) return 'fin_small_business';
+    if (pathRetailSignals.some(k => urlPath.includes(k))) return 'fin_retail_bank';
+    if (pathRetailGeneric.some(k => urlPath.includes(k))) return 'fin_retail_bank';
+    return 'fin';
+  }
+
+  // Step 2: Only route to auto if the DOMAIN itself is an auto brand
   const pathRetailSignals = ['/bank','/banking','/checking','/savings','/deposits','/cd','/money-market','/personal-banking'];
   const pathCreditSignals = ['/credit-card','/creditcard','/rewards-card','/cash-back'];
   const pathIsRetail = pathRetailSignals.some(k => urlPath.includes(k));
   const pathIsCredit = pathCreditSignals.some(k => urlPath.includes(k));
-  const isFin = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'].some(k=>d.includes(k));
-  if (isFin && pathIsRetail) return 'fin_retail_bank';
-  if (isFin && pathIsCredit) return 'fin';
+  // (pathIsRetail/pathIsCredit only matter for non-fin domains — kept for future use)
   // Fallback: check page content
   if (pageData) {
     const pageText = [
@@ -254,6 +273,184 @@ const INDUSTRY_DATA: Record<string, any> = {
     label: 'Retail Banking',
     awareness: { chase: 62, 'bank of america': 58, 'wells fargo': 52, ally: 48, marcus: 42, 'capital one': 50, citi: 44, 'us bank': 36, 'discover bank': 38, sofi: 34, 'synchrony bank': 28, 'american express bank': 30, barclays: 20, usaa: 32, 'navy federal': 26 },
   },
+  fin_wealth: {
+    name: 'wealth management',
+    label: 'Wealth Management',
+    queries: [
+      ['General', 'Best wealth management accounts for high net worth individuals'],
+      ['General', 'Which bank has the best private banking services?'],
+      ['General', 'Best premium banking tiers for affluent customers'],
+      ['General', 'Which bank offers the best perks for high balance customers?'],
+      ['General', 'Best private client banking relationships in the US'],
+      ['General', 'Which bank is best for clients with $200K to $1M in deposits?'],
+      ['General', 'Best banks for personalized wealth management advice'],
+      ['General', 'Which bank has the best concierge banking services?'],
+      ['General', 'Best premium checking accounts for high earners'],
+      ['General', 'Which wealth management bank has the best digital tools?'],
+      ['Investment', 'Best banks for investment management for affluent clients'],
+      ['Investment', 'Which bank offers the best robo-advisor for wealthy clients?'],
+      ['Investment', 'Best banks for access to alternative investments'],
+      ['Investment', 'Which private bank has the best portfolio management services?'],
+      ['Investment', 'Best banks for equity and bond investment access'],
+      ['Investment', 'Which bank is best for retirement planning for high earners?'],
+      ['Investment', 'Best banks for trust and estate planning services'],
+      ['Investment', 'Which wealth management platform has the lowest fees?'],
+      ['Investment', 'Best banks for access to IPOs and private equity'],
+      ['Investment', 'Which bank is best for socially responsible investing?'],
+      ['Benefits', 'Which premium bank tier has the best travel benefits?'],
+      ['Benefits', 'Best banks for airport lounge access through premium accounts'],
+      ['Benefits', 'Which bank offers the best rewards for wealthy customers?'],
+      ['Benefits', 'Best premium banking tiers for waiving fees'],
+      ['Benefits', 'Which bank has the best relationship pricing on loans and mortgages?'],
+      ['Benefits', 'Best banks for priority customer service lines'],
+      ['Benefits', 'Which bank offers the best dedicated financial advisor access?'],
+      ['Benefits', 'Best premium bank accounts with global ATM fee reimbursement'],
+      ['Benefits', 'Which bank has the best benefits for frequent international travelers?'],
+      ['Benefits', 'Best banks for foreign currency accounts and FX rates'],
+      ['Expert Recommendation', 'Which wealth management bank do financial advisors recommend?'],
+      ['Expert Recommendation', 'Best private banking accounts ranked by Forbes'],
+      ['Expert Recommendation', 'Which bank is best for mass affluent customers?'],
+      ['Expert Recommendation', 'Best premium banking tiers compared by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best wealth management for millennials?'],
+      ['Expert Recommendation', 'Best banks for clients transitioning from retail to private banking'],
+      ['Expert Recommendation', 'Which bank is best for entrepreneurs and business owners personally?'],
+      ['Expert Recommendation', 'Best wealth management banks for women investors'],
+      ['Expert Recommendation', 'Which bank has the most comprehensive financial planning tools?'],
+      ['Expert Recommendation', 'Best banks for clients with complex financial needs'],
+      ['Comparison', 'Citigold vs Chase Private Client vs Bank of America Preferred'],
+      ['Comparison', 'Which is better for wealth management — Citi or JPMorgan?'],
+      ['Comparison', 'Best premium banking tier compared to Merrill Lynch?'],
+      ['Comparison', 'Citibank wealth vs Schwab vs Fidelity for high net worth'],
+      ['Comparison', 'Which bank beats Morgan Stanley for mass affluent clients?'],
+      ['Comparison', 'Best bank wealth tier vs independent RIA for $500K portfolio'],
+      ['Comparison', 'Citi Private Bank vs Chase Private Client — which is better?'],
+      ['Comparison', 'Which premium bank tier gives better mortgage rates?'],
+      ['Comparison', 'Best bank wealth tier for someone with $250K in deposits'],
+      ['Comparison', 'Which wealth management bank has better technology — Citi or BofA?'],
+    ],
+    comps: ['Chase Private Client', 'Bank of America Preferred', 'Wells Fargo Private', 'Morgan Stanley', 'Merrill Lynch', 'Schwab', 'Fidelity', 'Goldman Sachs Private', 'US Bank Wealth', 'Northern Trust'],
+    compUrls: { 'Chase Private Client': 'chase.com/personal/private-client', 'Bank of America Preferred': 'bankofamerica.com/preferred-rewards', 'Wells Fargo Private': 'wellsfargo.com/the-private-bank', 'Morgan Stanley': 'morganstanley.com', 'Merrill Lynch': 'ml.com', 'Schwab': 'schwab.com', 'Fidelity': 'fidelity.com', 'Goldman Sachs Private': 'goldmansachs.com', 'US Bank Wealth': 'usbank.com/wealth-management', 'Northern Trust': 'northerntrust.com' },
+    awareness: { 'chase private client': 52, 'bank of america preferred': 48, 'wells fargo private': 42, 'morgan stanley': 62, 'merrill lynch': 60, schwab: 58, fidelity: 64, 'goldman sachs private': 56, 'us bank wealth': 30, 'northern trust': 38 },
+  },
+  fin_commercial: {
+    name: 'commercial banking',
+    label: 'Commercial Banking',
+    queries: [
+      ['Treasury', 'Best banks for treasury management services for mid-size companies'],
+      ['Treasury', 'Which bank has the best cash management solutions for corporations?'],
+      ['Treasury', 'Best commercial banks for automated payables and receivables'],
+      ['Treasury', 'Which bank offers the best liquidity management for businesses?'],
+      ['Treasury', 'Best banks for commercial sweep accounts and overnight investing'],
+      ['Treasury', 'Which bank is best for working capital management?'],
+      ['Treasury', 'Best commercial banking platforms for CFOs'],
+      ['Treasury', 'Which bank has the best online treasury portal for businesses?'],
+      ['Treasury', 'Best banks for international wire transfers for corporations'],
+      ['Treasury', 'Which bank offers the best fraud protection for business accounts?'],
+      ['Commercial Credit', 'Best banks for commercial lines of credit for mid-size businesses'],
+      ['Commercial Credit', 'Which bank has the best commercial real estate loan rates?'],
+      ['Commercial Credit', 'Best banks for equipment financing for businesses'],
+      ['Commercial Credit', 'Which bank offers the best SBA loans for growing companies?'],
+      ['Commercial Credit', 'Best commercial banks for acquisition financing'],
+      ['Commercial Credit', 'Which bank is best for corporate revolving credit facilities?'],
+      ['Commercial Credit', 'Best banks for asset-based lending solutions'],
+      ['Commercial Credit', 'Which bank has the best terms for commercial construction loans?'],
+      ['Commercial Credit', 'Best banks for inventory financing and supply chain credit'],
+      ['Commercial Credit', 'Which bank offers the best commercial mortgage products?'],
+      ['Business Solutions', 'Best banks for merchant services and payment processing'],
+      ['Business Solutions', 'Which bank has the best business checking account for corporations?'],
+      ['Business Solutions', 'Best commercial banks for payroll and HR payment solutions'],
+      ['Business Solutions', 'Which bank is best for business foreign exchange and FX hedging?'],
+      ['Business Solutions', 'Best banks for corporate card programs for large companies'],
+      ['Business Solutions', 'Which bank offers the best escrow and trust services?'],
+      ['Business Solutions', 'Best banks for healthcare payment solutions'],
+      ['Business Solutions', 'Which bank has the best trade finance and letter of credit services?'],
+      ['Business Solutions', 'Best banks for real estate developer banking relationships'],
+      ['Business Solutions', 'Which commercial bank is best for private equity-backed companies?'],
+      ['Expert Recommendation', 'Which bank do CFOs recommend for commercial banking relationships?'],
+      ['Expert Recommendation', 'Best commercial banks ranked by middle market companies'],
+      ['Expert Recommendation', 'Which bank is most recommended for treasury technology integration?'],
+      ['Expert Recommendation', 'Best banks for companies doing $50M to $500M in revenue'],
+      ['Expert Recommendation', 'Which commercial bank has the best relationship management?'],
+      ['Expert Recommendation', 'Best banks for companies expanding internationally'],
+      ['Expert Recommendation', 'Which bank is best for IPO readiness and capital markets access?'],
+      ['Expert Recommendation', 'Best commercial banks for nonprofit and government entities'],
+      ['Expert Recommendation', 'Which bank has the best digital banking platform for businesses?'],
+      ['Expert Recommendation', 'Best commercial banks for sustainable and ESG-focused companies'],
+      ['Industry Vertical', 'Best bank for healthcare organizations and hospital systems'],
+      ['Industry Vertical', 'Which bank is best for technology and SaaS companies?'],
+      ['Industry Vertical', 'Best commercial bank for real estate investment trusts'],
+      ['Industry Vertical', 'Which bank is best for manufacturing and industrial companies?'],
+      ['Industry Vertical', 'Best banks for government contractors and public sector entities'],
+      ['Industry Vertical', 'Which bank is best for media and entertainment companies?'],
+      ['Industry Vertical', 'Best commercial bank for franchise businesses'],
+      ['Industry Vertical', 'Which bank is best for energy and utilities companies?'],
+      ['Industry Vertical', 'Best banks for food and beverage companies'],
+      ['Industry Vertical', 'Which commercial bank specializes in professional services firms?'],
+    ],
+    comps: ['JPMorgan Chase Commercial', 'Bank of America Business', 'Wells Fargo Commercial', 'Citi Commercial', 'US Bank Business', 'PNC Commercial', 'Truist Commercial', 'KeyBank Business', 'Regions Commercial', 'Fifth Third Business'],
+    compUrls: { 'JPMorgan Chase Commercial': 'jpmorgan.com', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Commercial': 'wellsfargo.com/biz', 'Citi Commercial': 'citibank.com/commercialbank', 'US Bank Business': 'usbank.com/business', 'PNC Commercial': 'pnc.com/commercial', 'Truist Commercial': 'truist.com/commercial', 'KeyBank Business': 'key.com/business', 'Regions Commercial': 'regions.com/commercial', 'Fifth Third Business': '53.com/business' },
+    awareness: { 'jpmorgan chase commercial': 62, 'bank of america business': 58, 'wells fargo commercial': 52, 'citi commercial': 48, 'us bank business': 36, 'pnc commercial': 32, 'truist commercial': 28, 'keybank business': 24, 'regions commercial': 22, 'fifth third business': 20 },
+  },
+  fin_small_business: {
+    name: 'small business banking',
+    label: 'Small Business Banking',
+    queries: [
+      ['General', 'Best bank for a small business checking account'],
+      ['General', 'Which bank is best for small business owners?'],
+      ['General', 'Best banks for startups and new businesses'],
+      ['General', 'Which bank has the best small business banking features?'],
+      ['General', 'Best banks recommended by small business owners'],
+      ['General', 'Which bank offers the best free business checking account?'],
+      ['General', 'Best online banks for small businesses'],
+      ['General', 'Which bank is easiest to open a business account with?'],
+      ['General', 'Best banks for sole proprietors and freelancers'],
+      ['General', 'Which bank has the best mobile app for small businesses?'],
+      ['Credit & Lending', 'Best small business loans from banks'],
+      ['Credit & Lending', 'Which bank has the best small business line of credit?'],
+      ['Credit & Lending', 'Best banks for SBA 7a loans'],
+      ['Credit & Lending', 'Which bank offers the best business credit cards for small companies?'],
+      ['Credit & Lending', 'Best banks for startup business loans with no revenue'],
+      ['Credit & Lending', 'Which bank has the best merchant cash advance alternatives?'],
+      ['Credit & Lending', 'Best banks for small business equipment financing'],
+      ['Credit & Lending', 'Which bank is best for a business line of credit under $100K?'],
+      ['Credit & Lending', 'Best banks for minority-owned small business loans'],
+      ['Credit & Lending', 'Which bank offers the fastest small business loan approval?'],
+      ['Payments', 'Best bank for small business payment processing'],
+      ['Payments', 'Which bank has the best invoicing and payments tools for small business?'],
+      ['Payments', 'Best banks for accepting credit cards as a small business'],
+      ['Payments', 'Which bank integrates best with QuickBooks for small businesses?'],
+      ['Payments', 'Best banks for payroll services for small businesses'],
+      ['Payments', 'Which bank has the best cash deposit options for retail businesses?'],
+      ['Payments', 'Best banks for ACH payments for small businesses'],
+      ['Payments', 'Which bank offers the best Zelle for Business integration?'],
+      ['Payments', 'Best banks for e-commerce small businesses'],
+      ['Payments', 'Which bank has the lowest wire transfer fees for businesses?'],
+      ['Expert Recommendation', 'Which bank do accountants recommend for small businesses?'],
+      ['Expert Recommendation', 'Best banks for small businesses ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank is best for an LLC or S-corp?'],
+      ['Expert Recommendation', 'Best banks for small businesses with multiple employees'],
+      ['Expert Recommendation', 'Which bank offers the best rewards for business spending?'],
+      ['Expert Recommendation', 'Best banks for small businesses recommended by Forbes'],
+      ['Expert Recommendation', 'Which bank is best for a restaurant or food service business?'],
+      ['Expert Recommendation', 'Best banks for real estate investors and property managers'],
+      ['Expert Recommendation', 'Which bank is best for a medical or dental practice?'],
+      ['Expert Recommendation', 'Best banks for ecommerce and online-only businesses'],
+      ['Growth', 'Which bank helps small businesses grow to mid-size companies?'],
+      ['Growth', 'Best banks for businesses doing $1M to $10M in revenue'],
+      ['Growth', 'Which bank offers the best business savings and money market accounts?'],
+      ['Growth', 'Best banks for businesses that need international banking'],
+      ['Growth', 'Which bank has the best business CD rates for small companies?'],
+      ['Growth', 'Best banks for businesses planning to raise venture capital'],
+      ['Growth', 'Which bank is best for franchise owners?'],
+      ['Growth', 'Best banks for businesses with seasonal cash flow needs'],
+      ['Growth', 'Which bank offers the best treasury services for growing businesses?'],
+      ['Growth', 'Best banks for businesses expanding to multiple locations?'],
+    ],
+    comps: ['Chase Business', 'Bank of America Business', 'Wells Fargo Business', 'Relay', 'Bluevine', 'Mercury', 'Novo', 'US Bank Business', 'Citi Business', 'American Express Business'],
+    compUrls: { 'Chase Business': 'chase.com/business', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Business': 'wellsfargo.com/biz', 'Relay': 'relayfi.com', 'Bluevine': 'bluevine.com', 'Mercury': 'mercury.com', 'Novo': 'novo.co', 'US Bank Business': 'usbank.com/business', 'Citi Business': 'citi.com/business', 'American Express Business': 'americanexpress.com/business' },
+    awareness: { 'chase business': 58, 'bank of america business': 54, 'wells fargo business': 48, relay: 22, bluevine: 26, mercury: 28, novo: 20, 'us bank business': 30, 'citi business': 32, 'american express business': 36 },
+  },
+
   auto: {
     name: 'automotive',
     queries: [
@@ -930,7 +1127,7 @@ Return ONLY valid JSON, no markdown:
 
       const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1000);
       try {
-        sc = JSON.parse(raw.replace(/`{3}json|`{3}/g, '').trim());
+        sc = JSON.parse(raw.replace('```json','').replace('```','').trim());
         sc.citation_share = Math.min(sc.citation_share || 0, visibility + 10);
         for (const k of ['citation_share', 'sentiment', 'prominence', 'share_of_voice']) {
           sc[k] = Math.max(0, Math.min(100, sc[k] || 0));
@@ -1058,7 +1255,7 @@ Return ONLY valid JSON, no markdown:
     try {
       const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON array, no markdown: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
       const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
-      citationSources = JSON.parse(cr.replace(/`{3}json|`{3}/g, '').trim());
+      citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
     } catch {}
 
     let competitors = ind.comps
@@ -1126,14 +1323,25 @@ Return ONLY valid JSON, no markdown:
       industry: ind.name,
       ind_key: indKey,
       lob: (()=>{
-        if (indKey === 'fin') return 'Credit Cards';
-        if ((indKey as string) !== 'fin_retail_bank') return null;
-        const u = url.toLowerCase();
-        if (u.includes('/checking')) return 'Checking Accounts';
-        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
-        if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
-        if (u.includes('/bank') || u.includes('/banking')) return 'Retail Banking — Checking, Savings & CDs';
-        return 'Retail Banking';
+        if ((indKey as string) === 'fin_retail_bank') {
+          const u = url.toLowerCase();
+          if (u.includes('/checking')) return 'Checking Accounts';
+          if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
+          if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
+          return 'Retail Banking — Checking, Savings & CDs';
+        }
+        if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
+        if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
+        if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
+        if (indKey === 'fin') {
+          const u = url.toLowerCase();
+          if (u.includes('/auto') || u.includes('/car') || u.includes('/vehicle')) return 'Auto Loans';
+          if (u.includes('/mortgage') || u.includes('/home-loan') || u.includes('/heloc')) return 'Mortgage & Home Loans';
+          if (u.includes('/invest') || u.includes('/wealth') || u.includes('/brokerage')) return 'Wealth & Investments';
+          if (u.includes('/credit-card') || u.includes('/creditcard')) return 'Credit Cards';
+          return 'Credit Cards';
+        }
+        return null;
       })(),
       ind_label: ind.label,
       visibility: visOverride,
