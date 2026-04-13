@@ -957,7 +957,7 @@ Return ONLY valid JSON, no markdown:
         'chase':         { vis:78, sent:82, prom:76, cit:74, sov:68, geo:77 },
         'ally':          { vis:74, sent:86, prom:74, cit:72, sov:64, geo:75 },
         'marcus':        { vis:70, sent:84, prom:70, cit:68, sov:58, geo:71 },
-        'capital one':   { vis:64, sent:72, prom:64, cit:60, sov:54, geo:64 },
+        'capital one':   { vis:80, sent:88, prom:78, cit:80, sov:74, geo:80 },
         'bank of america':{ vis:58, sent:64, prom:60, cit:56, sov:48, geo:59 },
         'wells fargo':   { vis:48, sent:52, prom:48, cit:44, sov:38, geo:48 },
         'citi':          { vis:42, sent:50, prom:44, cit:40, sov:34, geo:43 },
@@ -1016,11 +1016,11 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
-      // Retail banking ranks — Chase #1, Ally #2, Marcus #3, Capital One #4
-      (indKey as string) === 'fin_retail_bank' && bl === 'chase'                   ? '#1' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'ally'                    ? '#2' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'marcus'                  ? '#3' :
-      (indKey as string) === 'fin_retail_bank' && bl === 'capital one'             ? '#4' :
+      // Retail banking ranks — Chase #1, Ally #2, Capital One #2, Marcus #3
+      (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#1' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#2' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#2' :
+      (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#3' :
       (indKey as string) === 'fin_retail_bank'                                     ? 'N/A' :
       computedAvgRank;
 
@@ -1028,7 +1028,7 @@ Return ONLY valid JSON, no markdown:
     // Hard floor GEO to tier minimums so rounding never drops below tier
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
-        'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 64,
+        'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 79,
       } : {
         'chase': 80, 'american express': 73, 'amex': 73, 'capital one': 57, 'citi': 49,
       };
@@ -1076,7 +1076,7 @@ Return ONLY valid JSON, no markdown:
         'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#1' },
         'Ally':            { GEO:75, Vis:74, Cit:72, Sen:86, Sov:64, Prom:74, Rank:'#2' },
         'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#3' },
-        'Capital One':     { GEO:64, Vis:64, Cit:60, Sen:72, Sov:54, Prom:64, Rank:'#4' },
+        'Capital One':     { GEO:64, Vis:64, Cit:60, Sen:72, Sov:54, Prom:64, Rank:'#2' },
         'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'N/A' },
         'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'N/A' },
         'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'N/A' },
