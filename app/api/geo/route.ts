@@ -930,7 +930,7 @@ Return ONLY valid JSON, no markdown:
 
       const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1000);
       try {
-        sc = JSON.parse(raw.replace(/```json|```/g, '').trim());
+        sc = JSON.parse(raw.replace(/`{3}json|`{3}/g, '').trim());
         sc.citation_share = Math.min(sc.citation_share || 0, visibility + 10);
         for (const k of ['citation_share', 'sentiment', 'prominence', 'share_of_voice']) {
           sc[k] = Math.max(0, Math.min(100, sc[k] || 0));
@@ -1058,7 +1058,7 @@ Return ONLY valid JSON, no markdown:
     try {
       const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON array, no markdown: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
       const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
-      citationSources = JSON.parse(cr.replace(/```json|```/g, '').trim());
+      citationSources = JSON.parse(cr.replace(/`{3}json|`{3}/g, '').trim());
     } catch {}
 
     let competitors = ind.comps
