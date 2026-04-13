@@ -212,17 +212,16 @@ function ROICurve({ score }: { score: number }) {
   );
 }
 
-// Category types for recommendations
 const REC_CATEGORIES: Record<string,{label:string;color:string;bg:string}> = {
-  'Comparison Page': {label:'Comparison Page', color:'#3B82F6', bg:'#EFF6FF'},
-  'Content Page':    {label:'Content Page',    color:'#8B5CF6', bg:'#F5F3FF'},
-  'FAQ Build':       {label:'FAQ Build',       color:'#10B981', bg:'#ECFDF5'},
-  'Structured Data': {label:'Structured Data', color:'#F59E0B', bg:'#FFFBEB'},
-  'Citation Push':   {label:'Citation Push',   color:'#EC4899', bg:'#FDF2F8'},
-  'PR / Earned Media':{label:'PR / Earned Media',color:'#6366F1',bg:'#EEF2FF'},
-  'Technical SEO':   {label:'Technical SEO',  color:'#14B8A6', bg:'#F0FDFA'},
-  'Content Strategy':{label:'Content Strategy',color:'#7C3AED',bg:'#F5F3FF'},
-  'Schema Markup':   {label:'Schema Markup',  color:'#F97316', bg:'#FFF7ED'},
+  'Comparison Page':  {label:'Comparison Page',  color:'#3B82F6', bg:'#EFF6FF'},
+  'Content Page':     {label:'Content Page',     color:'#8B5CF6', bg:'#F5F3FF'},
+  'FAQ Build':        {label:'FAQ Build',        color:'#10B981', bg:'#ECFDF5'},
+  'Structured Data':  {label:'Structured Data',  color:'#F59E0B', bg:'#FFFBEB'},
+  'Citation Push':    {label:'Citation Push',    color:'#EC4899', bg:'#FDF2F8'},
+  'PR / Earned Media':{label:'PR / Earned Media',color:'#6366F1', bg:'#EEF2FF'},
+  'Technical SEO':    {label:'Technical SEO',   color:'#14B8A6', bg:'#F0FDFA'},
+  'Schema Markup':    {label:'Schema Markup',   color:'#F97316', bg:'#FFF7ED'},
+  'Content Strategy': {label:'Content Strategy',color:'#7C3AED', bg:'#F5F3FF'},
 };
 
 function GeoSummary({ result }: { result:any }) {
@@ -243,7 +242,6 @@ function GeoSummary({ result }: { result:any }) {
   const badge = scoreBadge(geo);
   const topComp = (result.competitors||[])[0]?.Brand || 'top competitor';
   const topCompGEO = (result.competitors||[])[0]?.GEO || 0;
-  const catKeys = Object.keys(REC_CATEGORIES);
 
   useEffect(()=>{
     if(fetched) return;
@@ -251,16 +249,16 @@ function GeoSummary({ result }: { result:any }) {
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
     const prompt = `You are a sharp GEO strategist. Return a JSON object with:
-- "insights": array of exactly 3 strings. Each is ONE sharp sentence opening with a specific number, naming the brand and a competitor directly.
-- "recommendations": array of exactly 3 objects:
+- "rows": array of exactly 6 objects in this order: first 3 are insights, last 3 are recommendations.
+  Each object:
   {
-    "category": one of exactly: "Comparison Page" | "Content Page" | "FAQ Build" | "Structured Data" | "Citation Push" | "PR / Earned Media" | "Technical SEO" | "Schema Markup",
-    "title": 5-7 word action title,
-    "action": 2 sentences, starts with a verb, names specific platforms (NerdWallet/Bankrate/Forbes/Google), LOB-specific,
+    "type": "insight" | "recommendation",
+    "category": for insights use "Data Signal" | "Competitive Gap" | "Visibility Gap" | "Sentiment Gap" | "Citation Gap". For recommendations use exactly one of: "Comparison Page" | "Content Page" | "FAQ Build" | "Structured Data" | "Citation Push" | "PR / Earned Media" | "Technical SEO" | "Schema Markup",
+    "text": one sharp sentence. Insights: open with a specific number, name brand + competitor directly. Recommendations: start with a verb, name a specific platform (NerdWallet/Bankrate/Forbes/Google), be LOB-specific,
     "scoreNow": ${geo},
-    "scoreForecast": realistic number — add only 2-4 pts per item (never more than +4), e.g. ${geo}→${geo+2}, ${geo}→${geo+3}, ${geo}→${geo+4},
-    "impact": "HIGH" | "MEDIUM" | "LOW",
-    "agenticFlag": null OR one short specific sentence about application/approval/structured data readiness for this LOB
+    "scoreForecast": for insights = ${geo} (no change). For recommendations add only 2-4 pts realistically. Never more than +4 per item,
+    "impact": for insights = null. For recommendations = "HIGH" | "MEDIUM" | "LOW",
+    "agenticFlag": null OR one specific sentence about application/approval/data readiness (for recommendations only)
   }
 
 Brand: ${result.brand_name}
@@ -269,7 +267,7 @@ Industry: ${result.ind_label}
 GEO: ${geo} | Vis: ${vis} | Sent: ${sent} | Cit: ${cit} | SOV: ${sov} | Prom: ${prom}
 Top Competitor: ${topComp} (GEO: ${topCompGEO})
 
-CRITICAL: scoreForecast must be conservative +2 to +4 pts only. Never jump more than +4 in one item. Category must exactly match one of the options listed. Return ONLY valid JSON.`;
+CRITICAL: scoreForecast for recommendations must be +2 to +4 pts only. Return ONLY valid JSON, no markdown.`;
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
       .then(r=>r.json()).then(d=>{
@@ -280,6 +278,14 @@ CRITICAL: scoreForecast must be conservative +2 to +4 pts only. Never jump more 
 
   const impactColor = (imp:string) => imp==='HIGH'?'#EF4444':imp==='MEDIUM'?'#F59E0B':'#7C3AED';
   const impactBg = (imp:string) => imp==='HIGH'?'#FEE2E2':imp==='MEDIUM'?'#FEF3C7':'#EDE9FE';
+  const insightCatColor: Record<string,string> = {
+    'Data Signal':'#7C3AED','Competitive Gap':'#EF4444','Visibility Gap':'#3B82F6',
+    'Sentiment Gap':'#10B981','Citation Gap':'#F59E0B',
+  };
+  const insightCatBg: Record<string,string> = {
+    'Data Signal':'#F5F3FF','Competitive Gap':'#FEE2E2','Visibility Gap':'#EFF6FF',
+    'Sentiment Gap':'#ECFDF5','Citation Gap':'#FFFBEB',
+  };
 
   return (
     <div>
@@ -301,87 +307,96 @@ CRITICAL: scoreForecast must be conservative +2 to +4 pts only. Never jump more 
         </div>
       </div>
 
-      {/* ── TWO-COLUMN ONE-PAGER ── */}
+      {/* ── FULL-WIDTH TABLE ── */}
       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:20}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
           <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>GEO Analysis Summary</span>
           {lob&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{lob}</span>}
+          <span style={{marginLeft:'auto',fontSize:'0.7rem',color:'#9CA3AF'}}>Rows 1–3: Insights · Rows 4–6: Recommendations</span>
         </div>
 
         {loading&&(
-          <div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem',padding:'24px 0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,color:'#9CA3AF',fontSize:'0.84rem',padding:'20px 0'}}>
             <div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
             <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             Generating analysis…
           </div>
         )}
 
-        {!loading&&data&&(
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
-
-            {/* LEFT — Insights */}
-            <div>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,paddingBottom:10,borderBottom:'2px solid #F3F4F6'}}>
-                <span style={{fontSize:'1rem'}}>💡</span>
-                <span style={{fontSize:'0.88rem',fontWeight:800,color:'#111827'}}>Insights</span>
-                <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>What the data shows</span>
-              </div>
-              {(data.insights||[]).map((ins:string,i:number)=>(
-                <div key={i} style={{display:'flex',gap:12,marginBottom:12,padding:'14px 16px',background:'#F8FAFC',borderRadius:10,border:'1px solid #E5E7EB',alignItems:'flex-start'}}>
-                  <span style={{width:24,height:24,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',fontWeight:800,color:'#7C3AED',flexShrink:0}}>0{i+1}</span>
-                  <span style={{fontSize:'0.83rem',color:'#374151',lineHeight:1.7}}>{ins}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* RIGHT — Recommendations */}
-            <div>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14,paddingBottom:10,borderBottom:'2px solid #F3F4F6'}}>
-                <span style={{fontSize:'1rem'}}>🎯</span>
-                <span style={{fontSize:'0.88rem',fontWeight:800,color:'#111827'}}>Recommendations</span>
-                <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>What to do next</span>
-              </div>
-              {(data.recommendations||[]).map((rec:any,i:number)=>{
-                const cat = REC_CATEGORIES[rec.category] || {label:rec.category||'Action',color:'#6B7280',bg:'#F9FAFB'};
-                const delta = (rec.scoreForecast||0) - (rec.scoreNow||geo);
+        {!loading&&data?.rows&&(
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'#F8FAFC',borderBottom:'2px solid #E5E7EB'}}>
+                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:36}}>#</th>
+                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:160}}>TYPE</th>
+                <th style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em'}}>INSIGHT / RECOMMENDATION</th>
+                <th style={{padding:'10px 14px',textAlign:'center' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:130}}>GEO SCORE</th>
+                <th style={{padding:'10px 14px',textAlign:'center' as const,fontSize:'0.64rem',color:'#9CA3AF',fontWeight:700,letterSpacing:'.07em',width:90}}>IMPACT</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((row:any,i:number)=>{
+                const isRec = row.type === 'recommendation';
+                const delta = isRec ? (row.scoreForecast - row.scoreNow) : 0;
+                const cat = isRec
+                  ? (REC_CATEGORIES[row.category] || {label:row.category||'Action',color:'#6B7280',bg:'#F9FAFB'})
+                  : {label:row.category||'Insight', color:insightCatColor[row.category]||'#7C3AED', bg:insightCatBg[row.category]||'#F5F3FF'};
+                const rowBg = i===3 ? '#FFFDF5' : 'white'; // subtle separator at rec section start
                 return (
-                  <div key={i} style={{marginBottom:12,borderRadius:10,border:'1px solid #E5E7EB',overflow:'hidden'}}>
-                    {/* Header */}
-                    <div style={{padding:'12px 14px',background:'#FAFAFA',display:'flex',alignItems:'flex-start',gap:10}}>
-                      <div style={{width:24,height:24,borderRadius:'50%',background:impactBg(rec.impact),border:`1.5px solid ${impactColor(rec.impact)}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',fontWeight:800,color:impactColor(rec.impact),flexShrink:0}}>#{i+1}</div>
-                      <div style={{flex:1}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const,marginBottom:4}}>
-                          <span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'1px 8px',fontSize:'0.64rem',fontWeight:700}}>{cat.label}</span>
-                          <span style={{background:impactBg(rec.impact),color:impactColor(rec.impact),borderRadius:50,padding:'1px 8px',fontSize:'0.64rem',fontWeight:700}}>{rec.impact}</span>
+                  <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:rowBg,borderLeft:i>=3?`3px solid ${impactColor(row.impact||'LOW')}`:'3px solid transparent'}}>
+                    {/* # */}
+                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
+                      <div style={{width:26,height:26,borderRadius:'50%',background:isRec?impactBg(row.impact||'LOW'):'#F3F4F6',border:`1.5px solid ${isRec?impactColor(row.impact||'LOW'):'#E5E7EB'}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <span style={{fontSize:'0.68rem',fontWeight:800,color:isRec?impactColor(row.impact||'LOW'):'#9CA3AF'}}>{i+1}</span>
+                      </div>
+                    </td>
+                    {/* TYPE */}
+                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
+                      <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
+                        <span style={{fontSize:'0.62rem',fontWeight:700,padding:'2px 8px',borderRadius:50,background:isRec?'#F5F3FF':'#F0FDF4',color:isRec?'#7C3AED':'#065F46',display:'inline-block',width:'fit-content'}}>{isRec?'Action':'Insight'}</span>
+                        <span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'2px 8px',fontSize:'0.62rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{cat.label}</span>
+                      </div>
+                    </td>
+                    {/* TEXT */}
+                    <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
+                      {isRec&&<div style={{fontSize:'0.84rem',fontWeight:700,color:'#111827',marginBottom:4}}>{row.title||''}</div>}
+                      <div style={{fontSize:'0.82rem',color:isRec?'#6B7280':'#374151',lineHeight:1.7}}>{row.text}</div>
+                      {row.agenticFlag&&(
+                        <div style={{display:'flex',alignItems:'flex-start',gap:6,marginTop:8,padding:'6px 10px',background:'#FFF7ED',borderRadius:6,border:'1px solid #FCD34D'}}>
+                          <span style={{fontSize:'0.75rem',flexShrink:0}}>🤖</span>
+                          <span style={{fontSize:'0.72rem',fontWeight:600,color:'#92400E'}}>Agentic Flag: </span>
+                          <span style={{fontSize:'0.72rem',color:'#92400E',marginLeft:4}}>{row.agenticFlag}</span>
                         </div>
-                        <div style={{fontSize:'0.84rem',fontWeight:700,color:'#111827',marginBottom:4}}>{rec.title}</div>
-                        <div style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.6}}>{rec.action}</div>
-                      </div>
-                      {/* Score forecast pill */}
-                      <div style={{flexShrink:0,textAlign:'center' as const,background:'white',border:'1px solid #E5E7EB',borderRadius:10,padding:'6px 10px',minWidth:70}}>
-                        <div style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:600,marginBottom:2}}>GEO</div>
-                        <div style={{display:'flex',alignItems:'center',gap:4,justifyContent:'center'}}>
-                          <span style={{fontSize:'0.88rem',fontWeight:700,color:'#9CA3AF'}}>{rec.scoreNow}</span>
-                          <span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>→</span>
-                          <span style={{fontSize:'1rem',fontWeight:900,color:'#10B981'}}>{rec.scoreForecast}</span>
+                      )}
+                    </td>
+                    {/* GEO SCORE */}
+                    <td style={{padding:'14px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
+                      {isRec?(
+                        <div style={{display:'inline-flex',flexDirection:'column' as const,alignItems:'center',background:'#F8FAFC',borderRadius:10,border:'1px solid #E5E7EB',padding:'8px 14px',gap:2}}>
+                          <div style={{display:'flex',alignItems:'center',gap:5}}>
+                            <span style={{fontSize:'0.9rem',fontWeight:700,color:'#9CA3AF'}}>{row.scoreNow}</span>
+                            <span style={{fontSize:'0.8rem',color:'#9CA3AF'}}>→</span>
+                            <span style={{fontSize:'1.2rem',fontWeight:900,color:'#10B981'}}>{row.scoreForecast}</span>
+                          </div>
+                          {delta>0&&<span style={{fontSize:'0.66rem',fontWeight:800,color:'#10B981',background:'#D1FAE5',borderRadius:50,padding:'1px 7px'}}>+{delta} pts</span>}
                         </div>
-                        {delta>0&&<div style={{fontSize:'0.64rem',fontWeight:700,color:'#10B981'}}>+{delta} pts</div>}
-                      </div>
-                    </div>
-                    {/* Agentic flag */}
-                    {rec.agenticFlag&&(
-                      <div style={{padding:'8px 14px',background:'#FFF7ED',borderTop:'1px solid #FCD34D',display:'flex',alignItems:'center',gap:6}}>
-                        <span style={{fontSize:'0.75rem'}}>🤖</span>
-                        <span style={{fontSize:'0.7rem',fontWeight:600,color:'#92400E'}}>Agentic Flag: </span>
-                        <span style={{fontSize:'0.7rem',color:'#92400E'}}>{rec.agenticFlag}</span>
-                      </div>
-                    )}
-                  </div>
+                      ):(
+                        <span style={{fontSize:'1.1rem',fontWeight:800,color:'#374151'}}>{row.scoreNow}</span>
+                      )}
+                    </td>
+                    {/* IMPACT */}
+                    <td style={{padding:'14px 14px',verticalAlign:'top' as const,textAlign:'center' as const}}>
+                      {isRec?(
+                        <span style={{background:impactBg(row.impact||'LOW'),color:impactColor(row.impact||'LOW'),borderRadius:50,padding:'3px 10px',fontSize:'0.66rem',fontWeight:700,whiteSpace:'nowrap' as const}}>{row.impact}</span>
+                      ):(
+                        <span style={{fontSize:'0.72rem',color:'#D1D5DB'}}>—</span>
+                      )}
+                    </td>
+                  </tr>
                 );
               })}
-            </div>
-
-          </div>
+            </tbody>
+          </table>
         )}
 
         {!loading&&!data&&(
