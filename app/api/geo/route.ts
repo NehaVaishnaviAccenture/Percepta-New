@@ -112,20 +112,20 @@ function getIndustry(domain: string, pageData?: any): string {
     const pathWealthSignals   = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
     const pathCommercialSignals = ['/commercial','/corporate','/treasury','/institutional','/wholesale'];
     const pathSmbSignals      = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
-    const pathAutoLoanSignals  = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
-    const pathMortgageSignals  = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
-    const pathRetailSignals    = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
-    const pathRetailGeneric    = ['/bank','/banking'];
-    const pathCreditSignals    = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
-    if (pathWealthSignals.some(k => urlPath.includes(k)))    return 'fin_wealth';
-    if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
-    if (pathSmbSignals.some(k => urlPath.includes(k)))       return 'fin_small_business';
-    if (pathAutoLoanSignals.some(k => urlPath.includes(k)))  return 'fin_auto_loan';
-    if (pathMortgageSignals.some(k => urlPath.includes(k)))  return 'fin_mortgage';
-    if (pathRetailSignals.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
-    if (pathRetailGeneric.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
-    if (pathCreditSignals.some(k => urlPath.includes(k)))    return 'fin';
-    return 'fin';
+const pathAutoLoanSignals  = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
+const pathMortgageSignals  = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
+const pathRetailSignals    = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
+const pathRetailGeneric    = ['/bank','/banking'];
+const pathCreditSignals    = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
+if (pathWealthSignals.some(k => urlPath.includes(k)))    return 'fin_wealth';
+if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
+if (pathCreditSignals.some(k => urlPath.includes(k)))    return 'fin';   // ← MOVED UP: credit cards always win over SMB
+if (pathSmbSignals.some(k => urlPath.includes(k)))       return 'fin_small_business';
+if (pathAutoLoanSignals.some(k => urlPath.includes(k)))  return 'fin_auto_loan';
+if (pathMortgageSignals.some(k => urlPath.includes(k)))  return 'fin_mortgage';
+if (pathRetailSignals.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
+if (pathRetailGeneric.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
+return 'fin';
   }
 
   // Step 2: Only route to auto if the DOMAIN itself is an auto brand
