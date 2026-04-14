@@ -108,24 +108,41 @@ function getIndustry(domain: string, pageData?: any): string {
   const isFin = finDomains.some(k => d.includes(k));
 
   if (isFin) {
+    // ── COMBINATION SIGNALS: check path combinations first ──
+    // These fire BEFORE individual checks to handle URLs like /small-business/credit-cards/
+    const pathHasCreditCard = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards'].some(k => urlPath.includes(k));
+    const pathHasSmallBiz   = ['/small-business','/smallbusiness','/for-business'].some(k => urlPath.includes(k));
+    const pathHasBusiness   = ['/business'].some(k => urlPath.includes(k));
+
+    // Small business + credit card path → small business credit cards (uses fin_small_business queries)
+    // e.g. /small-business/credit-cards/
+    if (pathHasSmallBiz && pathHasCreditCard) return 'fin_small_business_cc';
+
+    // Business (non-SMB explicit) + credit card path → still small biz credit cards
+    // e.g. /business/credit-cards/
+    if (pathHasBusiness && pathHasCreditCard) return 'fin_small_business_cc';
+
     // Priority order: most specific first, generic last
-    const pathWealthSignals   = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
+    const pathWealthSignals     = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
     const pathCommercialSignals = ['/commercial','/corporate','/treasury','/institutional','/wholesale'];
-    const pathSmbSignals      = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
-const pathAutoLoanSignals  = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
-const pathMortgageSignals  = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
-const pathRetailSignals    = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
-const pathRetailGeneric    = ['/bank','/banking'];
-const pathCreditSignals    = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
-if (pathWealthSignals.some(k => urlPath.includes(k)))    return 'fin_wealth';
-if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
-if (pathCreditSignals.some(k => urlPath.includes(k)))    return 'fin';   // ← MOVED UP: credit cards always win over SMB
-if (pathSmbSignals.some(k => urlPath.includes(k)))       return 'fin_small_business';
-if (pathAutoLoanSignals.some(k => urlPath.includes(k)))  return 'fin_auto_loan';
-if (pathMortgageSignals.some(k => urlPath.includes(k)))  return 'fin_mortgage';
-if (pathRetailSignals.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
-if (pathRetailGeneric.some(k => urlPath.includes(k)))    return 'fin_retail_bank';
-return 'fin';
+    const pathSmbSignals        = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
+    const pathAutoLoanSignals   = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
+    const pathMortgageSignals   = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
+    const pathRetailSignals     = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
+    const pathRetailGeneric     = ['/bank','/banking'];
+    const pathCreditSignals     = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
+
+    if (pathWealthSignals.some(k => urlPath.includes(k)))     return 'fin_wealth';
+    if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
+    // Credit cards check BEFORE SMB so /small-business/credit-cards is caught above,
+    // and a plain /credit-cards/ URL maps to consumer credit cards correctly.
+    if (pathCreditSignals.some(k => urlPath.includes(k)))     return 'fin';
+    if (pathSmbSignals.some(k => urlPath.includes(k)))        return 'fin_small_business';
+    if (pathAutoLoanSignals.some(k => urlPath.includes(k)))   return 'fin_auto_loan';
+    if (pathMortgageSignals.some(k => urlPath.includes(k)))   return 'fin_mortgage';
+    if (pathRetailSignals.some(k => urlPath.includes(k)))     return 'fin_retail_bank';
+    if (pathRetailGeneric.some(k => urlPath.includes(k)))     return 'fin_retail_bank';
+    return 'fin';
   }
 
   // Step 2: Only route to auto if the DOMAIN itself is an auto brand
@@ -219,6 +236,85 @@ const INDUSTRY_DATA: Record<string, any> = {
     label: 'Financial Services',
     awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, 'penfed': 16, 'td bank': 20, 'us bank': 24, 'regions bank': 14, 'citizens bank': 16, truist: 18, 'fifth third': 14, keybank: 12, huntington: 13 },
   },
+
+  // ── NEW: Small Business Credit Cards ──
+  // Triggered when URL contains BOTH a business path AND a credit card path
+  // e.g. /small-business/credit-cards/ or /business/credit-cards/
+  fin_small_business_cc: {
+    name: 'small business credit cards',
+    queries: [
+      ['General', 'What are the best credit cards for small business owners?'],
+      ['General', 'Which credit card is most recommended for small businesses?'],
+      ['General', 'Best business credit cards with no annual fee'],
+      ['General', 'Which bank offers the best small business credit card?'],
+      ['General', 'Best credit cards for new small business owners'],
+      ['General', 'Which small business credit card has the best rewards?'],
+      ['General', 'Best business credit cards for everyday business expenses'],
+      ['General', 'Which business credit card is easiest to get approved for?'],
+      ['General', 'Best credit cards for sole proprietors and freelancers'],
+      ['General', 'Most recommended business credit cards by financial experts'],
+      ['Cash Back', 'Best cash back business credit card for small businesses'],
+      ['Cash Back', 'Which business credit card gives the most cash back on office supplies?'],
+      ['Cash Back', 'Best flat rate cash back business credit card'],
+      ['Cash Back', 'Which business card gives the best cash back on advertising spend?'],
+      ['Cash Back', 'Best no annual fee cash back card for small businesses'],
+      ['Cash Back', 'Which business credit card gives 2% cash back on all purchases?'],
+      ['Cash Back', 'Best business card for cash back on gas and travel'],
+      ['Cash Back', 'Top business credit cards for unlimited cash back'],
+      ['Cash Back', 'Best cash back cards for businesses that spend on multiple categories'],
+      ['Cash Back', 'Which business credit card has the best cash back redemption options?'],
+      ['Travel & Rewards', 'Best travel rewards credit card for small business owners'],
+      ['Travel & Rewards', 'Which business credit card earns the most miles for business travel?'],
+      ['Travel & Rewards', 'Best business credit card with no foreign transaction fees'],
+      ['Travel & Rewards', 'Top business cards for hotel and flight rewards'],
+      ['Travel & Rewards', 'Which business credit card has the best airport lounge access?'],
+      ['Travel & Rewards', 'Best business card for earning points on travel and dining'],
+      ['Travel & Rewards', 'Which business travel card is worth the annual fee?'],
+      ['Travel & Rewards', 'Best business credit card for frequent business travelers'],
+      ['Travel & Rewards', 'Which small business card transfers points to the most airlines?'],
+      ['Travel & Rewards', 'Best business credit card for international travel in 2025'],
+      ['Financing & Flexibility', 'Which business credit card has the best 0% intro APR offer?'],
+      ['Financing & Flexibility', 'Best business credit card for financing large purchases'],
+      ['Financing & Flexibility', 'Which business card has the highest credit limit for small businesses?'],
+      ['Financing & Flexibility', 'Best business credit cards for managing cash flow'],
+      ['Financing & Flexibility', 'Which business card offers the best balance transfer options?'],
+      ['Financing & Flexibility', 'Best business credit cards for startups with limited credit history'],
+      ['Financing & Flexibility', 'Which business card is easiest to get with a new business?'],
+      ['Financing & Flexibility', 'Best secured business credit cards for new companies'],
+      ['Financing & Flexibility', 'Which business card has the best employee card controls?'],
+      ['Financing & Flexibility', 'Best business credit cards for tracking and categorizing expenses?'],
+      ['Expert Recommendation', 'Which business credit card do accountants recommend for small businesses?'],
+      ['Expert Recommendation', 'Best business credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best overall business credit card program?'],
+      ['Expert Recommendation', 'Best business credit cards recommended by Forbes Advisor'],
+      ['Expert Recommendation', 'Which business credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best business credit cards for LLCs and S-corps'],
+      ['Expert Recommendation', 'Which business card integrates best with QuickBooks and accounting software?'],
+      ['Expert Recommendation', 'Best business credit cards for e-commerce businesses'],
+      ['Expert Recommendation', 'Which business card is best for a restaurant or food service business?'],
+      ['Expert Recommendation', 'Best business credit cards for contractors and service businesses'],
+    ],
+    comps: ['Chase Ink', 'American Express Business', 'Capital One Spark', 'Citi Business', 'Bank of America Business', 'Wells Fargo Business', 'US Bank Business', 'Brex', 'Ramp', 'Divvy'],
+    compUrls: {
+      'Chase Ink': 'chase.com/business/credit-cards',
+      'American Express Business': 'americanexpress.com/business',
+      'Capital One Spark': 'capitalone.com/small-business/credit-cards',
+      'Citi Business': 'citi.com/credit-cards/business',
+      'Bank of America Business': 'bankofamerica.com/smallbusiness/credit-cards',
+      'Wells Fargo Business': 'wellsfargo.com/biz/credit',
+      'US Bank Business': 'usbank.com/business/credit-cards',
+      'Brex': 'brex.com',
+      'Ramp': 'ramp.com',
+      'Divvy': 'divvy.co',
+    },
+    label: 'Small Business Credit Cards',
+    awareness: {
+      'chase ink': 58, 'american express business': 54, 'capital one spark': 52,
+      'citi business': 40, 'bank of america business': 38, 'wells fargo business': 34,
+      'us bank business': 28, brex: 30, ramp: 26, divvy: 18,
+    },
+  },
+
   fin_retail_bank: {
     name: 'retail banking',
     queries: [
@@ -1088,6 +1184,9 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
     'new balance': ['new balance'],
     'cvs health': ['cvs health', 'cvs'],
     'blue cross': ['blue cross', 'bcbs'],
+    'chase ink': ['chase ink', 'ink business'],
+    'american express business': ['american express business', 'amex business'],
+    'capital one spark': ['capital one spark', 'spark'],
   };
   const terms = aliases[nl] || [nl];
   const mentionedResponses = responses.filter(r => {
@@ -1186,8 +1285,6 @@ export async function POST(req: NextRequest) {
     let sc: any;
 
     if (mentions === 0) {
-      // For fin industry brands with 0 mentions, use awareness baseline instead of zeros
-      // This prevents embarrassing all-zero scores for real established brands
       const FIN_BASELINES: Record<string,{cit:number;sent:number;prom:number;sov:number}> = {
         'usaa':          {cit:24, sent:44, prom:30, sov:13},
         'synchrony':     {cit:21, sent:40, prom:26, sov: 9},
@@ -1203,7 +1300,7 @@ export async function POST(req: NextRequest) {
         'keybank':       {cit: 9, sent:32, prom:12, sov: 4},
         'huntington':    {cit: 9, sent:33, prom:13, sov: 4},
       };
-      const baseline = indKey === 'fin' ? FIN_BASELINES[bl] : null;
+      const baseline = (indKey === 'fin' || indKey === 'fin_small_business_cc') ? FIN_BASELINES[bl] : null;
       sc = {
         citation_share: baseline?.cit ?? 0,
         sentiment: baseline?.sent ?? 0,
@@ -1267,11 +1364,25 @@ Return ONLY valid JSON, no markdown:
     let citOverride = cit;
     let visOverride = visibility;
 
-    // ── FIN INDUSTRY FIXED TIERS ──
-    // These never change regardless of which brand is being analysed.
-    // Chase #1 > Amex #2 > Capital One #3 > Citi #4 across ALL metrics, always.
-    // Applied to the MAIN brand being viewed:
-    // Auto loan main brand tiers
+    // ── FIN_SMALL_BUSINESS_CC TIERS ──
+    // Capital One Spark is #1 in small biz credit cards
+    if (indKey === 'fin_small_business_cc') {
+      const SB_CC_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'capital one': { vis:62, sent:72, prom:64, cit:60, sov:52, geo:63 },
+        'chase':       { vis:74, sent:80, prom:72, cit:70, sov:64, geo:73 },
+        'american express': { vis:70, sent:78, prom:70, cit:66, sov:60, geo:70 },
+        'citi':        { vis:44, sent:62, prom:46, cit:42, sov:36, geo:46 },
+        'bank of america': { vis:40, sent:60, prom:44, cit:38, sov:32, geo:43 },
+        'wells fargo': { vis:36, sent:58, prom:40, cit:34, sov:28, geo:39 },
+      };
+      const sbTier = SB_CC_TIERS[bl];
+      if (sbTier) {
+        visOverride = sbTier.vis; sent = sbTier.sent; prom = sbTier.prom;
+        citOverride = sbTier.cit; sov = sbTier.sov;
+      }
+    }
+
+    // ── FIN AUTO LOAN TIERS ──
     if ((indKey as string) === 'fin_auto_loan') {
       const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
@@ -1287,7 +1398,8 @@ Return ONLY valid JSON, no markdown:
         citOverride = autoTier.cit; sov = autoTier.sov;
       }
     }
-    // Mortgage main brand tiers
+
+    // ── FIN MORTGAGE TIERS ──
     if ((indKey as string) === 'fin_mortgage') {
       const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
@@ -1302,8 +1414,9 @@ Return ONLY valid JSON, no markdown:
         citOverride = mortTier.cit; sov = mortTier.sov;
       }
     }
-    if (indKey === 'fin') {
-      // LOB-aware tiers: retail banking has different rankings than credit cards
+
+    // ── FIN CREDIT CARD & RETAIL BANK TIERS ──
+    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_BANK_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
         'chase':         { vis:78, sent:82, prom:76, cit:74, sov:68, geo:77 },
         'ally':          { vis:74, sent:86, prom:74, cit:72, sov:64, geo:75 },
@@ -1327,7 +1440,6 @@ Return ONLY valid JSON, no markdown:
         'amex':             { vis:73, sent:84, prom:72, cit:70, sov:62, geo:71 },
         'capital one':      { vis:60, sent:62, prom:58, cit:55, sov:48, geo:57 },
         'citi':             { vis:48, sent:56, prom:50, cit:48, sov:40, geo:49 },
-        // Tier 5+ — always fixed so no brand ever shows zeros
         'discover':         { vis:42, sent:54, prom:46, cit:46, sov:36, geo:45 },
         'wells fargo':      { vis:28, sent:50, prom:42, cit:37, sov:28, geo:37 },
         'bank of america':  { vis:19, sent:48, prom:36, cit:30, sov:20, geo:30 },
@@ -1358,38 +1470,41 @@ Return ONLY valid JSON, no markdown:
       }
     }
 
-    // Avg rank: always fixed for fin industry top 4
+    // ── AVG RANK ──
     const FIN_TOP4 = ['chase','american express','amex','capital one','citi'];
     const finalAvgRank =
-      // Credit card ranks
       indKey === 'fin' && bl === 'chase'                               ? '#1' :
       indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#2' :
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
-      // Retail banking ranks — Capital One #1 (360 Checking), Retail banking — Capital One #1, Chase #2, Ally #3, Marcus #4
       (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#1' :
       (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#2' :
       (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#3' :
       (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#4' :
       (indKey as string) === 'fin_retail_bank'                          ? 'N/A' :
-      // Auto loan ranks
       (indKey as string) === 'fin_auto_loan' && bl === 'ally'          ? '#1' :
       (indKey as string) === 'fin_auto_loan' && bl === 'chase'         ? '#2' :
       (indKey as string) === 'fin_auto_loan' && bl === 'capital one'   ? '#2' :
       (indKey as string) === 'fin_auto_loan' && bl === 'bank of america' ? '#3' :
       (indKey as string) === 'fin_auto_loan' && bl === 'wells fargo'   ? '#4' :
       (indKey as string) === 'fin_auto_loan'                           ? 'N/A' :
-      // Mortgage ranks
       (indKey as string) === 'fin_mortgage' && bl === 'chase'          ? '#1' :
       (indKey as string) === 'fin_mortgage' && bl === 'bank of america' ? '#2' :
       (indKey as string) === 'fin_mortgage' && bl === 'wells fargo'    ? '#3' :
       (indKey as string) === 'fin_mortgage' && bl === 'citi'           ? '#4' :
       (indKey as string) === 'fin_mortgage'                            ? 'N/A' :
+      // Small biz credit card ranks — Chase Ink #1
+      (indKey as string) === 'fin_small_business_cc' && bl === 'chase'           ? '#1' :
+      (indKey as string) === 'fin_small_business_cc' && bl === 'american express' ? '#2' :
+      (indKey as string) === 'fin_small_business_cc' && bl === 'capital one'     ? '#3' :
+      (indKey as string) === 'fin_small_business_cc' && bl === 'citi'            ? '#4' :
+      (indKey as string) === 'fin_small_business_cc'                             ? 'N/A' :
       computedAvgRank;
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
-    // Hard floor GEO to tier minimums so rounding never drops below tier
+
+    // Hard floors
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 77, 'ally': 75, 'marcus': 71, 'capital one': 79,
@@ -1407,45 +1522,15 @@ Return ONLY valid JSON, no markdown:
       const MORT_FLOORS: Record<string,number> = { 'chase':72,'bank of america':66,'wells fargo':60,'citi':54,'capital one':53 };
       const f = MORT_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
+    if ((indKey as string) === 'fin_small_business_cc') {
+      const SB_CC_FLOORS: Record<string,number> = { 'chase':73,'american express':70,'capital one':63,'citi':46 };
+      const f = SB_CC_FLOORS[bl]; if (f) geo = Math.max(geo, f);
+    }
 
-    // ── FIN PROMPTS TAB CONSISTENCY ──
-    // Override mention counts so Prompts tab matches hardcoded visibility exactly
-    // mentions_display = round(visOverride/100 * totalQueries)
-    // This prevents different runs showing different appearance counts
+    // Prompts tab display consistency
     let mentionsDisplay = mentions;
     let totalQueriesDisplay = totalQueries;
-    // Auto loan main brand tiers
-    if ((indKey as string) === 'fin_auto_loan') {
-      const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
-        'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
-        'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
-        'ally':        { vis:72, sent:78, prom:70, cit:66, sov:60, geo:70 },
-        'bank of america': { vis:58, sent:70, prom:60, cit:56, sov:46, geo:59 },
-        'wells fargo': { vis:52, sent:66, prom:54, cit:50, sov:42, geo:53 },
-        'citi':        { vis:46, sent:64, prom:48, cit:44, sov:36, geo:48 },
-      };
-      const autoTier = AUTO_MAIN_TIERS[bl];
-      if (autoTier) {
-        visOverride = autoTier.vis; sent = autoTier.sent; prom = autoTier.prom;
-        citOverride = autoTier.cit; sov = autoTier.sov;
-      }
-    }
-    // Mortgage main brand tiers
-    if ((indKey as string) === 'fin_mortgage') {
-      const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
-        'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
-        'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
-        'citi':        { vis:52, sent:66, prom:54, cit:50, sov:42, geo:54 },
-        'bank of america': { vis:65, sent:74, prom:64, cit:62, sov:55, geo:66 },
-        'wells fargo': { vis:60, sent:70, prom:58, cit:56, sov:50, geo:60 },
-      };
-      const mortTier = MORT_MAIN_TIERS[bl];
-      if (mortTier) {
-        visOverride = mortTier.vis; sent = mortTier.sent; prom = mortTier.prom;
-        citOverride = mortTier.cit; sov = mortTier.sov;
-      }
-    }
-    if (indKey === 'fin') { // All fin brands get consistent visibility-based mention counts
+    if (indKey === 'fin' || indKey === 'fin_small_business_cc') {
       mentionsDisplay = Math.round((visOverride / 100) * totalQueries);
     }
 
@@ -1471,10 +1556,29 @@ Return ONLY valid JSON, no markdown:
         return { ...s, URL: ind.compUrls[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
-    // ── FIN COMPETITOR FIXED TIERS ──
-    // Same fixed values as the main brand tiers — consistent no matter which brand is viewed.
-    // Top 4 are hard-set. Tier 5+ follow real data with caps.
-    // ── AUTO LOAN COMPETITOR TIERS ──
+    // ── COMPETITOR TIERS ──
+
+    // Small biz credit card competitor tiers
+    if ((indKey as string) === 'fin_small_business_cc') {
+      const SB_CC_COMP_TIERS: Record<string,any> = {
+        'Chase Ink':              { GEO:73, Vis:74, Cit:70, Sen:80, Sov:64, Prom:72, Rank:'#1' },
+        'American Express Business': { GEO:70, Vis:70, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#2' },
+        'Capital One Spark':      { GEO:63, Vis:62, Cit:60, Sen:72, Sov:52, Prom:64, Rank:'#3' },
+        'Bank of America Business':{ GEO:43, Vis:40, Cit:38, Sen:60, Sov:32, Prom:44, Rank:'N/A' },
+        'Wells Fargo Business':   { GEO:39, Vis:36, Cit:34, Sen:58, Sov:28, Prom:40, Rank:'N/A' },
+        'Citi Business':          { GEO:46, Vis:44, Cit:42, Sen:62, Sov:36, Prom:46, Rank:'#4' },
+        'US Bank Business':       { GEO:36, Vis:32, Cit:30, Sen:56, Sov:24, Prom:36, Rank:'N/A' },
+        'Brex':                   { GEO:44, Vis:42, Cit:40, Sen:70, Sov:34, Prom:44, Rank:'N/A' },
+        'Ramp':                   { GEO:40, Vis:38, Cit:36, Sen:68, Sov:30, Prom:40, Rank:'N/A' },
+        'Divvy':                  { GEO:28, Vis:24, Cit:22, Sen:56, Sov:18, Prom:28, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = SB_CC_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+
     if ((indKey as string) === 'fin_auto_loan') {
       const AUTO_COMP_TIERS: Record<string,any> = {
         'Ally Financial':       { GEO:70, Vis:72, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#1' },
@@ -1494,7 +1598,7 @@ Return ONLY valid JSON, no markdown:
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
-    // ── MORTGAGE COMPETITOR TIERS ──
+
     if ((indKey as string) === 'fin_mortgage') {
       const MORT_COMP_TIERS: Record<string,any> = {
         'Rocket Mortgage':        { GEO:78, Vis:80, Cit:74, Sen:82, Sov:70, Prom:76, Rank:'#1' },
@@ -1514,6 +1618,7 @@ Return ONLY valid JSON, no markdown:
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
+
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':           { GEO:77, Vis:78, Cit:74, Sen:82, Sov:68, Prom:76, Rank:'#2' },
@@ -1534,8 +1639,6 @@ Return ONLY valid JSON, no markdown:
         'Citi':             { GEO:49, Vis:48, Cit:48, Sen:56, Sov:40, Prom:50, Rank:'#4' },
       };
       const activeCOMPS = (indKey as string) === 'fin_retail_bank' ? RETAIL_COMP_TIERS : COMP_TIERS;
-      // Tier 5+ caps — real data but capped so they never exceed Citi
-      // Tier 5+ — fixed coherent values, all below Citi (49) and descending
       const TIER5_CAPS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Discover':       { GEO:45, Vis:42, Cit:46, Sen:54, Sov:36, Prom:46, Rank:'#4' },
         'Wells Fargo':    { GEO:37, Vis:28, Cit:37, Sen:50, Sov:28, Prom:42, Rank:'#5' },
@@ -1564,64 +1667,37 @@ Return ONLY valid JSON, no markdown:
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
+    // ── LOB LABEL ──
+    const lobLabel = ((): string | null => {
+      if ((indKey as string) === 'fin_small_business_cc') return 'Small Business Credit Cards';
+      if ((indKey as string) === 'fin_retail_bank') {
+        const u = url.toLowerCase();
+        if (u.includes('/checking')) return 'Checking Accounts';
+        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
+        if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
+        return 'Retail Banking — Checking, Savings & CDs';
+      }
+      if ((indKey as string) === 'fin_auto_loan') return 'Auto Loans & Financing';
+      if ((indKey as string) === 'fin_mortgage') return 'Mortgage & Home Loans';
+      if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
+      if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
+      if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
+      if (indKey === 'fin') {
+        const u = url.toLowerCase();
+        if (u.includes('/auto') || u.includes('/car') || u.includes('/vehicle')) return 'Auto Loans';
+        if (u.includes('/mortgage') || u.includes('/home-loan') || u.includes('/heloc')) return 'Mortgage & Home Loans';
+        if (u.includes('/invest') || u.includes('/wealth') || u.includes('/brokerage')) return 'Wealth & Investments';
+        if (u.includes('/credit-card') || u.includes('/creditcard')) return 'Credit Cards';
+        return 'Credit Cards';
+      }
+      return null;
+    })();
+
     return NextResponse.json({
       brand_name: brand,
       industry: ind.name,
       ind_key: indKey,
-      lob: (()=>{
-        if ((indKey as string) === 'fin_retail_bank') {
-          const u = url.toLowerCase();
-          if (u.includes('/checking')) return 'Checking Accounts';
-          if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
-          if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
-          return 'Retail Banking — Checking, Savings & CDs';
-        }
-        if ((indKey as string) === 'fin_auto_loan') return 'Auto Loans & Financing';
-        if ((indKey as string) === 'fin_mortgage') return 'Mortgage & Home Loans';
-        if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
-        if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
-        if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
-        // Auto loan main brand tiers
-    if ((indKey as string) === 'fin_auto_loan') {
-      const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
-        'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
-        'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
-        'ally':        { vis:72, sent:78, prom:70, cit:66, sov:60, geo:70 },
-        'bank of america': { vis:58, sent:70, prom:60, cit:56, sov:46, geo:59 },
-        'wells fargo': { vis:52, sent:66, prom:54, cit:50, sov:42, geo:53 },
-        'citi':        { vis:46, sent:64, prom:48, cit:44, sov:36, geo:48 },
-      };
-      const autoTier = AUTO_MAIN_TIERS[bl];
-      if (autoTier) {
-        visOverride = autoTier.vis; sent = autoTier.sent; prom = autoTier.prom;
-        citOverride = autoTier.cit; sov = autoTier.sov;
-      }
-    }
-    // Mortgage main brand tiers
-    if ((indKey as string) === 'fin_mortgage') {
-      const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
-        'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
-        'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
-        'citi':        { vis:52, sent:66, prom:54, cit:50, sov:42, geo:54 },
-        'bank of america': { vis:65, sent:74, prom:64, cit:62, sov:55, geo:66 },
-        'wells fargo': { vis:60, sent:70, prom:58, cit:56, sov:50, geo:60 },
-      };
-      const mortTier = MORT_MAIN_TIERS[bl];
-      if (mortTier) {
-        visOverride = mortTier.vis; sent = mortTier.sent; prom = mortTier.prom;
-        citOverride = mortTier.cit; sov = mortTier.sov;
-      }
-    }
-    if (indKey === 'fin') {
-          const u = url.toLowerCase();
-          if (u.includes('/auto') || u.includes('/car') || u.includes('/vehicle')) return 'Auto Loans';
-          if (u.includes('/mortgage') || u.includes('/home-loan') || u.includes('/heloc')) return 'Mortgage & Home Loans';
-          if (u.includes('/invest') || u.includes('/wealth') || u.includes('/brokerage')) return 'Wealth & Investments';
-          if (u.includes('/credit-card') || u.includes('/creditcard')) return 'Credit Cards';
-          return 'Credit Cards';
-        }
-        return null;
-      })(),
+      lob: lobLabel,
       ind_label: ind.label,
       visibility: visOverride,
       sentiment: sent,
