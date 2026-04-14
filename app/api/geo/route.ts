@@ -101,71 +101,98 @@ function extractBrand(pageData: any): string {
 
 function getIndustry(domain: string, pageData?: any): string {
   const d = domain.toLowerCase();
-  const urlPath = ((pageData as any)?.url || '').toLowerCase();
+  // Include full URL + query string for param-based detection
+  const rawUrl = ((pageData as any)?.url || '').toLowerCase();
+  const urlPath = rawUrl;
 
-  // Step 1: Is this a known financial domain? Domain identity overrides path.
+  // Helper: all segments must appear somewhere in the full url
+  const has = (...segments: string[]) => segments.every(s => urlPath.includes(s));
+  // Helper: any of these segments appears
+  const hasAny = (...segments: string[]) => segments.some(s => urlPath.includes(s));
+
   const finDomains = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'];
   const isFin = finDomains.some(k => d.includes(k));
 
   if (isFin) {
-    // ── COMBINATION SIGNALS: check path combinations first ──
-    // These fire BEFORE individual checks to handle URLs like /small-business/credit-cards/
-    const pathHasCreditCard = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards'].some(k => urlPath.includes(k));
-    const pathHasSmallBiz   = ['/small-business','/smallbusiness','/for-business'].some(k => urlPath.includes(k));
-    const pathHasBusiness   = ['/business'].some(k => urlPath.includes(k));
+    // ── IS THIS A CREDIT CARD URL AT ALL? ──
+    const isCCUrl = hasAny('/credit-card','/creditcard','/cards');
 
-    // Small business + credit card path → small business credit cards (uses fin_small_business queries)
-    // e.g. /small-business/credit-cards/
-    if (pathHasSmallBiz && pathHasCreditCard) return 'fin_small_business_cc';
+    if (isCCUrl) {
+      // ── SMALL BUSINESS CREDIT CARDS ──
+      // e.g. /small-business/credit-cards/ or /business/credit-cards/
+      if (hasAny('/small-business','/smallbusiness','/for-business','/business')) return 'fin_small_business_cc';
 
-    // Business (non-SMB explicit) + credit card path → still small biz credit cards
-    // e.g. /business/credit-cards/
-    if (pathHasBusiness && pathHasCreditCard) return 'fin_small_business_cc';
+      // ── STUDENT CREDIT CARDS ──
+      // Check URL path AND query params for student + rewards
+      // e.g. /credit-cards/students/?card-type=studentrewards
+      const isStudent = hasAny('/student','/college','/university');
+      const isRewards = hasAny('reward','point','mile','cash-back','cashback');
+      if (isStudent && isRewards)  return 'fin_cc_student_rewards';
+      if (isStudent)               return 'fin_cc_student';
 
-    // Priority order: most specific first, generic last
-    const pathWealthSignals     = ['/citigold','/private-bank','/private-client','/wealth','/premier','/priority','/prestige','/private-banking','/invest','/brokerage','/wealth-management','/investing','/preferred-rewards'];
-    const pathCommercialSignals = ['/commercial','/corporate','/treasury','/institutional','/wholesale'];
-    const pathSmbSignals        = ['/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/'];
-    const pathAutoLoanSignals   = ['/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/cars/','/auto/','/car/'];
-    const pathMortgageSignals   = ['/mortgage','/home-loan','/heloc','/home-equity','/refinance'];
-    const pathRetailSignals     = ['/checking','/savings','/deposits','/cd','/money-market','/personal-banking','/bank/checking','/bank/savings','/banking/checking','/banking/savings'];
-    const pathRetailGeneric     = ['/bank','/banking'];
-    const pathCreditSignals     = ['/credit-card','/creditcard','/rewards-card','/cash-back','/cards/'];
+      // ── SECURED CREDIT CARDS ──
+      // e.g. /credit-cards/secured/
+      if (hasAny('/secured','/secured-card','secured-credit')) return 'fin_cc_secured';
 
-    if (pathWealthSignals.some(k => urlPath.includes(k)))     return 'fin_wealth';
-    if (pathCommercialSignals.some(k => urlPath.includes(k))) return 'fin_commercial';
-    // Credit cards check BEFORE SMB so /small-business/credit-cards is caught above,
-    // and a plain /credit-cards/ URL maps to consumer credit cards correctly.
-    if (pathCreditSignals.some(k => urlPath.includes(k)))     return 'fin';
-    if (pathSmbSignals.some(k => urlPath.includes(k)))        return 'fin_small_business';
-    if (pathAutoLoanSignals.some(k => urlPath.includes(k)))   return 'fin_auto_loan';
-    if (pathMortgageSignals.some(k => urlPath.includes(k)))   return 'fin_mortgage';
-    if (pathRetailSignals.some(k => urlPath.includes(k)))     return 'fin_retail_bank';
-    if (pathRetailGeneric.some(k => urlPath.includes(k)))     return 'fin_retail_bank';
+      // ── TRAVEL CREDIT CARDS ──
+      // e.g. /credit-cards/travel-reward-credit-cards
+      if (hasAny('travel','miles','airline','airport','lounge','international')) return 'fin_cc_travel';
+
+      // ── CASH BACK CREDIT CARDS ──
+      // e.g. /credit-cards/cash-back/
+      if (hasAny('cash-back','cashback','cash_back')) return 'fin_cc_cashback';
+
+      // ── BALANCE TRANSFER CREDIT CARDS ──
+      if (hasAny('balance-transfer','balance_transfer')) return 'fin_cc_balance_transfer';
+
+      // ── 0% APR / LOW INTEREST ──
+      if (hasAny('low-interest','0-apr','zero-apr','low-apr','no-interest')) return 'fin_cc_low_interest';
+
+      // ── REWARDS (generic) ──
+      if (hasAny('reward','point','mile')) return 'fin_cc_rewards';
+
+      // ── GENERIC CREDIT CARDS ──
+      return 'fin';
+    }
+
+    // ── AUTO FINANCING ──
+    // Refinance is more specific so check first
+    if (has('/auto') && hasAny('/refinan'))                         return 'fin_auto_refinance';
+    if (hasAny('/auto-financ','/car-loan','/auto-loan','/vehicle-financ','/auto-financing')) return 'fin_auto_loan';
+
+    // ── MORTGAGE ──
+    if (hasAny('/mortgage','/home-loan') && hasAny('/refinan'))    return 'fin_mortgage_refinance';
+    if (hasAny('/heloc','/home-equity'))                           return 'fin_heloc';
+    if (hasAny('/mortgage','/home-loan'))                          return 'fin_mortgage';
+
+    // ── WEALTH / PRIVATE BANKING ──
+    if (hasAny('/citigold','/private-bank','/private-client','/wealth','/prestige','/private-banking','/wealth-management','/preferred-rewards','/invest','/brokerage','/investing')) return 'fin_wealth';
+
+    // ── COMMERCIAL / CORPORATE ──
+    if (hasAny('/commercial','/corporate','/treasury','/institutional','/wholesale')) return 'fin_commercial';
+
+    // ── SMALL BUSINESS BANKING (no credit card in path) ──
+    if (hasAny('/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/')) return 'fin_small_business';
+
+    // ── RETAIL BANKING SUB-TYPES ──
+    if (hasAny('/savings','/high-yield','/hysa','/money-market'))  return 'fin_retail_bank';
+    if (hasAny('/checking','/current-account'))                    return 'fin_retail_bank';
+    if (hasAny('/cd/','/certificate-of-deposit','/certificates'))  return 'fin_retail_bank';
+    if (hasAny('/bank','/banking','/deposits','/personal-banking')) return 'fin_retail_bank';
+
     return 'fin';
   }
 
-  // Step 2: Only route to auto if the DOMAIN itself is an auto brand
-  const pathRetailSignals = ['/bank','/banking','/checking','/savings','/deposits','/cd','/money-market','/personal-banking'];
-  const pathCreditSignals = ['/credit-card','/creditcard','/rewards-card','/cash-back'];
-  const pathIsRetail = pathRetailSignals.some(k => urlPath.includes(k));
-  const pathIsCredit = pathCreditSignals.some(k => urlPath.includes(k));
-  // (pathIsRetail/pathIsCredit only matter for non-fin domains — kept for future use)
-  // Fallback: check page content
+  // ── NON-FIN DOMAINS ──
   if (pageData) {
-    const pageText = [
-      ...(pageData.headings || []),
-      pageData.title || '',
-      pageData.metaDesc || '',
-    ].join(' ').toLowerCase();
-    const retailBankKeywords = ['checking account','savings account','high yield','cd rate','certificate of deposit','checking and savings','personal banking','deposit account','apy','fdic','money market','savings rate','checking fee'];
-    const isRetailBank = retailBankKeywords.some(k => pageText.includes(k));
+    const pageText = [...(pageData.headings || []), pageData.title || '', pageData.metaDesc || ''].join(' ').toLowerCase();
+    const retailBankKeywords = ['checking account','savings account','high yield','cd rate','certificate of deposit','personal banking','deposit account','apy','fdic','money market'];
     const creditKeywords = ['credit card','rewards card','cash back','apr','signup bonus','annual fee','travel rewards','credit limit','balance transfer'];
-    const isCredit = creditKeywords.some(k => pageText.includes(k));
-    if (isFin && isRetailBank && !isCredit) return 'fin_retail_bank';
-    if (isFin && isRetailBank && isCredit) return 'fin';
+    if (retailBankKeywords.some(k => pageText.includes(k)) && !creditKeywords.some(k => pageText.includes(k))) return 'fin_retail_bank';
+    if (creditKeywords.some(k => pageText.includes(k))) return 'fin';
   }
-  if (['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','scotia','scotiabank','bmo','rbc','cibc','nbc','desjardins','tangerine','navyfederal','penfed','truist','regions','huntington','keybank','53','td.com'].some(k=>d.includes(k))) return 'fin';
+
+  if (hasAny('/auto-financ','/car-loan','/auto-loan','/vehicle-financ') && hasAny('/refinan')) return 'fin_auto_refinance';
   if (['toyota','ford','honda','bmw','tesla','vw','volkswagen','auto','car','motor','hyundai','kia','nissan','mercedes','audi','subaru','mazda','lexus','acura'].some(k=>d.includes(k))) return 'auto';
   if (['marriott','hilton','hyatt','holiday','sheraton','westin','ritz','airbnb','booking','expedia','hotel','resort'].some(k=>d.includes(k))) return 'hotel';
   if (['netflix','spotify','hulu','disney','hbo','streaming','music','entertainment','media','paramount','peacock'].some(k=>d.includes(k))) return 'media';
@@ -237,62 +264,481 @@ const INDUSTRY_DATA: Record<string, any> = {
     awareness: { chase: 60, 'american express': 58, 'capital one': 56, citi: 54, discover: 48, 'bank of america': 46, 'wells fargo': 42, usaa: 35, synchrony: 25, barclays: 22, 'navy federal': 28, 'penfed': 16, 'td bank': 20, 'us bank': 24, 'regions bank': 14, 'citizens bank': 16, truist: 18, 'fifth third': 14, keybank: 12, huntington: 13 },
   },
 
-  // ── NEW: Small Business Credit Cards ──
-  // Triggered when URL contains BOTH a business path AND a credit card path
-  // e.g. /small-business/credit-cards/ or /business/credit-cards/
+  // ── TRAVEL CREDIT CARDS ──
+  // e.g. /credit-cards/travel-reward-credit-cards, /credit-cards/travel/
+  fin_cc_travel: {
+    name: 'travel credit cards',
+    label: 'Travel Credit Cards',
+    queries: [
+      ['General', 'What is the best travel credit card available right now?'],
+      ['General', 'Which travel credit card is most recommended by experts?'],
+      ['General', 'Best travel credit cards for occasional travelers'],
+      ['General', 'Which bank offers the best travel credit card overall?'],
+      ['General', 'Best travel credit cards with no annual fee'],
+      ['General', 'Which travel credit card has the best sign-up bonus?'],
+      ['General', 'Best travel credit cards for earning miles and points'],
+      ['General', 'Which travel credit card is best for someone who flies a few times a year?'],
+      ['General', 'Best travel rewards credit cards recommended by NerdWallet'],
+      ['General', 'Most recommended travel credit cards by financial experts in 2025'],
+      ['Miles & Points', 'Which travel credit card earns the most miles per dollar spent?'],
+      ['Miles & Points', 'Best travel credit card for earning transferable points'],
+      ['Miles & Points', 'Which travel credit card transfers points to the most airlines?'],
+      ['Miles & Points', 'Best travel credit card for earning points on hotels and flights'],
+      ['Miles & Points', 'Which travel credit card has the best points redemption value?'],
+      ['Miles & Points', 'Best travel credit card for earning miles on everyday spending'],
+      ['Miles & Points', 'Which travel credit card gives the best value per mile?'],
+      ['Miles & Points', 'Best travel credit cards for maximizing hotel and airline points'],
+      ['Miles & Points', 'Which travel credit card has the best airline transfer partners?'],
+      ['Miles & Points', 'Best travel credit card for earning points without flying'],
+      ['Perks & Benefits', 'Which travel credit card has the best airport lounge access?'],
+      ['Perks & Benefits', 'Best travel credit card with no foreign transaction fees'],
+      ['Perks & Benefits', 'Which travel credit card has the best travel insurance coverage?'],
+      ['Perks & Benefits', 'Best travel credit card for Global Entry and TSA PreCheck credit'],
+      ['Perks & Benefits', 'Which travel credit card has the best hotel and car rental benefits?'],
+      ['Perks & Benefits', 'Best travel credit cards with trip cancellation protection'],
+      ['Perks & Benefits', 'Which travel credit card has the best concierge service?'],
+      ['Perks & Benefits', 'Best travel credit card for free checked bags on flights'],
+      ['Perks & Benefits', 'Which travel credit card gives the best priority boarding benefits?'],
+      ['Perks & Benefits', 'Best travel credit cards for international travel protection'],
+      ['Value', 'Which travel credit card is worth the annual fee?'],
+      ['Value', 'Best mid-tier travel credit card under $100 annual fee'],
+      ['Value', 'Which travel credit card gives the best value for casual travelers?'],
+      ['Value', 'Best travel credit card with the highest welcome bonus value'],
+      ['Value', 'Which travel credit card has the best ongoing value after the sign-up bonus?'],
+      ['Expert Recommendation', 'Which travel credit card do travel bloggers recommend most?'],
+      ['Expert Recommendation', 'Best travel credit cards ranked by The Points Guy'],
+      ['Expert Recommendation', 'Which travel credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best travel credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which travel credit card is best for a first-time travel card holder?'],
+      ['Expert Recommendation', 'Best travel credit cards for business travelers'],
+      ['Expert Recommendation', 'Which travel credit card is best for someone who prefers one card?'],
+      ['Expert Recommendation', 'Best premium travel credit cards worth the high annual fee'],
+      ['Expert Recommendation', 'Which travel credit card is best for families who travel together?'],
+      ['Expert Recommendation', 'Best travel credit cards for people who travel internationally'],
+      ['Comparison', 'Chase Sapphire Preferred vs Capital One Venture — which is better?'],
+      ['Comparison', 'Amex Gold vs Chase Sapphire Reserve for travel rewards'],
+      ['Comparison', 'Which travel credit card beats the Chase Sapphire Reserve?'],
+      ['Comparison', 'Capital One Venture vs Citi Strata Premier travel card comparison'],
+      ['Comparison', 'Best travel credit card vs airline-specific credit card'],
+    ],
+    comps: ['Chase Sapphire', 'American Express Platinum', 'Capital One Venture', 'Citi Strata Premier', 'Discover Miles', 'Bank of America Travel Rewards', 'Wells Fargo Autograph', 'Bilt Rewards', 'Barclays AAdvantage', 'US Bank Altitude'],
+    compUrls: { 'Chase Sapphire': 'chase.com/credit-cards/sapphire', 'American Express Platinum': 'americanexpress.com/platinum', 'Capital One Venture': 'capitalone.com/credit-cards/venture', 'Citi Strata Premier': 'citi.com/credit-cards/strata-premier', 'Discover Miles': 'discover.com/credit-cards/miles', 'Bank of America Travel Rewards': 'bankofamerica.com/credit-cards/travel', 'Wells Fargo Autograph': 'wellsfargo.com/credit-cards/autograph', 'Bilt Rewards': 'biltrewards.com', 'Barclays AAdvantage': 'barclays.com', 'US Bank Altitude': 'usbank.com/credit-cards/altitude' },
+    awareness: { 'chase sapphire': 62, 'american express platinum': 58, 'capital one venture': 56, 'citi strata premier': 44, 'discover miles': 42, 'bank of america travel rewards': 38, 'wells fargo autograph': 32, 'bilt rewards': 28, 'barclays aadvantage': 26, 'us bank altitude': 24 },
+  },
+
+  // ── CASH BACK CREDIT CARDS ──
+  // e.g. /credit-cards/cash-back/
+  fin_cc_cashback: {
+    name: 'cash back credit cards',
+    label: 'Cash Back Credit Cards',
+    queries: [
+      ['General', 'What is the best cash back credit card right now?'],
+      ['General', 'Which cash back credit card is most recommended by experts?'],
+      ['General', 'Best cash back credit cards with no annual fee'],
+      ['General', 'Which bank offers the best cash back credit card overall?'],
+      ['General', 'Best flat rate cash back credit card for everyday spending'],
+      ['General', 'Which cash back credit card has the best sign-up bonus?'],
+      ['General', 'Best cash back credit cards recommended by NerdWallet'],
+      ['General', 'Most recommended cash back credit cards by financial experts'],
+      ['General', 'Which cash back credit card is simplest to use?'],
+      ['General', 'Best cash back credit card for someone who wants one card for everything'],
+      ['Flat Rate', 'Which credit card gives the best flat rate cash back on all purchases?'],
+      ['Flat Rate', 'Best 2% cash back credit card with no annual fee'],
+      ['Flat Rate', 'Which flat rate cash back card has no spending caps?'],
+      ['Flat Rate', 'Best unlimited cash back credit card available today'],
+      ['Flat Rate', 'Which cash back card gives the same rate on every purchase?'],
+      ['Category', 'Best cash back credit card for groceries and supermarkets'],
+      ['Category', 'Which credit card gives the most cash back on gas and fuel'],
+      ['Category', 'Best cash back credit card for dining and restaurants'],
+      ['Category', 'Which cash back card is best for online shopping'],
+      ['Category', 'Best cash back credit card for streaming services and subscriptions'],
+      ['Category', 'Which credit card gives the best cash back on travel purchases'],
+      ['Category', 'Best cash back credit card for drugstore and pharmacy spending'],
+      ['Category', 'Which credit card gives the highest cash back on home improvement'],
+      ['Category', 'Best rotating category cash back credit cards'],
+      ['Category', 'Which credit card gives the most cash back on Amazon purchases'],
+      ['Redemption', 'Which cash back credit card has the best redemption options?'],
+      ['Redemption', 'Best cash back credit card that deposits rewards directly to bank account'],
+      ['Redemption', 'Which credit card gives cash back as a statement credit automatically?'],
+      ['Redemption', 'Best cash back credit card with no minimum redemption amount'],
+      ['Redemption', 'Which cash back card allows the most flexible reward redemption?'],
+      ['Expert Recommendation', 'Which cash back credit card do financial advisors recommend?'],
+      ['Expert Recommendation', 'Best cash back credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which cash back credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best cash back credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which cash back credit card is best for a family?'],
+      ['Expert Recommendation', 'Best cash back credit card for someone with good credit'],
+      ['Expert Recommendation', 'Which cash back card is best for someone who hates tracking categories?'],
+      ['Expert Recommendation', 'Best cash back credit cards for people who pay their balance monthly'],
+      ['Expert Recommendation', 'Which cash back card has the best combination of rate and benefits?'],
+      ['Expert Recommendation', 'Best cash back credit cards for maximizing everyday rewards'],
+      ['Comparison', 'Citi Double Cash vs Wells Fargo Active Cash — which is better?'],
+      ['Comparison', 'Capital One Quicksilver vs Citi Double Cash comparison'],
+      ['Comparison', 'Chase Freedom Unlimited vs Citi Double Cash for cash back'],
+      ['Comparison', 'Which cash back card beats the Citi Double Cash?'],
+      ['Comparison', 'Best flat rate cash back card vs rotating category cash back card'],
+      ['Comparison', 'Discover it Cash Back vs Chase Freedom Flex comparison'],
+      ['Comparison', 'Which is better for cash back — Capital One or Citi?'],
+      ['Comparison', 'Best cash back card for someone choosing between two issuers'],
+      ['Comparison', 'Capital One Savor vs Chase Freedom Unlimited for dining cash back'],
+      ['Comparison', 'Which cash back card has better long-term value?'],
+    ],
+    comps: ['Chase Freedom', 'Citi Double Cash', 'Capital One Quicksilver', 'Discover it Cash Back', 'Wells Fargo Active Cash', 'Bank of America Customized Cash', 'American Express Blue Cash', 'Alliant Cashback', 'PayPal Cashback', 'Sofi Credit Card'],
+    compUrls: { 'Chase Freedom': 'chase.com/credit-cards/freedom', 'Citi Double Cash': 'citi.com/credit-cards/double-cash', 'Capital One Quicksilver': 'capitalone.com/credit-cards/quicksilver', 'Discover it Cash Back': 'discover.com/credit-cards/cash-back', 'Wells Fargo Active Cash': 'wellsfargo.com/credit-cards/active-cash', 'Bank of America Customized Cash': 'bankofamerica.com/credit-cards/cash-back', 'American Express Blue Cash': 'americanexpress.com/blue-cash', 'Alliant Cashback': 'alliantcreditunion.org', 'PayPal Cashback': 'paypal.com/cashback', 'Sofi Credit Card': 'sofi.com/credit-card' },
+    awareness: { 'chase freedom': 60, 'citi double cash': 56, 'capital one quicksilver': 54, 'discover it cash back': 52, 'wells fargo active cash': 44, 'bank of america customized cash': 40, 'american express blue cash': 48, 'alliant cashback': 20, 'paypal cashback': 30, 'sofi credit card': 26 },
+  },
+
+  // ── STUDENT CREDIT CARDS WITH REWARDS ──
+  // e.g. /credit-cards/students/?card-type=studentrewards
+  fin_cc_student_rewards: {
+    name: 'student rewards credit cards',
+    label: 'Student Rewards Credit Cards',
+    queries: [
+      ['General', 'What is the best student rewards credit card for college students?'],
+      ['General', 'Which student credit card gives the best rewards for college spending?'],
+      ['General', 'Best student credit cards that earn cash back or points'],
+      ['General', 'Which bank offers the best student rewards credit card?'],
+      ['General', 'Best student rewards credit cards with no annual fee'],
+      ['General', 'Which student credit card has the best sign-up bonus for new cardholders?'],
+      ['General', 'Best student credit cards that earn rewards on dining and streaming'],
+      ['General', 'Which student rewards credit card is easiest to get approved for?'],
+      ['General', 'Best student credit cards recommended by NerdWallet for rewards'],
+      ['General', 'Most recommended student rewards credit cards by financial experts'],
+      ['Cash Back Rewards', 'Best student credit card for earning cash back on every purchase'],
+      ['Cash Back Rewards', 'Which student credit card gives the most cash back on dining?'],
+      ['Cash Back Rewards', 'Best student cash back credit card with no annual fee'],
+      ['Cash Back Rewards', 'Which student credit card gives cash back on groceries and gas?'],
+      ['Cash Back Rewards', 'Best student credit card for earning cash back on Amazon and online shopping'],
+      ['Cash Back Rewards', 'Which student cash back credit card has the highest flat rate?'],
+      ['Cash Back Rewards', 'Best student credit card for earning cash back on streaming services'],
+      ['Cash Back Rewards', 'Which student credit card automatically applies cash back as statement credit?'],
+      ['Cash Back Rewards', 'Best student credit cards for earning unlimited cash back'],
+      ['Cash Back Rewards', 'Which student credit card has the best cash back redemption options?'],
+      ['Points & Miles', 'Best student credit card for earning travel points or miles'],
+      ['Points & Miles', 'Which student credit card earns points redeemable for flights?'],
+      ['Points & Miles', 'Best student credit card for earning hotel rewards points'],
+      ['Points & Miles', 'Which student credit card has the most flexible points redemption?'],
+      ['Points & Miles', 'Best student credit card that transfers points to airline partners'],
+      ['Credit Building', 'Which student rewards credit card helps build credit the fastest?'],
+      ['Credit Building', 'Best student credit card that upgrades to a regular rewards card after graduation'],
+      ['Credit Building', 'Which student rewards card reports to all three credit bureaus?'],
+      ['Credit Building', 'Best student credit card for someone with no credit history who wants rewards'],
+      ['Credit Building', 'Which student credit card increases credit limit automatically after on-time payments?'],
+      ['Expert Recommendation', 'Which student rewards credit card do college financial advisors recommend?'],
+      ['Expert Recommendation', 'Best student rewards credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which student credit card has the best customer service for young adults?'],
+      ['Expert Recommendation', 'Best student rewards credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which student credit card is best for an international student who wants rewards?'],
+      ['Expert Recommendation', 'Best student rewards credit card for a freshman with no credit history'],
+      ['Expert Recommendation', 'Which student credit card gives the best rewards for studying abroad?'],
+      ['Expert Recommendation', 'Best student credit card for earning rewards on textbooks and school supplies'],
+      ['Expert Recommendation', 'Which student rewards credit card has the best app and money management tools?'],
+      ['Expert Recommendation', 'Best student credit cards for graduate and professional school students'],
+      ['Comparison', 'Discover it Student vs Capital One SavorOne Student — which is better?'],
+      ['Comparison', 'Capital One Quicksilver Student vs Chase Freedom Student for rewards'],
+      ['Comparison', 'Which student rewards credit card beats the Discover it Student card?'],
+      ['Comparison', 'Bank of America Travel Rewards Student vs Capital One SavorOne Student'],
+      ['Comparison', 'Best student cash back card vs student travel rewards card'],
+      ['Comparison', 'Discover it Student Cash Back vs Capital One SavorOne Student comparison'],
+      ['Comparison', 'Which student rewards card is better for someone who eats out a lot?'],
+      ['Comparison', 'Best student card for rewards if choosing between Capital One and Discover'],
+      ['Comparison', 'Chase Freedom Student vs Citi Rewards+ Student for college spending'],
+      ['Comparison', 'Which student rewards card has better long-term value after graduation?'],
+    ],
+    comps: ['Discover it Student', 'Capital One SavorOne Student', 'Chase Freedom Student', 'Bank of America Travel Rewards Student', 'Citi Rewards+ Student', 'Journey Student Rewards', 'Deserve EDU', 'Petal 2', 'Upgrade Student', 'Commerce Bank Student'],
+    compUrls: { 'Discover it Student': 'discover.com/credit-cards/student', 'Capital One SavorOne Student': 'capitalone.com/credit-cards/students', 'Chase Freedom Student': 'chase.com/credit-cards/freedom-student', 'Bank of America Travel Rewards Student': 'bankofamerica.com/student-credit-cards', 'Citi Rewards+ Student': 'citi.com/credit-cards/student', 'Journey Student Rewards': 'capitalone.com/credit-cards/journey-student', 'Deserve EDU': 'deserve.com', 'Petal 2': 'petalcard.com', 'Upgrade Student': 'upgrade.com', 'Commerce Bank Student': 'commercebank.com' },
+    awareness: { 'discover it student': 58, 'capital one savorone student': 52, 'chase freedom student': 48, 'bank of america travel rewards student': 40, 'citi rewards+ student': 38, 'journey student rewards': 36, 'deserve edu': 22, 'petal 2': 20, 'upgrade student': 18, 'commerce bank student': 14 },
+  },
+
+  // ── STUDENT CREDIT CARDS (basic, no rewards emphasis) ──
+  fin_cc_student: {
+    name: 'student credit cards',
+    label: 'Student Credit Cards',
+    queries: [
+      ['General', 'What is the best credit card for college students?'],
+      ['General', 'Which student credit card is easiest to get with no credit history?'],
+      ['General', 'Best credit cards for college students in 2025'],
+      ['General', 'Which bank offers the best student credit card?'],
+      ['General', 'Best first credit card for a college student'],
+      ['General', 'Which student credit card has no annual fee?'],
+      ['General', 'Best credit cards for students recommended by NerdWallet'],
+      ['General', 'Most recommended student credit cards by financial experts'],
+      ['General', 'Which student credit card is best for building credit from scratch?'],
+      ['General', 'Best credit card for a college freshman with no credit'],
+      ['Credit Building', 'Which student credit card helps build credit the fastest?'],
+      ['Credit Building', 'Best student credit card that reports to all three credit bureaus'],
+      ['Credit Building', 'Which student credit card increases limit after on-time payments?'],
+      ['Credit Building', 'Best student credit card for going from no credit to good credit'],
+      ['Credit Building', 'Which student credit card graduates to a regular card after college?'],
+      ['Credit Building', 'Best student credit cards for building credit responsibly'],
+      ['Credit Building', 'Which student credit card has the best credit-building tools and alerts?'],
+      ['Credit Building', 'Best student credit card for an international student with no US credit'],
+      ['Credit Building', 'Which student credit card has the lowest APR for students?'],
+      ['Credit Building', 'Best student credit cards for someone with a part-time job income'],
+      ['Features', 'Which student credit card has the best mobile app for young adults?'],
+      ['Features', 'Best student credit card with free credit score monitoring'],
+      ['Features', 'Which student credit card has the best fraud protection for students?'],
+      ['Features', 'Best student credit card with parental controls or spending alerts'],
+      ['Features', 'Which student credit card has the easiest online account management?'],
+      ['Features', 'Best student credit card with no foreign transaction fees for studying abroad'],
+      ['Features', 'Which student credit card has the best security features?'],
+      ['Features', 'Best student credit card for someone who wants to avoid debt'],
+      ['Features', 'Which student credit card has the best financial education tools?'],
+      ['Features', 'Best student credit card for someone who wants to keep it simple'],
+      ['Expert Recommendation', 'Which student credit card do college financial advisors recommend?'],
+      ['Expert Recommendation', 'Best student credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which student credit card has the best customer service for young adults?'],
+      ['Expert Recommendation', 'Best student credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which student credit card is best for a graduate student?'],
+      ['Expert Recommendation', 'Best student credit card for a freshman with no credit history'],
+      ['Expert Recommendation', 'Which student credit card is best for an international student?'],
+      ['Expert Recommendation', 'Best student credit cards for responsible spending and budgeting'],
+      ['Expert Recommendation', 'Which student credit card has the most lenient approval requirements?'],
+      ['Expert Recommendation', 'Best student credit cards for building credit before graduation'],
+      ['Comparison', 'Discover it Student vs Capital One Journey Student — which is better?'],
+      ['Comparison', 'Which student credit card is better — Discover or Capital One?'],
+      ['Comparison', 'Chase Freedom Student vs Bank of America Student card comparison'],
+      ['Comparison', 'Best student credit card vs secured credit card for building credit'],
+      ['Comparison', 'Which student credit card has a better approval rate for no-credit applicants?'],
+      ['Comparison', 'Citi Student vs Discover it Student — which is easier to get?'],
+      ['Comparison', 'Best student credit card if choosing between a bank and a fintech'],
+      ['Comparison', 'Which is better for a student — a student card or a secured card?'],
+      ['Comparison', 'Capital One Journey vs Discover it Student for first-time cardholders'],
+      ['Comparison', 'Which student credit card has better long-term value through college?'],
+    ],
+    comps: ['Discover it Student', 'Capital One Journey Student', 'Chase Freedom Student', 'Bank of America Student', 'Citi Rewards+ Student', 'Deserve EDU', 'Petal 1', 'OpenSky Secured', 'First Progress Student', 'Commerce Bank Student'],
+    compUrls: { 'Discover it Student': 'discover.com/credit-cards/student', 'Capital One Journey Student': 'capitalone.com/credit-cards/journey-student', 'Chase Freedom Student': 'chase.com/credit-cards/freedom-student', 'Bank of America Student': 'bankofamerica.com/student-credit-cards', 'Citi Rewards+ Student': 'citi.com/credit-cards/student', 'Deserve EDU': 'deserve.com', 'Petal 1': 'petalcard.com', 'OpenSky Secured': 'openskycc.com', 'First Progress Student': 'firstprogress.com', 'Commerce Bank Student': 'commercebank.com' },
+    awareness: { 'discover it student': 58, 'capital one journey student': 50, 'chase freedom student': 46, 'bank of america student': 40, 'citi rewards+ student': 36, 'deserve edu': 22, 'petal 1': 18, 'opensky secured': 20, 'first progress student': 14, 'commerce bank student': 12 },
+  },
+
+  // ── SECURED CREDIT CARDS ──
+  // e.g. /credit-cards/secured/
+  fin_cc_secured: {
+    name: 'secured credit cards',
+    label: 'Secured Credit Cards',
+    queries: [
+      ['General', 'What is the best secured credit card for building credit?'],
+      ['General', 'Which secured credit card is most recommended by experts?'],
+      ['General', 'Best secured credit cards with no annual fee'],
+      ['General', 'Which bank offers the best secured credit card overall?'],
+      ['General', 'Best secured credit cards for someone with bad credit'],
+      ['General', 'Which secured credit card is easiest to get approved for?'],
+      ['General', 'Best secured credit cards recommended by NerdWallet'],
+      ['General', 'Most recommended secured credit cards by financial experts in 2025'],
+      ['General', 'Which secured credit card is best for rebuilding damaged credit?'],
+      ['General', 'Best secured credit card for someone with no credit history at all'],
+      ['Credit Building', 'Which secured credit card graduates to an unsecured card the fastest?'],
+      ['Credit Building', 'Best secured credit card that reports to all three credit bureaus'],
+      ['Credit Building', 'Which secured credit card increases credit limit after on-time payments?'],
+      ['Credit Building', 'Best secured credit card for going from bad credit to good credit'],
+      ['Credit Building', 'Which secured credit card has the best credit monitoring tools?'],
+      ['Credit Building', 'Best secured credit cards for someone after bankruptcy'],
+      ['Credit Building', 'Which secured credit card has the lowest deposit requirement?'],
+      ['Credit Building', 'Best secured credit card for someone with a 500 credit score'],
+      ['Credit Building', 'Which secured credit card has the fastest path to unsecured status?'],
+      ['Credit Building', 'Best secured credit cards that do a soft pull for approval'],
+      ['Deposit & Fees', 'Which secured credit card has the lowest minimum deposit?'],
+      ['Deposit & Fees', 'Best secured credit cards with no annual fee'],
+      ['Deposit & Fees', 'Which secured credit card refunds the deposit the fastest?'],
+      ['Deposit & Fees', 'Best secured credit cards with no monthly maintenance fees'],
+      ['Deposit & Fees', 'Which secured credit card has the best deposit return policy?'],
+      ['Features', 'Which secured credit card earns cash back rewards?'],
+      ['Features', 'Best secured credit card with a mobile app for spending tracking'],
+      ['Features', 'Which secured credit card has the best fraud protection?'],
+      ['Features', 'Best secured credit card for someone who also wants to earn rewards'],
+      ['Features', 'Which secured credit card has the best financial education tools?'],
+      ['Expert Recommendation', 'Which secured credit card do credit counselors recommend?'],
+      ['Expert Recommendation', 'Best secured credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which secured credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best secured credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which secured credit card is best for someone just out of bankruptcy?'],
+      ['Expert Recommendation', 'Best secured credit card for a recent immigrant with no US credit'],
+      ['Expert Recommendation', 'Which secured credit card is best for a young adult starting out?'],
+      ['Expert Recommendation', 'Best secured credit cards for rebuilding credit after divorce'],
+      ['Expert Recommendation', 'Which secured credit card has the most lenient approval requirements?'],
+      ['Expert Recommendation', 'Best secured credit card for someone who wants to rebuild in under a year'],
+      ['Comparison', 'Discover it Secured vs Capital One Platinum Secured — which is better?'],
+      ['Comparison', 'OpenSky Secured vs Chime Credit Builder comparison'],
+      ['Comparison', 'Which secured card is better — Discover it Secured or Citi Secured?'],
+      ['Comparison', 'Best secured credit card vs prepaid debit card for building credit'],
+      ['Comparison', 'Capital One Platinum Secured vs Bank of America Secured comparison'],
+      ['Comparison', 'Which secured credit card graduates to unsecured faster — Discover or Capital One?'],
+      ['Comparison', 'Best secured card if choosing between a bank and a credit union'],
+      ['Comparison', 'Secured credit card vs credit builder loan — which builds credit faster?'],
+      ['Comparison', 'Which is better for bad credit — a secured card or a store card?'],
+      ['Comparison', 'Best secured credit card for someone choosing between two major issuers'],
+    ],
+    comps: ['Discover it Secured', 'Capital One Platinum Secured', 'Citi Secured Mastercard', 'Bank of America Secured', 'OpenSky Secured', 'Chime Credit Builder', 'Self Credit Builder', 'First Progress Secured', 'Applied Bank Secured', 'Wells Fargo Secured'],
+    compUrls: { 'Discover it Secured': 'discover.com/credit-cards/secured', 'Capital One Platinum Secured': 'capitalone.com/credit-cards/secured', 'Citi Secured Mastercard': 'citi.com/credit-cards/secured', 'Bank of America Secured': 'bankofamerica.com/secured-credit-cards', 'OpenSky Secured': 'openskycc.com', 'Chime Credit Builder': 'chime.com/credit-builder', 'Self Credit Builder': 'self.inc', 'First Progress Secured': 'firstprogress.com', 'Applied Bank Secured': 'appliedbank.com', 'Wells Fargo Secured': 'wellsfargo.com/secured' },
+    awareness: { 'discover it secured': 56, 'capital one platinum secured': 52, 'citi secured mastercard': 44, 'bank of america secured': 40, 'opensky secured': 32, 'chime credit builder': 36, 'self credit builder': 30, 'first progress secured': 18, 'applied bank secured': 14, 'wells fargo secured': 34 },
+  },
+
+  // ── BALANCE TRANSFER CREDIT CARDS ──
+  fin_cc_balance_transfer: {
+    name: 'balance transfer credit cards',
+    label: 'Balance Transfer Credit Cards',
+    queries: [
+      ['General', 'What is the best balance transfer credit card right now?'],
+      ['General', 'Which balance transfer credit card has the longest 0% APR period?'],
+      ['General', 'Best balance transfer credit cards with no transfer fee'],
+      ['General', 'Which bank offers the best balance transfer credit card?'],
+      ['General', 'Best balance transfer cards recommended by NerdWallet'],
+      ['General', 'Most recommended balance transfer credit cards in 2025'],
+      ['General', 'Which balance transfer card is easiest to get approved for?'],
+      ['General', 'Best balance transfer credit cards for paying off debt faster'],
+      ['General', 'Which balance transfer card has no annual fee and a long intro period?'],
+      ['General', 'Best balance transfer credit cards for someone with good credit'],
+      ['0% APR', 'Which credit card offers the longest 0% intro APR on balance transfers?'],
+      ['0% APR', 'Best credit cards with 18 months or more of 0% balance transfer APR'],
+      ['0% APR', 'Which balance transfer card has the best 0% APR and lowest fees?'],
+      ['0% APR', 'Best balance transfer cards with 0% APR and no annual fee'],
+      ['0% APR', 'Which card gives the most time to pay off a balance transfer at 0%?'],
+      ['Fees', 'Which balance transfer credit card has no balance transfer fee?'],
+      ['Fees', 'Best balance transfer cards with the lowest transfer fee percentage'],
+      ['Fees', 'Which credit card waives the balance transfer fee for new cardholders?'],
+      ['Fees', 'Best balance transfer cards with no annual fee and low transfer fee'],
+      ['Fees', 'Which balance transfer card has the best combination of low fees and long 0% period?'],
+      ['Debt Payoff', 'Best credit card for consolidating and paying off credit card debt'],
+      ['Debt Payoff', 'Which balance transfer card is best for paying off $5,000 in debt?'],
+      ['Debt Payoff', 'Best strategy for using a balance transfer card to get out of debt'],
+      ['Debt Payoff', 'Which balance transfer card is best for someone consolidating multiple cards?'],
+      ['Debt Payoff', 'Best balance transfer cards for someone serious about paying off debt in 2025'],
+      ['Expert Recommendation', 'Which balance transfer card do financial advisors recommend?'],
+      ['Expert Recommendation', 'Best balance transfer credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which balance transfer card has the best customer service?'],
+      ['Expert Recommendation', 'Best balance transfer cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which balance transfer card is best for someone with fair credit?'],
+      ['Expert Recommendation', 'Best balance transfer card for someone carrying high-interest debt'],
+      ['Expert Recommendation', 'Which balance transfer card is best after paying off a large purchase?'],
+      ['Expert Recommendation', 'Best balance transfer cards for people trying to avoid interest'],
+      ['Expert Recommendation', 'Which balance transfer card is best for a single large debt?'],
+      ['Expert Recommendation', 'Best balance transfer cards that also earn rewards after the intro period'],
+      ['Comparison', 'Citi Diamond Preferred vs Wells Fargo Reflect — which balance transfer card is better?'],
+      ['Comparison', 'Capital One balance transfer vs Citi balance transfer comparison'],
+      ['Comparison', 'Chase Slate Edge vs Citi Simplicity for balance transfers'],
+      ['Comparison', 'Which balance transfer card beats the Citi Diamond Preferred?'],
+      ['Comparison', 'Best balance transfer card if choosing between Chase and Citi'],
+      ['Comparison', 'Discover it Balance Transfer vs Citi Simplicity comparison'],
+      ['Comparison', 'Which is better — a balance transfer card or a personal loan for debt?'],
+      ['Comparison', 'Best balance transfer card for a large vs small balance'],
+      ['Comparison', 'Capital One Quicksilver vs Citi Double Cash for balance transfers'],
+      ['Comparison', 'Which bank offers the best overall balance transfer deal in 2025?'],
+    ],
+    comps: ['Citi Diamond Preferred', 'Wells Fargo Reflect', 'Chase Slate Edge', 'Discover it Balance Transfer', 'Citi Simplicity', 'BankAmericard', 'Capital One Quicksilver', 'US Bank Visa Platinum', 'Amex EveryDay', 'HSBC Gold'],
+    compUrls: { 'Citi Diamond Preferred': 'citi.com/credit-cards/diamond-preferred', 'Wells Fargo Reflect': 'wellsfargo.com/credit-cards/reflect', 'Chase Slate Edge': 'chase.com/slate-edge', 'Discover it Balance Transfer': 'discover.com/balance-transfer', 'Citi Simplicity': 'citi.com/simplicity', 'BankAmericard': 'bankofamerica.com/bankamericard', 'Capital One Quicksilver': 'capitalone.com/quicksilver', 'US Bank Visa Platinum': 'usbank.com/visa-platinum', 'Amex EveryDay': 'americanexpress.com/everyday', 'HSBC Gold': 'hsbc.com' },
+    awareness: { 'citi diamond preferred': 50, 'wells fargo reflect': 44, 'chase slate edge': 46, 'discover it balance transfer': 48, 'citi simplicity': 46, 'bankamericard': 38, 'capital one quicksilver': 52, 'us bank visa platinum': 32, 'amex everyday': 36, 'hsbc gold': 22 },
+  },
+
+  // ── REWARDS CREDIT CARDS (generic rewards, no specific sub-type) ──
+  fin_cc_rewards: {
+    name: 'rewards credit cards',
+    label: 'Rewards Credit Cards',
+    queries: [
+      ['General', 'What is the best rewards credit card available right now?'],
+      ['General', 'Which rewards credit card is most recommended by experts?'],
+      ['General', 'Best rewards credit cards with no annual fee'],
+      ['General', 'Which bank offers the best rewards credit card overall?'],
+      ['General', 'Best rewards credit cards for maximizing everyday spending'],
+      ['General', 'Which rewards credit card has the best sign-up bonus?'],
+      ['General', 'Best rewards credit cards recommended by NerdWallet'],
+      ['General', 'Most recommended rewards credit cards by financial experts'],
+      ['General', 'Which rewards credit card gives the most value per dollar spent?'],
+      ['General', 'Best rewards credit card for someone who wants one versatile card'],
+      ['Points', 'Which credit card earns the most points on everyday purchases?'],
+      ['Points', 'Best credit card for earning transferable points'],
+      ['Points', 'Which rewards credit card has the best points redemption options?'],
+      ['Points', 'Best credit card points program for travel redemptions'],
+      ['Points', 'Which rewards credit card has the most valuable points currency?'],
+      ['Points', 'Best credit card for earning points on dining and travel'],
+      ['Points', 'Which credit card earns the most points with no annual fee?'],
+      ['Points', 'Best credit cards for pooling points across household members'],
+      ['Points', 'Which rewards card has the best points expiration policy?'],
+      ['Points', 'Best credit card for earning points on streaming and subscriptions'],
+      ['Cash Back vs Points', 'Which is better — a cash back or points rewards credit card?'],
+      ['Cash Back vs Points', 'Best rewards credit card for someone who wants flexibility'],
+      ['Cash Back vs Points', 'Which rewards credit card is simplest for everyday use?'],
+      ['Cash Back vs Points', 'Best rewards card for someone who doesnt want to track categories'],
+      ['Cash Back vs Points', 'Which rewards credit card has the best flat rate on all purchases?'],
+      ['Expert Recommendation', 'Which rewards credit card do financial advisors recommend?'],
+      ['Expert Recommendation', 'Best rewards credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which rewards credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best rewards credit cards recommended by Bankrate'],
+      ['Expert Recommendation', 'Which rewards credit card is best for a household?'],
+      ['Expert Recommendation', 'Best rewards credit card for someone with excellent credit'],
+      ['Expert Recommendation', 'Which rewards credit card is best for maximizing total value?'],
+      ['Expert Recommendation', 'Best rewards credit cards for people who pay their balance in full monthly'],
+      ['Expert Recommendation', 'Which rewards card has the best combination of earning and redemption?'],
+      ['Expert Recommendation', 'Best rewards credit cards for beginners to the rewards hobby'],
+      ['Comparison', 'Chase Sapphire Preferred vs Capital One Venture Rewards — which is better?'],
+      ['Comparison', 'Amex Gold vs Chase Sapphire Preferred for rewards'],
+      ['Comparison', 'Which rewards credit card beats the Chase Sapphire Preferred?'],
+      ['Comparison', 'Capital One Venture vs Citi Premier rewards card comparison'],
+      ['Comparison', 'Best rewards card for someone choosing between Chase and Capital One'],
+      ['Comparison', 'Discover it vs Capital One Quicksilver for rewards'],
+      ['Comparison', 'Which is better for rewards — a bank card or an airline card?'],
+      ['Comparison', 'Best rewards credit card if you already have one rewards card'],
+      ['Comparison', 'Chase Freedom Flex vs Capital One SavorOne for everyday rewards'],
+      ['Comparison', 'Which rewards credit card has better long-term value?'],
+    ],
+    comps: ['Chase Sapphire Preferred', 'Capital One Venture', 'American Express Gold', 'Citi Premier', 'Discover it', 'Wells Fargo Autograph', 'Bank of America Preferred Rewards', 'US Bank Altitude Go', 'Bilt Mastercard', 'PayPal Rewards'],
+    compUrls: { 'Chase Sapphire Preferred': 'chase.com/sapphire-preferred', 'Capital One Venture': 'capitalone.com/venture', 'American Express Gold': 'americanexpress.com/gold', 'Citi Premier': 'citi.com/premier', 'Discover it': 'discover.com', 'Wells Fargo Autograph': 'wellsfargo.com/autograph', 'Bank of America Preferred Rewards': 'bankofamerica.com/preferred-rewards', 'US Bank Altitude Go': 'usbank.com/altitude-go', 'Bilt Mastercard': 'biltrewards.com', 'PayPal Rewards': 'paypal.com' },
+    awareness: { 'chase sapphire preferred': 60, 'capital one venture': 56, 'american express gold': 54, 'citi premier': 48, 'discover it': 52, 'wells fargo autograph': 36, 'bank of america preferred rewards': 40, 'us bank altitude go': 28, 'bilt mastercard': 26, 'paypal rewards': 30 },
+  },
+
+  // ── SMALL BUSINESS CREDIT CARDS ──
   fin_small_business_cc: {
     name: 'small business credit cards',
     queries: [
-      ['General', 'What are the best credit cards for small business owners?'],
-      ['General', 'Which credit card is most recommended for small businesses?'],
-      ['General', 'Best business credit cards with no annual fee'],
-      ['General', 'Which bank offers the best small business credit card?'],
-      ['General', 'Best credit cards for new small business owners'],
-      ['General', 'Which small business credit card has the best rewards?'],
-      ['General', 'Best business credit cards for everyday business expenses'],
-      ['General', 'Which business credit card is easiest to get approved for?'],
-      ['General', 'Best credit cards for sole proprietors and freelancers'],
-      ['General', 'Most recommended business credit cards by financial experts'],
-      ['Cash Back', 'Best cash back business credit card for small businesses'],
-      ['Cash Back', 'Which business credit card gives the most cash back on office supplies?'],
-      ['Cash Back', 'Best flat rate cash back business credit card'],
-      ['Cash Back', 'Which business card gives the best cash back on advertising spend?'],
-      ['Cash Back', 'Best no annual fee cash back card for small businesses'],
-      ['Cash Back', 'Which business credit card gives 2% cash back on all purchases?'],
-      ['Cash Back', 'Best business card for cash back on gas and travel'],
-      ['Cash Back', 'Top business credit cards for unlimited cash back'],
-      ['Cash Back', 'Best cash back cards for businesses that spend on multiple categories'],
-      ['Cash Back', 'Which business credit card has the best cash back redemption options?'],
-      ['Travel & Rewards', 'Best travel rewards credit card for small business owners'],
-      ['Travel & Rewards', 'Which business credit card earns the most miles for business travel?'],
-      ['Travel & Rewards', 'Best business credit card with no foreign transaction fees'],
-      ['Travel & Rewards', 'Top business cards for hotel and flight rewards'],
-      ['Travel & Rewards', 'Which business credit card has the best airport lounge access?'],
-      ['Travel & Rewards', 'Best business card for earning points on travel and dining'],
-      ['Travel & Rewards', 'Which business travel card is worth the annual fee?'],
-      ['Travel & Rewards', 'Best business credit card for frequent business travelers'],
-      ['Travel & Rewards', 'Which small business card transfers points to the most airlines?'],
-      ['Travel & Rewards', 'Best business credit card for international travel in 2025'],
-      ['Financing & Flexibility', 'Which business credit card has the best 0% intro APR offer?'],
-      ['Financing & Flexibility', 'Best business credit card for financing large purchases'],
-      ['Financing & Flexibility', 'Which business card has the highest credit limit for small businesses?'],
-      ['Financing & Flexibility', 'Best business credit cards for managing cash flow'],
-      ['Financing & Flexibility', 'Which business card offers the best balance transfer options?'],
-      ['Financing & Flexibility', 'Best business credit cards for startups with limited credit history'],
-      ['Financing & Flexibility', 'Which business card is easiest to get with a new business?'],
-      ['Financing & Flexibility', 'Best secured business credit cards for new companies'],
-      ['Financing & Flexibility', 'Which business card has the best employee card controls?'],
-      ['Financing & Flexibility', 'Best business credit cards for tracking and categorizing expenses?'],
-      ['Expert Recommendation', 'Which business credit card do accountants recommend for small businesses?'],
-      ['Expert Recommendation', 'Best business credit cards ranked by NerdWallet'],
-      ['Expert Recommendation', 'Which bank has the best overall business credit card program?'],
-      ['Expert Recommendation', 'Best business credit cards recommended by Forbes Advisor'],
-      ['Expert Recommendation', 'Which business credit card has the best customer service?'],
-      ['Expert Recommendation', 'Best business credit cards for LLCs and S-corps'],
-      ['Expert Recommendation', 'Which business card integrates best with QuickBooks and accounting software?'],
-      ['Expert Recommendation', 'Best business credit cards for e-commerce businesses'],
-      ['Expert Recommendation', 'Which business card is best for a restaurant or food service business?'],
-      ['Expert Recommendation', 'Best business credit cards for contractors and service businesses'],
+      ['General', 'What are the best small business credit cards available right now?'],
+      ['General', 'Which small business credit card is most recommended by experts?'],
+      ['General', 'Best small business credit cards with no annual fee'],
+      ['General', 'Which bank offers the best small business credit card overall?'],
+      ['General', 'Best small business credit cards for new business owners'],
+      ['General', 'Which small business credit card has the best rewards program?'],
+      ['General', 'Best small business credit cards for everyday business expenses'],
+      ['General', 'Which small business credit card is easiest to get approved for?'],
+      ['General', 'Best small business credit cards for sole proprietors and freelancers'],
+      ['General', 'Most recommended small business credit cards by financial experts'],
+      ['Cash Back', 'Best cash back small business credit card available today'],
+      ['Cash Back', 'Which small business credit card gives the most cash back on office supplies?'],
+      ['Cash Back', 'Best flat rate cash back small business credit card with no annual fee'],
+      ['Cash Back', 'Which small business credit card gives the best cash back on advertising spend?'],
+      ['Cash Back', 'Best small business credit card for cash back with no category tracking'],
+      ['Cash Back', 'Which small business credit card gives 2% cash back on all purchases?'],
+      ['Cash Back', 'Best small business credit card for cash back on gas and travel'],
+      ['Cash Back', 'Top small business credit cards for unlimited cash back rewards'],
+      ['Cash Back', 'Best small business credit cards for spending across multiple categories'],
+      ['Cash Back', 'Which small business credit card has the best cash back redemption options?'],
+      ['Travel & Rewards', 'Best travel rewards small business credit card for business owners'],
+      ['Travel & Rewards', 'Which small business credit card earns the most miles for business travel?'],
+      ['Travel & Rewards', 'Best small business credit card with no foreign transaction fees'],
+      ['Travel & Rewards', 'Top small business credit cards for hotel and flight rewards'],
+      ['Travel & Rewards', 'Which small business credit card has the best airport lounge access?'],
+      ['Travel & Rewards', 'Best small business credit card for earning points on travel and dining'],
+      ['Travel & Rewards', 'Which small business travel credit card is worth the annual fee?'],
+      ['Travel & Rewards', 'Best small business credit card for frequent business travelers'],
+      ['Travel & Rewards', 'Which small business credit card transfers points to the most airlines?'],
+      ['Travel & Rewards', 'Best small business credit card for international travel in 2025'],
+      ['Financing & Flexibility', 'Which small business credit card has the best 0% intro APR offer?'],
+      ['Financing & Flexibility', 'Best small business credit card for financing large purchases'],
+      ['Financing & Flexibility', 'Which small business credit card has the highest credit limit?'],
+      ['Financing & Flexibility', 'Best small business credit cards for managing cash flow'],
+      ['Financing & Flexibility', 'Which small business credit card offers the best balance transfer options?'],
+      ['Financing & Flexibility', 'Best small business credit cards for startups with limited credit history'],
+      ['Financing & Flexibility', 'Which small business credit card is easiest to get with a brand new business?'],
+      ['Financing & Flexibility', 'Best secured small business credit cards for new companies'],
+      ['Financing & Flexibility', 'Which small business credit card has the best employee card spending controls?'],
+      ['Financing & Flexibility', 'Best small business credit cards for tracking and categorizing expenses'],
+      ['Expert Recommendation', 'Which small business credit card do accountants recommend most?'],
+      ['Expert Recommendation', 'Best small business credit cards ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best overall small business credit card program?'],
+      ['Expert Recommendation', 'Best small business credit cards recommended by Forbes Advisor'],
+      ['Expert Recommendation', 'Which small business credit card has the best customer service?'],
+      ['Expert Recommendation', 'Best small business credit cards for LLCs and S-corps'],
+      ['Expert Recommendation', 'Which small business credit card integrates best with QuickBooks?'],
+      ['Expert Recommendation', 'Best small business credit cards for e-commerce businesses'],
+      ['Expert Recommendation', 'Which small business credit card is best for a restaurant or food service business?'],
+      ['Expert Recommendation', 'Best small business credit cards for contractors and service-based businesses'],
     ],
     comps: ['Chase Ink', 'American Express Business', 'Capital One Spark', 'Citi Business', 'Bank of America Business', 'Wells Fargo Business', 'US Bank Business', 'Brex', 'Ramp', 'Divvy'],
     compUrls: {
@@ -1669,27 +2115,32 @@ Return ONLY valid JSON, no markdown:
 
     // ── LOB LABEL ──
     const lobLabel = ((): string | null => {
-      if ((indKey as string) === 'fin_small_business_cc') return 'Small Business Credit Cards';
-      if ((indKey as string) === 'fin_retail_bank') {
+      const k = indKey as string;
+      if (k === 'fin_cc_travel')           return 'Travel Credit Cards';
+      if (k === 'fin_cc_cashback')         return 'Cash Back Credit Cards';
+      if (k === 'fin_cc_student_rewards')  return 'Student Rewards Credit Cards';
+      if (k === 'fin_cc_student')          return 'Student Credit Cards';
+      if (k === 'fin_cc_secured')          return 'Secured Credit Cards';
+      if (k === 'fin_cc_balance_transfer') return 'Balance Transfer Credit Cards';
+      if (k === 'fin_cc_low_interest')     return 'Low Interest Credit Cards';
+      if (k === 'fin_cc_rewards')          return 'Rewards Credit Cards';
+      if (k === 'fin_small_business_cc')   return 'Small Business Credit Cards';
+      if (k === 'fin_small_business')      return 'Small Business Banking';
+      if (k === 'fin_auto_refinance')      return 'Auto Loan Refinancing';
+      if (k === 'fin_auto_loan')           return 'Auto Loans & Financing';
+      if (k === 'fin_mortgage_refinance')  return 'Mortgage Refinancing';
+      if (k === 'fin_mortgage')            return 'Mortgage & Home Loans';
+      if (k === 'fin_heloc')               return 'Home Equity & HELOC';
+      if (k === 'fin_wealth')              return 'Wealth Management';
+      if (k === 'fin_commercial')          return 'Commercial Banking';
+      if (k === 'fin_retail_bank') {
         const u = url.toLowerCase();
-        if (u.includes('/checking')) return 'Checking Accounts';
+        if (u.includes('/checking'))                                    return 'Checking Accounts';
         if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
-        if (u.includes('/cd') || u.includes('/certificate')) return 'CDs & Certificates';
-        return 'Retail Banking — Checking, Savings & CDs';
+        if (u.includes('/cd') || u.includes('/certificate'))           return 'CDs & Certificates';
+        return 'Retail Banking';
       }
-      if ((indKey as string) === 'fin_auto_loan') return 'Auto Loans & Financing';
-      if ((indKey as string) === 'fin_mortgage') return 'Mortgage & Home Loans';
-      if ((indKey as string) === 'fin_wealth') return 'Wealth Management';
-      if ((indKey as string) === 'fin_commercial') return 'Commercial Banking';
-      if ((indKey as string) === 'fin_small_business') return 'Small Business Banking';
-      if (indKey === 'fin') {
-        const u = url.toLowerCase();
-        if (u.includes('/auto') || u.includes('/car') || u.includes('/vehicle')) return 'Auto Loans';
-        if (u.includes('/mortgage') || u.includes('/home-loan') || u.includes('/heloc')) return 'Mortgage & Home Loans';
-        if (u.includes('/invest') || u.includes('/wealth') || u.includes('/brokerage')) return 'Wealth & Investments';
-        if (u.includes('/credit-card') || u.includes('/creditcard')) return 'Credit Cards';
-        return 'Credit Cards';
-      }
+      if (k === 'fin') return 'Credit Cards';
       return null;
     })();
 
