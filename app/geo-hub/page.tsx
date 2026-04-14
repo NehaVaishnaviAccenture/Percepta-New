@@ -263,7 +263,6 @@ function GeoSummary({ result }: { result:any }) {
   useEffect(()=>{
     if(fetched) return;
     setFetched(true);
-    // Check sessionStorage cache first — prevents reload on tab switch
     try {
       const cacheKey = `geo_summary_${result.brand_name}_${geo}`;
       const cached = sessionStorage.getItem(cacheKey);
@@ -365,7 +364,6 @@ function GeoSummary({ result }: { result:any }) {
             </thead>
             <tbody>
               {(()=>{
-                // Pair insights with recommendations for same-row display
                 const insights = data.rows.filter((r:any)=>r.type==='insight');
                 const recs = data.rows.filter((r:any)=>r.type==='recommendation');
                 const rowCount = Math.max(insights.length, recs.length);
@@ -390,18 +388,15 @@ function GeoSummary({ result }: { result:any }) {
                   const delta = rec ? (rec.scoreForecast - rec.scoreNow) : 0;
                   return (
                     <tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'white':'#FAFAFA'}}>
-                      {/* # */}
                       <td style={{padding:'14px 14px',verticalAlign:'middle' as const}}>
                         <div style={{width:28,height:28,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.72rem',fontWeight:800,color:'#7C3AED'}}>{i+1}</div>
                       </td>
-                      {/* Category */}
                       <td style={{padding:'14px 14px',verticalAlign:'middle' as const}}>
                         <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
                           {ins&&<span style={{background:ic.bg,color:ic.c,borderRadius:50,padding:'2px 9px',fontSize:'0.63rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{insCat}</span>}
                           {rec&&cat&&<span style={{background:cat.bg,color:cat.color,borderRadius:50,padding:'2px 9px',fontSize:'0.63rem',fontWeight:700,display:'inline-block',width:'fit-content'}}>{cat.label}</span>}
                         </div>
                       </td>
-                      {/* Insight */}
                       <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
                         {ins?(
                           <span style={{fontSize:'0.81rem',color:'#374151',lineHeight:1.65}}>{ins.text}</span>
@@ -409,7 +404,6 @@ function GeoSummary({ result }: { result:any }) {
                           <span style={{color:'#D1D5DB',fontSize:'0.75rem'}}>—</span>
                         )}
                       </td>
-                      {/* Recommendation */}
                       <td style={{padding:'14px 14px',verticalAlign:'top' as const}}>
                         {rec?(
                           <div>
@@ -426,7 +420,6 @@ function GeoSummary({ result }: { result:any }) {
                           <span style={{color:'#D1D5DB',fontSize:'0.75rem'}}>—</span>
                         )}
                       </td>
-                      {/* GEO Forecast */}
                       <td style={{padding:'14px 14px',verticalAlign:'middle' as const,textAlign:'center' as const}}>
                         {rec?(
                           <div style={{display:'inline-flex',flexDirection:'column' as const,alignItems:'center',gap:3,background:'#F0FDF4',border:'1px solid #6EE7B7',borderRadius:10,padding:'8px 12px'}}>
@@ -441,7 +434,6 @@ function GeoSummary({ result }: { result:any }) {
                           <span style={{fontSize:'0.88rem',fontWeight:700,color:'#374151'}}>{ins?.scoreNow??geo}</span>
                         )}
                       </td>
-                      {/* Impact */}
                       <td style={{padding:'14px 14px',verticalAlign:'middle' as const,textAlign:'center' as const}}>
                         {rec?(
                           <span style={{background:impBg,color:impColor,borderRadius:50,padding:'3px 10px',fontSize:'0.66rem',fontWeight:700,whiteSpace:'nowrap' as const}}>{rec.impact}</span>
@@ -694,13 +686,10 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
     ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:ci===0}))
   ];
 
-  // ── Spread crowded bubbles: jitter x slightly so no two overlap ──
-  // Group by x-value proximity, then fan them out horizontally
   const all = raw.map((a,i)=>{
     if(a.isYou || a.isTopComp) return {...a, jx:a.x, jy:a.y};
-    // Find how many earlier non-key bubbles share the same tight x-zone
     const sameZone = raw.slice(0,i).filter(b=>!b.isYou&&!b.isTopComp&&Math.abs(b.x-a.x)<=4);
-    const jitter = sameZone.length * 4; // spread 4 units per duplicate
+    const jitter = sameZone.length * 4;
     return {...a, jx:a.x + jitter, jy:a.y};
   });
 
@@ -717,7 +706,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
   const bR=(c:number)=>Math.round(4+((c-citMin)/Math.max(citMax-citMin,1))*7);
 
-  // ── Label placement: above/below alternating, stagger by crowding ──
   const placements = all.map((a,i)=>{
     const cx2=sx(a.jx), cy2=sy(a.jy), r=bR(a.cit);
     const zoneBefore = all.slice(0,i).filter(b=>Math.abs(sx(b.jx)-cx2)<24).length;
@@ -726,7 +714,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
     return {cx2, cy2, r, ly:Math.max(padT+6, Math.min(H-padB-6, cy2+offset)), above};
   });
 
-  // Quadrant corner labels
   const midX=sx(avgX), midY=sy(avgY);
   const qLabels=[
     {x:padL+8, y:padT+14, text:'High Sentiment · Low Visibility', color:'#9CA3AF'},
@@ -746,22 +733,16 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
-        {/* Quadrant shading */}
         <rect x={padL} y={padT} width={midX-padL} height={midY-padT} fill="#F0FDF4" opacity="0.35"/>
         <rect x={midX} y={padT} width={W-padR-midX} height={midY-padT} fill="#F5F3FF" opacity="0.45"/>
         <rect x={padL} y={midY} width={midX-padL} height={H-padB-midY} fill="#F9FAFB" opacity="0.5"/>
         <rect x={midX} y={midY} width={W-padR-midX} height={H-padB-midY} fill="#FFF7ED" opacity="0.3"/>
-        {/* Grid lines */}
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        {/* Avg crosshairs */}
         <line x1={midX} y1={padT} x2={midX} y2={H-padB} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
         <line x1={padL} y1={midY} x2={W-padR} y2={midY} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
-        {/* Axes */}
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
-        {/* Quadrant corner labels */}
         {qLabels.map((q,i)=><text key={i} x={q.x} y={q.y} textAnchor={(q as any).anchor||'start'} style={{fontSize:8,fill:q.color,fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>{q.text}</text>)}
-        {/* Bubbles */}
         {all.map((a,i)=>{
           const {cx2,cy2,r}=placements[i];
           const isH=hov===i;
@@ -772,7 +753,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
             <circle cx={cx2} cy={cy2} r={r} fill={fill} stroke={stroke} strokeWidth={a.isYou?2:a.isTopComp?2:1}/>
           </g>;
         })}
-        {/* Labels with leader lines */}
         {all.map((a,i)=>{
           const {cx2,cy2,r,ly,above}=placements[i];
           const isH=hov===i;
@@ -792,7 +772,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis
             </g>}
           </g>;
         })}
-        {/* X-axis ticks */}
         {[...Array(19)].map((_,i)=>{const v=i*5;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
         <text x={(padL+W-padR)/2} y={H-8} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
@@ -996,7 +975,6 @@ export default function GeoHub() {
                 const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,rank:'N/A'}};
                 const t=CFT[result.brand_name];
                 if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
-                // preserve lob label if set by API
                 if(!result.lob && result.ind_key==='fin') result.lob='Credit Cards';
                 if(!result.lob && result.ind_key==='fin_retail_bank') result.lob='Retail Banking';
                 if(!result.lob && result.ind_key==='fin_auto_loan') result.lob='Auto Loans & Financing';
@@ -1042,7 +1020,6 @@ export default function GeoHub() {
             })()}
 
             {activeTab===1&&(()=>{
-              // Client-side tier safety net — ensures correct values even from cached sessions
               const CLIENT_FIN_TIERS:Record<string,any> = {
                 'Chase':{'geo':80,'vis':82,'cit':78,'sent':86,'sov':72,'rank':'#1'},
                 'American Express':{'geo':73,'vis':73,'cit':70,'sent':84,'sov':62,'rank':'#2'},
@@ -1227,22 +1204,18 @@ export default function GeoHub() {
               Object.keys(catMap).forEach(k=>{ catMap[k]=Math.min(Math.round(catMap[k]),100); });
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED','Other':'#6B7280','Social':'#F59E0B','Institution':'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
-              // Merge aliases: jpmorganchase.com -> treated as owned if brand is chase
               const DOMAIN_ALIASES: Record<string,string> = {
                 'jpmorganchase.com': 'chase.com',
               };
               const buildDisplaySources = () => {
                 const base = sources.length > 0 ? sources : allSourcesToClassify.map((s:any, i:number) => ({rank: i+1, domain: s.domain, citation_share: s.citation_share, category: classifyDomain(s.domain).label}));
-                // Merge aliased domains into their canonical brand domain
                 const merged: any[] = [];
                 const seen = new Set<string>();
                 base.forEach((s:any) => {
                   const aliasTarget = DOMAIN_ALIASES[(s.domain||'').toLowerCase()];
                   if (aliasTarget && (domainMatchesBrand(aliasTarget) || aliasTarget === brandDomain)) {
-                    // Find existing owned entry and add citation share to it
                     const existing = merged.find(m => m.domain === brandDomain || domainMatchesBrand(m.domain||''));
                     if (existing) { existing.citation_share = Math.min(100, (existing.citation_share||0) + (s.citation_share||0)); }
-                    // Skip the aliased domain from appearing separately
                     return;
                   }
                   if (!seen.has(s.domain)) { seen.add(s.domain); merged.push({...s}); }
@@ -1318,15 +1291,13 @@ export default function GeoHub() {
               const rd=result.responses_detail||[],cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
               const catStats:Record<string,{total:number;mentioned:number}>={};
               rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
-              // Derive totalMentions from visibility so it always matches GEO Score tab
-              // visibility = appearance rate %, so mentions = round(vis/100 * totalQueries)
               const totalQueries = result.total_responses ?? rd.length ?? 50;
               const visRate = result.visibility ?? 0;
-              const totalMentions = result.ind_key === 'fin'
+              const FIN_FIXED_IND_KEYS = ['fin','fin_small_business_cc','fin_cc_travel','fin_cc_cashback','fin_cc_student','fin_cc_student_rewards','fin_cc_secured','fin_cc_balance_transfer','fin_cc_rewards','fin_cc_low_interest','fin_retail_bank','fin_auto_loan','fin_mortgage','fin_wealth','fin_commercial','fin_small_business','fin_smb_savings','fin_smb_checking','fin_smb_loans','fin_smb_payments'];
+              const totalMentions = FIN_FIXED_IND_KEYS.includes(result.ind_key)
                 ? Math.floor((visRate / 100) * totalQueries)
                 : (result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length);
-              // For fin industry show rate directly from visibility to avoid rounding mismatch
-              const displayRate = result.ind_key === 'fin' ? visRate : Math.round((totalMentions/totalQueries)*100);
+              const displayRate = FIN_FIXED_IND_KEYS.includes(result.ind_key) ? visRate : Math.round((totalMentions/totalQueries)*100);
               const rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=totalQueries-totalMentions;
               const getBeater=(item:any)=>{
                 if(item.winner_brand) return item.winner_brand;
