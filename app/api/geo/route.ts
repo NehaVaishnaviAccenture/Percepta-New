@@ -171,8 +171,22 @@ function getIndustry(domain: string, pageData?: any): string {
     // ── COMMERCIAL / CORPORATE ──
     if (hasAny('/commercial','/corporate','/treasury','/institutional','/wholesale')) return 'fin_commercial';
 
-    // ── SMALL BUSINESS BANKING (no credit card in path) ──
-    if (hasAny('/small-business','/smallbusiness','/business-checking','/business-banking','/for-business','/business/')) return 'fin_small_business';
+    // ── SMALL BUSINESS SUB-TYPES (most specific first) ──
+    const isSmallBiz = hasAny('/small-business','/smallbusiness','/for-business','/business');
+    if (isSmallBiz) {
+      // Savings
+      if (hasAny('/savings','/high-yield','/money-market'))           return 'fin_smb_savings';
+      // Checking
+      if (hasAny('/checking','/current-account'))                     return 'fin_smb_checking';
+      // Loans / lending
+      if (hasAny('/loan','/lending','/line-of-credit','/sba','/financing','/borrow')) return 'fin_smb_loans';
+      // Payments / merchant
+      if (hasAny('/payment','/merchant','/payroll','/invoic'))        return 'fin_smb_payments';
+      // Generic small business banking
+      return 'fin_small_business';
+    }
+    // Also catch business-checking / business-banking paths without /small-business prefix
+    if (hasAny('/business-checking','/business-banking'))             return 'fin_smb_checking';
 
     // ── RETAIL BANKING SUB-TYPES ──
     if (hasAny('/savings','/high-yield','/hysa','/money-market'))  return 'fin_retail_bank';
@@ -1056,6 +1070,254 @@ const INDUSTRY_DATA: Record<string, any> = {
     compUrls: { 'JPMorgan Chase Commercial': 'jpmorgan.com', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Commercial': 'wellsfargo.com/biz', 'Citi Commercial': 'citibank.com/commercialbank', 'US Bank Business': 'usbank.com/business', 'PNC Commercial': 'pnc.com/commercial', 'Truist Commercial': 'truist.com/commercial', 'KeyBank Business': 'key.com/business', 'Regions Commercial': 'regions.com/commercial', 'Fifth Third Business': '53.com/business' },
     awareness: { 'jpmorgan chase commercial': 62, 'bank of america business': 58, 'wells fargo commercial': 52, 'citi commercial': 48, 'us bank business': 36, 'pnc commercial': 32, 'truist commercial': 28, 'keybank business': 24, 'regions commercial': 22, 'fifth third business': 20 },
   },
+  // ── SMALL BUSINESS SAVINGS ──
+  // e.g. /small-business/bank/products/savings/
+  fin_smb_savings: {
+    name: 'small business savings accounts',
+    label: 'Small Business Savings',
+    queries: [
+      ['General', 'What is the best small business savings account right now?'],
+      ['General', 'Which bank offers the best small business savings account?'],
+      ['General', 'Best small business savings accounts with high interest rates'],
+      ['General', 'Which bank has the best APY on small business savings?'],
+      ['General', 'Best small business savings accounts recommended by experts'],
+      ['General', 'Which bank is best for a small business emergency fund savings account?'],
+      ['General', 'Best small business savings accounts with no monthly fees'],
+      ['General', 'Which bank makes it easiest to open a small business savings account?'],
+      ['General', 'Best small business savings accounts for sole proprietors and LLCs'],
+      ['General', 'Most recommended small business savings accounts by financial advisors'],
+      ['High Yield', 'Which bank has the highest APY on small business savings right now?'],
+      ['High Yield', 'Best high yield small business savings accounts in 2025'],
+      ['High Yield', 'Which online bank offers the best interest rate for small business savings?'],
+      ['High Yield', 'Best small business savings accounts beating inflation right now'],
+      ['High Yield', 'Which bank gives the most interest on small business savings with no minimums?'],
+      ['High Yield', 'Best high yield small business money market accounts'],
+      ['High Yield', 'Which bank has the best small business savings rate with easy access?'],
+      ['High Yield', 'Best small business savings accounts for earning passive interest on reserves'],
+      ['High Yield', 'Which bank offers the best small business savings rate for balances over $10K?'],
+      ['High Yield', 'Best banks for growing small business cash reserves through savings'],
+      ['Features', 'Which small business savings account has the best mobile app?'],
+      ['Features', 'Best small business savings accounts with no minimum balance requirement'],
+      ['Features', 'Which bank has the best small business savings account with unlimited transfers?'],
+      ['Features', 'Best small business savings account that integrates with accounting software'],
+      ['Features', 'Which bank offers the best small business savings with same-bank checking?'],
+      ['Features', 'Best small business savings accounts with FDIC insurance over $250K'],
+      ['Features', 'Which bank has the best small business savings with instant transfers?'],
+      ['Features', 'Best small business savings accounts with no minimum opening deposit'],
+      ['Features', 'Which bank allows the most withdrawals per month on business savings?'],
+      ['Features', 'Best small business savings accounts for multiple sub-accounts and buckets'],
+      ['Expert Recommendation', 'Which small business savings account do accountants recommend?'],
+      ['Expert Recommendation', 'Best small business savings accounts ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best small business savings customer service?'],
+      ['Expert Recommendation', 'Best small business savings accounts recommended by Bankrate'],
+      ['Expert Recommendation', 'Which bank is best for a small business saving for taxes?'],
+      ['Expert Recommendation', 'Best small business savings account for a business with seasonal cash flow'],
+      ['Expert Recommendation', 'Which bank is best for a startup saving its first $50K?'],
+      ['Expert Recommendation', 'Best small business savings accounts for e-commerce businesses'],
+      ['Expert Recommendation', 'Which bank offers the best small business savings for a restaurant?'],
+      ['Expert Recommendation', 'Best small business savings accounts for service-based businesses'],
+      ['Comparison', 'Chase Business savings vs Capital One small business savings — which is better?'],
+      ['Comparison', 'Mercury business savings vs Bluevine business savings comparison'],
+      ['Comparison', 'Which small business savings account beats Chase Business for interest rate?'],
+      ['Comparison', 'Bank of America small business savings vs Wells Fargo business savings'],
+      ['Comparison', 'Best online bank vs traditional bank for small business savings'],
+      ['Comparison', 'Relay business savings vs Mercury business savings comparison'],
+      ['Comparison', 'Which is better for small business savings — a bank or a credit union?'],
+      ['Comparison', 'Best small business savings account if choosing between two major banks'],
+      ['Comparison', 'Capital One business savings vs American Express business savings rate'],
+      ['Comparison', 'Which small business savings account has better long-term value?'],
+    ],
+    comps: ['Chase Business', 'Bank of America Business', 'Wells Fargo Business', 'Mercury', 'Bluevine', 'Relay', 'Novo', 'American Express Business', 'US Bank Business', 'Live Oak Bank'],
+    compUrls: { 'Chase Business': 'chase.com/business', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Business': 'wellsfargo.com/biz', 'Mercury': 'mercury.com', 'Bluevine': 'bluevine.com', 'Relay': 'relayfi.com', 'Novo': 'novo.co', 'American Express Business': 'americanexpress.com/business', 'US Bank Business': 'usbank.com/business', 'Live Oak Bank': 'liveoakbank.com' },
+    awareness: { 'chase business': 58, 'bank of america business': 54, 'wells fargo business': 48, mercury: 34, bluevine: 30, relay: 26, novo: 22, 'american express business': 36, 'us bank business': 28, 'live oak bank': 24 },
+  },
+
+  // ── SMALL BUSINESS CHECKING ──
+  // e.g. /small-business/bank/checking/ or /business-checking/
+  fin_smb_checking: {
+    name: 'small business checking accounts',
+    label: 'Small Business Checking',
+    queries: [
+      ['General', 'What is the best small business checking account right now?'],
+      ['General', 'Which bank offers the best free small business checking account?'],
+      ['General', 'Best small business checking accounts with no monthly fees'],
+      ['General', 'Which bank is best for a small business checking account overall?'],
+      ['General', 'Best small business checking accounts recommended by experts'],
+      ['General', 'Which bank is easiest to open a small business checking account with?'],
+      ['General', 'Best small business checking accounts for sole proprietors and LLCs'],
+      ['General', 'Which bank has the best mobile app for small business checking?'],
+      ['General', 'Best small business checking accounts with the most ATM access'],
+      ['General', 'Most recommended small business checking accounts by financial advisors'],
+      ['No Fee', 'Which small business checking account has no monthly maintenance fee?'],
+      ['No Fee', 'Best free small business checking accounts with no minimums'],
+      ['No Fee', 'Which bank waives small business checking fees for new businesses?'],
+      ['No Fee', 'Best small business checking accounts with no transaction fees'],
+      ['No Fee', 'Which online bank offers the best free small business checking?'],
+      ['No Fee', 'Best small business checking with no minimum opening deposit'],
+      ['No Fee', 'Which bank has the fewest fees on small business checking overall?'],
+      ['No Fee', 'Best small business checking accounts with no cash deposit fees'],
+      ['No Fee', 'Which bank waives small business checking fees with a minimum balance?'],
+      ['No Fee', 'Best small business checking accounts for startups with limited cash'],
+      ['Features', 'Which small business checking account has the best bill pay features?'],
+      ['Features', 'Best small business checking accounts with built-in invoicing tools'],
+      ['Features', 'Which bank offers the best small business checking with Zelle for Business?'],
+      ['Features', 'Best small business checking accounts with QuickBooks integration'],
+      ['Features', 'Which bank has the best small business checking with early direct deposit?'],
+      ['Features', 'Best small business checking accounts with unlimited transactions'],
+      ['Features', 'Which bank has the best overdraft protection for small business checking?'],
+      ['Features', 'Best small business checking accounts with sub-accounts for budgeting'],
+      ['Features', 'Which bank has the best small business debit card rewards on checking?'],
+      ['Features', 'Best small business checking accounts with same-day ACH transfers'],
+      ['Expert Recommendation', 'Which small business checking account do accountants recommend?'],
+      ['Expert Recommendation', 'Best small business checking accounts ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best small business checking customer service?'],
+      ['Expert Recommendation', 'Best small business checking accounts recommended by Bankrate'],
+      ['Expert Recommendation', 'Which bank is best for a restaurant small business checking?'],
+      ['Expert Recommendation', 'Best small business checking account for an e-commerce business'],
+      ['Expert Recommendation', 'Which bank is best for a small business checking with high cash deposits?'],
+      ['Expert Recommendation', 'Best small business checking accounts for freelancers and consultants'],
+      ['Expert Recommendation', 'Which bank offers the best small business checking for a nonprofit?'],
+      ['Expert Recommendation', 'Best small business checking accounts for businesses with employees'],
+      ['Comparison', 'Chase Business Complete vs Capital One Spark Business checking — which is better?'],
+      ['Comparison', 'Mercury business checking vs Relay business checking comparison'],
+      ['Comparison', 'Which small business checking account beats Chase for fees and features?'],
+      ['Comparison', 'Bank of America Business Advantage vs Wells Fargo Business checking'],
+      ['Comparison', 'Best online bank vs traditional bank for small business checking'],
+      ['Comparison', 'Bluevine business checking vs Mercury business checking comparison'],
+      ['Comparison', 'Novo vs Relay for small business checking — which is better?'],
+      ['Comparison', 'Which is better for small business checking — a bank or a fintech?'],
+      ['Comparison', 'Capital One Spark Business vs American Express Business checking'],
+      ['Comparison', 'Which small business checking account has better long-term value?'],
+    ],
+    comps: ['Chase Business', 'Bank of America Business', 'Wells Fargo Business', 'Mercury', 'Bluevine', 'Relay', 'Novo', 'American Express Business', 'US Bank Business', 'Axos Business'],
+    compUrls: { 'Chase Business': 'chase.com/business', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Business': 'wellsfargo.com/biz', 'Mercury': 'mercury.com', 'Bluevine': 'bluevine.com', 'Relay': 'relayfi.com', 'Novo': 'novo.co', 'American Express Business': 'americanexpress.com/business', 'US Bank Business': 'usbank.com/business', 'Axos Business': 'axosbank.com' },
+    awareness: { 'chase business': 58, 'bank of america business': 54, 'wells fargo business': 48, mercury: 34, bluevine: 30, relay: 26, novo: 22, 'american express business': 36, 'us bank business': 28, 'axos business': 20 },
+  },
+
+  // ── SMALL BUSINESS LOANS ──
+  // e.g. /small-business/loans/ or /small-business/line-of-credit/
+  fin_smb_loans: {
+    name: 'small business loans and lending',
+    label: 'Small Business Loans',
+    queries: [
+      ['General', 'What is the best small business loan lender right now?'],
+      ['General', 'Which bank offers the best small business loans overall?'],
+      ['General', 'Best small business loans for established businesses'],
+      ['General', 'Which lender has the best small business loan rates?'],
+      ['General', 'Best small business loans recommended by experts in 2025'],
+      ['General', 'Which bank is easiest to get a small business loan from?'],
+      ['General', 'Best small business loans for a business with good revenue'],
+      ['General', 'Which bank has the fastest small business loan approval?'],
+      ['General', 'Best small business loan lenders with no prepayment penalty'],
+      ['General', 'Most recommended small business loan lenders by financial advisors'],
+      ['SBA Loans', 'Which bank is best for SBA 7(a) loans for small businesses?'],
+      ['SBA Loans', 'Best SBA loan lenders of 2025'],
+      ['SBA Loans', 'Which bank has the fastest SBA loan approval process?'],
+      ['SBA Loans', 'Best banks for SBA 504 loans for small businesses'],
+      ['SBA Loans', 'Which SBA lender has the best terms and lowest rates?'],
+      ['Line of Credit', 'Best small business line of credit from a bank'],
+      ['Line of Credit', 'Which bank offers the best small business revolving line of credit?'],
+      ['Line of Credit', 'Best small business line of credit with no annual fee'],
+      ['Line of Credit', 'Which lender has the best small business line of credit for startups?'],
+      ['Line of Credit', 'Best small business lines of credit recommended by NerdWallet'],
+      ['Term Loans', 'Best small business term loans for working capital'],
+      ['Term Loans', 'Which bank has the best small business term loan rates?'],
+      ['Term Loans', 'Best small business loans for purchasing equipment'],
+      ['Term Loans', 'Which lender is best for a small business loan under $100K?'],
+      ['Term Loans', 'Best small business term loans with flexible repayment terms'],
+      ['Startup', 'Best small business loans for startups with limited credit history'],
+      ['Startup', 'Which lender gives small business loans to new businesses?'],
+      ['Startup', 'Best startup business loans with no revenue requirement'],
+      ['Startup', 'Which bank is best for a first-time small business loan?'],
+      ['Startup', 'Best small business loans for minority-owned and women-owned businesses'],
+      ['Expert Recommendation', 'Which small business loan lender do accountants recommend?'],
+      ['Expert Recommendation', 'Best small business loans ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best small business loan customer service?'],
+      ['Expert Recommendation', 'Best small business loans recommended by Bankrate'],
+      ['Expert Recommendation', 'Which bank is best for a small business loan for a restaurant?'],
+      ['Expert Recommendation', 'Best small business loans for an e-commerce business'],
+      ['Expert Recommendation', 'Which bank has the best small business loan for real estate investors?'],
+      ['Expert Recommendation', 'Best small business loans for businesses with seasonal revenue'],
+      ['Expert Recommendation', 'Which lender is best for a small business loan after bad credit?'],
+      ['Expert Recommendation', 'Best small business loan lenders for businesses with existing debt'],
+      ['Comparison', 'Chase Business loan vs Bank of America small business loan — which is better?'],
+      ['Comparison', 'OnDeck vs Kabbage for small business loans comparison'],
+      ['Comparison', 'Which small business loan beats Chase for approval speed?'],
+      ['Comparison', 'Wells Fargo small business loan vs Capital One small business loan'],
+      ['Comparison', 'Best online small business lender vs traditional bank loan'],
+      ['Comparison', 'Bluevine line of credit vs Kabbage line of credit comparison'],
+      ['Comparison', 'SBA loan vs traditional bank loan for small businesses'],
+      ['Comparison', 'Which is better — a small business loan or a business line of credit?'],
+      ['Comparison', 'Best small business loan if choosing between a bank and an online lender'],
+      ['Comparison', 'Which small business loan has better long-term value?'],
+    ],
+    comps: ['Chase Business', 'Bank of America Business', 'Wells Fargo Business', 'OnDeck', 'Kabbage', 'Bluevine', 'Fundbox', 'US Bank Business', 'Live Oak Bank', 'American Express Business'],
+    compUrls: { 'Chase Business': 'chase.com/business', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Business': 'wellsfargo.com/biz', 'OnDeck': 'ondeck.com', 'Kabbage': 'kabbage.com', 'Bluevine': 'bluevine.com', 'Fundbox': 'fundbox.com', 'US Bank Business': 'usbank.com/business', 'Live Oak Bank': 'liveoakbank.com', 'American Express Business': 'americanexpress.com/business' },
+    awareness: { 'chase business': 58, 'bank of america business': 54, 'wells fargo business': 48, ondeck: 32, kabbage: 28, bluevine: 30, fundbox: 24, 'us bank business': 28, 'live oak bank': 22, 'american express business': 36 },
+  },
+
+  // ── SMALL BUSINESS PAYMENTS ──
+  // e.g. /small-business/payments/ or /small-business/payroll/
+  fin_smb_payments: {
+    name: 'small business payments and payroll',
+    label: 'Small Business Payments',
+    queries: [
+      ['General', 'What is the best payment processing solution for small businesses?'],
+      ['General', 'Which bank offers the best small business payment processing?'],
+      ['General', 'Best small business payment solutions recommended by experts'],
+      ['General', 'Which payment processor is best for a small business in 2025?'],
+      ['General', 'Best small business payment solutions with low transaction fees'],
+      ['General', 'Which bank has the best small business merchant services?'],
+      ['General', 'Best small business payment platforms for accepting credit cards'],
+      ['General', 'Which payment solution is easiest for a small business to set up?'],
+      ['General', 'Best small business payment solutions for online and in-person sales'],
+      ['General', 'Most recommended small business payment processors by financial advisors'],
+      ['Merchant Services', 'Which bank has the best merchant services for small businesses?'],
+      ['Merchant Services', 'Best small business merchant accounts with low fees'],
+      ['Merchant Services', 'Which payment processor has the lowest transaction fee for small businesses?'],
+      ['Merchant Services', 'Best merchant services for a small retail business'],
+      ['Merchant Services', 'Which bank offers the best POS system for small businesses?'],
+      ['Payroll', 'Best payroll services for small businesses in 2025'],
+      ['Payroll', 'Which bank offers the best payroll integration for small businesses?'],
+      ['Payroll', 'Best small business payroll solutions with direct deposit'],
+      ['Payroll', 'Which payroll service is easiest for a small business with under 10 employees?'],
+      ['Payroll', 'Best payroll services for small businesses recommended by accountants'],
+      ['ACH & Transfers', 'Which bank has the best ACH payment solution for small businesses?'],
+      ['ACH & Transfers', 'Best small business banks for same-day ACH transfers'],
+      ['ACH & Transfers', 'Which bank offers the best wire transfer rates for small businesses?'],
+      ['ACH & Transfers', 'Best small business banks for paying vendors and suppliers by ACH'],
+      ['ACH & Transfers', 'Which bank has the best Zelle for Business integration?'],
+      ['Invoicing', 'Best small business banks with built-in invoicing tools'],
+      ['Invoicing', 'Which bank offers the best small business invoicing and payments platform?'],
+      ['Invoicing', 'Best small business payment solutions for sending and tracking invoices'],
+      ['Invoicing', 'Which bank has the best small business accounts receivable tools?'],
+      ['Invoicing', 'Best small business platforms for getting paid faster by clients'],
+      ['Expert Recommendation', 'Which small business payment solution do accountants recommend?'],
+      ['Expert Recommendation', 'Best small business payment processors ranked by NerdWallet'],
+      ['Expert Recommendation', 'Which bank has the best small business payments customer service?'],
+      ['Expert Recommendation', 'Best small business payment solutions recommended by Bankrate'],
+      ['Expert Recommendation', 'Which payment solution is best for a restaurant small business?'],
+      ['Expert Recommendation', 'Best small business payment solutions for e-commerce businesses'],
+      ['Expert Recommendation', 'Which bank has the best payment tools for a service-based business?'],
+      ['Expert Recommendation', 'Best small business payment solutions for businesses with employees'],
+      ['Expert Recommendation', 'Which bank offers the best payment automation for small businesses?'],
+      ['Expert Recommendation', 'Best small business payment solutions for businesses that invoice clients'],
+      ['Comparison', 'Chase Business payments vs Square for small businesses — which is better?'],
+      ['Comparison', 'Stripe vs Square for small business payment processing comparison'],
+      ['Comparison', 'Which small business payment solution beats PayPal for fees?'],
+      ['Comparison', 'Bank merchant services vs third-party payment processor for small businesses'],
+      ['Comparison', 'Best online payment processor vs bank payment solution for small businesses'],
+      ['Comparison', 'Clover vs Square POS for small business payments comparison'],
+      ['Comparison', 'Which is better for small business payments — a bank or a fintech?'],
+      ['Comparison', 'Best small business payment solution if choosing between two providers'],
+      ['Comparison', 'Capital One business payments vs Chase business payments comparison'],
+      ['Comparison', 'Which small business payment solution has better long-term value?'],
+    ],
+    comps: ['Chase Business', 'Bank of America Business', 'Wells Fargo Business', 'Square', 'Stripe', 'PayPal Business', 'Clover', 'Relay', 'Mercury', 'American Express Business'],
+    compUrls: { 'Chase Business': 'chase.com/business', 'Bank of America Business': 'bankofamerica.com/smallbusiness', 'Wells Fargo Business': 'wellsfargo.com/biz', 'Square': 'squareup.com', 'Stripe': 'stripe.com', 'PayPal Business': 'paypal.com/business', 'Clover': 'clover.com', 'Relay': 'relayfi.com', 'Mercury': 'mercury.com', 'American Express Business': 'americanexpress.com/business' },
+    awareness: { 'chase business': 58, 'bank of america business': 54, 'wells fargo business': 48, square: 62, stripe: 58, 'paypal business': 60, clover: 44, relay: 26, mercury: 34, 'american express business': 36 },
+  },
+
   fin_small_business: {
     name: 'small business banking',
     label: 'Small Business Banking',
@@ -2124,7 +2386,11 @@ Return ONLY valid JSON, no markdown:
       if (k === 'fin_cc_balance_transfer') return 'Balance Transfer Credit Cards';
       if (k === 'fin_cc_low_interest')     return 'Low Interest Credit Cards';
       if (k === 'fin_cc_rewards')          return 'Rewards Credit Cards';
-      if (k === 'fin_small_business_cc')   return 'Small Business Credit Cards';
+      if (k === 'fin_smb_savings')          return 'Small Business Savings';
+      if (k === 'fin_smb_checking')         return 'Small Business Checking';
+      if (k === 'fin_smb_loans')            return 'Small Business Loans';
+      if (k === 'fin_smb_payments')         return 'Small Business Payments';
+      if (k === 'fin_small_business_cc')    return 'Small Business Credit Cards';
       if (k === 'fin_small_business')      return 'Small Business Banking';
       if (k === 'fin_auto_refinance')      return 'Auto Loan Refinancing';
       if (k === 'fin_auto_loan')           return 'Auto Loans & Financing';
