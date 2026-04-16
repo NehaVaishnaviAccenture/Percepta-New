@@ -728,7 +728,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 14px 0'}}>
         <div style={{fontSize:'0.72rem',color:'#6B7280',display:'flex',alignItems:'center',gap:12}}>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#7C3AED"/></svg> You</span>
-          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> #1 Competitor ★</span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> Top Competitor ★ <span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>(highest GEO among rivals)</span></span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#CBD5E1"/></svg> Others</span>
           <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>· Bubble size = Citation Score · <strong style={{color:'#374151'}}>Hover any bubble to see data</strong></span>
         </div>
@@ -1204,9 +1204,9 @@ export default function GeoHub() {
               const catMap:Record<string,number>={};
               const allSourcesToClassify = sources.length > 0 ? sources : (() => {
                 const knownSources = [
-                  {domain:'nerdwallet.com', share:14},{domain:'bankrate.com', share:12},{domain:'thepointsguy.com', share:10},
-                  {domain:'forbes.com', share:10},{domain:'creditkarma.com', share:9},{domain:'reddit.com', share:8},
-                  {domain:'wikipedia.org', share:7},{domain:'consumerfinance.gov', share:7},{domain:'cnbc.com', share:6},{domain:'investopedia.com', share:5},
+                  {domain:'nerdwallet.com', share:5},{domain:'bankrate.com', share:4},{domain:'thepointsguy.com', share:4},
+                  {domain:'forbes.com', share:4},{domain:'creditkarma.com', share:3},{domain:'reddit.com', share:3},
+                  {domain:'wikipedia.org', share:3},{domain:'consumerfinance.gov', share:3},{domain:'cnbc.com', share:3},{domain:'investopedia.com', share:3},
                 ];
                 return knownSources.map(s => ({ domain: s.domain, citation_share: s.share }));
               })();
@@ -1239,10 +1239,12 @@ export default function GeoHub() {
                 });
                 const hasBrandDomain = merged.some((s:any) => domainMatchesBrand(s.domain||''));
                 let result2 = hasBrandDomain ? merged : [{ rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true }, ...merged];
-                // Cap owned media at 15%
+                // Cap owned media at 15%, cap all other sources at 5%
                 result2 = result2.map((s:any) => ({
                   ...s,
-                  citation_share: domainMatchesBrand(s.domain||'') ? Math.min(s.citation_share, 15) : s.citation_share,
+                  citation_share: domainMatchesBrand(s.domain||'')
+                    ? Math.min(s.citation_share, 15)
+                    : Math.min(s.citation_share, 5),
                 }));
                 return result2.map((s:any, i:number) => ({ ...s, rank: i+1, isOwned: domainMatchesBrand(s.domain||'') }));
               };
