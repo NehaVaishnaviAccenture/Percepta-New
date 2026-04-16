@@ -728,7 +728,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 14px 0'}}>
         <div style={{fontSize:'0.72rem',color:'#6B7280',display:'flex',alignItems:'center',gap:12}}>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#7C3AED"/></svg> You</span>
-          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> Top Competitor ★ <span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>(highest GEO among rivals)</span></span>
+          <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> Top Competitor</span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#CBD5E1"/></svg> Others</span>
           <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>· Bubble size = Citation Score · <strong style={{color:'#374151'}}>Hover any bubble to see data</strong></span>
         </div>
@@ -764,10 +764,10 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
           const tipW=176,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL+2),W-padR-tipW-2),ty=cy2>padT+70?cy2-tipH-14:cy2+r+10;
           return <g key={`l${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
             <line x1={cx2} y1={leaderY} x2={cx2} y2={above?ly+3:ly-3} stroke={lc} strokeWidth="0.8" strokeDasharray="2,2" opacity="0.4"/>
-            <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:lc,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}{a.isTopComp?' ★':''}</text>
+            <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:lc,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}</text>
             {isH&&<g>
               <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
-              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (#1 Competitor)':a.isYou?' (You)':''}</text>
+              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (Top Competitor)':a.isYou?' (You)':''}</text>
               <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: {a.x} · Sentiment: {a.y}</text>
               <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation Score: {a.cit}</text>
             </g>}
@@ -1063,6 +1063,8 @@ export default function GeoHub() {
               const resolvedRank=(c:any)=>{
                 const r=String(c.Rank||'').replace(/^#+/,'').trim();
                 if(!r||r==='N/A'||r==='null'||r==='undefined') return '—';
+                const num = parseInt(r, 10);
+                if(!isNaN(num) && num > 5) return '—';
                 return `#${r}`;
               };
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
@@ -1204,9 +1206,9 @@ export default function GeoHub() {
               const catMap:Record<string,number>={};
               const allSourcesToClassify = sources.length > 0 ? sources : (() => {
                 const knownSources = [
-                  {domain:'nerdwallet.com', share:5},{domain:'bankrate.com', share:4},{domain:'thepointsguy.com', share:4},
-                  {domain:'forbes.com', share:4},{domain:'creditkarma.com', share:3},{domain:'reddit.com', share:3},
-                  {domain:'wikipedia.org', share:3},{domain:'consumerfinance.gov', share:3},{domain:'cnbc.com', share:3},{domain:'investopedia.com', share:3},
+                  {domain:'nerdwallet.com', share:4.9},{domain:'bankrate.com', share:3.8},{domain:'thepointsguy.com', share:3.2},
+                  {domain:'forbes.com', share:2.9},{domain:'creditkarma.com', share:2.7},{domain:'reddit.com', share:2.4},
+                  {domain:'wikipedia.org', share:2.2},{domain:'consumerfinance.gov', share:2.1},{domain:'cnbc.com', share:1.9},{domain:'investopedia.com', share:1.7},
                 ];
                 return knownSources.map(s => ({ domain: s.domain, citation_share: s.share }));
               })();
