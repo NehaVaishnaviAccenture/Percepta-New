@@ -975,7 +975,7 @@ export default function GeoHub() {
                 const t=CFT[result.brand_name];
                 if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
                 if(!result.lob && result.ind_key==='fin') result.lob='Credit Cards';
-                if(!result.lob && result.ind_key==='fin_retail_bank') result.lob='Retail Banking';
+                // lob already set by route.ts to 'Retail Banking — Savings · Checking · CDs' etc
                 if(!result.lob && result.ind_key==='fin_auto_loan') result.lob='Auto Loans & Financing';
                 if(!result.lob && result.ind_key==='fin_mortgage') result.lob='Mortgage & Home Loans';
                 if(!result.lob && result.ind_key==='fin_wealth') result.lob='Wealth Management';
