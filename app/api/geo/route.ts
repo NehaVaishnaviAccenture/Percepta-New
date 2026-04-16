@@ -233,6 +233,56 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Best credit cards for small business owners'],
       ['Expert Recommendation', 'Which credit card has the lowest interest rates?'],
       ['Expert Recommendation', 'What credit card do most Americans use and recommend?'],
+      ['Rewards Optimization', 'Which credit card gives the most points on dining and restaurants?'],
+      ['Rewards Optimization', 'Best credit card for earning rewards on grocery spending'],
+      ['Rewards Optimization', 'Which credit card has the best welcome bonus right now?'],
+      ['Rewards Optimization', 'Best credit cards for earning points on everyday purchases'],
+      ['Rewards Optimization', 'Which credit card transfers points to the most travel partners?'],
+      ['Rewards Optimization', 'Best credit cards for maximizing cash back on gas stations'],
+      ['Rewards Optimization', 'Which credit card earns the most on streaming subscriptions?'],
+      ['Rewards Optimization', 'Best credit card for earning miles without flying frequently'],
+      ['Rewards Optimization', 'Which credit card has the best rotating bonus categories?'],
+      ['Rewards Optimization', 'Best credit cards for earning rewards on online shopping'],
+      ['Card Benefits', 'Which credit card has the best travel insurance and protections?'],
+      ['Card Benefits', 'Best credit cards with free airport lounge access'],
+      ['Card Benefits', 'Which credit card offers the best purchase protection?'],
+      ['Card Benefits', 'Best credit cards with cell phone protection included'],
+      ['Card Benefits', 'Which credit card has the best extended warranty benefit?'],
+      ['Card Benefits', 'Best credit cards with no foreign transaction fees for travel'],
+      ['Card Benefits', 'Which credit card has the best rental car insurance coverage?'],
+      ['Card Benefits', 'Best credit cards with concierge services and premium perks'],
+      ['Card Benefits', 'Which credit card has the best trip delay and cancellation coverage?'],
+      ['Card Benefits', 'Best credit cards with Global Entry or TSA PreCheck credit'],
+      ['Interest & Fees', 'Which credit card has the lowest ongoing APR?'],
+      ['Interest & Fees', 'Best credit cards with 0% intro APR on new purchases'],
+      ['Interest & Fees', 'Which credit card has no annual fee and still earns good rewards?'],
+      ['Interest & Fees', 'Best credit cards for someone who carries a balance occasionally'],
+      ['Interest & Fees', 'Which credit card has no penalty APR after a late payment?'],
+      ['Interest & Fees', 'Best credit cards with waived first year annual fee'],
+      ['Interest & Fees', 'Which credit card has the most transparent fee structure?'],
+      ['Interest & Fees', 'Best credit cards for people who want to avoid interest entirely'],
+      ['Interest & Fees', 'Which credit card has the best grace period on purchases?'],
+      ['Interest & Fees', 'Best credit cards with no foreign transaction and no annual fee'],
+      ['Premium Cards', 'What is the best premium credit card worth the high annual fee?'],
+      ['Premium Cards', 'Which luxury credit card gives the best return on the annual fee?'],
+      ['Premium Cards', 'Best premium credit cards for frequent business travelers'],
+      ['Premium Cards', 'Which high-end credit card has the most valuable perks?'],
+      ['Premium Cards', 'Best credit cards for high spenders who want maximum rewards'],
+      ['Approval & Credit', 'Which credit card is easiest to get approved for with fair credit?'],
+      ['Approval & Credit', 'Best credit cards that do a soft pull pre-approval check'],
+      ['Approval & Credit', 'Which credit card has the highest approval rate for average credit?'],
+      ['Approval & Credit', 'Best credit cards for someone with a 650 credit score'],
+      ['Approval & Credit', 'Which credit card issuer is most generous with credit limits?'],
+      ['Comparison', 'Chase Sapphire Preferred vs American Express Gold — which is better?'],
+      ['Comparison', 'Capital One Venture X vs Chase Sapphire Reserve comparison'],
+      ['Comparison', 'Which cash back card beats the Citi Double Cash for flat rate rewards?'],
+      ['Comparison', 'Discover it vs Capital One Quicksilver — best no annual fee card?'],
+      ['Comparison', 'Chase Freedom Unlimited vs Citi Double Cash — which earns more?'],
+      ['Comparison', 'American Express Blue Cash Preferred vs Chase Freedom Flex comparison'],
+      ['Comparison', 'Which travel card wins — Capital One Venture or Bilt Rewards?'],
+      ['Comparison', 'Best overall credit card for someone choosing between Chase and Amex'],
+      ['Comparison', 'Capital One SavorOne vs Chase Freedom Unlimited for dining rewards'],
+      ['Comparison', 'Which credit card issuer has better fraud protection — Chase or Capital One?'],
     ],
     comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'PenFed', 'TD Bank', 'US Bank', 'Regions Bank', 'Citizens Bank', 'Truist', 'Fifth Third', 'KeyBank', 'Huntington'],
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', 'PenFed': 'penfed.org', 'TD Bank': 'td.com', 'US Bank': 'usbank.com', 'Regions Bank': 'regions.com', 'Citizens Bank': 'citizensbank.com', Truist: 'truist.com', 'Fifth Third': '53.com', KeyBank: 'key.com', Huntington: 'huntington.com' },
@@ -778,6 +828,56 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Best banks for FDIC insured deposits'],
       ['Expert Recommendation', 'Which bank is best for building long term wealth?'],
       ['Expert Recommendation', 'Best banks for overall value and low fees'],
+      ['Digital & Mobile', 'Which bank has the best mobile app for everyday banking?'],
+      ['Digital & Mobile', 'Best banks for digital-only customers with no branch needs'],
+      ['Digital & Mobile', 'Which bank app makes it easiest to transfer money?'],
+      ['Digital & Mobile', 'Best banks for managing finances entirely from your phone'],
+      ['Digital & Mobile', 'Which bank has the best mobile deposit and bill pay features?'],
+      ['Digital & Mobile', 'Best banks for sending money with Zelle or instant transfer'],
+      ['Digital & Mobile', 'Which online bank is the most secure for digital banking?'],
+      ['Digital & Mobile', 'Best banks for real-time transaction alerts and notifications'],
+      ['Digital & Mobile', 'Which bank has the best budgeting tools built into the app?'],
+      ['Digital & Mobile', 'Best banks for paperless account management'],
+      ['Savings Rates', 'Which bank is offering the best savings account interest rate today?'],
+      ['Savings Rates', 'Best high yield savings accounts beating money market funds right now'],
+      ['Savings Rates', 'Which online bank pays the most interest on savings with no fees?'],
+      ['Savings Rates', 'Best banks for growing an emergency fund with a competitive APY'],
+      ['Savings Rates', 'Which bank raised its savings rate the most recently?'],
+      ['Savings Rates', 'Best savings accounts recommended by personal finance experts in 2025'],
+      ['Savings Rates', 'Which bank gives the best return on a $10,000 savings balance?'],
+      ['Savings Rates', 'Best banks for setting up automatic savings contributions'],
+      ['Savings Rates', 'Which bank has the highest APY with no minimum balance on savings?'],
+      ['Savings Rates', 'Best savings accounts for building wealth over five years'],
+      ['Checking Features', 'Which bank offers free checking with the most ATM access?'],
+      ['Checking Features', 'Best banks for checking accounts with no overdraft fees'],
+      ['Checking Features', 'Which bank has the best early direct deposit feature?'],
+      ['Checking Features', 'Best checking accounts for people who get paid biweekly'],
+      ['Checking Features', 'Which bank waives monthly checking fees most easily?'],
+      ['Checking Features', 'Best banks for joint checking accounts for couples'],
+      ['Checking Features', 'Which bank has the best cashback checking account?'],
+      ['Checking Features', 'Best banks for checking accounts with free paper checks'],
+      ['Checking Features', 'Which bank has the most ATMs nationwide for checking customers?'],
+      ['Checking Features', 'Best checking accounts with no minimum balance requirement'],
+      ['CD Rates', 'Which bank is offering the best 12-month CD rate right now?'],
+      ['CD Rates', 'Best no-penalty CDs available from major banks in 2025'],
+      ['CD Rates', 'Which bank has the best CD rates for short-term savings?'],
+      ['CD Rates', 'Best banks for building a CD ladder with competitive rates'],
+      ['CD Rates', 'Which bank offers the best 6-month CD with no early withdrawal penalty?'],
+      ['CD Rates', 'Best banks for locking in a high CD rate before rates fall'],
+      ['CD Rates', 'Which bank has the highest 2-year CD rate available?'],
+      ['CD Rates', 'Best CD accounts for conservative savers who want guaranteed returns'],
+      ['CD Rates', 'Which bank auto-renews CDs at the best rate?'],
+      ['CD Rates', 'Best online banks for CD rates vs traditional brick and mortar banks'],
+      ['Switching & Onboarding', 'Which bank makes it easiest to switch from another bank?'],
+      ['Switching & Onboarding', 'Best banks for new customers with a welcome bonus offer'],
+      ['Switching & Onboarding', 'Which bank can I open an account with online in under 5 minutes?'],
+      ['Switching & Onboarding', 'Best banks for immigrants or people with no US credit history'],
+      ['Switching & Onboarding', 'Which bank has the best new account promotion right now?'],
+      ['Switching & Onboarding', 'Best banks for people who want to consolidate all accounts in one place'],
+      ['Switching & Onboarding', 'Which bank is easiest to get approved for with a low credit score?'],
+      ['Switching & Onboarding', 'Best banks for young adults opening their first checking account'],
+      ['Switching & Onboarding', 'Which bank offers the best referral bonus for recommending a friend?'],
+      ['Switching & Onboarding', 'Best banks for getting set up with direct deposit quickly'],
     ],
     comps: ['Chase', 'Bank of America', 'Wells Fargo', 'Ally', 'Marcus', 'Capital One', 'Citi', 'US Bank', 'Discover Bank', 'SoFi', 'Synchrony Bank', 'American Express Bank', 'Barclays', 'USAA', 'Navy Federal'],
     compUrls: { 'Chase': 'chase.com', 'Bank of America': 'bankofamerica.com', 'Wells Fargo': 'wellsfargo.com', 'Ally': 'ally.com', 'Marcus': 'marcus.com', 'Capital One': 'capitalone.com', 'Citi': 'citi.com', 'US Bank': 'usbank.com', 'Discover Bank': 'discover.com', 'SoFi': 'sofi.com', 'Synchrony Bank': 'synchrony.com', 'American Express Bank': 'americanexpress.com', 'Barclays': 'barclays.com', 'USAA': 'usaa.com', 'Navy Federal': 'navyfederal.org' },
@@ -2175,24 +2275,21 @@ Return ONLY valid JSON, no markdown:
       const f = SB_CC_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
 
-    // ── CHANGE 2: Scale display to 100 queries ──
-    const DISPLAY_MULTIPLIER = 2; // show 100 queries instead of 50
-    let mentionsDisplay = Math.round((visOverride / 100) * totalQueries * DISPLAY_MULTIPLIER);
-    let totalQueriesDisplay = totalQueries * DISPLAY_MULTIPLIER;
+    // Display counts = actual query counts (real 100 queries run per industry)
+    let mentionsDisplay = Math.round((visOverride / 100) * totalQueries);
+    let totalQueriesDisplay = totalQueries;
 
-    const responsesDetailBase = allQA.map(p => ({
+    const responsesDetail = allQA.map(p => ({
       category: p.category,
       query: p.q,
       mentioned: aliases.some(a => (p.a || '').toLowerCase().includes(a)),
       response_preview: p.a || '',
       position: getBrandPosition(p.a || '', brand),
     }));
-    // Duplicate to match DISPLAY_MULTIPLIER=2, so table shows 100 rows matching totalQueriesDisplay
-    const responsesDetail = [...responsesDetailBase, ...responsesDetailBase];
 
     let citationSources: any[] = [];
     try {
-      const cp = `For "${brand}" in ${ind.name}, list top 10 domains influencing AI knowledge. Estimate citation % (sum=100), classify as Social/Institution/Earned Media/Owned Media/Other, list top 3 page paths. Return ONLY valid JSON array, no markdown: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":25,"top_pages":["/a","/b","/c"]}]. Exactly 10 items.`;
+      const cp = `For "${brand}" in ${ind.name}, list exactly 10 real domains that AI models pull from when answering questions in this category. Use realistic citation share percentages — owned domain should be 10-15%, top third-party sources 3-5%, others 1-3%. Total does NOT need to sum to 100. Classify each as Social/Institution/Earned Media/Owned Media/Other. Return ONLY valid JSON array, no markdown, no preamble: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":4.9,"top_pages":["/best-cards","/reviews","/compare"]}]. Exactly 10 items. Use real domain names relevant to ${ind.name}.`;
       const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
       citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
     } catch {}
@@ -2272,11 +2369,11 @@ Return ONLY valid JSON, no markdown:
         'Marcus':          { GEO:71, Vis:70, Cit:68, Sen:84, Sov:58, Prom:70, Rank:'#4' },
         'Capital One':     { GEO:79, Vis:80, Cit:80, Sen:88, Sov:74, Prom:78, Rank:'#1' },
         'Bank of America': { GEO:59, Vis:58, Cit:56, Sen:64, Sov:48, Prom:60, Rank:'#5' },
-        'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'#6' },
-        'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'#7' },
-        'Citi':            { GEO:43, Vis:42, Cit:40, Sen:50, Sov:34, Prom:44, Rank:'#8' },
-        'Discover Bank':   { GEO:41, Vis:40, Cit:38, Sen:60, Sov:30, Prom:42, Rank:'#9' },
-        'Synchrony Bank':  { GEO:40, Vis:38, Cit:36, Sen:58, Sov:28, Prom:40, Rank:'#10' },
+        'Wells Fargo':     { GEO:48, Vis:48, Cit:44, Sen:52, Sov:38, Prom:48, Rank:'N/A' },
+        'SoFi':            { GEO:46, Vis:44, Cit:42, Sen:68, Sov:36, Prom:46, Rank:'N/A' },
+        'Citi':            { GEO:43, Vis:42, Cit:40, Sen:50, Sov:34, Prom:44, Rank:'N/A' },
+        'Discover Bank':   { GEO:41, Vis:40, Cit:38, Sen:60, Sov:30, Prom:42, Rank:'N/A' },
+        'Synchrony Bank':  { GEO:40, Vis:38, Cit:36, Sen:58, Sov:28, Prom:40, Rank:'N/A' },
       };
       const COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':            { GEO:80, Vis:82, Cit:78, Sen:86, Sov:72, Prom:80, Rank:'#1' },
@@ -2358,9 +2455,10 @@ Return ONLY valid JSON, no markdown:
     };
     const cappedCitationSources = citationSources.map((s: any) => ({
       ...s,
+      // Owned domain capped at 15%, all others capped at 5% — realistic AI citation distribution
       citation_share: domainMatchesBrandFn(s.domain || '')
         ? Math.min(s.citation_share, 15)
-        : s.citation_share,
+        : Math.min(s.citation_share, 5),
     }));
 
     return NextResponse.json({
