@@ -114,7 +114,6 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
         Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you\'re not yet the brand AI leads with or recommends first.'}
       </p>
-
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
           <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${b.border}`,padding:'10px 12px'}}>
@@ -214,7 +213,7 @@ function ROICurve({ score }: { score: number }) {
 
 const REC_CATEGORIES: Record<string,{label:string;color:string;bg:string}> = {
   // Content Layer
-  'Comparison Page':   {label:'Comparison Page',   color:'#3B82F6', bg:'#EFF6FF'},
+  'Owned Content Optimization': {label:'Owned Content Optimization', color:'#0F766E', bg:'#F0FDFA'},
   'Content Page':      {label:'Content Page',      color:'#8B5CF6', bg:'#F5F3FF'},
   'FAQ Build':         {label:'FAQ Build',         color:'#10B981', bg:'#ECFDF5'},
   'How-To Guide':      {label:'How-To Guide',      color:'#0EA5E9', bg:'#F0F9FF'},
@@ -271,13 +270,14 @@ function GeoSummary({ result }: { result:any }) {
     setLoading(true);
     const lobContext = lob ? `Line of Business: ${lob}.` : '';
     const insightCats = 'Data Signal|Competitive Gap|Visibility Gap|Sentiment Gap|Citation Gap|Earned Media Gap|Content Gap|Rank Signal';
-    const recCats = 'Comparison Page|Content Page|FAQ Build|How-To Guide|Product Explainer|Best-Of List|Use Case Page|Content Strategy|PR / Earned Media|Citation Push|Review Platform|Forum Presence|Wikipedia / Entity|Influencer / Creator|Structured Data|Schema Markup|Entity Optimization|Technical SEO|Internal Linking|Syndication|Data Feed|API Presence';
+    // FIX 2: "Comparison Page" removed — replaced with "Owned Content Optimization"
+    const recCats = 'Owned Content Optimization|Content Page|FAQ Build|How-To Guide|Product Explainer|Best-Of List|Use Case Page|Content Strategy|PR / Earned Media|Citation Push|Review Platform|Forum Presence|Wikipedia / Entity|Influencer / Creator|Structured Data|Schema Markup|Entity Optimization|Technical SEO|Internal Linking|Syndication|Data Feed|API Presence';
     const prompt = [
       'You are a sharp GEO strategist. Return a JSON object with:',
       '- "rows": array of exactly 10 objects. First 5 insights, last 5 recommendations.',
       '  Each object: { "type":"insight"|"recommendation", "category": insights use: '+insightCats+'. Recommendations use: '+recCats+',',
       '  "title": 4-6 word action title for recommendations only (null for insights),',
-      '  "text": one sharp sentence. Insights: open with a specific number, name brand+competitor. Recommendations: verb-first, platform-specific, LOB-specific, max 25 words,',
+      '  "text": one sharp sentence. Insights: open with a specific number, name brand+competitor. Recommendations: verb-first, platform-specific, LOB-specific, max 25 words. NEVER suggest competitor comparison pages — banks do not publish pages comparing themselves to rivals,',
       '  "scoreNow": '+String(geo)+',',
       '  "scoreForecast": insights='+String(geo)+'. Recommendations: +1 to +4 pts max. Be conservative,',
       '  "impact": insights=null. Recommendations="HIGH"|"MEDIUM"|"LOW". Sort HIGH first then MEDIUM then LOW,',
@@ -287,7 +287,7 @@ function GeoSummary({ result }: { result:any }) {
       'Industry: '+result.ind_label,
       'GEO: '+String(geo)+' | Vis: '+String(vis)+' | Sent: '+String(sent)+' | Cit: '+String(cit)+' | SOV: '+String(sov)+' | Prom: '+String(prom),
       'Top Competitor: '+topComp+' (GEO: '+String(topCompGEO)+')',
-      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Earned Media Gap and Content Gap insights. scoreForecast +1 to +4 only. Return ONLY valid JSON no markdown.',
+      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Earned Media Gap and Content Gap insights. scoreForecast +1 to +4 only. NEVER recommend comparison pages against competitors. Return ONLY valid JSON no markdown.',
     ].join('\n');
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
@@ -335,7 +335,6 @@ function GeoSummary({ result }: { result:any }) {
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
           <span style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>GEO Analysis Summary</span>
           {lob&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{lob}</span>}
-
         </div>
 
         {loading&&(
@@ -678,12 +677,13 @@ function VisibilityBars({ brand, vis, competitors }: { brand:string; vis:number;
   return <div>{all.map((a,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}><div style={{width:18,fontSize:'0.8rem',color:a.isYou?'#7C3AED':'#9CA3AF',fontWeight:a.isYou?700:400}}>{i+1}</div><div style={{width:140,fontSize:'0.84rem',color:'#374151',fontWeight:a.isYou?700:400}}>{a.Brand}{a.isYou&&<span style={{marginLeft:6,fontSize:'0.68rem',background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontWeight:700}}>← You</span>}</div><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:8,overflow:'hidden'}}><div style={{background:a.isYou?'#7C3AED':'#D1D5DB',height:8,borderRadius:50,width:`${(a.Vis/max)*100}%`}}/></div><div style={{width:32,fontSize:'0.85rem',fontWeight:700,color:a.isYou?'#7C3AED':'#374151',textAlign:'right' as const}}>{a.Vis}</div></div>)}</div>;
 }
 
-function ScatterPlot({ brand, vis, sent, cit, competitors }: { brand:string; vis:number; sent:number; cit:number; competitors:any[] }) {
+function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { brand:string; vis:number; sent:number; cit:number; competitors:any[]; topCompBrand:string }) {
   const [hov,setHov]=useState<number|null>(null);
   const top20 = competitors.slice(0,20);
   const raw=[
     {label:brand, x:vis, y:sent, cit:cit, isYou:true, isTopComp:false},
-    ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:ci===0}))
+    // FIX 1: isTopComp is determined by highest GEO score (already sorted), not hardcoded
+    ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:c.Brand===topCompBrand}))
   ];
 
   const all = raw.map((a,i)=>{
@@ -789,7 +789,8 @@ function PriorityActionsTable({ result }: { result:any }) {
     const prompt=`You are a GEO strategist. Generate a JSON array of 5-7 specific implementable priority actions for this brand.
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
-Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Comparison Page"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
+IMPORTANT: Do NOT suggest comparison pages against competitors — banks never publish pages comparing themselves to rivals.
+Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Owned Content Optimization"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
 Order: High first, then Medium, then Low.`;
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const raw2=data.response||'';let cl2=raw2.replace('```json','').replace('```','').trim();setActions(JSON.parse(cl2));}).catch(()=>setActions([])).finally(()=>setLoading(false));
   },[]);
@@ -807,8 +808,6 @@ Order: High first, then Medium, then Low.`;
     </div>
   );
 }
-
-
 
 export default function GeoHub() {
   const [url,setUrl]=useState('');
@@ -908,10 +907,10 @@ export default function GeoHub() {
             const displayName = brandName.charAt(0).toUpperCase()+brandName.slice(1);
             const steps = [
               {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata'},
-              {icon:'🤖', label:'Launching 50 AI queries', detail:'Firing all query batches simultaneously across 5 categories'},
+              {icon:'🤖', label:'Launching 100 AI queries', detail:'Firing all query batches simultaneously across 5 categories'},
               {icon:'💳', label:'Running General Consumer queries', detail:'10 broad brand awareness questions'},
               {icon:'💰', label:'Running category-specific queries', detail:'Cash Back · Travel & Rewards · Credit Building'},
-              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all 50 AI responses for ${displayName} references`},
+              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all 100 AI responses for ${displayName} references`},
               {icon:'📊', label:'Scoring sentiment & prominence', detail:'Analysing tone and position in each response'},
               {icon:'🏆', label:'Benchmarking competitors', detail:'Scoring Chase · Amex · Citi · Discover and 6 others'},
               {icon:'🔗', label:'Building citation network', detail:'Mapping sources and share of voice'},
@@ -954,7 +953,6 @@ export default function GeoHub() {
                     </div>
                   ))}
                 </div>
-
               </div>
             );
           })()}
@@ -985,6 +983,17 @@ export default function GeoHub() {
               }
               return null;
             })()}
+
+            {/* FIX 1: Compute topCompBrand dynamically from sorted competitors by GEO score */}
+            {(()=>{
+              const comps = result.competitors || [];
+              const sorted = [...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
+              const topCompBrand = sorted.length > 0 ? sorted[0].Brand : '';
+              // Store on result for use in child components
+              result._topCompBrand = topCompBrand;
+              return null;
+            })()}
+
             {activeTab===0&&(()=>{
               const geo = result.overall_geo_score;
               const vis = result.visibility;
@@ -1104,6 +1113,8 @@ export default function GeoHub() {
               const vis=result.visibility,comps=result.competitors||[],allVis=[vis,...comps.map((c:any)=>c.Vis)];
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1,topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
               const gapToTop=vis-(topComp?topComp.Vis:vis),avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
+              // FIX 1: topCompBrand is the brand with highest GEO, already computed
+              const topCompBrand = result._topCompBrand || (comps.length > 0 ? comps[0].Brand : '');
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
@@ -1111,7 +1122,12 @@ export default function GeoHub() {
                     <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}><VisibilityBars brand={result.brand_name} vis={vis} competitors={result.competitors||[]}/></div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility — Market Positioning</div><div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div><ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]}/></div>
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
+                    <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility — Market Positioning</div>
+                    <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div>
+                    {/* FIX 1: pass topCompBrand so star goes on correct brand */}
+                    <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
+                  </div>
                 </div>
               );
             })()}
@@ -1187,9 +1203,9 @@ export default function GeoHub() {
               const catMap:Record<string,number>={};
               const allSourcesToClassify = sources.length > 0 ? sources : (() => {
                 const knownSources = [
-                  {domain:'nerdwallet.com', share:20},{domain:'bankrate.com', share:18},{domain:'thepointsguy.com', share:14},
-                  {domain:'forbes.com', share:12},{domain:'creditkarma.com', share:10},{domain:'reddit.com', share:8},
-                  {domain:'wikipedia.org', share:7},{domain:'consumerfinance.gov', share:6},{domain:'cnbc.com', share:6},{domain:'investopedia.com', share:5},
+                  {domain:'nerdwallet.com', share:14},{domain:'bankrate.com', share:12},{domain:'thepointsguy.com', share:10},
+                  {domain:'forbes.com', share:10},{domain:'creditkarma.com', share:9},{domain:'reddit.com', share:8},
+                  {domain:'wikipedia.org', share:7},{domain:'consumerfinance.gov', share:7},{domain:'cnbc.com', share:6},{domain:'investopedia.com', share:5},
                 ];
                 return knownSources.map(s => ({ domain: s.domain, citation_share: s.share }));
               })();
@@ -1222,6 +1238,11 @@ export default function GeoHub() {
                 });
                 const hasBrandDomain = merged.some((s:any) => domainMatchesBrand(s.domain||''));
                 let result2 = hasBrandDomain ? merged : [{ rank: 0, domain: brandDomain, citation_share: 15, category: 'Owned Media', isOwned: true }, ...merged];
+                // Cap owned media at 15%
+                result2 = result2.map((s:any) => ({
+                  ...s,
+                  citation_share: domainMatchesBrand(s.domain||'') ? Math.min(s.citation_share, 15) : s.citation_share,
+                }));
                 return result2.map((s:any, i:number) => ({ ...s, rank: i+1, isOwned: domainMatchesBrand(s.domain||'') }));
               };
               const displaySources = buildDisplaySources();
@@ -1288,24 +1309,34 @@ export default function GeoHub() {
             })()}
 
             {activeTab===5&&(()=>{
-              const rd=result.responses_detail||[],cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
+              const rd=result.responses_detail||[];
+              // FIX 3 & 4: Use total_responses from API (already set to 100 by route.ts multiplier)
+              // Show ALL queries in the table — no hardcoded 50 limit
+              const totalQueries = result.total_responses ?? rd.length;
+              const totalMentions = result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length;
+              const displayRate = Math.round((totalMentions / Math.max(totalQueries, 1)) * 100);
+
+              // FIX 3: For retail banking — derive categories from the brand URL / lob
+              // The lob already comes from route.ts (e.g. "Savings Accounts", "Checking Accounts")
+              // Show category breakdown using actual response_detail categories from the API
+              const cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
               const catStats:Record<string,{total:number;mentioned:number}>={};
-              rd.forEach((r:any)=>{if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};catStats[r.category].total++;if(r.mentioned)catStats[r.category].mentioned++;});
-              const totalQueries = result.total_responses ?? rd.length ?? 50;
-              const visRate = result.visibility ?? 0;
-              const FIN_FIXED_IND_KEYS = ['fin','fin_small_business_cc','fin_cc_travel','fin_cc_cashback','fin_cc_student','fin_cc_student_rewards','fin_cc_secured','fin_cc_balance_transfer','fin_cc_rewards','fin_cc_low_interest','fin_retail_bank','fin_auto_loan','fin_mortgage','fin_wealth','fin_commercial','fin_small_business','fin_smb_savings','fin_smb_checking','fin_smb_loans','fin_smb_payments'];
-              const totalMentions = FIN_FIXED_IND_KEYS.includes(result.ind_key)
-                ? Math.floor((visRate / 100) * totalQueries)
-                : (result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length);
-              const displayRate = FIN_FIXED_IND_KEYS.includes(result.ind_key) ? visRate : Math.round((totalMentions/totalQueries)*100);
-              const rank1=rd.filter((r:any)=>r.position===1).length,top3=rd.filter((r:any)=>r.position>0&&r.position<=3).length,notMentioned=totalQueries-totalMentions;
+              rd.forEach((r:any)=>{
+                if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};
+                catStats[r.category].total++;
+                if(r.mentioned)catStats[r.category].mentioned++;
+              });
+
+              // FIX 4: Show ALL queries sorted, no slice to 50
+              const sorted=[...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
+
               const getBeater=(item:any)=>{
                 if(item.winner_brand) return item.winner_brand;
                 if(item.top_brand && item.top_brand !== result.brand_name) return item.top_brand;
                 if(item.position===0 && item.brands_mentioned?.length>0) return item.brands_mentioned[0];
                 return null;
               };
-              const sorted=[...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
+
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
@@ -1313,20 +1344,30 @@ export default function GeoHub() {
                     <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
                     <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
-                  <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>Appearance Rate by Category</div>
+
+                  {/* FIX 3: Show product-specific category breakdown — label uses lob from URL */}
+                  <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>
+                    Appearance Rate by Category
+                    {result.lob && <span style={{marginLeft:10,background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{result.lob}</span>}
+                  </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
                     {Object.entries(catStats).map(([c,v])=><div key={c} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:'0.8rem',fontWeight:600,color:'#111827',marginBottom:7}}>{c}</div><div style={{background:'#F3F4F6',borderRadius:50,height:5,marginBottom:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${Math.round((v.mentioned/Math.max(v.total,1))*100)}%`}}/></div><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{v.mentioned} of {v.total} queries</span><span style={{fontSize:'0.76rem',fontWeight:700,color:'#7C3AED'}}>{Math.round((v.mentioned/Math.max(v.total,1))*100)}%</span></div></div>)}
                   </div>
+
                   <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
                     <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
                   </div>
+
+                  {/* FIX 4: Title now shows actual count, not hardcoded 50 */}
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
                     <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div></div>
                     <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>{cats.map(c=><option key={c}>{c}</option>)}</select>
                   </div>
+
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                      {/* FIX 4: No .slice(0,50) — show all sorted queries */}
                       <tbody>{sorted.map((item:any,i:number)=>{const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned,beater=isMissed?getBeater(item):null,isTop=rp===1;return<tr key={i} style={{borderTop:'1px solid #F3F4F6',background:isTop?'#F0FDF4':isMissed?'#FFFBFB':'white'}}><td style={{padding:'12px 14px',fontSize:'0.8rem',color:'#9CA3AF',verticalAlign:'top',width:32}}>{i+1}</td><td style={{padding:'12px 14px',verticalAlign:'top'}}><div style={{display:'flex',gap:8,alignItems:'center',marginBottom:5,flexWrap:'wrap' as const}}><span style={{background:'#EDE9FE',color:'#5B21B6',borderRadius:6,padding:'2px 9px',fontSize:'0.7rem',fontWeight:600}}>{item.category}</span>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.76rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.76rem',fontWeight:600}}>✗ Not Mentioned</span>}{isMissed&&<span style={{background:'#FEE2E2',color:'#991B1B',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>⚠ Missed</span>}{isTop&&<span style={{background:'#D1FAE5',color:'#065F46',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>★ Top Rank</span>}</div><div style={{fontSize:'0.86rem',color:'#374151',fontWeight:500}}>{item.query}</div></td><td style={{padding:'12px 14px',fontSize:'1rem',fontWeight:800,color:rankColor,verticalAlign:'top',width:80}}>{rankLabel}</td><td style={{padding:'12px 14px',verticalAlign:'top',width:160}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#92400E'}}>👑 {beater} #1</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.75rem',color:'#9CA3AF'}}>—</span>}</td></tr>;})}</tbody>
                     </table>
                   </div>
@@ -1343,7 +1384,7 @@ export default function GeoHub() {
                   <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:14}}>Which audience segments is your brand winning vs. losing in AI responses?</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>{segments.map((s,i)=><div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span><span style={{background:s.status==='Winning'?'#D1FAE5':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span></div><div style={{background:s.status==='Winning'?'#D1FAE5':'#FEE2E2',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div><div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong> &nbsp;·&nbsp; Dominated by: {s.dominated}</div></div>)}</div>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>⚡</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>GEO Health Summary</span></div>
-                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Based on how your brand performed across 20 generic AI queries.</div>
+                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Based on how your brand performed across AI queries.</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:24}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ What is Working Well</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>✓</span><span>{s}</span></li>)}</ul></div>
                     <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ What Needs Improvement</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>)}</ul></div>
