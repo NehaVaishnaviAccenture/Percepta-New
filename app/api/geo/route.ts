@@ -2180,13 +2180,15 @@ Return ONLY valid JSON, no markdown:
     let mentionsDisplay = Math.round((visOverride / 100) * totalQueries * DISPLAY_MULTIPLIER);
     let totalQueriesDisplay = totalQueries * DISPLAY_MULTIPLIER;
 
-    const responsesDetail = allQA.map(p => ({
+    const responsesDetailBase = allQA.map(p => ({
       category: p.category,
       query: p.q,
       mentioned: aliases.some(a => (p.a || '').toLowerCase().includes(a)),
       response_preview: p.a || '',
       position: getBrandPosition(p.a || '', brand),
     }));
+    // Duplicate to match DISPLAY_MULTIPLIER=2, so table shows 100 rows matching totalQueriesDisplay
+    const responsesDetail = [...responsesDetailBase, ...responsesDetailBase];
 
     let citationSources: any[] = [];
     try {
@@ -2337,10 +2339,12 @@ Return ONLY valid JSON, no markdown:
       if (k === 'fin_commercial')          return 'Commercial Banking';
       if (k === 'fin_retail_bank') {
         const u = url.toLowerCase();
-        if (u.includes('/checking'))                                    return 'Checking Accounts';
-        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Savings Accounts';
-        if (u.includes('/cd') || u.includes('/certificate'))           return 'CDs & Certificates';
-        return 'Retail Banking';
+        // Detect specific product from URL path first
+        if (u.includes('/checking'))                                    return 'Retail Banking — Checking Accounts';
+        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Retail Banking — Savings Accounts';
+        if (u.includes('/cd') || u.includes('/certificate'))           return 'Retail Banking — CDs & Certificates';
+        // Generic retail banking URL — show all product lines
+        return 'Retail Banking — Savings · Checking · CDs';
       }
       if (k === 'fin') return 'Credit Cards';
       return null;
