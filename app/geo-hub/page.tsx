@@ -263,7 +263,8 @@ function GeoSummary({ result }: { result:any }) {
     if(fetched) return;
     setFetched(true);
     try {
-      const cacheKey = `geo_summary_${result.brand_name}_${geo}`;
+      // v2 cache key — busts any old cached results that had "Comparison Page"
+      const cacheKey = `geo_summary_v2_${result.brand_name}_${geo}`;
       const cached = sessionStorage.getItem(cacheKey);
       if(cached){ setData(JSON.parse(cached)); return; }
     } catch{}
@@ -295,7 +296,7 @@ function GeoSummary({ result }: { result:any }) {
         const threeQ='`'+'`'+'`'; let clean1=(d.response||''); while(clean1.startsWith(threeQ))clean1=clean1.slice(3); while(clean1.endsWith(threeQ))clean1=clean1.slice(0,-3); clean1=clean1.replace('json','').trim();
         const parsed = JSON.parse(clean1.trim());
         setData(parsed);
-        try{ sessionStorage.setItem('geo_summary_'+result.brand_name+'_'+String(geo), JSON.stringify(parsed)); }catch{}
+        try{ sessionStorage.setItem('geo_summary_v2_'+result.brand_name+'_'+String(geo), JSON.stringify(parsed)); }catch{}
       }).catch(()=>setData(null)).finally(()=>setLoading(false));
   },[]);
 
@@ -962,7 +963,7 @@ export default function GeoHub() {
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
             {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
             <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-              <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.removeItem('geo_result');sessionStorage.removeItem('geo_url');}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
+              <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>← New Analysis</button>
             </div>
           </div>
 
