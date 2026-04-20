@@ -2393,12 +2393,6 @@ Return ONLY valid JSON, no markdown:
         citOverride = tier.cit;
         sov = tier.sov;
       }
-      competitors = competitors.map((c: any) => {
-        const t = RETIREMENT_COMP_TIERS[c.Brand];
-        if (t) return { ...c, ...t };
-        return c;
-      });
-      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
@@ -2648,6 +2642,26 @@ Return ONLY valid JSON, no markdown:
       };
       competitors = competitors.map((c: any) => {
         const t = SB_CC_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+
+    if ((indKey as string) === 'fin_retirement') {
+      const RETIREMENT_COMP_TIERS_POST: Record<string,any> = {
+        'Fidelity':       { GEO:71, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#1' },
+        'Vanguard':       { GEO:69, Vis:70, Cit:66, Sen:80, Sov:60, Prom:68, Rank:'#2' },
+        'Schwab':         { GEO:62, Vis:62, Cit:58, Sen:74, Sov:52, Prom:60, Rank:'#3' },
+        'T. Rowe Price':  { GEO:54, Vis:54, Cit:50, Sen:72, Sov:42, Prom:52, Rank:'#4' },
+        'TIAA':           { GEO:53, Vis:52, Cit:48, Sen:72, Sov:40, Prom:50, Rank:'#5' },
+        'Empower':        { GEO:49, Vis:48, Cit:44, Sen:66, Sov:36, Prom:46, Rank:'N/A' },
+        'Prudential':     { GEO:44, Vis:44, Cit:40, Sen:66, Sov:32, Prom:42, Rank:'N/A' },
+        'Mass Mutual':    { GEO:39, Vis:38, Cit:34, Sen:64, Sov:26, Prom:36, Rank:'N/A' },
+        'Transamerica':   { GEO:35, Vis:34, Cit:30, Sen:60, Sov:22, Prom:32, Rank:'N/A' },
+        'American Funds': { GEO:37, Vis:36, Cit:32, Sen:62, Sov:24, Prom:34, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = RETIREMENT_COMP_TIERS_POST[c.Brand];
         return t ? { ...c, ...t } : c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
