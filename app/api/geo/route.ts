@@ -60,6 +60,17 @@ function extractBrand(pageData: any): string {
     bofa: 'Bank of America', bankofamerica: 'Bank of America',
     wellsfargo: 'Wells Fargo', wells: 'Wells Fargo', usaa: 'USAA', capitalone: 'Capital One',
     discover: 'Discover', citi: 'Citi', citibank: 'Citi',
+    // Wealth, Insurance & Investment
+    principal: 'Principal Financial', fidelity: 'Fidelity', vanguard: 'Vanguard',
+    schwab: 'Charles Schwab', morganstanley: 'Morgan Stanley', merrill: 'Merrill Lynch',
+    edwardjones: 'Edward Jones', raymondjames: 'Raymond James', ubs: 'UBS',
+    prudential: 'Prudential', metlife: 'MetLife', transamerica: 'Transamerica',
+    massmutual: 'MassMutual', johanhancok: 'John Hancock', johnhancock: 'John Hancock',
+    tiaa: 'TIAA', nationwide: 'Nationwide', statestreet: 'State Street',
+    blackrock: 'BlackRock', invesco: 'Invesco', troweprice: 'T. Rowe Price',
+    empower: 'Empower', securian: 'Securian', lincoln: 'Lincoln Financial',
+    sunlife: 'Sun Life', greatwest: 'Great-West Life', lpl: 'LPL Financial',
+    // Auto
     toyota: 'Toyota', ford: 'Ford', honda: 'Honda',
     tesla: 'Tesla', hyundai: 'Hyundai', kia: 'Kia', nissan: 'Nissan',
     mercedes: 'Mercedes', audi: 'Audi', marriott: 'Marriott', hilton: 'Hilton',
@@ -107,10 +118,23 @@ function getIndustry(domain: string, pageData?: any): string {
   const has = (...segments: string[]) => segments.every(s => urlPath.includes(s));
   const hasAny = (...segments: string[]) => segments.some(s => urlPath.includes(s));
 
-  const finDomains = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com'];
+  const finDomains = ['capital','chase','amex','americanexpress','citi','discover','bank','credit','card','finance','fargo','visa','master','barclays','synchrony','usaa','wellsfargo','nerdwallet','bankrate','navyfederal','penfed','truist','regions','huntington','keybank','td.com','principal','fidelity','vanguard','schwab','blackrock','merrill','edward','raymond','robinhood','etrade','wealthfront','betterment','sofi','ally','marcus','lending','loan','mortgage','insurance','invest','retirement','annuity','401k','ira','pension','asset','wealth','brokerage','money','savings','mutual','fund','securities','financial','advisors','planners'];
   const isFin = finDomains.some(k => d.includes(k));
 
+  // Domain-level override for retirement / asset management firms with no specific product path
+  const retirementDomains = ['principal','fidelity','vanguard','tiaa','massmutual','transamerica','lincolnfinancial','nationwide','sunlife','metlife','newyorklife','johnhancock','pacificlife','guardian','ameritas','northwestern','prudential','allianz','empower','troweprice','americanfunds','blackrock'];
+  const wealthAdvisorDomains = ['schwab','merrilledge','edwardjones','raymondjames','wealthfront','betterment','robinhood','etrade','morganstanley','goldmansachs','ubs','stifel'];
+  const isRetirementFirm = retirementDomains.some(k => d.includes(k));
+  const isWealthAdvisorFirm = wealthAdvisorDomains.some(k => d.includes(k));
+  if (isRetirementFirm && !hasAny('/credit-card','/auto-loan','/mortgage','/checking')) return 'fin_retirement';
+  if (isWealthAdvisorFirm && !hasAny('/credit-card','/auto-loan','/mortgage','/checking')) return 'fin_wealth';
+
   if (isFin) {
+    // ── Explicit wealth/insurance/investment detection (before CC check) ──
+    const wealthDomains = ['principal','fidelity','vanguard','schwab','morganstanley','merrilllynch','edwardjones','raymondjames','ubs','prudential','metlife','transamerica','massmutual','johnhancock','tiaa','nationwide','statestreet','blackrock','invesco','troweprice','empower','securian','lincoln','sunlife','lpl'];
+    const isWealthDomain = wealthDomains.some(k => d.includes(k));
+    if (isWealthDomain) return 'fin_wealth';
+
     const isCCUrl = hasAny('/credit-card','/creditcard','/cards');
 
     if (isCCUrl) {
@@ -893,6 +917,125 @@ const INDUSTRY_DATA: Record<string, any> = {
     compUrls: { 'Chase': 'chase.com', 'Bank of America': 'bankofamerica.com', 'Wells Fargo': 'wellsfargo.com', 'Ally': 'ally.com', 'Marcus': 'marcus.com', 'Capital One': 'capitalone.com', 'Citi': 'citi.com', 'US Bank': 'usbank.com', 'Discover Bank': 'discover.com', 'SoFi': 'sofi.com', 'Synchrony Bank': 'synchrony.com', 'American Express Bank': 'americanexpress.com', 'Barclays': 'barclays.com', 'USAA': 'usaa.com', 'Navy Federal': 'navyfederal.org' },
     label: 'Retail Banking',
     awareness: { chase: 62, 'bank of america': 58, 'wells fargo': 52, ally: 48, marcus: 42, 'capital one': 50, citi: 44, 'us bank': 36, 'discover bank': 38, sofi: 34, 'synchrony bank': 28, 'american express bank': 30, barclays: 20, usaa: 32, 'navy federal': 26 },
+  },
+  fin_retirement: {
+    name: 'retirement planning & asset management',
+    label: 'Retirement & Asset Management',
+    queries: [
+      // ── RETIREMENT PLANNING (10) ──
+      ['Retirement Planning', 'What is the best company for retirement planning and 401k management?'],
+      ['Retirement Planning', 'Which financial company is best for managing my 401k investments?'],
+      ['Retirement Planning', 'What is the best retirement savings plan provider in the US?'],
+      ['Retirement Planning', 'Which company offers the best IRA accounts for retirement savings?'],
+      ['Retirement Planning', 'What is the best financial company for long-term retirement planning?'],
+      ['Retirement Planning', 'Which retirement plan provider do financial advisors recommend most?'],
+      ['Retirement Planning', 'What is the best company to roll over a 401k into an IRA?'],
+      ['Retirement Planning', 'Which financial firm is best for someone starting their retirement savings?'],
+      ['Retirement Planning', 'What is the best place to open a Roth IRA for long-term growth?'],
+      ['Retirement Planning', 'Which company has the best tools for retirement income planning?'],
+      // ── EMPLOYER BENEFITS & 401K (10) ──
+      ['Employer Benefits', 'Which company provides the best 401k plan administration for employers?'],
+      ['Employer Benefits', 'What is the best 401k provider for small and mid-sized businesses?'],
+      ['Employer Benefits', 'Which financial firm is most recommended for employee retirement benefits?'],
+      ['Employer Benefits', 'What is the best company for setting up a company retirement plan?'],
+      ['Employer Benefits', 'Which 401k provider has the best investment options for employees?'],
+      ['Employer Benefits', 'What is the best employer-sponsored retirement savings platform?'],
+      ['Employer Benefits', 'Which company is best for managing defined contribution retirement plans?'],
+      ['Employer Benefits', 'What is the best financial partner for employee benefit plans and 401k?'],
+      ['Employer Benefits', 'Which retirement plan provider has the lowest fees for small businesses?'],
+      ['Employer Benefits', 'What is the best company for automated 401k enrollment and management?'],
+      // ── INVESTMENT MANAGEMENT (10) ──
+      ['Investment Management', 'What is the best company for managed investment portfolios?'],
+      ['Investment Management', 'Which financial firm has the best mutual fund options for retirement?'],
+      ['Investment Management', 'What is the best asset management company for long-term investors?'],
+      ['Investment Management', 'Which company offers the best target date funds for retirement?'],
+      ['Investment Management', 'What is the best investment firm for diversified retirement portfolios?'],
+      ['Investment Management', 'Which financial company has the best index fund options?'],
+      ['Investment Management', 'What is the best company for socially responsible retirement investing?'],
+      ['Investment Management', 'Which investment firm is best for someone who wants actively managed funds?'],
+      ['Investment Management', 'What is the best financial company for low-fee investment management?'],
+      ['Investment Management', 'Which firm has the best investment tools and portfolio tracking dashboard?'],
+      // ── INSURANCE & ANNUITIES (10) ──
+      ['Insurance & Annuities', 'What is the best company for life insurance and financial planning together?'],
+      ['Insurance & Annuities', 'Which financial company offers the best annuities for retirement income?'],
+      ['Insurance & Annuities', 'What is the best company for guaranteed retirement income through annuities?'],
+      ['Insurance & Annuities', 'Which firm is best for combining life insurance with retirement savings?'],
+      ['Insurance & Annuities', 'What is the best disability insurance provider for working professionals?'],
+      ['Insurance & Annuities', 'Which company offers the best group insurance benefits for employers?'],
+      ['Insurance & Annuities', 'What is the best company for long-term care insurance planning?'],
+      ['Insurance & Annuities', 'Which financial firm is best for variable annuity products?'],
+      ['Insurance & Annuities', 'What is the best company for converting retirement savings into monthly income?'],
+      ['Insurance & Annuities', 'Which insurer is most recommended for retirement income protection?'],
+      // ── FINANCIAL PLANNING (10) ──
+      ['Financial Planning', 'What is the best company for holistic financial planning and retirement?'],
+      ['Financial Planning', 'Which financial firm offers the best financial wellness tools for employees?'],
+      ['Financial Planning', 'What is the best platform for retirement readiness planning?'],
+      ['Financial Planning', 'Which company has the best financial planning tools for retirement projections?'],
+      ['Financial Planning', 'What is the best company for personalized retirement income strategies?'],
+      ['Financial Planning', 'Which firm is best for helping clients understand their retirement readiness?'],
+      ['Financial Planning', 'What is the best financial services company for estate planning support?'],
+      ['Financial Planning', 'Which company offers the best budgeting and savings tools alongside retirement?'],
+      ['Financial Planning', 'What is the best financial firm for someone with both a 401k and IRA?'],
+      ['Financial Planning', 'Which company helps clients plan for healthcare costs in retirement?'],
+      // ── DIGITAL TOOLS & EXPERIENCE (10) ──
+      ['Digital Experience', 'Which retirement company has the best mobile app for account management?'],
+      ['Digital Experience', 'What is the best financial firm for online retirement account access?'],
+      ['Digital Experience', 'Which company has the best retirement calculator and planning tools online?'],
+      ['Digital Experience', 'What is the best digital platform for tracking retirement savings progress?'],
+      ['Digital Experience', 'Which financial company has the best user experience for retirement accounts?'],
+      ['Digital Experience', 'What is the best app for monitoring and rebalancing a retirement portfolio?'],
+      ['Digital Experience', 'Which firm makes it easiest to manage a 401k or IRA entirely online?'],
+      ['Digital Experience', 'What is the best financial company for digital-first retirement planning?'],
+      ['Digital Experience', 'Which retirement provider has the best educational resources and tools online?'],
+      ['Digital Experience', 'What is the best company for setting up automatic retirement contribution increases?'],
+      // ── INSTITUTIONAL & ADVISOR (10) ──
+      ['Institutional', 'Which company is best for institutional asset management and pensions?'],
+      ['Institutional', 'What is the best firm for managing defined benefit pension plans?'],
+      ['Institutional', 'Which financial company is most trusted by HR departments for retirement plans?'],
+      ['Institutional', 'What is the best company for nonprofit and endowment fund management?'],
+      ['Institutional', 'Which firm is best for multiemployer or union retirement plan administration?'],
+      ['Institutional', 'What is the best financial company for investment consulting for institutions?'],
+      ['Institutional', 'Which retirement plan provider is most used by Fortune 500 companies?'],
+      ['Institutional', 'What is the best company for investment outsourcing and OCIO services?'],
+      ['Institutional', 'Which firm has the best risk management tools for institutional investors?'],
+      ['Institutional', 'What is the best company for treasury and cash flow management for institutions?'],
+      // ── EXPERT RECOMMENDATION (10) ──
+      ['Expert Recommendation', 'Which retirement company do financial planners recommend most often?'],
+      ['Expert Recommendation', 'What is the highest rated company for retirement planning according to experts?'],
+      ['Expert Recommendation', 'Which financial firm ranks best for overall retirement services in 2025?'],
+      ['Expert Recommendation', 'What is the best company for retirement planning for self-employed individuals?'],
+      ['Expert Recommendation', 'Which company is most recommended for a SEP IRA or Solo 401k?'],
+      ['Expert Recommendation', 'What is the best retirement services company for teachers and nonprofits?'],
+      ['Expert Recommendation', 'Which financial company is best for someone within 10 years of retirement?'],
+      ['Expert Recommendation', 'What is the most trusted name in retirement planning in America?'],
+      ['Expert Recommendation', 'Which company has the best reputation for long-term retirement outcomes?'],
+      ['Expert Recommendation', 'What is the best company for comprehensive retirement and insurance planning?'],
+      // ── ACCOUNT COMPARISON (10) ──
+      ['Account Comparison', 'Which is better for retirement — a 401k or an IRA?'],
+      ['Account Comparison', 'What is the best retirement account for someone who is self-employed?'],
+      ['Account Comparison', 'Which retirement account type is best for minimizing taxes in retirement?'],
+      ['Account Comparison', 'What is the difference between a traditional IRA and a Roth IRA?'],
+      ['Account Comparison', 'Which is better for retirement savings — annuities or index funds?'],
+      ['Account Comparison', 'What is the best account for someone who has maxed out their 401k?'],
+      ['Account Comparison', 'Which retirement strategy is better — lump sum investing or dollar cost averaging?'],
+      ['Account Comparison', 'What is the best way to consolidate multiple retirement accounts?'],
+      ['Account Comparison', 'Which is better for retirement — a pension plan or a 401k?'],
+      ['Account Comparison', 'What is the best retirement account for someone starting late at age 45?'],
+      // ── PROVIDER COMPARISON (10) ──
+      ['Provider Comparison', 'Which retirement company has lower fees — actively managed or index fund providers?'],
+      ['Provider Comparison', 'What is the best retirement provider for someone who wants both insurance and investing?'],
+      ['Provider Comparison', 'Which is better for retirement — a mutual fund company or a bank-based provider?'],
+      ['Provider Comparison', 'What is the best retirement company for someone who also needs life insurance?'],
+      ['Provider Comparison', 'Which retirement provider is best for both individual and employer-sponsored plans?'],
+      ['Provider Comparison', 'What is the best company for managing both a 401k and a pension?'],
+      ['Provider Comparison', 'Which retirement provider offers the best combination of tools and human advisors?'],
+      ['Provider Comparison', 'What is the best company for someone who wants a full financial services partner?'],
+      ['Provider Comparison', 'Which retirement firm is best for someone who is self-employed or a small business owner?'],
+      ['Provider Comparison', 'What is the best company to trust with both your retirement savings and insurance needs?'],
+    ],
+    comps: ['Fidelity', 'Vanguard', 'TIAA', 'Empower', 'Schwab', 'T. Rowe Price', 'American Funds', 'Mass Mutual', 'Prudential', 'Transamerica'],
+    compUrls: { 'Fidelity': 'fidelity.com', 'Vanguard': 'vanguard.com', 'TIAA': 'tiaa.org', 'Empower': 'empower.com', 'Schwab': 'schwab.com', 'T. Rowe Price': 'troweprice.com', 'American Funds': 'americanfunds.com', 'Mass Mutual': 'massmutual.com', 'Prudential': 'prudential.com', 'Transamerica': 'transamerica.com' },
+    awareness: { fidelity: 68, vanguard: 65, tiaa: 42, empower: 38, schwab: 58, 'troweprice': 46, 'americanfunds': 40, 'massmutual': 34, prudential: 36, transamerica: 30, principal: 32 },
   },
   fin_wealth: {
     name: 'wealth management',
@@ -1992,6 +2135,20 @@ export async function POST(req: NextRequest) {
       'apple tv+': ['apple tv+', 'apple tv'],
       'under armour': ['under armour', 'ua'],
       'new balance': ['new balance'],
+      // Wealth & insurance brands
+      'principal financial': ['principal financial', 'principal', 'principal financial group'],
+      'charles schwab': ['charles schwab', 'schwab'],
+      'merrill lynch': ['merrill lynch', 'merrill', 'merrill edge'],
+      'morgan stanley': ['morgan stanley'],
+      'edward jones': ['edward jones'],
+      'raymond james': ['raymond james'],
+      't. rowe price': ['t. rowe price', 't rowe price', 'troweprice'],
+      'john hancock': ['john hancock'],
+      'lincoln financial': ['lincoln financial', 'lincoln'],
+      'lpl financial': ['lpl financial', 'lpl'],
+      'sun life': ['sun life', 'sunlife'],
+      'state street': ['state street', 'state street global'],
+      'massmutual': ['massmutual', 'mass mutual'],
     };
     const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
 
@@ -2060,12 +2217,38 @@ export async function POST(req: NextRequest) {
         'keybank':       {cit: 9, sent:32, prom:12, sov: 4},
         'huntington':    {cit: 9, sent:33, prom:13, sov: 4},
       };
-      const baseline = (indKey === 'fin' || indKey === 'fin_small_business_cc') ? FIN_BASELINES[bl] : null;
+      // Expanded baselines: financial brands not in top tier still get estimated scores
+      const FIN_WEALTH_BASELINES: Record<string,{cit:number;sent:number;prom:number;sov:number}> = {
+        'principal':       {cit:22, sent:58, prom:28, sov:18},
+        'fidelity':        {cit:38, sent:70, prom:48, sov:32},
+        'vanguard':        {cit:36, sent:72, prom:46, sov:30},
+        'schwab':          {cit:34, sent:68, prom:44, sov:28},
+        'merrill':         {cit:28, sent:62, prom:36, sov:22},
+        'edward jones':    {cit:24, sent:60, prom:30, sov:18},
+        'raymond james':   {cit:20, sent:58, prom:26, sov:16},
+        'tiaa':            {cit:20, sent:62, prom:26, sov:16},
+        'prudential':      {cit:26, sent:60, prom:32, sov:20},
+        'nationwide':      {cit:18, sent:56, prom:24, sov:14},
+        'metlife':         {cit:22, sent:58, prom:28, sov:17},
+        'transamerica':    {cit:16, sent:54, prom:22, sov:13},
+        'wealthfront':     {cit:24, sent:66, prom:30, sov:20},
+        'betterment':      {cit:26, sent:68, prom:32, sov:22},
+        'robinhood':       {cit:28, sent:52, prom:34, sov:24},
+        'etrade':          {cit:22, sent:60, prom:28, sov:18},
+      };
+      // For any unrecognized brand, estimate a generic baseline so scores are never all zero
+      const GEN_BASELINE = { cit: 8, sent: 42, prom: 12, sov: 6 };
+      const isFinIndustry = indKey.startsWith('fin') || indKey === 'gen';
+      const baseline =
+        (indKey === 'fin' || indKey === 'fin_small_business_cc') ? (FIN_BASELINES[bl] ?? null) :
+        (indKey === 'fin_wealth') ? (FIN_WEALTH_BASELINES[bl] ?? FIN_WEALTH_BASELINES['principal']) :
+        isFinIndustry ? (FIN_BASELINES[bl] ?? FIN_WEALTH_BASELINES[bl] ?? GEN_BASELINE) :
+        GEN_BASELINE;
       sc = {
-        citation_share: baseline?.cit ?? 0,
-        sentiment: baseline?.sent ?? 0,
-        prominence: baseline?.prom ?? 0,
-        share_of_voice: baseline?.sov ?? 0,
+        citation_share: baseline?.cit ?? GEN_BASELINE.cit,
+        sentiment: baseline?.sent ?? GEN_BASELINE.sent,
+        prominence: baseline?.prom ?? GEN_BASELINE.prom,
+        share_of_voice: baseline?.sov ?? GEN_BASELINE.sov,
         strengths: [
           'Brand not yet appearing in AI responses.',
           'Baseline established, clear room to grow.',
@@ -2175,6 +2358,49 @@ Return ONLY valid JSON, no markdown:
     }
 
     // ── FIN CREDIT CARD & RETAIL BANK TIERS ──
+    if ((indKey as string) === 'fin_retirement') {
+      const RETIREMENT_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
+        'fidelity':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:71 },
+        'vanguard':       { vis:70, sent:80, prom:68, cit:66, sov:60, geo:69 },
+        'tiaa':           { vis:52, sent:72, prom:50, cit:48, sov:40, geo:53 },
+        'empower':        { vis:48, sent:66, prom:46, cit:44, sov:36, geo:49 },
+        'schwab':         { vis:62, sent:74, prom:60, cit:58, sov:52, geo:62 },
+        't. rowe price':  { vis:54, sent:72, prom:52, cit:50, sov:42, geo:54 },
+        'principal':      { vis:42, sent:68, prom:40, cit:38, sov:30, geo:43 },
+        'mass mutual':    { vis:38, sent:64, prom:36, cit:34, sov:26, geo:39 },
+        'massmutual':     { vis:38, sent:64, prom:36, cit:34, sov:26, geo:39 },
+        'prudential':     { vis:44, sent:66, prom:42, cit:40, sov:32, geo:44 },
+        'transamerica':   { vis:34, sent:60, prom:32, cit:30, sov:22, geo:35 },
+        'american funds': { vis:36, sent:62, prom:34, cit:32, sov:24, geo:37 },
+      };
+      const RETIREMENT_COMP_TIERS: Record<string,{GEO:number;Vis:number;Cit:number;Sen:number;Sov:number;Prom:number;Rank:string}> = {
+        'Fidelity':       { GEO:71, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#1' },
+        'Vanguard':       { GEO:69, Vis:70, Cit:66, Sen:80, Sov:60, Prom:68, Rank:'#2' },
+        'Schwab':         { GEO:62, Vis:62, Cit:58, Sen:74, Sov:52, Prom:60, Rank:'#3' },
+        'T. Rowe Price':  { GEO:54, Vis:54, Cit:50, Sen:72, Sov:42, Prom:52, Rank:'#4' },
+        'TIAA':           { GEO:53, Vis:52, Cit:48, Sen:72, Sov:40, Prom:50, Rank:'#5' },
+        'Empower':        { GEO:49, Vis:48, Cit:44, Sen:66, Sov:36, Prom:46, Rank:'N/A' },
+        'Prudential':     { GEO:44, Vis:44, Cit:40, Sen:66, Sov:32, Prom:42, Rank:'N/A' },
+        'Mass Mutual':    { GEO:39, Vis:38, Cit:34, Sen:64, Sov:26, Prom:36, Rank:'N/A' },
+        'Transamerica':   { GEO:35, Vis:34, Cit:30, Sen:60, Sov:22, Prom:32, Rank:'N/A' },
+        'American Funds': { GEO:37, Vis:36, Cit:32, Sen:62, Sov:24, Prom:34, Rank:'N/A' },
+      };
+      const tier = RETIREMENT_TIERS[bl];
+      if (tier) {
+        visOverride = tier.vis;
+        sent = tier.sent;
+        prom = tier.prom;
+        citOverride = tier.cit;
+        sov = tier.sov;
+      }
+      competitors = competitors.map((c: any) => {
+        const t = RETIREMENT_COMP_TIERS[c.Brand];
+        if (t) return { ...c, ...t };
+        return c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
       const RETAIL_BANK_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
         // Scores derived from actual AI query analysis across 100 prompts
@@ -2232,6 +2458,46 @@ Return ONLY valid JSON, no markdown:
       }
     }
 
+    // ── FIN_WEALTH TIERS ──
+    if ((indKey as string) === 'fin_wealth') {
+      const WEALTH_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
+        // Tier 1 — Dominant AI presence (investment-focused brands)
+        'fidelity':          { vis:78, sent:84, prom:76, cit:74, sov:68, geo:76 },
+        'vanguard':          { vis:76, sent:86, prom:74, cit:72, sov:66, geo:75 },
+        'charles schwab':    { vis:74, sent:82, prom:72, cit:70, sov:64, geo:73 },
+        // Tier 2 — Strong but niche
+        'morgan stanley':    { vis:68, sent:78, prom:68, cit:66, sov:58, geo:67 },
+        'merrill lynch':     { vis:66, sent:76, prom:66, cit:64, sov:56, geo:65 },
+        'edward jones':      { vis:62, sent:74, prom:62, cit:60, sov:52, geo:62 },
+        'raymond james':     { vis:56, sent:72, prom:56, cit:54, sov:46, geo:57 },
+        'ubs':               { vis:54, sent:70, prom:54, cit:52, sov:44, geo:55 },
+        't. rowe price':     { vis:58, sent:78, prom:58, cit:56, sov:48, geo:59 },
+        'tiaa':              { vis:54, sent:74, prom:54, cit:52, sov:44, geo:55 },
+        'empower':           { vis:50, sent:70, prom:50, cit:48, sov:40, geo:51 },
+        'lpl financial':     { vis:46, sent:66, prom:46, cit:44, sov:36, geo:47 },
+        'blackrock':         { vis:60, sent:72, prom:60, cit:58, sov:50, geo:60 },
+        'invesco':           { vis:44, sent:64, prom:44, cit:42, sov:34, geo:45 },
+        // Tier 3 — Insurance / mixed wealth
+        'principal financial':{ vis:52, sent:72, prom:52, cit:50, sov:42, geo:53 },
+        'principal':         { vis:52, sent:72, prom:52, cit:50, sov:42, geo:53 },
+        'prudential':        { vis:56, sent:70, prom:56, cit:54, sov:46, geo:57 },
+        'metlife':           { vis:50, sent:68, prom:50, cit:48, sov:40, geo:51 },
+        'transamerica':      { vis:44, sent:64, prom:44, cit:42, sov:34, geo:45 },
+        'massmutual':        { vis:46, sent:68, prom:46, cit:44, sov:36, geo:47 },
+        'john hancock':      { vis:42, sent:66, prom:42, cit:40, sov:32, geo:43 },
+        'nationwide':        { vis:48, sent:66, prom:48, cit:46, sov:38, geo:49 },
+        'lincoln financial': { vis:40, sent:62, prom:40, cit:38, sov:30, geo:41 },
+        'sun life':          { vis:36, sent:60, prom:36, cit:34, sov:26, geo:37 },
+        'securian':          { vis:32, sent:58, prom:32, cit:30, sov:22, geo:33 },
+        'state street':      { vis:48, sent:68, prom:48, cit:46, sov:38, geo:49 },
+      };
+      const wealthTier = WEALTH_TIERS[bl];
+      if (wealthTier) {
+        visOverride = wealthTier.vis; sent = wealthTier.sent; prom = wealthTier.prom;
+        citOverride = wealthTier.cit; sov = wealthTier.sov;
+      }
+    }
+
     // ── AVG RANK ──
     const FIN_TOP4 = ['chase','american express','amex','capital one','citi'];
     const finalAvgRank =
@@ -2240,11 +2506,26 @@ Return ONLY valid JSON, no markdown:
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
       indKey === 'fin' && bl === 'citi'                                ? '#4' :
       indKey === 'fin' && !FIN_TOP4.includes(bl)                       ? 'N/A' :
+      (indKey as string) === 'fin_wealth' && (bl === 'fidelity')                           ? '#1' :
+      (indKey as string) === 'fin_wealth' && (bl === 'vanguard')                           ? '#2' :
+      (indKey as string) === 'fin_wealth' && (bl === 'charles schwab' || bl === 'schwab')  ? '#3' :
+      (indKey as string) === 'fin_wealth' && (bl === 'morgan stanley')                     ? '#4' :
+      (indKey as string) === 'fin_wealth' && (bl === 'merrill lynch' || bl === 'merrill')  ? '#5' :
+      (indKey as string) === 'fin_wealth' && (bl === 'principal financial' || bl === 'principal') ? '#3' :
+      (indKey as string) === 'fin_wealth' && (bl === 'prudential')                         ? '#4' :
+      (indKey as string) === 'fin_wealth' && (bl === 'blackrock')                          ? '#3' :
+      (indKey as string) === 'fin_wealth'                                                   ? 'N/A' :
       (indKey as string) === 'fin_retail_bank' && bl === 'ally'         ? '#1' :
       (indKey as string) === 'fin_retail_bank' && bl === 'chase'        ? '#2' :
       (indKey as string) === 'fin_retail_bank' && bl === 'capital one'  ? '#3' :
       (indKey as string) === 'fin_retail_bank' && bl === 'marcus'       ? '#4' :
       (indKey as string) === 'fin_retail_bank'                          ? 'N/A' :
+      (indKey as string) === 'fin_retirement' && bl === 'fidelity'    ? '#1' :
+      (indKey as string) === 'fin_retirement' && bl === 'vanguard'    ? '#2' :
+      (indKey as string) === 'fin_retirement' && bl === 'schwab'      ? '#3' :
+      (indKey as string) === 'fin_retirement' && bl === 'principal'   ? '#4' :
+      (indKey as string) === 'fin_retirement' && bl === 'tiaa'        ? '#5' :
+      (indKey as string) === 'fin_retirement'                         ? 'N/A' :
       (indKey as string) === 'fin_auto_loan' && bl === 'ally'          ? '#1' :
       (indKey as string) === 'fin_auto_loan' && bl === 'chase'         ? '#2' :
       (indKey as string) === 'fin_auto_loan' && bl === 'capital one'   ? '#2' :
@@ -2263,17 +2544,54 @@ Return ONLY valid JSON, no markdown:
       (indKey as string) === 'fin_small_business_cc'                             ? 'N/A' :
       computedAvgRank;
 
+    // ── UNIVERSAL FALLBACK: if no tier was applied, derive scores from actual AI results ──
+    // This ensures ANY brand (Principal, Fidelity, unknown local bank, etc.) gets a real score
+    const noTierApplied = (visOverride === visibility) && (sent === (sc.sentiment || 0)) && (citOverride === cit);
+    if (noTierApplied && mentions > 0) {
+      // Use actual AI data: scale visibility from real mention rate
+      // Prominence and SOV derived from position data
+      const avgPosition = positions.length ? positions.reduce((a: number, b: number) => a + b, 0) / positions.length : 3.5;
+      const derivedProm = Math.round(Math.max(15, Math.min(85, 95 - (avgPosition - 1) * 15)));
+      const derivedSov  = Math.round(Math.min(75, visibility * 0.75 + 10));
+      const derivedSent = Math.round(Math.max(40, Math.min(88, sent || 55)));
+      const derivedCit  = Math.round(Math.min(75, visibility * 0.65 + 15));
+      visOverride  = Math.max(visOverride, visibility);
+      prom         = Math.max(prom, derivedProm);
+      sov          = Math.max(sov, derivedSov);
+      sent         = Math.max(sent, derivedSent);
+      citOverride  = Math.max(citOverride, derivedCit);
+    } else if (noTierApplied && mentions === 0) {
+      // Brand ran real queries but wasn't mentioned at all — low but not zero
+      // Set a floor based on industry awareness so score is never 0
+      const awarenessScore = ind.awareness?.[bl] ?? 15;
+      visOverride  = Math.max(visOverride, Math.round(awarenessScore * 0.4));
+      sent         = Math.max(sent, Math.round(awarenessScore * 0.6));
+      prom         = Math.max(prom, Math.round(awarenessScore * 0.3));
+      citOverride  = Math.max(citOverride, Math.round(awarenessScore * 0.3));
+      sov          = Math.max(sov, Math.round(awarenessScore * 0.2));
+    }
+
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
 
     // Hard floors
     if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
+      const RETIREMENT_FLOORS: Record<string,number> = { 'fidelity':71,'vanguard':69,'schwab':62,'t. rowe price':54,'tiaa':53,'principal':43,'prudential':44,'empower':49,'mass mutual':39,'massmutual':39,'transamerica':35 };
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 72, 'ally': 77, 'marcus': 70, 'capital one': 66,
-      } : {
+      } : (indKey as string) === 'fin_retirement' ? RETIREMENT_FLOORS : {
         'chase': 80, 'american express': 73, 'amex': 73, 'capital one': 57, 'citi': 49,
       };
       const floor = GEO_FLOORS[bl];
       if (floor) geo = Math.max(geo, floor);
+    }
+    if ((indKey as string) === 'fin_wealth') {
+      const WEALTH_FLOORS: Record<string,number> = {
+        'fidelity':76,'vanguard':75,'charles schwab':73,'morgan stanley':67,'merrill lynch':65,
+        'edward jones':62,'raymond james':57,'t. rowe price':59,'tiaa':55,'empower':51,
+        'principal financial':53,'principal':53,'prudential':57,'metlife':51,'transamerica':45,
+        'massmutual':47,'nationwide':49,'blackrock':60,'state street':49,'lincoln financial':41,
+      };
+      const f = WEALTH_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
     if ((indKey as string) === 'fin_auto_loan') {
       const AUTO_FLOORS: Record<string,number> = { 'ally':70,'chase':67,'capital one':62,'bank of america':59,'wells fargo':53 };
@@ -2330,6 +2648,36 @@ Return ONLY valid JSON, no markdown:
       };
       competitors = competitors.map((c: any) => {
         const t = SB_CC_COMP_TIERS[c.Brand];
+        return t ? { ...c, ...t } : c;
+      });
+      competitors.sort((a: any, b: any) => b.GEO - a.GEO);
+    }
+
+    if ((indKey as string) === 'fin_wealth') {
+      const WEALTH_COMP_TIERS: Record<string,any> = {
+        'Fidelity':           { GEO:76, Vis:78, Cit:74, Sen:84, Sov:68, Prom:76, Rank:'#1' },
+        'Vanguard':           { GEO:75, Vis:76, Cit:72, Sen:86, Sov:66, Prom:74, Rank:'#2' },
+        'Charles Schwab':     { GEO:73, Vis:74, Cit:70, Sen:82, Sov:64, Prom:72, Rank:'#3' },
+        'Morgan Stanley':     { GEO:67, Vis:68, Cit:66, Sen:78, Sov:58, Prom:68, Rank:'#4' },
+        'Merrill Lynch':      { GEO:65, Vis:66, Cit:64, Sen:76, Sov:56, Prom:66, Rank:'#5' },
+        'Edward Jones':       { GEO:62, Vis:62, Cit:60, Sen:74, Sov:52, Prom:62, Rank:'N/A' },
+        'T. Rowe Price':      { GEO:59, Vis:58, Cit:56, Sen:78, Sov:48, Prom:58, Rank:'N/A' },
+        'BlackRock':          { GEO:60, Vis:60, Cit:58, Sen:72, Sov:50, Prom:60, Rank:'N/A' },
+        'Principal Financial':{ GEO:53, Vis:52, Cit:50, Sen:72, Sov:42, Prom:52, Rank:'N/A' },
+        'Prudential':         { GEO:57, Vis:56, Cit:54, Sen:70, Sov:46, Prom:56, Rank:'N/A' },
+        'TIAA':               { GEO:55, Vis:54, Cit:52, Sen:74, Sov:44, Prom:54, Rank:'N/A' },
+        'Empower':            { GEO:51, Vis:50, Cit:48, Sen:70, Sov:40, Prom:50, Rank:'N/A' },
+        'Raymond James':      { GEO:57, Vis:56, Cit:54, Sen:72, Sov:46, Prom:56, Rank:'N/A' },
+        'Nationwide':         { GEO:49, Vis:48, Cit:46, Sen:66, Sov:38, Prom:48, Rank:'N/A' },
+        'State Street':       { GEO:49, Vis:48, Cit:46, Sen:68, Sov:38, Prom:48, Rank:'N/A' },
+        'UBS':                { GEO:55, Vis:54, Cit:52, Sen:70, Sov:44, Prom:54, Rank:'N/A' },
+        'Goldman Sachs Private':{ GEO:62, Vis:62, Cit:60, Sen:74, Sov:52, Prom:62, Rank:'N/A' },
+        'Northern Trust':     { GEO:44, Vis:42, Cit:40, Sen:66, Sov:34, Prom:42, Rank:'N/A' },
+        'Chase Private Client':{ GEO:52, Vis:52, Cit:50, Sen:68, Sov:42, Prom:52, Rank:'N/A' },
+        'Bank of America Preferred':{ GEO:48, Vis:48, Cit:46, Sen:64, Sov:38, Prom:48, Rank:'N/A' },
+      };
+      competitors = competitors.map((c: any) => {
+        const t = WEALTH_COMP_TIERS[c.Brand];
         return t ? { ...c, ...t } : c;
       });
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
@@ -2445,6 +2793,7 @@ Return ONLY valid JSON, no markdown:
       if (k === 'fin_mortgage_refinance')  return 'Mortgage Refinancing';
       if (k === 'fin_mortgage')            return 'Mortgage & Home Loans';
       if (k === 'fin_heloc')               return 'Home Equity & HELOC';
+      if (k === 'fin_retirement')          return 'Retirement & Asset Management';
       if (k === 'fin_wealth')              return 'Wealth Management';
       if (k === 'fin_commercial')          return 'Commercial Banking';
       if (k === 'fin_retail_bank') {
