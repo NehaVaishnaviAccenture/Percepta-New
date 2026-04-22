@@ -1448,82 +1448,173 @@ export default function GeoHub() {
                     <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
 
-                  {/* ── QUERY INTELLIGENCE: Bubble map + Trending ── */}
+                  {/* ── QUERY INTELLIGENCE: Force-directed network map ── */}
                   {bubbleData.length > 0 && (
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                    <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
+                      {/* Header */}
+                      <div style={{background:'#0F172A',padding:'16px 22px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                         <div>
-                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>Query Intelligence Map</div>
-                          <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginTop:2}}>Each bubble = a query category. Size = volume. Color = win rate. Click to explore prompts.</div>
+                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
+                          <div style={{fontSize:'0.72rem',color:'#64748B',marginTop:2}}>Topic clusters sized by AI search volume · Color = your win rate · Lines = topic relatedness · Click any node</div>
                         </div>
-                        {selectedCluster && <button onClick={()=>{setSelectedCluster(null);setFilterCat('All');}} style={{background:'#F3F4F6',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',color:'#374151',cursor:'pointer',fontWeight:600}}>← Back to all</button>}
+                        <div style={{display:'flex',alignItems:'center',gap:16}}>
+                          {[{color:'#10B981',label:'Winning'},{color:'#F59E0B',label:'Emerging'},{color:'#EF4444',label:'Gap'},{color:'#818CF8',label:'Untapped'}].map((l,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:5}}>
+                              <div style={{width:8,height:8,borderRadius:'50%',background:l.color,boxShadow:`0 0 6px ${l.color}`}}/>
+                              <span style={{fontSize:'0.68rem',color:'#94A3B8'}}>{l.label}</span>
+                            </div>
+                          ))}
+                          {selectedCluster && <button onClick={()=>{setSelectedCluster(null);setFilterCat('All');}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:8,padding:'5px 12px',fontSize:'0.72rem',color:'#94A3B8',cursor:'pointer'}}>← All topics</button>}
+                        </div>
                       </div>
 
-                      {/* Bubble SVG */}
-                      {!selectedCluster && (
-                        <svg viewBox="0 0 700 340" style={{width:'100%',display:'block',overflow:'visible'}}>
-                          {/* Connection lines between related categories */}
-                          {bubbleData.map((b:any) =>
-                            (b.related||[]).slice(0,2).map((rel:any) => {
-                              const target = bubbleData.find((bb:any)=>bb.category===rel.category);
-                              if(!target) return null;
-                              const opacity = Math.min(0.35, rel.similarity / 100);
-                              return <line key={`${b.category}-${rel.category}`} x1={b.x} y1={b.y} x2={target.x} y2={target.y} stroke="#C4B5FD" strokeWidth="1.5" opacity={opacity}/>;
-                            })
-                          )}
-                          {/* Bubbles */}
-                          {bubbleData.map((b:any) => {
-                            const isSelected = selectedCluster === b.category;
-                            const winColor = b.winRate >= 60 ? '#10B981' : b.winRate >= 30 ? '#F59E0B' : '#EF4444';
-                            const winBg = b.winRate >= 60 ? '#D1FAE5' : b.winRate >= 30 ? '#FEF3C7' : '#FEE2E2';
-                            const label = b.category.length > 10 ? b.category.slice(0,9)+'…' : b.category;
-                            return (
-                              <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setSelectedCluster(b.category);setFilterCat(b.category);}}>
-                                <circle cx={b.x} cy={b.y} r={b.r+4} fill={winBg} opacity="0.4"/>
-                                <circle cx={b.x} cy={b.y} r={b.r} fill={winColor} opacity={isSelected?1:0.75} stroke={isSelected?'#7C3AED':'white'} strokeWidth={isSelected?3:1.5}/>
-                                <text x={b.x} y={b.y-4} textAnchor="middle" dominantBaseline="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.4)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
-                                <text x={b.x} y={b.y+8} textAnchor="middle" dominantBaseline="middle" style={{fontSize:8,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none',opacity:0.9}}>{b.winRate}%</text>
-                              </g>
-                            );
-                          })}
-                          {/* Legend */}
-                          <g transform="translate(10,318)">
-                            {[{color:'#10B981',label:'Winning (≥60%)'},{color:'#F59E0B',label:'Emerging (30–59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
-                              <g key={i} transform={`translate(${i*140},0)`}>
-                                <circle cx={6} cy={0} r={6} fill={l.color} opacity="0.8"/>
-                                <text x={16} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
-                              </g>
-                            ))}
-                            <text x={440} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Lines = related topics · Click bubble to explore queries</text>
-                          </g>
-                        </svg>
-                      )}
+                      {/* Network SVG */}
+                      {!selectedCluster && (()=>{
+                        const W=900,H=480;
+                        // Force-directed layout: run physics iterations
+                        const nodes = bubbleData.map((b:any,i:number)=>({...b, fx:null, fy:null}));
+                        // Initialize positions on a circle
+                        const n = nodes.length;
+                        nodes.forEach((node:any,i:number)=>{
+                          const angle = (i/n)*Math.PI*2 - Math.PI/2;
+                          const radius = 160 + Math.random()*40;
+                          node.x = W/2 + radius*Math.cos(angle);
+                          node.y = H/2 + radius*Math.sin(angle);
+                          node.vx = 0; node.vy = 0;
+                        });
+                        // Run 120 force simulation iterations
+                        for(let iter=0;iter<120;iter++){
+                          const alpha = 1 - iter/120;
+                          // Repulsion between all pairs
+                          for(let i=0;i<nodes.length;i++){
+                            for(let j=i+1;j<nodes.length;j++){
+                              const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+                              const dist=Math.sqrt(dx*dx+dy*dy)||1;
+                              const minDist=(nodes[i].r+nodes[j].r+30);
+                              if(dist<minDist){
+                                const force=(minDist-dist)/dist*0.5*alpha;
+                                nodes[i].vx-=dx*force; nodes[i].vy-=dy*force;
+                                nodes[j].vx+=dx*force; nodes[j].vy+=dy*force;
+                              }
+                            }
+                          }
+                          // Attraction along edges
+                          nodes.forEach((node:any)=>{
+                            (node.related||[]).forEach((rel:any)=>{
+                              const target=nodes.find((nn:any)=>nn.category===rel.category);
+                              if(!target) return;
+                              const dx=target.x-node.x,dy=target.y-node.y;
+                              const dist=Math.sqrt(dx*dx+dy*dy)||1;
+                              const strength=(rel.similarity/100)*0.08*alpha;
+                              node.vx+=dx*strength; node.vy+=dy*strength;
+                              target.vx-=dx*strength; target.vy-=dy*strength;
+                            });
+                          });
+                          // Center gravity
+                          nodes.forEach((node:any)=>{
+                            node.vx+=(W/2-node.x)*0.01*alpha;
+                            node.vy+=(H/2-node.y)*0.01*alpha;
+                          });
+                          // Apply velocity + damping
+                          nodes.forEach((node:any)=>{
+                            node.vx*=0.7; node.vy*=0.7;
+                            node.x+=node.vx; node.y+=node.vy;
+                            // Boundary
+                            node.x=Math.max(node.r+10,Math.min(W-node.r-10,node.x));
+                            node.y=Math.max(node.r+10,Math.min(H-node.r-10,node.y));
+                          });
+                        }
+                        const fmtSearches=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
+                        return (
+                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
+                            {/* Grid dots background */}
+                            {Array.from({length:20},(_,i)=>Array.from({length:12},(_,j)=>(
+                              <circle key={`${i}-${j}`} cx={i*(W/19)} cy={j*(H/11)} r="1" fill="#1E293B"/>
+                            )))}
+                            {/* Connection lines — drawn first so nodes appear on top */}
+                            {nodes.map((b:any)=>
+                              (b.related||[]).map((rel:any)=>{
+                                const target=nodes.find((nn:any)=>nn.category===rel.category);
+                                if(!target||rel.similarity<15) return null;
+                                const opacity=Math.min(0.6,rel.similarity/100*0.8);
+                                const strokeW=rel.similarity>60?2:rel.similarity>35?1.5:1;
+                                const midX=(b.x+target.x)/2, midY=(b.y+target.y)/2-20;
+                                return <path key={`${b.category}-${rel.category}`}
+                                  d={`M${b.x},${b.y} Q${midX},${midY} ${target.x},${target.y}`}
+                                  fill="none" stroke="#818CF8" strokeWidth={strokeW} opacity={opacity} strokeDasharray={rel.similarity>50?'none':'4,3'}/>;
+                              })
+                            )}
+                            {/* Nodes */}
+                            {nodes.map((b:any)=>{
+                              const isUntapped = b.winRate===0 && b.total>0;
+                              const nodeColor = isUntapped?'#818CF8':b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
+                              const glowColor = nodeColor;
+                              const label = b.category.split(' ').length>2 ? b.category.split(' ').slice(0,2).join(' ') : b.category;
+                              const isSelected = selectedCluster===b.category;
+                              return (
+                                <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setSelectedCluster(b.category);setFilterCat(b.category);}}>
+                                  {/* Glow */}
+                                  <circle cx={b.x} cy={b.y} r={b.r+12} fill={glowColor} opacity="0.08"/>
+                                  <circle cx={b.x} cy={b.y} r={b.r+6} fill={glowColor} opacity="0.12"/>
+                                  {/* Main circle */}
+                                  <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isSelected?1:0.82} stroke={isSelected?'white':glowColor} strokeWidth={isSelected?2.5:1}/>
+                                  {/* Category name */}
+                                  <text x={b.x} y={b.y-(b.r>35?10:6)} textAnchor="middle" style={{fontSize:Math.max(8,Math.min(12,b.r*0.38)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
+                                  {/* Win rate */}
+                                  <text x={b.x} y={b.y+(b.r>35?4:2)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.3)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                                  {/* Daily searches */}
+                                  {b.r>28&&<text x={b.x} y={b.y+(b.r>35?16:12)} textAnchor="middle" style={{fontSize:7,fill:'rgba(255,255,255,0.6)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>~{fmtSearches(b.dailySearches)}/day</text>}
+                                  {/* Winner badge - shown on larger nodes */}
+                                  {b.r>32&&b.topCompetitor&&<text x={b.x} y={b.y+b.r+12} textAnchor="middle" style={{fontSize:7,fill:'#94A3B8',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>👑 {b.topCompetitor.split(' ')[0]}</text>}
+                                  {/* Untapped badge */}
+                                  {isUntapped&&<text x={b.x} y={b.y-b.r-8} textAnchor="middle" style={{fontSize:7,fill:'#818CF8',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>UNTAPPED</text>}
+                                </g>
+                              );
+                            })}
+                          </svg>
+                        );
+                      })()}
 
-                      {/* Selected cluster: show its queries inline */}
+                      {/* Selected cluster detail panel */}
                       {selectedCluster && (()=>{
+                        const clusterData = clusters.find((c:any)=>c.category===selectedCluster);
                         const clusterRows = rd.filter((r:any)=>r.category===selectedCluster).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
                         const clusterWin = clusterRows.filter((r:any)=>r.mentioned).length;
                         const clusterRate = Math.round((clusterWin/Math.max(clusterRows.length,1))*100);
                         const winColor = clusterRate>=60?'#10B981':clusterRate>=30?'#F59E0B':'#EF4444';
+                        const fmtS=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
                         return (
-                          <div>
-                            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,padding:'12px 16px',background:'#F5F3FF',borderRadius:10}}>
-                              <span style={{fontSize:'1.4rem',fontWeight:900,color:winColor}}>{clusterRate}%</span>
-                              <div><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{selectedCluster}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>{clusterWin} of {clusterRows.length} queries — brand appeared</div></div>
+                          <div style={{background:'#0F172A',padding:'0'}}>
+                            {/* Cluster stats bar */}
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',borderBottom:'1px solid #1E293B'}}>
+                              {[
+                                {label:'Win Rate',val:`${clusterRate}%`,color:winColor},
+                                {label:'Queries Tested',val:`${clusterRows.length}`,color:'white'},
+                                {label:'AI Searches/Day',val:`~${fmtS(clusterData?.dailySearches||0)}`,color:'#818CF8'},
+                                {label:'Top Competitor',val:clusterData?.topCompetitor||'—',color:'#F59E0B'},
+                              ].map((s,i)=>(
+                                <div key={i} style={{padding:'14px 20px',borderRight:i<3?'1px solid #1E293B':'none'}}>
+                                  <div style={{fontSize:'0.62rem',color:'#64748B',fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:4}}>{s.label}</div>
+                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:s.color}}>{s.val}</div>
+                                </div>
+                              ))}
                             </div>
-                            <table style={{width:'100%',borderCollapse:'collapse'}}>
-                              <thead><tr style={{background:'#FAFAFA'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                              <tbody>{clusterRows.map((item:any,i:number)=>{
-                                const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
-                                const beater=isMissed&&item.winner_brand?item.winner_brand:null;
-                                return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
-                                  <td style={{padding:'10px 12px',fontSize:'0.78rem',color:'#9CA3AF',width:28}}>{i+1}</td>
-                                  <td style={{padding:'10px 12px'}}><div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3,flexWrap:'wrap' as const}}>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.72rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.72rem',fontWeight:600}}>✗ Missed</span>}</div><div style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{item.query}</div></td>
-                                  <td style={{padding:'10px 12px',fontSize:'0.95rem',fontWeight:800,color:rankColor,width:70}}>{rankLabel}</td>
-                                  <td style={{padding:'10px 12px',width:150}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:7,padding:'2px 9px',fontSize:'0.72rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:7,padding:'2px 9px',fontSize:'0.72rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>—</span>}</td>
-                                </tr>;
-                              })}</tbody>
-                            </table>
+                            {/* Query table */}
+                            <div style={{background:'white',borderTop:'none'}}>
+                              <table style={{width:'100%',borderCollapse:'collapse'}}>
+                                <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                                <tbody>{clusterRows.map((item:any,i:number)=>{
+                                  const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
+                                  const beater=isMissed&&item.winner_brand?item.winner_brand:null;
+                                  return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                                    <td style={{padding:'10px 14px',fontSize:'0.78rem',color:'#9CA3AF',width:28}}>{i+1}</td>
+                                    <td style={{padding:'10px 14px'}}><div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3}}>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.7rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.7rem',fontWeight:600}}>✗ Missed</span>}</div><div style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{item.query}</div></td>
+                                    <td style={{padding:'10px 14px',fontSize:'0.95rem',fontWeight:800,color:rankColor,width:80}}>{rankLabel}</td>
+                                    <td style={{padding:'10px 14px',width:160}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:7,padding:'3px 10px',fontSize:'0.72rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:7,padding:'3px 10px',fontSize:'0.72rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>—</span>}</td>
+                                  </tr>;
+                                })}</tbody>
+                              </table>
+                            </div>
                           </div>
                         );
                       })()}
