@@ -2837,6 +2837,51 @@ Return ONLY valid JSON, no markdown:
         : Math.min(s.citation_share, 5),
     }));
 
+    // ── TRENDING QUERIES: what people are asking AI right now (beyond what we tested) ──
+    let trendingQueries: any[] = [];
+    try {
+      const trendPrompt = `You are a GEO analyst. For the brand "${brand}" in the ${ind.name} industry, list exactly 10 questions that consumers are actively asking AI models RIGHT NOW in 2025 that this brand should be optimizing for — but that are NOT generic brand awareness questions.
+
+These should be specific, high-intent queries that reflect real consumer decision moments. For each query also estimate:
+- trend: "Rising" | "Peak" | "Stable"  
+- opportunity: "High" | "Medium" | "Low" (how much opportunity exists for ${brand} to rank #1 for this)
+- category: the product feature this relates to (e.g. "Cash Back", "Travel Benefits", "Fees & APR")
+
+Return ONLY valid JSON array, no markdown:
+[{"query":"...","trend":"Rising","opportunity":"High","category":"Cash Back"}]
+Exactly 10 items. Make them realistic and specific to ${ind.name}.`;
+      const trendRaw = await callAI([{ role: 'user', content: trendPrompt }], 0.4, 1000);
+      trendingQueries = JSON.parse(trendRaw.replace('```json','').replace('```','').trim());
+    } catch { trendingQueries = []; }
+
+    // ── QUERY CLUSTERS: compute category relationships from co-occurrence in allQA ──
+    // For each pair of categories, count how many responses mention the brand in BOTH
+    // High co-mention = categories are semantically connected for this brand
+    const catNames = [...new Set(allQA.map(p => p.category))];
+    const queryClusters: any[] = catNames.map(cat => {
+      const catRows = allQA.filter(p => p.category === cat);
+      const total = catRows.length;
+      const mentioned = catRows.filter(p => aliases.some(a => (p.a || '').toLowerCase().includes(a))).length;
+      const winRate = total > 0 ? Math.round((mentioned / total) * 100) : 0;
+      // Find related categories: categories that tend to have similar brand mention patterns
+      const related = catNames
+        .filter(c => c !== cat)
+        .map(c => {
+          const cRows = allQA.filter(p => p.category === c);
+          // Jaccard-like similarity: both categories mentioned brand in same responses
+          const cMentioned = new Set(cRows.filter(p => aliases.some(a => (p.a||'').toLowerCase().includes(a))).map(p=>p.q));
+          const catMentioned = new Set(catRows.filter(p => aliases.some(a => (p.a||'').toLowerCase().includes(a))).map(p=>p.q));
+          const intersection = [...catMentioned].filter(q => cMentioned.has(q)).length;
+          const union = new Set([...catMentioned, ...cMentioned]).size;
+          const similarity = union > 0 ? Math.round((intersection / union) * 100) : 0;
+          return { category: c, similarity };
+        })
+        .filter(r => r.similarity > 0)
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, 3);
+      return { category: cat, total, mentioned, winRate, related };
+    });
+
     return NextResponse.json({
       brand_name: brand,
       industry: ind.name,
@@ -2861,6 +2906,8 @@ Return ONLY valid JSON, no markdown:
       internal_links: (pageData as any).internalLinks || [],
       domain: (pageData as any).domain || '',
       page_url: url,
+      trending_queries: trendingQueries,
+      query_clusters: queryClusters,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
