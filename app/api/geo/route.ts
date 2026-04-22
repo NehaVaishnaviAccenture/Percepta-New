@@ -307,6 +307,21 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'What is the single best all-around rewards credit card for most people?'],
       ['Comparison', 'Which credit card earns the most rewards specifically on dining out?'],
       ['Comparison', 'Which credit card company has the best fraud protection and zero liability?'],
+      ['Balance Transfer', 'What is the best credit card for balance transfers with no fee?'],
+      ['Balance Transfer', 'Which credit card has the longest 0% APR period for balance transfers?'],
+      ['Balance Transfer', 'Best credit card to transfer debt from a high-interest card'],
+      ['Balance Transfer', 'Which balance transfer card is easiest to get approved for?'],
+      ['Balance Transfer', 'What credit card should I use to consolidate $10,000 in credit card debt?'],
+      ['Family Spending', 'What is the best credit card for families with kids?'],
+      ['Family Spending', 'Which credit card gives the best rewards on family groceries and gas?'],
+      ['Family Spending', 'Best credit card for family travel and Disney vacations'],
+      ['Family Spending', 'Which credit card is best for parents who spend on kids activities and sports?'],
+      ['Family Spending', 'Best credit card for household bills and family subscriptions'],
+      ['No Annual Fee', 'What is the best credit card with no annual fee?'],
+      ['No Annual Fee', 'Which no annual fee credit card gives the best cash back?'],
+      ['No Annual Fee', 'Best no annual fee credit card for everyday spending'],
+      ['No Annual Fee', 'Which credit card has no annual fee and no foreign transaction fee?'],
+      ['No Annual Fee', 'Best no annual fee card with a good welcome bonus'],
     ],
     comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'PenFed', 'TD Bank', 'US Bank', 'Regions Bank', 'Citizens Bank', 'Truist', 'Fifth Third', 'KeyBank', 'Huntington'],
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', 'PenFed': 'penfed.org', 'TD Bank': 'td.com', 'US Bank': 'usbank.com', 'Regions Bank': 'regions.com', 'Citizens Bank': 'citizensbank.com', Truist: 'truist.com', 'Fifth Third': '53.com', KeyBank: 'key.com', Huntington: 'huntington.com' },
@@ -2858,15 +2873,22 @@ Exactly 10 items. No brand names in the query text.`;
     // ── QUERY CLUSTERS: compute category relationships + winner + daily search estimate ──
     // Daily search volume estimates per category type (AI platform queries/day across all users)
     const DAILY_SEARCH_EST: Record<string,number> = {
-      'General Consumer':32000,'Cash Back':28000,'Travel & Rewards':41000,'Credit Building':18000,
-      'Expert Recommendation':22000,'Rewards Optimization':19000,'Card Benefits':24000,
-      'Interest & Fees':21000,'Premium Cards':12000,'Approval & Credit':16000,'Comparison':35000,
-      'General Banking':26000,'Checking Accounts':22000,'Savings Accounts':38000,'CD Accounts':14000,
-      'Teen & Youth Banking':9000,'Kids & Family Banking':7000,'Digital & Mobile':18000,
-      'No Fees & Access':16000,'Account Comparison':12000,
-      'Retirement Planning':24000,'Investment Management':31000,'Financial Planning':19000,
-      'Digital Experience':11000,'Insurance & Annuities':17000,'Employer Benefits':14000,
-      'General':20000,'Miles & Points':29000,'Perks & Benefits':23000,'Value':18000,
+      // Credit cards — realistic AI platform query volume across ChatGPT/Perplexity/Gemini/Claude combined
+      'General Consumer':48000,'Cash Back':44000,'Travel & Rewards':52000,'Credit Building':28000,
+      'Expert Recommendation':36000,'Rewards Optimization':31000,'Card Benefits':38000,
+      'Interest & Fees':33000,'Premium Cards':22000,'Approval & Credit':26000,'Comparison':51000,
+      'Balance Transfer':35000,'Family Spending':29000,'No Annual Fee':41000,
+      'Flat Rate':24000,'Category':27000,'Redemption':19000,
+      // Retail banking
+      'General Banking':42000,'Checking Accounts':36000,'Savings Accounts':49000,'CD Accounts':22000,
+      'Teen & Youth Banking':14000,'Kids & Family Banking':11000,'Digital & Mobile':28000,
+      'No Fees & Access':24000,'Account Comparison':18000,
+      // Retirement / wealth
+      'Retirement Planning':38000,'Investment Management':46000,'Financial Planning':31000,
+      'Digital Experience':17000,'Insurance & Annuities':26000,'Employer Benefits':21000,
+      // Generic
+      'General':32000,'Miles & Points':43000,'Perks & Benefits':35000,'Value':28000,
+      'Debt Payoff':32000,'0% APR':38000,'Fees':29000,
     };
     const catNames = [...new Set(allQA.map(p => p.category))];
 
@@ -2915,10 +2937,15 @@ Exactly 10 items. No brand names in the query text.`;
           const semanticBonus = (() => {
             const pairs: [string,string,number][] = [
               ['Cash Back','Rewards Optimization',0.7],['Cash Back','Comparison',0.6],
+              ['Cash Back','No Annual Fee',0.65],['Cash Back','Family Spending',0.55],
               ['Travel & Rewards','Card Benefits',0.65],['Travel & Rewards','Rewards Optimization',0.6],
-              ['Travel & Rewards','Comparison',0.55],['Expert Recommendation','General Consumer',0.5],
+              ['Travel & Rewards','Comparison',0.55],['Travel & Rewards','Family Spending',0.6],
+              ['Travel & Rewards','Premium Cards',0.65],
+              ['Expert Recommendation','General Consumer',0.5],
               ['Credit Building','Approval & Credit',0.8],['Interest & Fees','Comparison',0.6],
-              ['Premium Cards','Card Benefits',0.7],['Premium Cards','Travel & Rewards',0.65],
+              ['Interest & Fees','Balance Transfer',0.75],['Balance Transfer','No Annual Fee',0.55],
+              ['Premium Cards','Card Benefits',0.7],['Family Spending','General Consumer',0.55],
+              ['Family Spending','No Annual Fee',0.6],
               ['Savings Accounts','CD Accounts',0.75],['Savings Accounts','No Fees & Access',0.6],
               ['Checking Accounts','No Fees & Access',0.7],['Digital & Mobile','General Banking',0.55],
               ['Retirement Planning','Investment Management',0.8],['Financial Planning','Retirement Planning',0.7],
