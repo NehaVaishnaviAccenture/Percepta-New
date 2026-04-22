@@ -1566,8 +1566,8 @@ export default function GeoHub() {
                                   {b.r>28&&<text x={b.x} y={b.y+(b.r>35?16:12)} textAnchor="middle" style={{fontSize:7,fill:'rgba(255,255,255,0.6)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>~{fmtSearches(b.dailySearches)}/day</text>}
                                   {/* Winner badge - shown on larger nodes */}
                                   {b.r>32&&b.topCompetitor&&<text x={b.x} y={b.y+b.r+12} textAnchor="middle" style={{fontSize:7,fill:'#94A3B8',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>👑 {b.topCompetitor.split(' ')[0]}</text>}
-                                  {/* Untapped badge */}
-                                  {isUntapped&&<text x={b.x} y={b.y-b.r-8} textAnchor="middle" style={{fontSize:7,fill:'#818CF8',fontFamily:'Inter,sans-serif',fontWeight:700,pointerEvents:'none'}}>UNTAPPED</text>}
+                                  {/* Untapped: dashed stroke ring instead of floating label */}
+                                  {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7"/>}
                                 </g>
                               );
                             })}
@@ -1622,32 +1622,119 @@ export default function GeoHub() {
                   )}
 
                   {/* ── TRENDING QUERIES SECTION ── */}
-                  {trendingQs.length > 0 && (
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
-                        <span style={{fontSize:'1rem'}}>🔥</span>
-                        <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
-                      </div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>AI-detected high-intent queries trending in {result.ind_label} — beyond what we tested. These are your optimization opportunities.</div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                        {trendingQs.map((tq:any,i:number)=>{
-                          const trendColor = tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
-                          const trendBg = tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
-                          const oppColor = tq.opportunity==='High'?'#10B981':tq.opportunity==='Medium'?'#F59E0B':'#9CA3AF';
-                          return (
-                            <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:'1px solid #E5E7EB',padding:'12px 14px'}}>
-                              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
-                                <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
-                                <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
-                                <span style={{marginLeft:'auto',fontSize:'0.65rem',fontWeight:700,color:oppColor}}>{tq.opportunity} opportunity</span>
+                  {trendingQs.length > 0 && (()=>{
+                    // Only show High opportunity
+                    const highOpp = trendingQs.filter((tq:any)=>tq.opportunity==='High');
+                    // Top winning categories from clusters
+                    const topWinning = [...clusters].sort((a:any,b:any)=>b.winRate-a.winRate).slice(0,3);
+                    const topTrending = [...clusters].sort((a:any,b:any)=>b.dailySearches-a.dailySearches).slice(0,3);
+                    // Match trending query to cluster data for winner info
+                    const getClusterForCat = (cat:string) => clusters.find((c:any)=>
+                      c.category.toLowerCase().includes(cat.toLowerCase()) ||
+                      cat.toLowerCase().includes(c.category.toLowerCase().split(' ')[0])
+                    );
+                    return (
+                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
+                        {/* Header */}
+                        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                          <span style={{fontSize:'1rem'}}>🔥</span>
+                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
+                        </div>
+                        <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>
+                          AI-detected high-intent queries trending in {result.ind_label} — beyond what we tested.
+                          <span style={{marginLeft:6,background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.68rem',color:'#6B7280'}}>
+                            ⓘ Volume = estimated AI platform queries/day based on category search intent signals
+                          </span>
+                        </div>
+
+                        {/* Top winners + trending summary */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
+                          <div style={{background:'#F0FDF4',borderRadius:10,border:'1px solid #6EE7B7',padding:'12px 16px'}}>
+                            <div style={{fontSize:'0.7rem',fontWeight:700,color:'#065F46',letterSpacing:'.06em',marginBottom:8}}>🏆 HIGHEST WINNING CATEGORIES</div>
+                            {topWinning.map((c:any,i:number)=>(
+                              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                                <span style={{fontSize:'0.78rem',color:'#111827',fontWeight:500}}>{c.category}</span>
+                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <span style={{fontSize:'0.78rem',fontWeight:800,color:'#10B981'}}>{c.winRate}%</span>
+                                  {c.topCompetitor&&<span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>vs {c.topCompetitor.split(' ')[0]}</span>}
+                                </div>
                               </div>
-                              <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500}}>{tq.query}</div>
-                            </div>
-                          );
-                        })}
+                            ))}
+                          </div>
+                          <div style={{background:'#FFF7ED',borderRadius:10,border:'1px solid #FED7AA',padding:'12px 16px'}}>
+                            <div style={{fontSize:'0.7rem',fontWeight:700,color:'#92400E',letterSpacing:'.06em',marginBottom:8}}>📈 HIGHEST VOLUME CATEGORIES</div>
+                            {topTrending.map((c:any,i:number)=>(
+                              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+                                <span style={{fontSize:'0.78rem',color:'#111827',fontWeight:500}}>{c.category}</span>
+                                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                  <span style={{fontSize:'0.78rem',fontWeight:800,color:'#F59E0B'}}>~{c.dailySearches>=1000?`${(c.dailySearches/1000).toFixed(0)}K`:c.dailySearches}/day</span>
+                                  <span style={{fontSize:'0.65rem',color:c.winRate>=50?'#10B981':'#EF4444',fontWeight:600}}>{c.winRate>=50?'Winning':'Gap'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* High opportunity trending queries — expandable */}
+                        <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:10}}>
+                          High Opportunity Queries <span style={{fontWeight:400,color:'#9CA3AF',fontSize:'0.72rem'}}>— topics where no brand clearly dominates yet</span>
+                        </div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                          {highOpp.map((tq:any,i:number)=>{
+                            const trendColor = tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
+                            const trendBg = tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
+                            const cluster = getClusterForCat(tq.category);
+                            const brandWinRate = cluster?.winRate ?? null;
+                            const brandWinning = brandWinRate !== null && brandWinRate >= 40;
+                            const topComp = cluster?.topCompetitor || null;
+                            const dailyV = tq.estimated_daily_searches || cluster?.dailySearches || null;
+                            const fmtV = (n:number) => n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
+                            const isOpen = selectedCluster === `trend-${i}`;
+                            return (
+                              <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`,overflow:'hidden',transition:'border-color 0.15s'}}>
+                                {/* Card header — always visible, clickable */}
+                                <div style={{padding:'12px 14px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
+                                    <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
+                                    <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
+                                    {dailyV&&<span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#9CA3AF'}}>{fmtV(dailyV)}</span>}
+                                  </div>
+                                  <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500,marginBottom:6}}>{tq.query}</div>
+                                  {/* Who is winning line */}
+                                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' as const}}>
+                                    {topComp&&<span style={{fontSize:'0.68rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'1px 7px',fontWeight:600}}>👑 {topComp} leading</span>}
+                                    {brandWinRate!==null&&<span style={{fontSize:'0.68rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win rate</span>}
+                                    <span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#6B7280'}}>{isOpen?'▲ Less':'▼ More'}</span>
+                                  </div>
+                                </div>
+                                {/* Expanded detail */}
+                                {isOpen&&(
+                                  <div style={{borderTop:'1px solid #E5E7EB',padding:'12px 14px',background:'white'}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                                      {[
+                                        {label:'Currently Winning',val:topComp||'No clear leader',color:'#F59E0B'},
+                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'—',color:brandWinning?'#10B981':'#EF4444'},
+                                        {label:'AI Queries / Day',val:dailyV?fmtV(dailyV):'—',color:'#7C3AED'},
+                                        {label:'Trend Signal',val:tq.trend,color:trendColor},
+                                      ].map((s,j)=>(
+                                        <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'8px 10px'}}>
+                                          <div style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em',marginBottom:2}}>{s.label.toUpperCase()}</div>
+                                          <div style={{fontSize:'0.88rem',fontWeight:800,color:s.color}}>{s.val}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6,background:'#F5F3FF',borderRadius:6,padding:'8px 10px'}}>
+                                      💡 <strong>Why High Opportunity:</strong> {topComp?`${topComp} currently leads but hasn't locked in dominance.`:'No brand clearly owns this topic yet.'} {brandWinning?`${result.brand_name} is already showing strength here — double down.`:`${result.brand_name} has room to own this with targeted content.`}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* ── CATEGORY BREAKDOWN (existing) ── */}
                   {/* FIX 3: Show product-specific category breakdown — label uses lob from URL */}
