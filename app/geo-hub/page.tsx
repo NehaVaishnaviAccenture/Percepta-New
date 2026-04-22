@@ -17,12 +17,34 @@ const METRIC_TIPS: Record<string,string> = {
 };
 
 const RADAR_TIPS: Record<string,string> = {
-  'Positivity': 'How favorable the tone is when AI mentions your brand.',
-  'Brand Authority': 'How credible and expert AI perceives your brand.',
-  'Message Clarity': 'How clearly and consistently your brand message comes through in AI responses.',
-  'Market Relevance': 'How often your brand is surfaced for relevant queries.',
-  'Trust': 'How trustworthy AI portrays your brand to consumers.',
-  'Recommendation': 'How often AI actively recommends your brand over alternatives.',
+  // Credit card features
+  'Cash Back':        'How often AI recommends your brand for cash back and everyday rewards queries.',
+  'Travel Benefits':  'How often AI surfaces your brand for travel, miles, lounge and international queries.',
+  'Fees & APR':       'How well your brand is positioned on low fees, 0% APR and interest rate queries.',
+  'Rewards / Points': 'How often AI mentions your brand for points, rewards optimization and bonus categories.',
+  'Credit Building':  'How strongly AI associates your brand with credit building, secured cards and approvals.',
+  'Perks & Benefits': 'How often AI highlights your brand for premium perks, purchase protection and card benefits.',
+  // Retail banking features
+  'Savings Rate':     'How often AI recommends your brand for high-yield savings and APY queries.',
+  'No Fees':          'How well your brand is positioned on no-fee, no-minimum banking queries.',
+  'ATM Access':       'How often AI highlights your brand for ATM access and fee-free ATM queries.',
+  'Mobile & Digital': 'How strongly AI associates your brand with digital banking and mobile app quality.',
+  'CD Rates':         'How often AI recommends your brand for CD accounts and fixed-rate savings.',
+  'Family Banking':   'How often AI surfaces your brand for kids, teen and family banking queries.',
+  // Retirement / wealth features
+  'Retirement Plans': 'How often AI recommends your brand for 401k and retirement planning queries.',
+  'Investment Funds': 'How well your brand is positioned for mutual funds and portfolio management.',
+  'Financial Planning':'How often AI highlights your brand for holistic financial planning queries.',
+  'Digital Tools':    'How strongly AI associates your brand with digital retirement and investment tools.',
+  'Insurance':        'How often AI surfaces your brand for life insurance and annuity queries.',
+  'Employer Plans':   'How often AI recommends your brand for employer-sponsored retirement benefits.',
+  // Generic fallback
+  'Visibility':       'How often your brand appears across all AI queries in this category.',
+  'Sentiment':        'How positively AI describes your brand overall.',
+  'Authority':        'How credibly and authoritatively AI references your brand.',
+  'Prominence':       'How early in AI responses your brand is mentioned.',
+  'Share of Voice':   'Your brand mentions as a share of all brand mentions in AI responses.',
+  'Recommendation':   'How often AI actively recommends your brand over alternatives.',
 };
 
 const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt','FAQ'];
@@ -42,15 +64,92 @@ function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
-function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number) {
+// ── Product-feature radar dimensions ──
+// Derives real scores from responses_detail query categories.
+// Falls back to abstract score math when no rd data is available (competitor rows).
+function buildFeatureDims(
+  indKey: string,
+  rd: any[],                          // responses_detail from API (may be empty for competitors)
+  sent: number, prom: number, vis: number, cit: number, sov: number
+) {
+  // Helper: appearance rate for given query categories from rd (0-100)
+  const rate = (cats: string[]): number | null => {
+    const rows = rd.filter((r: any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
+    if (rows.length === 0) return null;
+    return Math.round((rows.filter((r: any) => r.mentioned).length / rows.length) * 100);
+  };
+
+  // ── Credit cards ──
+  if (indKey === 'fin' || indKey === 'fin_cc_travel' || indKey === 'fin_cc_cashback' ||
+      indKey === 'fin_cc_rewards' || indKey === 'fin_cc_student' || indKey === 'fin_cc_student_rewards' ||
+      indKey === 'fin_cc_secured' || indKey === 'fin_cc_balance_transfer' || indKey === 'fin_small_business_cc') {
+    const cashBack    = rate(['Cash Back','Flat Rate','Category','Redemption']);
+    const travel      = rate(['Travel & Rewards','Miles & Points','Perks & Benefits','Value']);
+    const feesApr     = rate(['Interest & Fees','0% APR','Fees','Debt Payoff','Balance Transfer']);
+    const rewards     = rate(['Rewards Optimization','Points','Cash Back vs Points']);
+    const creditBuild = rate(['Credit Building','Approval & Credit','Credit Builder','Deposit & Fees','Features']);
+    const perks       = rate(['Card Benefits','Expert Recommendation','Premium Cards','Comparison']);
+    // fallback to abstract math if no rd data (competitor mode)
+    return [
+      { label: 'Cash Back',       val: cashBack    ?? Math.round(vis * 0.6 + sov * 0.4) },
+      { label: 'Travel Benefits', val: travel      ?? Math.round(sent * 0.5 + prom * 0.5) },
+      { label: 'Fees & APR',      val: feesApr     ?? Math.round(cit * 0.5 + sent * 0.5) },
+      { label: 'Rewards / Points',val: rewards     ?? Math.round(prom * 0.6 + vis * 0.4) },
+      { label: 'Credit Building', val: creditBuild ?? Math.round(sov * 0.6 + cit * 0.4) },
+      { label: 'Perks & Benefits',val: perks       ?? Math.round(sent * 0.55 + prom * 0.45) },
+    ];
+  }
+
+  // ── Retail banking ──
+  if (indKey === 'fin_retail_bank') {
+    const savingsRate = rate(['Savings Accounts','Savings Rate','High Yield']);
+    const noFees      = rate(['No Fees & Access','General Banking']);
+    const atmAccess   = rate(['No Fees & Access','Checking Accounts']);
+    const mobile      = rate(['Digital & Mobile']);
+    const cdRates     = rate(['CD Accounts']);
+    const family      = rate(['Kids & Family Banking','Teen & Youth Banking','Account Comparison']);
+    return [
+      { label: 'Savings Rate',    val: savingsRate ?? Math.round(vis * 0.6 + sent * 0.4) },
+      { label: 'No Fees',         val: noFees      ?? Math.round(sent * 0.5 + sov * 0.5) },
+      { label: 'ATM Access',      val: atmAccess   ?? Math.round(cit * 0.5 + prom * 0.5) },
+      { label: 'Mobile & Digital',val: mobile      ?? Math.round(prom * 0.6 + vis * 0.4) },
+      { label: 'CD Rates',        val: cdRates     ?? Math.round(sov * 0.6 + cit * 0.4) },
+      { label: 'Family Banking',  val: family      ?? Math.round(sent * 0.55 + prom * 0.45) },
+    ];
+  }
+
+  // ── Retirement / asset management ──
+  if (indKey === 'fin_retirement' || indKey === 'fin_wealth') {
+    const retPlans  = rate(['Retirement Planning','Employer Benefits','Account Comparison']);
+    const investing = rate(['Investment Management','Investment','Provider Comparison']);
+    const planning  = rate(['Financial Planning','Expert Recommendation']);
+    const digital   = rate(['Digital Experience','Digital Tools']);
+    const insurance = rate(['Insurance & Annuities','Insurance']);
+    const employer  = rate(['Employer Benefits','Institutional']);
+    return [
+      { label: 'Retirement Plans',  val: retPlans  ?? Math.round(vis * 0.6 + sent * 0.4) },
+      { label: 'Investment Funds',  val: investing  ?? Math.round(cit * 0.6 + prom * 0.4) },
+      { label: 'Financial Planning',val: planning   ?? Math.round(sent * 0.5 + prom * 0.5) },
+      { label: 'Digital Tools',     val: digital    ?? Math.round(prom * 0.6 + vis * 0.4) },
+      { label: 'Insurance',         val: insurance  ?? Math.round(sov * 0.6 + cit * 0.4) },
+      { label: 'Employer Plans',    val: employer   ?? Math.round(sent * 0.55 + sov * 0.45) },
+    ];
+  }
+
+  // ── Generic fallback (auto, hotel, retail, tech, health, sport, gen) ──
   return [
-    { label: 'Positivity',      val: sent },
-    { label: 'Brand Authority', val: Math.round((cit * 0.6 + prom * 0.4)) },
-    { label: 'Trust',           val: Math.round((sent * 0.5 + cit * 0.5)) },
-    { label: 'Market Relevance',val: Math.round((vis * 0.5 + sov * 0.5)) },
-    { label: 'Message Clarity', val: Math.round((prom * 0.6 + sent * 0.4)) },
-    { label: 'Recommendation',  val: Math.round((sov * 0.55 + prom * 0.45)) },
+    { label: 'Visibility',    val: vis },
+    { label: 'Sentiment',     val: sent },
+    { label: 'Authority',     val: Math.round(cit * 0.6 + prom * 0.4) },
+    { label: 'Prominence',    val: prom },
+    { label: 'Share of Voice',val: sov },
+    { label: 'Recommendation',val: Math.round(sov * 0.55 + prom * 0.45) },
   ];
+}
+
+// Keep backward-compatible wrapper for competitor rows (no rd data)
+function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, indKey = 'gen') {
+  return buildFeatureDims(indKey, [], sent, prom, vis, cit, sov);
 }
 
 function Tooltip({ text }: { text: string }) {
@@ -606,10 +705,10 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151',maxWidth:'100%'}}>{elements}</div>;
 }
 
-function RadarChart({ sent, prom, vis, cit, sov }: { sent:number; prom:number; vis:number; cit:number; sov:number }) {
+function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:number; prom:number; vis:number; cit:number; sov:number; indKey?:string; rd?:any[] }) {
   const [hov,setHov]=useState<number|null>(null);
   const [tooltipPos,setTooltipPos]=useState<{x:number;y:number}|null>(null);
-  const dims = buildRadarDims(sent, prom, vis, cit, sov);
+  const dims = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
   const compDims=dims.map(d=>({...d,val:Math.round(d.val*0.75)}));
   const cx=200,cy=200,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
@@ -631,14 +730,14 @@ function RadarChart({ sent, prom, vis, cit, sov }: { sent:number; prom:number; v
         <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text><circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text></g>
       </svg>
       {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{RADAR_TIPS[dims[hov].label]}</div></div>}
-      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Insight:</strong> Strong in {top2.join(' and ')}, weaker in {bot2.join(' and ')}.</div>
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Feature Insight:</strong> Strongest in <strong>{top2.join(' and ')}</strong> — AI frequently associates your brand with these. Weakest in <strong>{bot2.join(' and ')}</strong> — competitors dominate these product queries.</div>
     </div>
   );
 }
 
-function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[] }) {
+function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, indKey='gen', rd=[] }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[]; indKey?:string; rd?:any[] }) {
   const [hovCell,setHovCell]=useState<string|null>(null);
-  const myDims = buildRadarDims(sent, prom, vis, cit, sov);
+  const myDims = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
     {name:brandName,isYou:true,scores:myDims.map(d=>d.val)},
@@ -648,20 +747,20 @@ function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors }:
       const cv=c.Vis||Math.round(vis*0.75+seed(c.Brand||'',2)*25);
       const cct=c.Cit||Math.round((cit||30)*0.75+seed(c.Brand||'',3)*25);
       const csov=c.Sov||Math.round((sov||40)*0.75+seed(c.Brand||'',4)*25);
-      const compDims = buildRadarDims(cs, cp, cv, cct, csov);
+      const compDims = buildFeatureDims(indKey, [], cs, cp, cv, cct, csov);
       return{name:c.Brand||'',isYou:false,scores:compDims.map(d=>Math.min(100,Math.max(10,d.val+Math.round(seed(c.Brand||'',5)*20-10))))};
     })
   ];
   const labels = myDims.map(d => d.label);
-  const shortLabels = ['Positivity','Authority','Trust','Mkt Rel.','Clarity','Recommend.'];
+  const shortLabels = myDims.map(d => d.label.length > 9 ? d.label.slice(0,8)+'.' : d.label);
   const allScores=rows.flatMap(r=>r.scores),minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
   const cellColor=(val:number)=>{const t=(val-minS)/Math.max(maxS-minS,1);if(t<0.2)return{bg:'#F3F4F6',text:'#9CA3AF'};if(t<0.4)return{bg:'#EDE9FE',text:'#6D28D9'};if(t<0.6)return{bg:'#C4B5FD',text:'#5B21B6'};if(t<0.8)return{bg:'#8B5CF6',text:'white'};return{bg:'#5B21B6',text:'white'};};
   const compRows=rows.slice(1),dimWins=labels.map((lbl,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:lbl,score:yourScore,beaten};});
   const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0],weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sentiment Dimensions vs Competitors</div>
-      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Darker = stronger. Hover to see score.</div>
+      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Strength vs Competitors</div>
+      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Darker = stronger AI association with that product feature. Hover to see score.</div>
       <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${labels.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
         <div/>{shortLabels.map((lbl,i)=><div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{lbl}</div>)}
         {rows.map((r,ri)=>[<div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,...r.scores.map((val,ci)=>{const k=`${ri}-${ci}`,{bg,text}=cellColor(val),isH=hovCell===k;return<div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)} style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>{isH?val:''}</div>;})])}
@@ -1158,13 +1257,13 @@ export default function GeoHub() {
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Dimensions</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Hover each point for definition.</div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Product Feature Positioning</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>How your brand scores on key product decision drivers. Hover each point for detail.</div>
                       <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
-                        <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov}/>
+                        <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
                       </div>
                     </div>
-                    <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]}/>
+                    <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>✓ Sentiment Strengths</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
