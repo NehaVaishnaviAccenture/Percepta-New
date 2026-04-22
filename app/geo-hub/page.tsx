@@ -921,6 +921,7 @@ export default function GeoHub() {
   const [promptHistory,setPromptHistory]=useState<{q:string;a:string}[]>([]);
   const [promptLoading,setPromptLoading]=useState(false);
   const [filterCat,setFilterCat]=useState('All');
+  const [selectedCluster,setSelectedCluster]=useState<string|null>(null);
   const [hovBar,setHovBar]=useState<number|null>(null);
   const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
   const [hovNode,setHovNode]=useState<string|null>(null);
@@ -1392,11 +1393,31 @@ export default function GeoHub() {
 
             {activeTab===5&&(()=>{
               const rd=result.responses_detail||[];
-              // FIX 3 & 4: Use total_responses from API (already set to 100 by route.ts multiplier)
-              // Show ALL queries in the table — no hardcoded 50 limit
+              const clusters=result.query_clusters||[];
+              const trendingQs=result.trending_queries||[];
               const totalQueries = result.total_responses ?? rd.length;
               const totalMentions = result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length;
               const displayRate = Math.round((totalMentions / Math.max(totalQueries, 1)) * 100);
+
+              // ── BUBBLE MAP: force-layout positions for category bubbles ──
+              // Place bubbles in a grid-like layout with jitter based on winRate
+              const bubbleData = clusters.map((c:any, i:number) => {
+                const cols = Math.ceil(Math.sqrt(clusters.length));
+                const row = Math.floor(i / cols);
+                const col = i % cols;
+                const W = 700, H = 320;
+                const cellW = W / cols;
+                const cellH = H / Math.ceil(clusters.length / cols);
+                // Base position in grid + jitter so it looks organic
+                const seed = (c.category||'').split('').reduce((a:number,ch:string)=>a+ch.charCodeAt(0),0);
+                const jx = ((seed * 17) % 40) - 20;
+                const jy = ((seed * 31) % 30) - 15;
+                const x = col * cellW + cellW / 2 + jx;
+                const y = row * cellH + cellH / 2 + jy;
+                // Bubble radius: proportional to query count, min 22 max 52
+                const r = Math.round(22 + (c.total / Math.max(...clusters.map((cc:any)=>cc.total),1)) * 30);
+                return { ...c, x, y, r };
+              });
 
               // FIX 3: For retail banking — derive categories from the brand URL / lob
               // The lob already comes from route.ts (e.g. "Savings Accounts", "Checking Accounts")
@@ -1427,6 +1448,117 @@ export default function GeoHub() {
                     <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
 
+                  {/* ── QUERY INTELLIGENCE: Bubble map + Trending ── */}
+                  {bubbleData.length > 0 && (
+                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                        <div>
+                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>Query Intelligence Map</div>
+                          <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginTop:2}}>Each bubble = a query category. Size = volume. Color = win rate. Click to explore prompts.</div>
+                        </div>
+                        {selectedCluster && <button onClick={()=>{setSelectedCluster(null);setFilterCat('All');}} style={{background:'#F3F4F6',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',color:'#374151',cursor:'pointer',fontWeight:600}}>← Back to all</button>}
+                      </div>
+
+                      {/* Bubble SVG */}
+                      {!selectedCluster && (
+                        <svg viewBox="0 0 700 340" style={{width:'100%',display:'block',overflow:'visible'}}>
+                          {/* Connection lines between related categories */}
+                          {bubbleData.map((b:any) =>
+                            (b.related||[]).slice(0,2).map((rel:any) => {
+                              const target = bubbleData.find((bb:any)=>bb.category===rel.category);
+                              if(!target) return null;
+                              const opacity = Math.min(0.35, rel.similarity / 100);
+                              return <line key={`${b.category}-${rel.category}`} x1={b.x} y1={b.y} x2={target.x} y2={target.y} stroke="#C4B5FD" strokeWidth="1.5" opacity={opacity}/>;
+                            })
+                          )}
+                          {/* Bubbles */}
+                          {bubbleData.map((b:any) => {
+                            const isSelected = selectedCluster === b.category;
+                            const winColor = b.winRate >= 60 ? '#10B981' : b.winRate >= 30 ? '#F59E0B' : '#EF4444';
+                            const winBg = b.winRate >= 60 ? '#D1FAE5' : b.winRate >= 30 ? '#FEF3C7' : '#FEE2E2';
+                            const label = b.category.length > 10 ? b.category.slice(0,9)+'…' : b.category;
+                            return (
+                              <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setSelectedCluster(b.category);setFilterCat(b.category);}}>
+                                <circle cx={b.x} cy={b.y} r={b.r+4} fill={winBg} opacity="0.4"/>
+                                <circle cx={b.x} cy={b.y} r={b.r} fill={winColor} opacity={isSelected?1:0.75} stroke={isSelected?'#7C3AED':'white'} strokeWidth={isSelected?3:1.5}/>
+                                <text x={b.x} y={b.y-4} textAnchor="middle" dominantBaseline="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.4)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
+                                <text x={b.x} y={b.y+8} textAnchor="middle" dominantBaseline="middle" style={{fontSize:8,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none',opacity:0.9}}>{b.winRate}%</text>
+                              </g>
+                            );
+                          })}
+                          {/* Legend */}
+                          <g transform="translate(10,318)">
+                            {[{color:'#10B981',label:'Winning (≥60%)'},{color:'#F59E0B',label:'Emerging (30–59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
+                              <g key={i} transform={`translate(${i*140},0)`}>
+                                <circle cx={6} cy={0} r={6} fill={l.color} opacity="0.8"/>
+                                <text x={16} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>{l.label}</text>
+                              </g>
+                            ))}
+                            <text x={440} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Lines = related topics · Click bubble to explore queries</text>
+                          </g>
+                        </svg>
+                      )}
+
+                      {/* Selected cluster: show its queries inline */}
+                      {selectedCluster && (()=>{
+                        const clusterRows = rd.filter((r:any)=>r.category===selectedCluster).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
+                        const clusterWin = clusterRows.filter((r:any)=>r.mentioned).length;
+                        const clusterRate = Math.round((clusterWin/Math.max(clusterRows.length,1))*100);
+                        const winColor = clusterRate>=60?'#10B981':clusterRate>=30?'#F59E0B':'#EF4444';
+                        return (
+                          <div>
+                            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:14,padding:'12px 16px',background:'#F5F3FF',borderRadius:10}}>
+                              <span style={{fontSize:'1.4rem',fontWeight:900,color:winColor}}>{clusterRate}%</span>
+                              <div><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827'}}>{selectedCluster}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>{clusterWin} of {clusterRows.length} queries — brand appeared</div></div>
+                            </div>
+                            <table style={{width:'100%',borderCollapse:'collapse'}}>
+                              <thead><tr style={{background:'#FAFAFA'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                              <tbody>{clusterRows.map((item:any,i:number)=>{
+                                const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
+                                const beater=isMissed&&item.winner_brand?item.winner_brand:null;
+                                return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                                  <td style={{padding:'10px 12px',fontSize:'0.78rem',color:'#9CA3AF',width:28}}>{i+1}</td>
+                                  <td style={{padding:'10px 12px'}}><div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3,flexWrap:'wrap' as const}}>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.72rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.72rem',fontWeight:600}}>✗ Missed</span>}</div><div style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{item.query}</div></td>
+                                  <td style={{padding:'10px 12px',fontSize:'0.95rem',fontWeight:800,color:rankColor,width:70}}>{rankLabel}</td>
+                                  <td style={{padding:'10px 12px',width:150}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:7,padding:'2px 9px',fontSize:'0.72rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:7,padding:'2px 9px',fontSize:'0.72rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>—</span>}</td>
+                                </tr>;
+                              })}</tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* ── TRENDING QUERIES SECTION ── */}
+                  {trendingQs.length > 0 && (
+                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
+                      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                        <span style={{fontSize:'1rem'}}>🔥</span>
+                        <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
+                      </div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>AI-detected high-intent queries trending in {result.ind_label} — beyond what we tested. These are your optimization opportunities.</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                        {trendingQs.map((tq:any,i:number)=>{
+                          const trendColor = tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
+                          const trendBg = tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
+                          const oppColor = tq.opportunity==='High'?'#10B981':tq.opportunity==='Medium'?'#F59E0B':'#9CA3AF';
+                          return (
+                            <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:'1px solid #E5E7EB',padding:'12px 14px'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
+                                <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
+                                <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
+                                <span style={{marginLeft:'auto',fontSize:'0.65rem',fontWeight:700,color:oppColor}}>{tq.opportunity} opportunity</span>
+                              </div>
+                              <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500}}>{tq.query}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── CATEGORY BREAKDOWN (existing) ── */}
                   {/* FIX 3: Show product-specific category breakdown — label uses lob from URL */}
                   <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>
                     Appearance Rate by Category
