@@ -1361,7 +1361,52 @@ export default function GeoHub() {
               const geo=result.overall_geo_score,fin=result.ind_key==='fin';
               const brandNameLower = (result.brand_name||'').toLowerCase();
               const filterDominated = (d:string) => d.split(',').map((s:string)=>s.trim()).filter((s:string)=>!s.toLowerCase().includes(brandNameLower)&&!brandNameLower.includes(s.toLowerCase())).join(', ')||'Top Competitors';
-              const segments=fin?[{name:'General Consumers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.9),dominated:filterDominated('Chase, Citi')},{name:'Travelers / Rewards',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.min(100,Math.round(geo*1.1)),dominated:filterDominated('Amex, Chase')},{name:'Affluent / HNW',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.45),dominated:filterDominated('Amex Centurion, Chase Sapphire')},{name:'First-Time Users',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.95),dominated:filterDominated('Discover')},{name:'Cashback Seekers',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.5),dominated:filterDominated('Citi, Wells Fargo')},{name:'Small Business',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.35),dominated:filterDominated('Amex, Chase Ink')}]:[{name:'General Consumers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*0.9),dominated:'Top Competitors'},{name:'Expert Seekers',status:'Winning',color:'#10B981',bg:'#F0FDF4',border:'#6EE7B7',score:Math.round(geo*1.0),dominated:'Industry Leaders'},{name:'Premium Segment',status:'Gap',color:'#EF4444',bg:'#FFF1F2',border:'#FCA5A5',score:Math.round(geo*0.5),dominated:'Competitors'}];
+
+              // ── DERIVE segments from real responses_detail ──
+              const rd = result.responses_detail || [];
+
+              // Category name → segment definition map
+              // Each segment maps one or more query categories from responses_detail
+              const SEG_DEFS = fin ? [
+                { name:'General Consumers',  cats:['General Consumer'],                dominated:'Chase, Citi',                   dominated2:'Amex, Chase' },
+                { name:'Travelers / Rewards', cats:['Travel & Rewards'],                dominated:'Amex, Chase',                   dominated2:'Chase Sapphire' },
+                { name:'Cashback Seekers',    cats:['Cash Back','Rewards Optimization'], dominated:'Chase, Wells Fargo',            dominated2:'Discover' },
+                { name:'Credit Builders',     cats:['Credit Building','Approval & Credit'], dominated:'Discover, Capital One',     dominated2:'Secured cards' },
+                { name:'Expert / Premium',    cats:['Expert Recommendation','Premium Cards','Card Benefits'], dominated:'Amex, Chase Sapphire', dominated2:'Amex' },
+                { name:'Small Business',      cats:['Comparison','Interest & Fees'],    dominated:'Amex, Chase Ink',               dominated2:'Chase' },
+              ] : [
+                { name:'General Consumers',  cats:['General Consumer','General Banking','General'], dominated:'Top Competitors', dominated2:'Industry Leaders' },
+                { name:'Expert Seekers',     cats:['Expert Recommendation','Expert'],               dominated:'Industry Leaders', dominated2:'Top Brands' },
+                { name:'Premium Segment',    cats:['Premium','Luxury','Investment','Wealth'],        dominated:'Competitors',     dominated2:'Top Brands' },
+                { name:'Digital Users',      cats:['Digital & Mobile','Digital Experience'],         dominated:'Top Competitors', dominated2:'Leaders' },
+                { name:'Value Seekers',      cats:['Value','No Fees & Access','Flat Rate'],          dominated:'Top Competitors', dominated2:'Leaders' },
+                { name:'Savers',             cats:['Savings Accounts','CD Accounts','High Yield'],   dominated:'Ally, Marcus',    dominated2:'Online banks' },
+              ];
+
+              const segRate = (cats: string[]) => {
+                const rows = rd.filter((r:any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
+                if (rows.length === 0) return null; // no data for this category
+                const mentioned = rows.filter((r:any) => r.mentioned).length;
+                return Math.round((mentioned / rows.length) * 100);
+              };
+
+              const WIN_THRESHOLD = 40; // ≥ 40% appearance = Winning
+
+              const segments = SEG_DEFS.map(def => {
+                const rate = segRate(def.cats);
+                // If no query data for this category, skip it (return null to filter out)
+                if (rate === null) return null;
+                const isWinning = rate >= WIN_THRESHOLD;
+                return {
+                  name: def.name,
+                  status: isWinning ? 'Winning' : 'Gap',
+                  color: isWinning ? '#10B981' : '#EF4444',
+                  bg: isWinning ? '#F0FDF4' : '#FFF1F2',
+                  border: isWinning ? '#6EE7B7' : '#FCA5A5',
+                  score: rate,
+                  dominated: isWinning ? filterDominated(def.dominated2) : filterDominated(def.dominated),
+                };
+              }).filter(Boolean);
               return (
                 <div>
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
