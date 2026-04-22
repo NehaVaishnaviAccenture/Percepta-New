@@ -1060,12 +1060,13 @@ export default function GeoHub() {
               const sov=_ct?_ct.sov:result.share_of_voice;
               const avgRank=_ct?_ct.rank:result.avg_rank;
               const top=[{Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Rank:avgRank,isYou:true},...(result.competitors||[]).slice(0,9).map((c:any)=>({...c,isYou:false}))].sort((a,b)=>b.GEO-a.GEO);
+              // Rank by sequential position in the GEO-sorted `top` array — no duplicates, max #5
               const resolvedRank=(c:any)=>{
-                const r=String(c.Rank||'').replace(/^#+/,'').trim();
-                if(!r||r==='N/A'||r==='null'||r==='undefined') return '—';
-                const num = parseInt(r, 10);
-                if(!isNaN(num) && num > 5) return '—';
-                return `#${r}`;
+                const pos = top.findIndex(t => t.Brand === c.Brand || (t.isYou && c.isYou));
+                if(pos < 0) return '—';
+                const rank = pos + 1; // 1-based
+                if(rank > 5) return '—';
+                return `#${rank}`;
               };
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
