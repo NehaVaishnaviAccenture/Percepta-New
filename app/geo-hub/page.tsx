@@ -1458,12 +1458,16 @@ export default function GeoHub() {
                           <div style={{fontSize:'0.72rem',color:'#64748B',marginTop:2}}>Topic clusters sized by AI search volume · Color = your win rate · Lines = topic relatedness · Click any node</div>
                         </div>
                         <div style={{display:'flex',alignItems:'center',gap:16}}>
-                          {[{color:'#10B981',label:'Winning'},{color:'#F59E0B',label:'Emerging'},{color:'#EF4444',label:'Gap'},{color:'#818CF8',label:'Untapped'}].map((l,i)=>(
+                          {[{color:'#10B981',label:'Winning (≥60%)'},{color:'#F59E0B',label:'Emerging (30–59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
                             <div key={i} style={{display:'flex',alignItems:'center',gap:5}}>
                               <div style={{width:8,height:8,borderRadius:'50%',background:l.color,boxShadow:`0 0 6px ${l.color}`}}/>
                               <span style={{fontSize:'0.68rem',color:'#94A3B8'}}>{l.label}</span>
                             </div>
                           ))}
+                          <div style={{display:'flex',alignItems:'center',gap:5}}>
+                            <div style={{width:8,height:8,borderRadius:'50%',background:'transparent',border:'1.5px dashed #EF4444'}}/>
+                            <span style={{fontSize:'0.68rem',color:'#94A3B8'}}>Zero presence</span>
+                          </div>
                           {selectedCluster && <button onClick={()=>{setSelectedCluster(null);setFilterCat('All');}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:8,padding:'5px 12px',fontSize:'0.72rem',color:'#94A3B8',cursor:'pointer'}}>← All topics</button>}
                         </div>
                       </div>
@@ -1531,6 +1535,30 @@ export default function GeoHub() {
                             {Array.from({length:20},(_,i)=>Array.from({length:12},(_,j)=>(
                               <circle key={`${i}-${j}`} cx={i*(W/19)} cy={j*(H/11)} r="1" fill="#1E293B"/>
                             )))}
+                            {/* Theme group hulls */}
+                            {(()=>{
+                              const THEMES = [
+                                {name:'Rewards & Cash Back',cats:['Cash Back','Rewards Optimization','No Annual Fee','Flat Rate','Category','Redemption'],color:'#10B981'},
+                                {name:'Travel',cats:['Travel & Rewards','Premium Cards','Card Benefits','Miles & Points','Perks & Benefits'],color:'#818CF8'},
+                                {name:'Family & Everyday',cats:['Family Spending','General Consumer','Expert Recommendation','Comparison'],color:'#F59E0B'},
+                                {name:'Credit & Debt',cats:['Balance Transfer','Credit Building','Approval & Credit','Interest & Fees','Debt Payoff'],color:'#EF4444'},
+                              ];
+                              return THEMES.map(theme=>{
+                                const tn=nodes.filter((n:any)=>theme.cats.includes(n.category));
+                                if(tn.length<2) return null;
+                                const xs=tn.map((n:any)=>n.x),ys=tn.map((n:any)=>n.y);
+                                const maxR=Math.max(...tn.map((n:any)=>n.r));
+                                const pad=maxR+22;
+                                const x1=Math.min(...xs)-pad,y1=Math.min(...ys)-pad;
+                                const x2=Math.max(...xs)+pad,y2=Math.max(...ys)+pad;
+                                return (
+                                  <g key={theme.name}>
+                                    <ellipse cx={(x1+x2)/2} cy={(y1+y2)/2} rx={(x2-x1)/2} ry={(y2-y1)/2} fill={theme.color} opacity="0.05" stroke={theme.color} strokeWidth="1" strokeDasharray="6,4" strokeOpacity="0.25"/>
+                                    <text x={x1+8} y={y1+14} style={{fontSize:9,fill:theme.color,fontFamily:'Inter,sans-serif',fontWeight:700,opacity:0.55,letterSpacing:'0.05em'}}>{theme.name.toUpperCase()}</text>
+                                  </g>
+                                );
+                              });
+                            })()}
                             {/* Connection lines — drawn first so nodes appear on top */}
                             {nodes.map((b:any)=>
                               (b.related||[]).map((rel:any)=>{
@@ -1547,7 +1575,8 @@ export default function GeoHub() {
                             {/* Nodes */}
                             {nodes.map((b:any)=>{
                               const isUntapped = b.winRate===0 && b.total>0;
-                              const nodeColor = isUntapped?'#818CF8':b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
+                              // Untapped = worst kind of Gap — red like Gap but with dashed ring
+                              const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
                               const glowColor = nodeColor;
                               const label = b.category.split(' ').length>2 ? b.category.split(' ').slice(0,2).join(' ') : b.category;
                               const isSelected = selectedCluster===b.category;
@@ -1621,6 +1650,68 @@ export default function GeoHub() {
                     </div>
                   )}
 
+                  {/* ── PROMPT GAPS SECTION ── */}
+                  {clusters.length > 0 && (()=>{
+                    const fmtV=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
+                    // Winning = ≥50% win rate, Gap = <30%, sort by daily volume to show highest-impact gaps first
+                    const winning = clusters.filter((c:any)=>c.winRate>=50).sort((a:any,b:any)=>b.winRate-a.winRate).slice(0,4);
+                    const gaps = clusters.filter((c:any)=>c.winRate<30 && c.total>0).sort((a:any,b:any)=>b.dailySearches-a.dailySearches).slice(0,4);
+                    if(winning.length===0 && gaps.length===0) return null;
+                    return (
+                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
+                        <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827',marginBottom:2}}>Prompt Gaps & Strengths</div>
+                        <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>Where {result.brand_name} shows up vs where it&apos;s missing — based on actual AI query results.</div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+                          {/* Winning */}
+                          <div>
+                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+                              <div style={{width:3,height:16,background:'#10B981',borderRadius:2}}/>
+                              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#065F46'}}>Where {result.brand_name} appears</span>
+                            </div>
+                            {winning.map((c:any,i:number)=>(
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 12px',background:'#F0FDF4',borderRadius:8,border:'1px solid #D1FAE5',cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</div>
+                                  <div style={{fontSize:'0.7rem',color:'#6B7280',marginTop:1}}>{fmtV(c.dailySearches)} · {c.topCompetitor?`also: ${c.topCompetitor.split(' ')[0]}`:'leading'}</div>
+                                </div>
+                                <div style={{textAlign:'right' as const}}>
+                                  <div style={{fontSize:'1.1rem',fontWeight:900,color:'#10B981'}}>{c.winRate}%</div>
+                                  <div style={{fontSize:'0.65rem',color:'#10B981'}}>win rate</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Gaps */}
+                          <div>
+                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
+                              <div style={{width:3,height:16,background:'#EF4444',borderRadius:2}}/>
+                              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#991B1B'}}>Where {result.brand_name} is missing</span>
+                            </div>
+                            {gaps.map((c:any,i:number)=>(
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 12px',background:'#FFF1F2',borderRadius:8,border:'1px solid #FCA5A5',cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
+                                <div style={{flex:1}}>
+                                  <div style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</div>
+                                  <div style={{fontSize:'0.7rem',color:'#6B7280',marginTop:1}}>{fmtV(c.dailySearches)} · {c.topCompetitor?`${c.topCompetitor.split(' ')[0]} dominates`:'no clear leader'}</div>
+                                </div>
+                                <div style={{textAlign:'right' as const}}>
+                                  <div style={{fontSize:'1.1rem',fontWeight:900,color:'#EF4444'}}>{c.winRate}%</div>
+                                  <div style={{fontSize:'0.65rem',color:'#EF4444',whiteSpace:'nowrap' as const}}>whitespace →</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {/* Strategic insight line */}
+                        {winning.length>0&&gaps.length>0&&(
+                          <div style={{marginTop:14,padding:'10px 14px',background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',fontSize:'0.78rem',color:'#5B21B6',lineHeight:1.6}}>
+                            💡 <strong>{result.brand_name} shows up for {winning[0]?.category} ({winning[0]?.winRate}% win rate) but is barely present in {gaps[0]?.category} queries ({gaps[0]?.winRate}% win rate) — a topic with {fmtV(gaps[0]?.dailySearches)} AI searches. That&apos;s your highest-impact whitespace opportunity.
+                            {gaps[0]?.topCompetitor ? ` ${gaps[0].topCompetitor.split(' ')[0]} currently dominates there.` : ''}</strong>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* ── TRENDING QUERIES SECTION ── */}
                   {trendingQs.length > 0 && (()=>{
                     // Only show High opportunity
@@ -1647,33 +1738,7 @@ export default function GeoHub() {
                           </span>
                         </div>
 
-                        {/* Top winners + trending summary */}
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:18}}>
-                          <div style={{background:'#F0FDF4',borderRadius:10,border:'1px solid #6EE7B7',padding:'12px 16px'}}>
-                            <div style={{fontSize:'0.7rem',fontWeight:700,color:'#065F46',letterSpacing:'.06em',marginBottom:8}}>🏆 HIGHEST WINNING CATEGORIES</div>
-                            {topWinning.map((c:any,i:number)=>(
-                              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-                                <span style={{fontSize:'0.78rem',color:'#111827',fontWeight:500}}>{c.category}</span>
-                                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                                  <span style={{fontSize:'0.78rem',fontWeight:800,color:'#10B981'}}>{c.winRate}%</span>
-                                  {c.topCompetitor&&<span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>vs {c.topCompetitor.split(' ')[0]}</span>}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div style={{background:'#FFF7ED',borderRadius:10,border:'1px solid #FED7AA',padding:'12px 16px'}}>
-                            <div style={{fontSize:'0.7rem',fontWeight:700,color:'#92400E',letterSpacing:'.06em',marginBottom:8}}>📈 HIGHEST VOLUME CATEGORIES</div>
-                            {topTrending.map((c:any,i:number)=>(
-                              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-                                <span style={{fontSize:'0.78rem',color:'#111827',fontWeight:500}}>{c.category}</span>
-                                <div style={{display:'flex',alignItems:'center',gap:6}}>
-                                  <span style={{fontSize:'0.78rem',fontWeight:800,color:'#F59E0B'}}>~{c.dailySearches>=1000?`${(c.dailySearches/1000).toFixed(0)}K`:c.dailySearches}/day</span>
-                                  <span style={{fontSize:'0.65rem',color:c.winRate>=50?'#10B981':'#EF4444',fontWeight:600}}>{c.winRate>=50?'Winning':'Gap'}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+
 
                         {/* High opportunity trending queries — expandable */}
                         <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:10}}>
