@@ -1415,7 +1415,7 @@ export default function GeoHub() {
                 const x = col * cellW + cellW / 2 + jx;
                 const y = row * cellH + cellH / 2 + jy;
                 // Bubble radius: proportional to query count, min 22 max 52
-                const r = Math.round(22 + (c.total / Math.max(...clusters.map((cc:any)=>cc.total),1)) * 30);
+                const r = Math.round(18 + (c.total / Math.max(...clusters.map((cc:any)=>cc.total),1)) * 22);
                 return { ...c, x, y, r };
               });
 
@@ -1474,14 +1474,14 @@ export default function GeoHub() {
 
                       {/* Network SVG */}
                       {!selectedCluster && (()=>{
-                        const W=900,H=480;
+                        const W=980,H=580;
                         // Force-directed layout: run physics iterations
                         const nodes = bubbleData.map((b:any,i:number)=>({...b, fx:null, fy:null}));
                         // Initialize positions on a circle
                         const n = nodes.length;
                         nodes.forEach((node:any,i:number)=>{
                           const angle = (i/n)*Math.PI*2 - Math.PI/2;
-                          const radius = 160 + Math.random()*40;
+                          const radius = 210 + (i%2===0?30:-30);
                           node.x = W/2 + radius*Math.cos(angle);
                           node.y = H/2 + radius*Math.sin(angle);
                           node.vx = 0; node.vy = 0;
@@ -1494,9 +1494,9 @@ export default function GeoHub() {
                             for(let j=i+1;j<nodes.length;j++){
                               const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
                               const dist=Math.sqrt(dx*dx+dy*dy)||1;
-                              const minDist=(nodes[i].r+nodes[j].r+30);
+                              const minDist=(nodes[i].r+nodes[j].r+55);
                               if(dist<minDist){
-                                const force=(minDist-dist)/dist*0.5*alpha;
+                                const force=(minDist-dist)/dist*0.75*alpha;
                                 nodes[i].vx-=dx*force; nodes[i].vy-=dy*force;
                                 nodes[j].vx+=dx*force; nodes[j].vy+=dy*force;
                               }
@@ -1578,7 +1578,8 @@ export default function GeoHub() {
                               // Untapped = worst kind of Gap — red like Gap but with dashed ring
                               const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
                               const glowColor = nodeColor;
-                              const label = b.category.split(' ').length>2 ? b.category.split(' ').slice(0,2).join(' ') : b.category;
+                              const words = b.category.split(' ');
+                              const label = words.length>3 ? words.slice(0,2).join(' ')+'…' : b.category;
                               const isSelected = selectedCluster===b.category;
                               return (
                                 <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setSelectedCluster(b.category);setFilterCat(b.category);}}>
@@ -1588,13 +1589,13 @@ export default function GeoHub() {
                                   {/* Main circle */}
                                   <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isSelected?1:0.82} stroke={isSelected?'white':glowColor} strokeWidth={isSelected?2.5:1}/>
                                   {/* Category name */}
-                                  <text x={b.x} y={b.y-(b.r>35?10:6)} textAnchor="middle" style={{fontSize:Math.max(8,Math.min(12,b.r*0.38)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
+                                  <text x={b.x} y={b.y-(b.r>35?10:6)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.32)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
                                   {/* Win rate */}
-                                  <text x={b.x} y={b.y+(b.r>35?4:2)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.3)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                                  <text x={b.x} y={b.y+(b.r>35?4:2)} textAnchor="middle" style={{fontSize:Math.max(6,Math.min(9,b.r*0.26)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
                                   {/* Daily searches */}
-                                  {b.r>28&&<text x={b.x} y={b.y+(b.r>35?16:12)} textAnchor="middle" style={{fontSize:7,fill:'rgba(255,255,255,0.6)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>~{fmtSearches(b.dailySearches)}/day</text>}
+                                  {b.r>26&&<text x={b.x} y={b.y+(b.r>32?14:10)} textAnchor="middle" style={{fontSize:6.5,fill:'rgba(255,255,255,0.6)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>~{fmtSearches(b.dailySearches)}/day</text>}
                                   {/* Winner badge - shown on larger nodes */}
-                                  {b.r>32&&b.topCompetitor&&<text x={b.x} y={b.y+b.r+12} textAnchor="middle" style={{fontSize:7,fill:'#94A3B8',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>👑 {b.topCompetitor.split(' ')[0]}</text>}
+                                  {b.r>30&&b.topCompetitor&&<text x={b.x} y={b.y+b.r+11} textAnchor="middle" style={{fontSize:6.5,fill:'#94A3B8',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>👑 {b.topCompetitor.split(' ')[0]}</text>}
                                   {/* Untapped: dashed stroke ring instead of floating label */}
                                   {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7"/>}
                                 </g>
@@ -1650,63 +1651,98 @@ export default function GeoHub() {
                     </div>
                   )}
 
-                  {/* ── PROMPT GAPS SECTION ── */}
+                  {/* ── WHERE TO PLAY: Strategic Priority Matrix ── */}
                   {clusters.length > 0 && (()=>{
                     const fmtV=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
-                    // Winning = ≥50% win rate, Gap = <30%, sort by daily volume to show highest-impact gaps first
-                    const winning = clusters.filter((c:any)=>c.winRate>=50).sort((a:any,b:any)=>b.winRate-a.winRate).slice(0,4);
-                    const gaps = clusters.filter((c:any)=>c.winRate<30 && c.total>0).sort((a:any,b:any)=>b.dailySearches-a.dailySearches).slice(0,4);
-                    if(winning.length===0 && gaps.length===0) return null;
-                    return (
-                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-                        <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827',marginBottom:2}}>Prompt Gaps & Strengths</div>
-                        <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>Where {result.brand_name} shows up vs where it&apos;s missing — based on actual AI query results.</div>
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-                          {/* Winning */}
-                          <div>
-                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
-                              <div style={{width:3,height:16,background:'#10B981',borderRadius:2}}/>
-                              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#065F46'}}>Where {result.brand_name} appears</span>
-                            </div>
-                            {winning.map((c:any,i:number)=>(
-                              <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 12px',background:'#F0FDF4',borderRadius:8,border:'1px solid #D1FAE5',cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</div>
-                                  <div style={{fontSize:'0.7rem',color:'#6B7280',marginTop:1}}>{fmtV(c.dailySearches)} · {c.topCompetitor?`also: ${c.topCompetitor.split(' ')[0]}`:'leading'}</div>
-                                </div>
-                                <div style={{textAlign:'right' as const}}>
-                                  <div style={{fontSize:'1.1rem',fontWeight:900,color:'#10B981'}}>{c.winRate}%</div>
-                                  <div style={{fontSize:'0.65rem',color:'#10B981'}}>win rate</div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          {/* Gaps */}
-                          <div>
-                            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
-                              <div style={{width:3,height:16,background:'#EF4444',borderRadius:2}}/>
-                              <span style={{fontSize:'0.78rem',fontWeight:700,color:'#991B1B'}}>Where {result.brand_name} is missing</span>
-                            </div>
-                            {gaps.map((c:any,i:number)=>(
-                              <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 12px',background:'#FFF1F2',borderRadius:8,border:'1px solid #FCA5A5',cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
-                                <div style={{flex:1}}>
-                                  <div style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</div>
-                                  <div style={{fontSize:'0.7rem',color:'#6B7280',marginTop:1}}>{fmtV(c.dailySearches)} · {c.topCompetitor?`${c.topCompetitor.split(' ')[0]} dominates`:'no clear leader'}</div>
-                                </div>
-                                <div style={{textAlign:'right' as const}}>
-                                  <div style={{fontSize:'1.1rem',fontWeight:900,color:'#EF4444'}}>{c.winRate}%</div>
-                                  <div style={{fontSize:'0.65rem',color:'#EF4444',whiteSpace:'nowrap' as const}}>whitespace →</div>
-                                </div>
-                              </div>
-                            ))}
+
+                    // Priority score = volume × (1 - winRate/100) → highest = most urgent gap
+                    // Quadrant logic:
+                    // DEFEND    = high win (≥50%) + high volume (≥35K)  → already winning where it matters
+                    // DOUBLE DOWN = high win (≥50%) + lower volume      → strong but niche, grow the pie
+                    // URGENT GAP  = low win (<50%) + high volume (≥35K) → losing where it matters most
+                    // WHITE SPACE = zero win + any volume                → untapped, no one owns it yet
+
+                    const DEFEND      = clusters.filter((c:any)=>c.winRate>=50 && c.dailySearches>=35000).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
+                    const DOUBLE_DOWN = clusters.filter((c:any)=>c.winRate>=50 && c.dailySearches<35000).sort((a:any,b:any)=>b.winRate-a.winRate);
+                    const URGENT      = clusters.filter((c:any)=>c.winRate>0 && c.winRate<50 && c.dailySearches>=35000).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
+                    const WHITE_SPACE = clusters.filter((c:any)=>c.winRate===0 && c.total>0).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
+
+                    const QuadCard = ({c, accent, bg, border, label}:{c:any,accent:string,bg:string,border:string,label:string}) => (
+                      <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:bg,borderRadius:8,border:`1px solid ${border}`,marginBottom:7,cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis'}}>{c.category}</div>
+                          <div style={{fontSize:'0.68rem',color:'#6B7280',marginTop:1,display:'flex',gap:6,alignItems:'center'}}>
+                            <span>{fmtV(c.dailySearches)}</span>
+                            {c.topCompetitor&&<span>· {c.topCompetitor.split(' ')[0]} leads</span>}
                           </div>
                         </div>
-                        {/* Strategic insight line */}
-                        {winning.length>0&&gaps.length>0&&(
-                          <div style={{marginTop:14,padding:'10px 14px',background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',fontSize:'0.78rem',color:'#5B21B6',lineHeight:1.6}}>
-                            💡 <strong>{result.brand_name} shows up for {winning[0]?.category} ({winning[0]?.winRate}% win rate) but is barely present in {gaps[0]?.category} queries ({gaps[0]?.winRate}% win rate) — a topic with {fmtV(gaps[0]?.dailySearches)} AI searches. That&apos;s your highest-impact whitespace opportunity.
-                            {gaps[0]?.topCompetitor ? ` ${gaps[0].topCompetitor.split(' ')[0]} currently dominates there.` : ''}</strong>
-                          </div>
+                        <div style={{textAlign:'right' as const,flexShrink:0}}>
+                          <div style={{fontSize:'1.05rem',fontWeight:900,color:accent}}>{c.winRate}%</div>
+                          <div style={{fontSize:'0.6rem',color:accent,whiteSpace:'nowrap' as const}}>win rate</div>
+                        </div>
+                      </div>
+                    );
+
+                    const QuadSection = ({title, icon, desc, items, accent, bg, border, emptyMsg}:{title:string,icon:string,desc:string,items:any[],accent:string,bg:string,border:string,emptyMsg:string}) => (
+                      <div style={{background:'white',borderRadius:12,border:`1.5px solid ${border}`,padding:'14px 16px',display:'flex',flexDirection:'column' as const}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
+                          <span style={{fontSize:'0.95rem'}}>{icon}</span>
+                          <span style={{fontSize:'0.82rem',fontWeight:800,color:accent}}>{title}</span>
+                        </div>
+                        <div style={{fontSize:'0.68rem',color:'#9CA3AF',marginBottom:10,lineHeight:1.4}}>{desc}</div>
+                        {items.length===0
+                          ? <div style={{fontSize:'0.75rem',color:'#D1D5DB',fontStyle:'italic',textAlign:'center' as const,padding:'12px 0'}}>{emptyMsg}</div>
+                          : items.slice(0,4).map((c:any,i:number)=><QuadCard key={i} c={c} accent={accent} bg={bg} border={border} label={title}/>)
+                        }
+                      </div>
+                    );
+
+                    // Build strategic insight sentence
+                    const topUrgent = URGENT[0], topDefend = DEFEND[0], topWhite = WHITE_SPACE[0];
+                    const insight = [
+                      topDefend ? `<strong>${result.brand_name} is winning where it counts most</strong> — ${topDefend.category} (${topDefend.winRate}% win, ${fmtV(topDefend.dailySearches)}).` : '',
+                      topUrgent ? `Biggest risk: <strong>${topUrgent.category}</strong> has ${fmtV(topUrgent.dailySearches)} daily AI searches but only a ${topUrgent.winRate}% win rate${topUrgent.topCompetitor ? ` — ${topUrgent.topCompetitor.split(' ')[0]} is dominating` : ''}.` : '',
+                      topWhite ? `Best untapped opportunity: <strong>${topWhite.category}</strong> — ${fmtV(topWhite.dailySearches)}/day with zero brand presence and no clear market leader.` : '',
+                    ].filter(Boolean).join(' ');
+
+                    return (
+                      <div style={{background:'#F8FAFC',borderRadius:16,border:'1px solid #E2E8F0',padding:'20px 24px',marginBottom:20}}>
+                        <div style={{marginBottom:14}}>
+                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827',marginBottom:3}}>Where to Play — Strategic Priority Matrix</div>
+                          <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Based on your actual AI query win rate × daily search volume. Click any row to see the prompts.</div>
+                        </div>
+
+                        {/* 2×2 grid */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+                          <QuadSection
+                            title="Defend" icon="🛡️"
+                            desc="High win rate + high volume. You're already winning where it matters. Protect this position."
+                            items={DEFEND} accent="#065F46" bg="#F0FDF4" border="#6EE7B7"
+                            emptyMsg="No dominant high-volume wins yet"
+                          />
+                          <QuadSection
+                            title="Urgent Gap" icon="🚨"
+                            desc="Low win rate + high volume. Losing where the most consumers are looking. Act now."
+                            items={URGENT} accent="#991B1B" bg="#FFF1F2" border="#FCA5A5"
+                            emptyMsg="No urgent high-volume gaps"
+                          />
+                          <QuadSection
+                            title="Double Down" icon="📈"
+                            desc="High win rate + lower volume. You're strong here — grow awareness to bring more people in."
+                            items={DOUBLE_DOWN} accent="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
+                            emptyMsg="No niche wins yet"
+                          />
+                          <QuadSection
+                            title="White Space" icon="⬜"
+                            desc="Zero brand presence. No competitor owns this either. First mover wins."
+                            items={WHITE_SPACE} accent="#6D28D9" bg="#F5F3FF" border="#DDD6FE"
+                            emptyMsg="No untapped categories found"
+                          />
+                        </div>
+
+                        {/* Strategic insight */}
+                        {insight && (
+                          <div style={{padding:'12px 16px',background:'white',borderRadius:10,border:'1px solid #E5E7EB',fontSize:'0.78rem',color:'#374151',lineHeight:1.7}} dangerouslySetInnerHTML={{__html:'💡 ' + insight}}/>
                         )}
                       </div>
                     );
@@ -1714,19 +1750,26 @@ export default function GeoHub() {
 
                   {/* ── TRENDING QUERIES SECTION ── */}
                   {trendingQs.length > 0 && (()=>{
-                    // Only show High opportunity
                     const highOpp = trendingQs.filter((tq:any)=>tq.opportunity==='High');
-                    // Top winning categories from clusters
-                    const topWinning = [...clusters].sort((a:any,b:any)=>b.winRate-a.winRate).slice(0,3);
-                    const topTrending = [...clusters].sort((a:any,b:any)=>b.dailySearches-a.dailySearches).slice(0,3);
-                    // Match trending query to cluster data for winner info
-                    const getClusterForCat = (cat:string) => clusters.find((c:any)=>
-                      c.category.toLowerCase().includes(cat.toLowerCase()) ||
-                      cat.toLowerCase().includes(c.category.toLowerCase().split(' ')[0])
-                    );
+                    const fmtV=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
+
+                    // Normalize category match: find cluster whose category name overlaps with tq.category
+                    const getCluster = (tqCat:string) => {
+                      const tl = tqCat.toLowerCase();
+                      return clusters.find((c:any)=>{
+                        const cl = (c.category||'').toLowerCase();
+                        // Direct include check both ways
+                        if(cl.includes(tl)||tl.includes(cl)) return true;
+                        // Word overlap
+                        const tWords = tl.split(/[\s&,]+/);
+                        const cWords = cl.split(/[\s&,]+/);
+                        return tWords.some((w:string)=>w.length>3&&cWords.some((cw:string)=>cw.includes(w)||w.includes(cw)));
+                      }) || null;
+                    };
+
+                    if(highOpp.length===0) return null;
                     return (
                       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-                        {/* Header */}
                         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
                           <span style={{fontSize:'1rem'}}>🔥</span>
                           <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
@@ -1734,13 +1777,9 @@ export default function GeoHub() {
                         <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>
                           AI-detected high-intent queries trending in {result.ind_label} — beyond what we tested.
                           <span style={{marginLeft:6,background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.68rem',color:'#6B7280'}}>
-                            ⓘ Volume = estimated AI platform queries/day based on category search intent signals
+                            ⓘ Volume = est. AI platform queries/day across ChatGPT, Perplexity, Gemini & Claude combined
                           </span>
                         </div>
-
-
-
-                        {/* High opportunity trending queries — expandable */}
                         <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:10}}>
                           High Opportunity Queries <span style={{fontWeight:400,color:'#9CA3AF',fontSize:'0.72rem'}}>— topics where no brand clearly dominates yet</span>
                         </div>
@@ -1748,38 +1787,39 @@ export default function GeoHub() {
                           {highOpp.map((tq:any,i:number)=>{
                             const trendColor = tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
                             const trendBg = tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
-                            const cluster = getClusterForCat(tq.category);
+                            const cluster = getCluster(tq.category);
+                            // Always use cluster daily volume for consistency with network map
+                            const dailyV = cluster?.dailySearches ?? null;
                             const brandWinRate = cluster?.winRate ?? null;
                             const brandWinning = brandWinRate !== null && brandWinRate >= 40;
                             const topComp = cluster?.topCompetitor || null;
-                            const dailyV = tq.estimated_daily_searches || cluster?.dailySearches || null;
-                            const fmtV = (n:number) => n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
+                            const fmtVol = (n:number) => n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
                             const isOpen = selectedCluster === `trend-${i}`;
                             return (
-                              <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`,overflow:'hidden',transition:'border-color 0.15s'}}>
-                                {/* Card header — always visible, clickable */}
+                              <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`,overflow:'hidden'}}>
                                 <div style={{padding:'12px 14px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
                                   <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
                                     <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
                                     <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
-                                    {dailyV&&<span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#9CA3AF'}}>{fmtV(dailyV)}</span>}
+                                    {dailyV&&<span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#9CA3AF'}}>{fmtVol(dailyV)}</span>}
                                   </div>
-                                  <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500,marginBottom:6}}>{tq.query}</div>
-                                  {/* Who is winning line */}
-                                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap' as const}}>
-                                    {topComp&&<span style={{fontSize:'0.68rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'1px 7px',fontWeight:600}}>👑 {topComp} leading</span>}
-                                    {brandWinRate!==null&&<span style={{fontSize:'0.68rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win rate</span>}
+                                  <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500,marginBottom:8}}>{tq.query}</div>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const}}>
+                                    {topComp&&<span style={{fontSize:'0.68rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'2px 8px',fontWeight:600}}>👑 {topComp.split(' ')[0]} leading</span>}
+                                    {brandWinRate!==null
+                                      ? <span style={{fontSize:'0.68rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'2px 8px'}}>{result.brand_name}: {brandWinRate}% win rate</span>
+                                      : <span style={{fontSize:'0.68rem',color:'#9CA3AF',fontStyle:'italic'}}>No data for this category yet</span>
+                                    }
                                     <span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#6B7280'}}>{isOpen?'▲ Less':'▼ More'}</span>
                                   </div>
                                 </div>
-                                {/* Expanded detail */}
                                 {isOpen&&(
                                   <div style={{borderTop:'1px solid #E5E7EB',padding:'12px 14px',background:'white'}}>
                                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
                                       {[
-                                        {label:'Currently Winning',val:topComp||'No clear leader',color:'#F59E0B'},
-                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'—',color:brandWinning?'#10B981':'#EF4444'},
-                                        {label:'AI Queries / Day',val:dailyV?fmtV(dailyV):'—',color:'#7C3AED'},
+                                        {label:'Currently Leading',val:topComp||'No clear leader',color:'#F59E0B'},
+                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'No data',color:brandWinning?'#10B981':'#EF4444'},
+                                        {label:'AI Queries / Day',val:dailyV?fmtVol(dailyV):'Est. unavailable',color:'#7C3AED'},
                                         {label:'Trend Signal',val:tq.trend,color:trendColor},
                                       ].map((s,j)=>(
                                         <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'8px 10px'}}>
@@ -1789,7 +1829,7 @@ export default function GeoHub() {
                                       ))}
                                     </div>
                                     <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6,background:'#F5F3FF',borderRadius:6,padding:'8px 10px'}}>
-                                      💡 <strong>Why High Opportunity:</strong> {topComp?`${topComp} currently leads but hasn't locked in dominance.`:'No brand clearly owns this topic yet.'} {brandWinning?`${result.brand_name} is already showing strength here — double down.`:`${result.brand_name} has room to own this with targeted content.`}
+                                      💡 <strong>Why this matters:</strong> {topComp?`${topComp.split(' ')[0]} currently leads this query type but hasn't locked in dominance.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is already showing strength here — invest in content to consolidate.`:` ${result.brand_name} has room to own this with targeted AI-optimized content.`):'Consider testing this topic in your next analysis.'}
                                     </div>
                                   </div>
                                 )}
@@ -1801,6 +1841,7 @@ export default function GeoHub() {
                     );
                   })()}
 
+                  {/* ── CATEGORY BREAKDOWN (existing) ── */}
                   {/* ── CATEGORY BREAKDOWN (existing) ── */}
                   {/* FIX 3: Show product-specific category breakdown — label uses lob from URL */}
                   <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>
