@@ -880,19 +880,19 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
   );
 }
 
-function PriorityActionsTable({ result }: { result:any }) {
-  const [actions,setActions]=useState<any[]>([]);
-  const [loading,setLoading]=useState(false);
-  const [fetched,setFetched]=useState(false);
+function PriorityActionsTable({ result, cachedActions, setCachedActions, actionsLoading, setActionsLoading }: { result:any; cachedActions:any[]|null; setCachedActions:(a:any[])=>void; actionsLoading:boolean; setActionsLoading:(b:boolean)=>void }) {
+  const actions = cachedActions || [];
+  const loading = actionsLoading;
   useEffect(()=>{
-    if(fetched)return;setFetched(true);setLoading(true);
+    if(cachedActions!==null)return; // already fetched — don't re-run
+    setActionsLoading(true);
     const prompt=`You are a GEO strategist. Generate a JSON array of 5-7 specific implementable priority actions for this brand.
 Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}
 Competitors: ${(result.competitors||[]).map((c:any)=>c.Brand).join(', ')}
 IMPORTANT: Do NOT suggest comparison pages against competitors — banks never publish pages comparing themselves to rivals.
 Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Owned Content Optimization"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 — ARD"|"Workstream 02 — AOP"|"Workstream 03 — DT1"}
 Order: High first, then Medium, then Low.`;
-    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const raw2=data.response||'';let cl2=raw2.replace('```json','').replace('```','').trim();setActions(JSON.parse(cl2));}).catch(()=>setActions([])).finally(()=>setLoading(false));
+    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const raw2=data.response||'';let cl2=raw2.replace('```json','').replace('```','').trim();setCachedActions(JSON.parse(cl2));}).catch(()=>setCachedActions([])).finally(()=>setActionsLoading(false));
   },[]);
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
@@ -922,6 +922,8 @@ export default function GeoHub() {
   const [promptLoading,setPromptLoading]=useState(false);
   const [filterCat,setFilterCat]=useState('All');
   const [selectedCluster,setSelectedCluster]=useState<string|null>(null);
+  const [cachedActions,setCachedActions]=useState<any[]|null>(null);
+  const [actionsLoading,setActionsLoading]=useState(false);
   const [hovBar,setHovBar]=useState<number|null>(null);
   const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
   const [hovNode,setHovNode]=useState<string|null>(null);
@@ -953,7 +955,7 @@ export default function GeoHub() {
       setLoadingProgress(100);
       await new Promise(r=>setTimeout(r,400));
       if(data.error)setError(data.error);
-      else{setResult(data);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      else{setResult(data);setCachedActions(null);setActionsLoading(false);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
       setError(e.message);
@@ -1935,7 +1937,7 @@ export default function GeoHub() {
                     <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>✗ What Needs Improvement</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>✗</span><span>{w}</span></li>)}</ul></div>
                   </div>
                   {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,marginBottom:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
-                  <PriorityActionsTable result={result}/>
+                  <PriorityActionsTable result={result} cachedActions={cachedActions} setCachedActions={setCachedActions} actionsLoading={actionsLoading} setActionsLoading={setActionsLoading}/>
                 </div>
               );
             })()}
