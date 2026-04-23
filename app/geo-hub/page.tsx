@@ -259,7 +259,7 @@ function ROICurve({ score }: { score: number }) {
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        <text x={W/2} y={22} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Where You Need to Be</text>
+        <text x={W/2} y={22} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Your Opportunity</text>
         {[0,25,50,75,100].map(v=>(
           <g key={v}>
             <line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/>
@@ -288,7 +288,7 @@ function ROICurve({ score }: { score: number }) {
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
           <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2"/>
           <text x={goalCX-12} y={goalCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#92400E',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
-          <text x={goalCX-12} y={goalCY-3} textAnchor="end" style={{fontSize:6,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>&quot;The Sweet Spot&quot;</text>
+          <text x={goalCX-12} y={goalCY-3} textAnchor="end" style={{fontSize:6,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>&quot;Opportunity Zone&quot;</text>
           {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
         </g>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
@@ -352,11 +352,56 @@ function GeoSummary({ result }: { result:any }) {
   const prom = result.prominence ?? 0;
   const lob = result.lob || null;
   const isLeader = geo >= 80;
-  const maxGain = geo >= 80 ? 5 : geo >= 70 ? 10 : 22;
-  const projected = Math.min(geo + maxGain, 97);
   const badge = scoreBadge(geo);
   const topComp = (result.competitors||[])[0]?.Brand || 'top competitor';
   const topCompGEO = (result.competitors||[])[0]?.GEO || 0;
+
+  // ── OPPORTUNITY SCORE: built from real 100 query results ──
+  // Logic: look at queries where brand did NOT appear.
+  // Of those losses, count how many are in high-volume categories (dailySearches ≥ 35K).
+  // "Conservative flip": assume we can win 50% of high-volume losses, 25% of low-volume losses.
+  // Recalculate appearance rate → new GEO score.
+  const rd = result.responses_detail || [];
+  const clusters = result.query_clusters || [];
+  const totalQ = rd.length || 1;
+  const currentWins = rd.filter((r:any)=>r.mentioned).length;
+  const losses = rd.filter((r:any)=>!r.mentioned);
+
+  // For each loss, find its category's daily search volume
+  const getVol = (cat:string) => {
+    const cl = clusters.find((c:any)=>c.category===cat);
+    return cl?.dailySearches || 20000;
+  };
+
+  // High volume losses (≥35K/day) → flip 50% conservatively
+  // Low volume losses (<35K/day) → flip 25%
+  const flippableWins = losses.reduce((sum:number, r:any) => {
+    const vol = getVol(r.category||'');
+    return sum + (vol >= 35000 ? 0.5 : 0.25);
+  }, 0);
+
+  const opportunityWins = Math.min(currentWins + Math.round(flippableWins), totalQ);
+  const opportunityRate = opportunityWins / totalQ; // new appearance rate
+
+  // GEO is heavily driven by visibility which correlates with appearance rate
+  // Scale: current vis score → opportunity vis score proportionally
+  const visScale = vis > 0 ? (opportunityRate / (currentWins / totalQ)) : 1;
+  const oppVis = Math.min(95, Math.round(vis * visScale));
+  const oppSov = Math.min(95, Math.round(sov * (1 + flippableWins / totalQ * 0.6)));
+  const oppCit = Math.min(95, Math.round(cit * (1 + flippableWins / totalQ * 0.4)));
+
+  // Recalculate GEO with opportunity sub-scores (sentiment/prominence unchanged — content doesn't move those)
+  const opportunityGeo = Math.min(94, Math.round(
+    oppVis * 0.30 + sent * 0.20 + prom * 0.20 + oppCit * 0.15 + oppSov * 0.15
+  ));
+  const opportunityGain = opportunityGeo - geo;
+
+  // Breakdown for tooltip: which sub-score drives most of the gain
+  const visGain = Math.round((oppVis - vis) * 0.30);
+  const citGain = Math.round((oppCit - cit) * 0.15);
+  const sovGain = Math.round((oppSov - sov) * 0.15);
+
+  const projected = opportunityGeo;
 
   useEffect(()=>{
     if(fetched) return;
@@ -418,8 +463,8 @@ function GeoSummary({ result }: { result:any }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
             {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold')},
-            {label:'Forecasted GEO Score', val:projected, color:'#10B981', sub:isLeader?'After closing authority gaps':'After acting on all recommendations'},
-            {label:isLeader?'Score Defend':'Score Unlock', val:`+${projected-geo} pts`, color:'#7C3AED', sub:'Estimated gain from prioritised actions'},
+            {label:'Opportunity Score', val:projected, color:'#10B981', sub:`Based on ${losses.length} lost queries — if you flipped your highest-volume gaps`},
+            {label:'Score Opportunity', val:`+${opportunityGain} pts`, color:'#7C3AED', sub:`Vis +${visGain}pts · Cit +${citGain}pts · SOV +${sovGain}pts from real query gaps`},
           ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
               <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>{c.label}</div>
