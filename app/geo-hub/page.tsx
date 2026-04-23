@@ -363,9 +363,11 @@ function GeoSummary({ result }: { result:any }) {
   // Recalculate appearance rate → new GEO score.
   const rd = result.responses_detail || [];
   const clusters = result.query_clusters || [];
-  const totalQ = rd.length || 1;
-  const currentWins = rd.filter((r:any)=>r.mentioned).length;
-  const losses = rd.filter((r:any)=>!r.mentioned);
+  // Use API's total_responses (100) not rd array length (may differ)
+  const totalQ = result.total_responses || rd.length || 100;
+  const currentWins = result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length;
+  const lossCount = totalQ - currentWins; // true lost queries
+  const losses = rd.filter((r:any)=>!r.mentioned).slice(0, lossCount); // cap to true loss count
 
   // For each loss, find its category's daily search volume
   const getVol = (cat:string) => {
@@ -408,7 +410,7 @@ function GeoSummary({ result }: { result:any }) {
     setFetched(true);
     try {
       // v2 cache key — busts any old cached results that had "Comparison Page"
-      const cacheKey = `geo_summary_v2_${result.brand_name}_${geo}`;
+      const cacheKey = `geo_summary_v3_${result.brand_name}_${geo}_${opportunityGain}`;
       const cached = sessionStorage.getItem(cacheKey);
       if(cached){ setData(JSON.parse(cached)); return; }
     } catch{}
@@ -417,6 +419,18 @@ function GeoSummary({ result }: { result:any }) {
     const insightCats = 'Data Signal|Competitive Gap|Visibility Gap|Sentiment Gap|Citation Gap|Earned Media Gap|Content Gap|Rank Signal';
     // FIX 2: "Comparison Page" removed — replaced with "Owned Content Optimization"
     const recCats = 'Owned Content Optimization|Content Page|FAQ Build|How-To Guide|Product Explainer|Best-Of List|Use Case Page|Content Strategy|PR / Earned Media|Citation Push|Review Platform|Forum Presence|Wikipedia / Entity|Influencer / Creator|Structured Data|Schema Markup|Entity Optimization|Technical SEO|Internal Linking|Syndication|Data Feed|API Presence';
+    // Real opportunity breakdown — passed to AI so recommendations sum to actual opportunity gain
+    const oppBreakdown = `Opportunity Score breakdown (from real query results):
+- Total queries run: ${totalQ}. Brand appeared in: ${currentWins}. Lost: ${lossCount}.
+- Visibility gap drives +${visGain} pts of the +${opportunityGain} pt opportunity (highest impact).
+- Citations gap drives +${citGain} pts.
+- SOV gap drives +${sovGain} pts.
+- Recommendations MUST address these gaps in priority order: Visibility first, then Citations, then SOV.
+- HIGH recommendations should address Visibility gap and collectively account for ~${visGain} pts.
+- MEDIUM/LOW recommendations address Citations (+${citGain}pts) and SOV (+${sovGain}pts).
+- scoreForecast values across all recommendations must sum to approximately ${opportunityGain} pts total.
+- Each individual recommendation: +1 to +${Math.min(6, visGain)} pts max. Be realistic.`;
+
     const prompt = [
       'You are a sharp GEO strategist. Return a JSON object with:',
       '- "rows": array of exactly 10 objects. First 5 insights, last 5 recommendations.',
@@ -424,15 +438,16 @@ function GeoSummary({ result }: { result:any }) {
       '  "title": 4-6 word action title for recommendations only (null for insights),',
       '  "text": one sharp sentence. Insights: open with a specific number, name brand+competitor. Recommendations: verb-first, platform-specific, LOB-specific, max 25 words. NEVER suggest competitor comparison pages — banks do not publish pages comparing themselves to rivals,',
       '  "scoreNow": '+String(geo)+',',
-      '  "scoreForecast": insights='+String(geo)+'. Recommendations: +1 to +4 pts max. Be conservative,',
-      '  "impact": insights=null. Recommendations="HIGH"|"MEDIUM"|"LOW". Sort HIGH first then MEDIUM then LOW,',
+      '  "scoreForecast": insights='+String(geo)+'. Recommendations: assign pts based on which gap the action addresses (Visibility=higher pts, Citations/SOV=lower pts). scoreForecast values must sum to ~'+String(opportunityGain)+' total across all recommendations,',
+      '  "impact": insights=null. Recommendations: HIGH if addresses Visibility gap, MEDIUM if Citations, LOW if SOV. Sort HIGH first then MEDIUM then LOW,',
       '  "agenticFlag": null OR one short sentence on application/data/approval readiness (recommendations only) }',
       'Brand: '+result.brand_name,
       lobContext,
       'Industry: '+result.ind_label,
       'GEO: '+String(geo)+' | Vis: '+String(vis)+' | Sent: '+String(sent)+' | Cit: '+String(cit)+' | SOV: '+String(sov)+' | Prom: '+String(prom),
       'Top Competitor: '+topComp+' (GEO: '+String(topCompGEO)+')',
-      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Earned Media Gap and Content Gap insights. scoreForecast +1 to +4 only. NEVER recommend comparison pages against competitors. Return ONLY valid JSON no markdown.',
+      oppBreakdown,
+      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Visibility Gap and Content Gap insights tied to the '+String(lossCount)+' lost queries. NEVER recommend comparison pages against competitors. Return ONLY valid JSON no markdown.',
     ].join('\n');
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
@@ -440,7 +455,7 @@ function GeoSummary({ result }: { result:any }) {
         const threeQ='`'+'`'+'`'; let clean1=(d.response||''); while(clean1.startsWith(threeQ))clean1=clean1.slice(3); while(clean1.endsWith(threeQ))clean1=clean1.slice(0,-3); clean1=clean1.replace('json','').trim();
         const parsed = JSON.parse(clean1.trim());
         setData(parsed);
-        try{ sessionStorage.setItem('geo_summary_v2_'+result.brand_name+'_'+String(geo), JSON.stringify(parsed)); }catch{}
+        try{ sessionStorage.setItem('geo_summary_v3_'+result.brand_name+'_'+String(geo)+'_'+String(opportunityGain), JSON.stringify(parsed)); }catch{}
       }).catch(()=>setData(null)).finally(()=>setLoading(false));
   },[]);
 
@@ -463,7 +478,7 @@ function GeoSummary({ result }: { result:any }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
             {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold')},
-            {label:'Opportunity Score', val:projected, color:'#10B981', sub:`Based on ${losses.length} lost queries — if you flipped your highest-volume gaps`},
+            {label:'Opportunity Score', val:projected, color:'#10B981', sub:`Based on ${lossCount} lost queries — if you flipped your highest-volume gaps`},
             {label:'Score Opportunity', val:`+${opportunityGain} pts`, color:'#7C3AED', sub:`Vis +${visGain}pts · Cit +${citGain}pts · SOV +${sovGain}pts from real query gaps`},
           ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
