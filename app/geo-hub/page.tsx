@@ -478,8 +478,8 @@ function GeoSummary({ result }: { result:any }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
             {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' — Category leader':geo>=70?' — Above threshold':' — Below efficiency threshold')},
-            {label:'Opportunity Score', val:projected, color:'#10B981', sub:`Based on ${lossCount} lost queries — if you flipped your highest-volume gaps`},
-            {label:'Score Opportunity', val:`+${opportunityGain} pts`, color:'#7C3AED', sub:`Vis +${visGain}pts · Cit +${citGain}pts · SOV +${sovGain}pts from real query gaps`},
+            {label:'Opportunity Score', val:projected, color:'#10B981', sub:''},
+            {label:'Score Opportunity', val:`+${opportunityGain} pts`, color:'#7C3AED', sub:''},
           ].map((c,i)=>(
             <div key={i} style={{background:'#F9F9FC',borderRadius:12,border:'1px solid #E5E7EB',padding:'16px 18px',textAlign:'center' as const}}>
               <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:6}}>{c.label}</div>
