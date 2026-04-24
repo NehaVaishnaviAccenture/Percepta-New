@@ -47,6 +47,12 @@ const RADAR_TIPS: Record<string,string> = {
   'Recommendation':   'How often AI actively recommends your brand over alternatives.',
 };
 
+// Get tip for any label — falls back to generic description for dynamic categories
+function getRadarTip(label: string): string {
+  if (RADAR_TIPS[label]) return RADAR_TIPS[label];
+  return `How often your brand appears in AI responses for ${label.toLowerCase()} queries.`;
+}
+
 const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt','FAQ'];
 
 function scoreBadge(s: number) {
@@ -136,7 +142,24 @@ function buildFeatureDims(
     ];
   }
 
-  // ── Generic fallback (auto, hotel, retail, tech, health, sport, gen) ──
+  // ── Dynamic fallback: derive axes from real rd categories ──
+  // If rd has data (dynamic brand or any non-fin industry), use actual query categories as axes
+  if (rd.length > 0) {
+    const cats = [...new Set(rd.map((r:any) => r.category).filter(Boolean))] as string[];
+    // Pick up to 6 categories that have at least some queries
+    const topCats = cats.slice(0, 6);
+    if (topCats.length >= 3) {
+      return topCats.map(cat => {
+        const rows = rd.filter((r:any) => r.category === cat);
+        const val = rows.length > 0
+          ? Math.round((rows.filter((r:any) => r.mentioned).length / rows.length) * 100)
+          : Math.round(vis * 0.5 + sent * 0.5);
+        return { label: cat, val };
+      });
+    }
+  }
+
+  // ── Last resort fallback (no rd data at all) ──
   return [
     { label: 'Visibility',    val: vis },
     { label: 'Sentiment',     val: sent },
@@ -789,7 +812,7 @@ function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:n
         {dims.map((d,i)=>{const lp=pt(i,R+26);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);return<text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;})}
         <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text><circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text></g>
       </svg>
-      {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{RADAR_TIPS[dims[hov].label]}</div></div>}
+      {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{getRadarTip(dims[hov].label)}</div></div>}
       <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Feature Insight:</strong> Strongest in <strong>{top2.join(' and ')}</strong> — AI frequently associates your brand with these. Weakest in <strong>{bot2.join(' and ')}</strong> — competitors dominate these product queries.</div>
     </div>
   );
