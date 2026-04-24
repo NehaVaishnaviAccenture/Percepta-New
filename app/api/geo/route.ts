@@ -2168,10 +2168,88 @@ export async function POST(req: NextRequest) {
     const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
 
     const inputHostname = new URL(url).hostname.replace('www.', '');
-    const indKey = getIndustry(inputHostname, pageData) !== 'gen'
+    let indKey = getIndustry(inputHostname, pageData) !== 'gen'
       ? getIndustry(inputHostname, pageData)
       : getIndustry((pageData as any).domain || inputHostname, pageData);
-    const ind = INDUSTRY_DATA[indKey];
+
+    // ── DYNAMIC FALLBACK: if still 'gen', use AI to detect brand/industry/competitors/queries ──
+    let dynamicCompetitors: string[] = [];
+    let isDynamic = false;
+
+    if (indKey === 'gen') {
+      isDynamic = true;
+      const pageText = [
+        (pageData as any).title || '',
+        (pageData as any).metaDesc || '',
+        ...((pageData as any).headings || []).slice(0, 10),
+        ((pageData as any).bodyText || '').slice(0, 1000),
+      ].join(' ').trim().slice(0, 2000);
+
+      const detectPrompt = `You are a brand intelligence analyst. Analyze this webpage and return ONLY valid JSON:
+{
+  "brand_name": "exact brand name",
+  "industry": "one-line industry description e.g. Beauty & Personal Care, Athletic Apparel, Fast Food",
+  "industry_key": "short snake_case key e.g. beauty, apparel, food",
+  "competitors": ["Competitor1","Competitor2","Competitor3","Competitor4","Competitor5"],
+  "categories": ["Category1","Category2","Category3","Category4","Category5","Category6","Category7","Category8","Category9","Category10"],
+  "lob": "short product line label e.g. Skincare & Haircare"
+}
+
+Webpage content: ${pageText}
+
+Rules:
+- competitors must be real US market competitors for this brand
+- categories must be specific product/service topics consumers search for
+- Return ONLY the JSON object, no markdown`;
+
+      let detected: any = {};
+      try {
+        const detectRaw = await callAI([{role:'user', content: detectPrompt}], 0.2, 600);
+        detected = JSON.parse(detectRaw.replace(/```json|```/g,'').trim());
+      } catch { detected = {}; }
+
+      // Override brand if AI detected it more accurately
+      const detectedBrand = detected.brand_name || brand;
+      dynamicCompetitors = detected.competitors || [];
+
+      // Generate 100 dynamic queries across the detected categories
+      const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
+      const queryGenPrompt = `Generate exactly 100 consumer questions that someone would ask an AI when researching ${detectedBrand} in the ${detected.industry || 'consumer goods'} industry in the USA. 
+
+Rules:
+- NO brand names in any query — all questions must be generic
+- Distribute evenly across these 10 categories (10 questions each): ${cats.join(', ')}
+- Questions should reflect real purchase decision intent
+- Return ONLY a JSON array of objects: [{"category":"Category1","query":"question text"}, ...]
+- Exactly 100 items, no more, no less`;
+
+      let dynamicQueries: string[][] = [];
+      try {
+        const queryRaw = await callAI([{role:'user', content: queryGenPrompt}], 0.4, 3000);
+        const parsed = JSON.parse(queryRaw.replace(/```json|```/g,'').trim());
+        dynamicQueries = parsed.map((q: any) => [q.category, q.query]);
+      } catch { 
+        // Fallback: generate simpler queries if parsing fails
+        dynamicQueries = cats.flatMap(cat => 
+          Array.from({length:10}, (_,i) => [cat, `What is the best ${cat.toLowerCase()} option for consumers in 2025? (${i+1})`])
+        );
+      }
+
+      // Build a dynamic industry object that matches INDUSTRY_DATA structure
+      const dynamicInd = {
+        name: detected.industry || 'Consumer Products',
+        label: detected.industry || 'Consumer Products',
+        lob: detected.lob || '',
+        queries: dynamicQueries,
+        comps: dynamicCompetitors,
+      };
+
+      // Inject into INDUSTRY_DATA temporarily for this request
+      (INDUSTRY_DATA as any)['_dynamic'] = dynamicInd;
+      indKey = '_dynamic';
+    }
+
+    const ind = INDUSTRY_DATA[indKey] || INDUSTRY_DATA['gen'];
     const queries: string[][] = ind.queries;
     const allQA: any[] = new Array(queries.length);
 
@@ -2634,11 +2712,13 @@ Return ONLY valid JSON, no markdown:
       citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
     } catch {}
 
-    let competitors = ind.comps
+    // For dynamic industries, use AI-detected competitors scored from real query responses
+    const compSource = isDynamic ? dynamicCompetitors : ind.comps;
+    let competitors = compSource
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
         const s = scoreCompetitor(c, responsesDetail, ind.awareness || {});
-        return { ...s, URL: ind.compUrls[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
+        return { ...s, URL: ind.compUrls?.[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
     // ── COMPETITOR TIERS ──
@@ -2803,6 +2883,7 @@ Return ONLY valid JSON, no markdown:
     // ── LOB LABEL ──
     const lobLabel = ((): string | null => {
       const k = indKey as string;
+      if (k === '_dynamic') return (INDUSTRY_DATA as any)['_dynamic']?.lob || null;
       if (k === 'fin_cc_travel')           return 'Travel Credit Cards';
       if (k === 'fin_cc_cashback')         return 'Cash Back Credit Cards';
       if (k === 'fin_cc_student_rewards')  return 'Student Rewards Credit Cards';
