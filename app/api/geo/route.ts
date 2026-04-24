@@ -2165,7 +2165,11 @@ export async function POST(req: NextRequest) {
       'state street': ['state street', 'state street global'],
       'massmutual': ['massmutual', 'mass mutual'],
     };
-    const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')];
+    // For dynamic brands, also include common name variations
+    const baseBrandAliases = [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-'), bl.replace(/[^a-z0-9]/gi,'')];
+    // Also extract key words from brand name (e.g. "L'Oreal Paris" → "loreal", "l'oreal")
+    const brandWords = bl.split(/[\s'\-]+/).filter((w:string) => w.length > 2);
+    const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [...new Set([...baseBrandAliases, ...brandWords])];
 
     const inputHostname = new URL(url).hostname.replace('www.', '');
     let indKey = getIndustry(inputHostname, pageData) !== 'gen'
@@ -2190,7 +2194,7 @@ export async function POST(req: NextRequest) {
   "brand_name": "exact brand name",
   "industry": "one-line industry description e.g. Beauty & Personal Care, Athletic Apparel, Fast Food",
   "industry_key": "short snake_case key e.g. beauty, apparel, food",
-  "competitors": ["Competitor1","Competitor2","Competitor3","Competitor4","Competitor5"],
+  "competitors": ["Competitor1","Competitor2","Competitor3","Competitor4","Competitor5","Competitor6","Competitor7","Competitor8","Competitor9","Competitor10"],
   "categories": ["Category1","Category2","Category3","Category4","Category5","Category6","Category7","Category8","Category9","Category10"],
   "lob": "short product line label e.g. Skincare & Haircare"
 }
@@ -2262,7 +2266,8 @@ Rules:
     await Promise.all(batches.map(async (batch, batchIdx) => {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q[1]}`).join('\n\n');
       const answerLabels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
-      const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
+      const brandCtx = isDynamic ? ` The brand being analyzed is ${brand} but do not favour it — mention it only if genuinely relevant.` : '';
+      const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.${brandCtx}\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
       let bt = '';
       try { bt = await callAI([{ role: 'user', content: prompt }], 0.7, 4096); } catch {}
       batch.forEach((q, j) => {
@@ -2707,7 +2712,24 @@ Return ONLY valid JSON, no markdown:
 
     let citationSources: any[] = [];
     try {
-      const cp = `For "${brand}" in ${ind.name}, list exactly 10 real domains that AI models pull from when answering questions in this category. Use realistic citation share percentages — owned domain should be 10-15%, top third-party sources 3-5%, others 1-3%. Total does NOT need to sum to 100. Classify each as Social/Institution/Earned Media/Owned Media/Other. Return ONLY valid JSON array, no markdown, no preamble: [{"rank":1,"domain":"x.com","category":"Earned Media","citation_share":4.9,"top_pages":["/best-cards","/reviews","/compare"]}]. Exactly 10 items. Use real domain names relevant to ${ind.name}.`;
+      // Get the brand's actual domain for owned media classification
+      const brandDomain = inputHostname;
+      const industryCtx = isDynamic
+        ? `${brand} is a ${ind.name} brand. The brand's own domain is ${brandDomain}.`
+        : `${brand} in ${ind.name}. The brand's own domain is ${brandDomain}.`;
+      const cp = `${industryCtx}
+
+List exactly 10 real domains that AI models actually cite when answering consumer questions about ${brand} and its product category (${ind.name}).
+
+Rules:
+- First entry MUST be ${brandDomain} classified as "Owned Media" with citation_share 10-15%
+- All other domains must be GENUINELY relevant to ${ind.name} — no financial sites for beauty brands, no beauty sites for tech brands
+- Use realistic citation share: top third-party 3-5%, others 1-3%
+- Classify each: Social / Institution / Earned Media / Owned Media / Other
+
+Return ONLY valid JSON array, no markdown:
+[{"rank":1,"domain":"${brandDomain}","category":"Owned Media","citation_share":12,"top_pages":["/products","/about","/faq"]}]
+Exactly 10 items. All domains must be real and relevant to ${ind.name} specifically.`;
       const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
       citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
     } catch {}
