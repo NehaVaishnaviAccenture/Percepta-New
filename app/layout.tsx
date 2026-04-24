@@ -57,9 +57,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </Link>
               ))}
             </div>
-            {user && (
-              <div style={{ fontSize: '0.85rem', color: '#6B7280' }}>
-                {user.emailAddresses[0]?.emailAddress}
+          {user && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>
+                  {user.emailAddresses[0]?.emailAddress}
+                </span>
+                <a href="/sign-out" style={{
+                  fontSize: '0.82rem',
+                  color: '#7C3AED',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  background: '#EDE9FE',
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                }}>
+                  Sign Out
+                </a>
               </div>
             )}
           </nav>
