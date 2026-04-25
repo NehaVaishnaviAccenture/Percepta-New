@@ -1669,8 +1669,8 @@ export default function GeoHub() {
                       return clusters.find((c:any)=>{
                         const cl = (c.category||'').toLowerCase();
                         if(cl.includes(tl)||tl.includes(cl)) return true;
-                        const tWords = tl.split(/[\s&,]+/);
-                        const cWords = cl.split(/[\s&,]+/);
+                        const tWords = tl.replace(/[&,]+/g,' ').split(' ').filter((w:string)=>w.length>0);
+                        const cWords = cl.replace(/[&,]+/g,' ').split(' ').filter((w:string)=>w.length>0);
                         return tWords.some((w:string)=>w.length>3&&cWords.some((cw:string)=>cw.includes(w)||w.includes(cw)));
                       }) || null;
                     };
