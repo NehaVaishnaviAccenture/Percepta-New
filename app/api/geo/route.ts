@@ -301,27 +301,11 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'What is the best high-end travel credit card worth a $500 annual fee?'],
       ['Comparison', 'Which credit card gives the highest flat-rate cash back on every purchase?'],
       ['Comparison', 'What is the best no annual fee cash back credit card available?'],
-      ['Comparison', 'Which credit card earns the most cash back with no annual fee?'],
-      ['Comparison', 'Which credit card earns the most cash back on groceries and dining?'],
-      ['Comparison', 'Which travel rewards card is best for someone who rents an apartment?'],
       ['Comparison', 'What is the single best all-around rewards credit card for most people?'],
       ['Comparison', 'Which credit card earns the most rewards specifically on dining out?'],
       ['Comparison', 'Which credit card company has the best fraud protection and zero liability?'],
-      ['Balance Transfer', 'What is the best credit card for balance transfers with no fee?'],
-      ['Balance Transfer', 'Which credit card has the longest 0% APR period for balance transfers?'],
-      ['Balance Transfer', 'Best credit card to transfer debt from a high-interest card'],
-      ['Balance Transfer', 'Which balance transfer card is easiest to get approved for?'],
-      ['Balance Transfer', 'What credit card should I use to consolidate $10,000 in credit card debt?'],
-      ['Family Spending', 'What is the best credit card for families with kids?'],
-      ['Family Spending', 'Which credit card gives the best rewards on family groceries and gas?'],
-      ['Family Spending', 'Best credit card for family travel and Disney vacations'],
-      ['Family Spending', 'Which credit card is best for parents who spend on kids activities and sports?'],
-      ['Family Spending', 'Best credit card for household bills and family subscriptions'],
-      ['No Annual Fee', 'What is the best credit card with no annual fee?'],
-      ['No Annual Fee', 'Which no annual fee credit card gives the best cash back?'],
-      ['No Annual Fee', 'Best no annual fee credit card for everyday spending'],
-      ['No Annual Fee', 'Which credit card has no annual fee and no foreign transaction fee?'],
-      ['No Annual Fee', 'Best no annual fee card with a good welcome bonus'],
+      ['Balance Transfer', 'What is the best credit card for balance transfers with the longest 0% APR period?'],
+      ['Balance Transfer', 'Which credit card is best for consolidating and paying off high-interest debt?'],
     ],
     comps: ['Chase', 'American Express', 'Capital One', 'Citi', 'Discover', 'Wells Fargo', 'Bank of America', 'Synchrony', 'Barclays', 'USAA', 'Navy Federal', 'PenFed', 'TD Bank', 'US Bank', 'Regions Bank', 'Citizens Bank', 'Truist', 'Fifth Third', 'KeyBank', 'Huntington'],
     compUrls: { Chase: 'chase.com', 'American Express': 'americanexpress.com', 'Capital One': 'capitalone.com', Citi: 'citi.com', Discover: 'discover.com', 'Wells Fargo': 'wellsfargo.com', 'Bank of America': 'bankofamerica.com', Synchrony: 'synchrony.com', Barclays: 'barclays.com', USAA: 'usaa.com', 'Navy Federal': 'navyfederal.org', 'PenFed': 'penfed.org', 'TD Bank': 'td.com', 'US Bank': 'usbank.com', 'Regions Bank': 'regions.com', 'Citizens Bank': 'citizensbank.com', Truist: 'truist.com', 'Fifth Third': '53.com', KeyBank: 'key.com', Huntington: 'huntington.com' },
@@ -2218,14 +2202,16 @@ Rules:
 
       // Generate 100 dynamic queries across the detected categories
       const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
-      const queryGenPrompt = `Generate exactly 100 consumer questions that someone would ask an AI when researching ${detectedBrand} in the ${detected.industry || 'consumer goods'} industry in the USA. 
+      // Ensure exactly 10 categories for even distribution
+      const cats10 = cats.slice(0, 10).length === 10 ? cats.slice(0, 10) : [...cats.slice(0, 10), ...Array(10 - cats.slice(0,10).length).fill('General')];
+      const queryGenPrompt = `Generate exactly 100 consumer questions that someone would ask an AI when researching products in the ${detected.industry || 'consumer goods'} industry in the USA.
 
 Rules:
-- NO brand names in any query — all questions must be generic
-- Distribute evenly across these 10 categories (10 questions each): ${cats.join(', ')}
+- NO brand names in any query — all questions must be generic consumer questions
+- Distribute EXACTLY 10 questions per category across these 10 categories: ${cats10.join(', ')}
 - Questions should reflect real purchase decision intent
-- Return ONLY a JSON array of objects: [{"category":"Category1","query":"question text"}, ...]
-- Exactly 100 items, no more, no less`;
+- Return ONLY a valid JSON array, no markdown: [{"category":"CategoryName","query":"question text"}, ...]
+- EXACTLY 100 items total, 10 per category, no more no less`;
 
       let dynamicQueries: string[][] = [];
       try {
@@ -2234,8 +2220,8 @@ Rules:
         dynamicQueries = parsed.map((q: any) => [q.category, q.query]);
       } catch { 
         // Fallback: generate simpler queries if parsing fails
-        dynamicQueries = cats.flatMap(cat => 
-          Array.from({length:10}, (_,i) => [cat, `What is the best ${cat.toLowerCase()} option for consumers in 2025? (${i+1})`])
+        dynamicQueries = cats10.flatMap((cat:string) => 
+          Array.from({length:10}, (_:any, i:number) => [cat, `What should consumers know about ${cat.toLowerCase()} when making a purchase decision? (${i+1})`])
         );
       }
 
