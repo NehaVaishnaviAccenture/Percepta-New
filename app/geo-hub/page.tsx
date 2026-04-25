@@ -1365,7 +1365,7 @@ export default function GeoHub() {
               const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
               const domainMatchesBrand = (domain: string) => {
                 const dk = domain.replace('www.','').split('.')[0].toLowerCase();
-                return dk === brandKey3 || dk.startsWith(brandKey3) || brandKey3.startsWith(dk.replace(/[^a-z]/g,''));
+                return dk === brandKey3 || dk.startsWith(brandKey3) || brandKey3.startsWith(dk.split('').filter((c:string)=>c>='a'&&c<='z').join(''));
               };
               const OWNED_URLS: Record<string,string[]> = {
                 'capitalone': ['https://www.capitalone.com/credit-cards/','https://www.capitalone.com/credit-cards/venture/','https://www.capitalone.com/credit-cards/quicksilver/','https://www.capitalone.com/credit-cards/savor/','https://www.capitalone.com/credit-cards/secured/'],
@@ -1669,8 +1669,8 @@ export default function GeoHub() {
                       return clusters.find((c:any)=>{
                         const cl = (c.category||'').toLowerCase();
                         if(cl.includes(tl)||tl.includes(cl)) return true;
-                        const tWords = tl.replace(/[&,]+/g,' ').split(' ').filter((w:string)=>w.length>0);
-                        const cWords = cl.replace(/[&,]+/g,' ').split(' ').filter((w:string)=>w.length>0);
+                        const tWords = tl.split('&').join(' ').split(',').join(' ').split(' ').filter((w:string)=>w.length>0);
+                        const cWords = cl.split('&').join(' ').split(',').join(' ').split(' ').filter((w:string)=>w.length>0);
                         return tWords.some((w:string)=>w.length>3&&cWords.some((cw:string)=>cw.includes(w)||w.includes(cw)));
                       }) || null;
                     };
