@@ -95,7 +95,7 @@ function extractBrand(pageData: any): string {
   const title = pageData.title || '';
   const genericTitles = ['thanks for visiting', 'page not found', '404', 'access denied', 'redirecting', 'just a moment', 'attention required', 'error'];
   if (title && !genericTitles.some(g => title.toLowerCase().includes(g))) {
-    for (const sep of ['|', '–', '-', '·']) {
+    for (const sep of ['|', '-', '-', '·']) {
       if (title.includes(sep)) {
         const segs = title.split(sep).map((s: string) => s.trim()).reverse();
         for (const seg of segs) {
@@ -620,7 +620,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Best cash back credit cards for maximizing everyday rewards'],
       ['Comparison', 'Which 2% flat-rate cash back card has the best overall package?'],
       ['Comparison', 'What is the best no annual fee flat-rate cash back card?'],
-      ['Comparison', 'Which cash back card earns more — a flat-rate or a hybrid card?'],
+      ['Comparison', 'Which cash back card earns more -- a flat-rate or a hybrid card?'],
       ['Comparison', 'Is there a cash back card better than the standard 2% flat rate?'],
       ['Comparison', 'Best flat rate cash back card vs rotating category cash back card'],
       ['Comparison', 'What is the best rotating category cash back card available?'],
@@ -681,7 +681,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'What is the best student credit card for earning rewards on dining?'],
       ['Comparison', 'Which student rewards card earns the most cash back with no annual fee?'],
       ['Comparison', 'Which student rewards card gives the best long-term value after graduation?'],
-      ['Comparison', 'Which student card is better — travel points or cash back rewards?'],
+      ['Comparison', 'Which student card is better -- travel points or cash back rewards?'],
       ['Comparison', 'Best student cash back card vs student travel rewards card'],
       ['Comparison', 'What is the best student cash back card for someone starting college?'],
       ['Comparison', 'Which student rewards card is better for someone who eats out a lot?'],
@@ -745,7 +745,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Which student credit card has a better approval rate for no-credit applicants?'],
       ['Comparison', 'Which student credit card has the easiest approval process?'],
       ['Comparison', 'Best student credit card if choosing between a bank and a fintech'],
-      ['Comparison', 'Which is better for a student — a student card or a secured card?'],
+      ['Comparison', 'Which is better for a student -- a student card or a secured card?'],
       ['Comparison', 'What is the most recommended student credit card by financial experts?'],
       ['Comparison', 'Which student credit card has better long-term value through college?'],
     ],
@@ -805,8 +805,8 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'What is the best secured credit card from a major bank?'],
       ['Comparison', 'Which secured card issuer has the best credit-building track record?'],
       ['Comparison', 'Should I get a secured credit card from a bank or a credit union?'],
-      ['Comparison', 'Secured credit card vs credit builder loan — which builds credit faster?'],
-      ['Comparison', 'Which is better for bad credit — a secured card or a store card?'],
+      ['Comparison', 'Secured credit card vs credit builder loan -- which builds credit faster?'],
+      ['Comparison', 'Which is better for bad credit -- a secured card or a store card?'],
       ['Comparison', 'Best secured credit card for someone choosing between two major issuers'],
     ],
     comps: ['Discover it Secured', 'Capital One Platinum Secured', 'Citi Secured Mastercard', 'Bank of America Secured', 'OpenSky Secured', 'Chime Credit Builder', 'Self Credit Builder', 'First Progress Secured', 'Applied Bank Secured', 'Wells Fargo Secured'],
@@ -859,7 +859,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Is there a balance transfer card better than the current market leader?'],
       ['Comparison', 'Which credit card issuer has the best balance transfer offer right now?'],
       ['Comparison', 'What is the best balance transfer card that also earns rewards?'],
-      ['Comparison', 'Which is better — a balance transfer card or a personal loan for debt?'],
+      ['Comparison', 'Which is better -- a balance transfer card or a personal loan for debt?'],
       ['Comparison', 'Best balance transfer card for a large vs small balance'],
       ['Comparison', 'Which rewards card also offers a solid balance transfer intro APR?'],
       ['Comparison', 'Which bank offers the best overall balance transfer deal in 2025?'],
@@ -893,7 +893,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Points', 'Best credit cards for pooling points across household members'],
       ['Points', 'Which rewards card has the best points expiration policy?'],
       ['Points', 'Best credit card for earning points on streaming and subscriptions'],
-      ['Cash Back vs Points', 'Which is better — a cash back or points rewards credit card?'],
+      ['Cash Back vs Points', 'Which is better -- a cash back or points rewards credit card?'],
       ['Cash Back vs Points', 'Best rewards credit card for someone who wants flexibility'],
       ['Cash Back vs Points', 'Which rewards credit card is simplest for everyday use?'],
       ['Cash Back vs Points', 'Best rewards card for someone who doesnt want to track categories'],
@@ -914,7 +914,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Which bank has the best flexible points rewards credit card?'],
       ['Comparison', 'Which rewards card issuer has the best overall ecosystem of cards?'],
       ['Comparison', 'Which no annual fee card earns the most overall rewards?'],
-      ['Comparison', 'Which is better for rewards — a bank card or an airline card?'],
+      ['Comparison', 'Which is better for rewards -- a bank card or an airline card?'],
       ['Comparison', 'Best rewards credit card if you already have one rewards card'],
       ['Comparison', 'Which rewards card earns the most on everyday non-travel spending?'],
       ['Comparison', 'Which rewards credit card has better long-term value?'],
@@ -1102,12 +1102,12 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which online bank has won the most awards for customer satisfaction?'],
       ['Expert Recommendation', 'What is the best bank for someone who wants competitive rates across all account types?'],
       // ── ACCOUNT COMPARISON (10) ──
-      ['Account Comparison', 'Which is better for growing savings — a high yield savings account or a CD?'],
+      ['Account Comparison', 'Which is better for growing savings -- a high yield savings account or a CD?'],
       ['Account Comparison', 'What is the best account type for someone who wants both flexibility and high interest?'],
       ['Account Comparison', 'Should I open a checking account or a savings account first at an online bank?'],
       ['Account Comparison', 'Which bank account type earns the most interest with no risk?'],
       ['Account Comparison', 'What is the difference between a performance savings account and a money market account?'],
-      ['Account Comparison', 'Which is better for short-term savings — a CD or a high yield savings account?'],
+      ['Account Comparison', 'Which is better for short-term savings -- a CD or a high yield savings account?'],
       ['Account Comparison', 'What is the best bank for someone who wants both a free checking and high-yield savings?'],
       ['Account Comparison', 'Which online bank account is best for an emergency fund versus long-term savings?'],
       ['Account Comparison', 'What is the best bank for a family that needs checking savings and CD accounts together?'],
@@ -1211,20 +1211,20 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which company has the best reputation for long-term retirement outcomes?'],
       ['Expert Recommendation', 'What is the best company for comprehensive retirement and insurance planning?'],
       // ── ACCOUNT COMPARISON (10) ──
-      ['Account Comparison', 'Which is better for retirement — a 401k or an IRA?'],
+      ['Account Comparison', 'Which is better for retirement -- a 401k or an IRA?'],
       ['Account Comparison', 'What is the best retirement account for someone who is self-employed?'],
       ['Account Comparison', 'Which retirement account type is best for minimizing taxes in retirement?'],
       ['Account Comparison', 'What is the difference between a traditional IRA and a Roth IRA?'],
-      ['Account Comparison', 'Which is better for retirement savings — annuities or index funds?'],
+      ['Account Comparison', 'Which is better for retirement savings -- annuities or index funds?'],
       ['Account Comparison', 'What is the best account for someone who has maxed out their 401k?'],
-      ['Account Comparison', 'Which retirement strategy is better — lump sum investing or dollar cost averaging?'],
+      ['Account Comparison', 'Which retirement strategy is better -- lump sum investing or dollar cost averaging?'],
       ['Account Comparison', 'What is the best way to consolidate multiple retirement accounts?'],
-      ['Account Comparison', 'Which is better for retirement — a pension plan or a 401k?'],
+      ['Account Comparison', 'Which is better for retirement -- a pension plan or a 401k?'],
       ['Account Comparison', 'What is the best retirement account for someone starting late at age 45?'],
       // ── PROVIDER COMPARISON (10) ──
-      ['Provider Comparison', 'Which retirement company has lower fees — actively managed or index fund providers?'],
+      ['Provider Comparison', 'Which retirement company has lower fees -- actively managed or index fund providers?'],
       ['Provider Comparison', 'What is the best retirement provider for someone who wants both insurance and investing?'],
-      ['Provider Comparison', 'Which is better for retirement — a mutual fund company or a bank-based provider?'],
+      ['Provider Comparison', 'Which is better for retirement -- a mutual fund company or a bank-based provider?'],
       ['Provider Comparison', 'What is the best retirement company for someone who also needs life insurance?'],
       ['Provider Comparison', 'Which retirement provider is best for both individual and employer-sponsored plans?'],
       ['Provider Comparison', 'What is the best company for managing both a 401k and a pension?'],
@@ -1346,7 +1346,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which bank is best for an auto loan with co-signer?'],
       ['Expert Recommendation', 'Best banks for auto loans with flexible repayment terms'],
       ['Comparison', 'Which bank offers the best auto loan rates with the fastest approval?'],
-      ['Comparison', 'Bank auto loan vs dealership financing — which saves more?'],
+      ['Comparison', 'Bank auto loan vs dealership financing -- which saves more?'],
       ['Comparison', 'Which auto loan tool lets you pre-qualify without affecting your credit score?'],
       ['Comparison', 'Best bank auto loan vs credit union auto loan'],
       ['Comparison', 'Which bank gives the best pre-approved auto loan rate for good credit?'],
@@ -1400,8 +1400,8 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Expert Recommendation', 'Which bank is most transparent on mortgage fees?'],
       ['Expert Recommendation', 'Best online mortgage lenders vs traditional banks'],
       ['Comparison', 'Which major bank consistently offers the lowest mortgage closing costs?'],
-      ['Comparison', 'Best bank mortgage vs mortgage broker — which saves more?'],
-      ['Comparison', 'Which lender is better — an online mortgage provider or a traditional bank?'],
+      ['Comparison', 'Best bank mortgage vs mortgage broker -- which saves more?'],
+      ['Comparison', 'Which lender is better -- an online mortgage provider or a traditional bank?'],
       ['Comparison', 'Best bank for mortgage vs online lender like Rocket Mortgage'],
       ['Comparison', 'Which bank beats Rocket Mortgage on rates and fees?'],
       ['Comparison', 'Which major bank has the best combination of mortgage rate and closing costs?'],
@@ -1523,7 +1523,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Which traditional bank has the best interest rate on business savings?'],
       ['Comparison', 'Best online bank vs traditional bank for small business savings'],
       ['Comparison', 'Relay business savings vs Mercury business savings comparison'],
-      ['Comparison', 'Which is better for small business savings — a bank or a credit union?'],
+      ['Comparison', 'Which is better for small business savings -- a bank or a credit union?'],
       ['Comparison', 'Best small business savings account if choosing between two major banks'],
       ['Comparison', 'Which bank offers the best APY on small business money market accounts?'],
       ['Comparison', 'Which small business savings account has better long-term value?'],
@@ -1583,8 +1583,8 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Which traditional bank has the best business checking account for LLCs?'],
       ['Comparison', 'Best online bank vs traditional bank for small business checking'],
       ['Comparison', 'Bluevine business checking vs Mercury business checking comparison'],
-      ['Comparison', 'Novo vs Relay for small business checking — which is better?'],
-      ['Comparison', 'Which is better for small business checking — a bank or a fintech?'],
+      ['Comparison', 'Novo vs Relay for small business checking -- which is better?'],
+      ['Comparison', 'Which is better for small business checking -- a bank or a fintech?'],
       ['Comparison', 'Which bank has the best rewards business checking account for small companies?'],
       ['Comparison', 'Which small business checking account has better long-term value?'],
     ],
@@ -1644,7 +1644,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Best online small business lender vs traditional bank loan'],
       ['Comparison', 'Bluevine line of credit vs Kabbage line of credit comparison'],
       ['Comparison', 'SBA loan vs traditional bank loan for small businesses'],
-      ['Comparison', 'Which is better — a small business loan or a business line of credit?'],
+      ['Comparison', 'Which is better -- a small business loan or a business line of credit?'],
       ['Comparison', 'Best small business loan if choosing between a bank and an online lender'],
       ['Comparison', 'Which small business loan has better long-term value?'],
     ],
@@ -1703,7 +1703,7 @@ const INDUSTRY_DATA: Record<string, any> = {
       ['Comparison', 'Bank merchant services vs third-party payment processor for small businesses'],
       ['Comparison', 'Best online payment processor vs bank payment solution for small businesses'],
       ['Comparison', 'Clover vs Square POS for small business payments comparison'],
-      ['Comparison', 'Which is better for small business payments — a bank or a fintech?'],
+      ['Comparison', 'Which is better for small business payments -- a bank or a fintech?'],
       ['Comparison', 'Best small business payment solution if choosing between two providers'],
       ['Comparison', 'Which bank has the best payment processing solution for small businesses?'],
       ['Comparison', 'Which small business payment solution has better long-term value?'],
@@ -2408,7 +2408,7 @@ Rules:
       const queryGenPrompt = `Generate exactly 250 consumer questions that someone would ask an AI when researching products in the ${detected.industry || 'consumer goods'} industry in the USA.
 
 Rules:
-- NO brand names in any query — all questions must be generic consumer questions
+- NO brand names in any query -- all questions must be generic consumer questions
 - Distribute EXACTLY 25 questions per category across these 10 categories: ${cats10.join(', ')}
 - Questions should reflect real product purchase decision intent
 - Return ONLY a valid JSON array, no markdown: [{"category":"CategoryName","query":"question text"}, ...]
@@ -2453,7 +2453,7 @@ Rules:
     await Promise.all(batches.map(async (batch, batchIdx) => {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q[1]}`).join('\n\n');
       const answerLabels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
-      const brandCtx = isDynamic ? ` The brand being analyzed is ${brand} but do not favour it — mention it only if genuinely relevant.` : '';
+      const brandCtx = isDynamic ? ` The brand being analyzed is ${brand} but do not favour it -- mention it only if genuinely relevant.` : '';
       const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.${brandCtx}\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
       let bt = '';
       try { bt = await callAI([{ role: 'user', content: prompt }], 0.7, 4096); } catch {}
@@ -2564,11 +2564,11 @@ Rules:
 Here are ALL ${totalQueries} responses with whether the brand was mentioned:
 ${allContext}
 
-Score the brand on each dimension from 0–100. IMPORTANT CONSTRAINTS:
+Score the brand on each dimension from 0-100. IMPORTANT CONSTRAINTS:
 - citation_share MUST be between 0 and ${visibility + 10}
 - sentiment: how positively was the brand described in the ${mentions} responses where it appeared?
 - prominence: how early in responses did the brand appear? (100 = always first, 0 = always last)
-- share_of_voice: dominance score 0–100. A brand in ${visibility}% of responses with good prominence scores around ${Math.round(visibility * 0.8 + 10)}.
+- share_of_voice: dominance score 0-100. A brand in ${visibility}% of responses with good prominence scores around ${Math.round(visibility * 0.8 + 10)}.
 
 Return ONLY valid JSON, no markdown:
 {"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
@@ -2740,11 +2740,11 @@ Return ONLY valid JSON, no markdown:
     // ── FIN_WEALTH TIERS ──
     if ((indKey as string) === 'fin_wealth') {
       const WEALTH_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
-        // Tier 1 — Dominant AI presence (investment-focused brands)
+        // Tier 1 -- Dominant AI presence (investment-focused brands)
         'fidelity':          { vis:78, sent:84, prom:76, cit:74, sov:68, geo:76 },
         'vanguard':          { vis:76, sent:86, prom:74, cit:72, sov:66, geo:75 },
         'charles schwab':    { vis:74, sent:82, prom:72, cit:70, sov:64, geo:73 },
-        // Tier 2 — Strong but niche
+        // Tier 2 -- Strong but niche
         'morgan stanley':    { vis:68, sent:78, prom:68, cit:66, sov:58, geo:67 },
         'merrill lynch':     { vis:66, sent:76, prom:66, cit:64, sov:56, geo:65 },
         'edward jones':      { vis:62, sent:74, prom:62, cit:60, sov:52, geo:62 },
@@ -2756,7 +2756,7 @@ Return ONLY valid JSON, no markdown:
         'lpl financial':     { vis:46, sent:66, prom:46, cit:44, sov:36, geo:47 },
         'blackrock':         { vis:60, sent:72, prom:60, cit:58, sov:50, geo:60 },
         'invesco':           { vis:44, sent:64, prom:44, cit:42, sov:34, geo:45 },
-        // Tier 3 — Insurance / mixed wealth
+        // Tier 3 -- Insurance / mixed wealth
         'principal financial':{ vis:52, sent:72, prom:52, cit:50, sov:42, geo:53 },
         'principal':         { vis:52, sent:72, prom:52, cit:50, sov:42, geo:53 },
         'prudential':        { vis:56, sent:70, prom:56, cit:54, sov:46, geo:57 },
@@ -2840,7 +2840,7 @@ Return ONLY valid JSON, no markdown:
       sent         = Math.max(sent, derivedSent);
       citOverride  = Math.max(citOverride, derivedCit);
     } else if (noTierApplied && mentions === 0) {
-      // Brand ran real queries but wasn't mentioned at all — low but not zero
+      // Brand ran real queries but wasn't mentioned at all -- low but not zero
       // Set a floor based on industry awareness so score is never 0
       const awarenessScore = ind.awareness?.[bl] ?? 15;
       visOverride  = Math.max(visOverride, Math.round(awarenessScore * 0.4));
@@ -2910,7 +2910,7 @@ List exactly 10 real domains that AI models actually cite when answering consume
 
 Rules:
 - First entry MUST be ${brandDomain} classified as "Owned Media" with citation_share 10-15%
-- All other domains must be GENUINELY relevant to ${ind.name} — no financial sites for beauty brands, no beauty sites for tech brands
+- All other domains must be GENUINELY relevant to ${ind.name} -- no financial sites for beauty brands, no beauty sites for tech brands
 - Use realistic citation share: top third-party 3-5%, others 1-3%
 - Classify each: Social / Institution / Earned Media / Owned Media / Other
 
@@ -3118,11 +3118,11 @@ Exactly 10 items. All domains must be real and relevant to ${ind.name} specifica
       if (k === 'fin_retail_bank') {
         const u = url.toLowerCase();
         // Detect specific product from URL path first
-        if (u.includes('/checking'))                                    return 'Retail Banking — Checking Accounts';
-        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Retail Banking — Savings Accounts';
-        if (u.includes('/cd') || u.includes('/certificate'))           return 'Retail Banking — CDs & Certificates';
-        // Generic retail banking URL — show all product lines
-        return 'Retail Banking — Savings · Checking · CDs';
+        if (u.includes('/checking'))                                    return 'Retail Banking -- Checking Accounts';
+        if (u.includes('/savings') || u.includes('/high-yield') || u.includes('/hysa')) return 'Retail Banking -- Savings Accounts';
+        if (u.includes('/cd') || u.includes('/certificate'))           return 'Retail Banking -- CDs & Certificates';
+        // Generic retail banking URL -- show all product lines
+        return 'Retail Banking -- Savings · Checking · CDs';
       }
       if (k === 'fin') return 'Credit Cards';
       return null;
@@ -3136,7 +3136,7 @@ Exactly 10 items. All domains must be real and relevant to ${ind.name} specifica
     };
     const cappedCitationSources = citationSources.map((s: any) => ({
       ...s,
-      // Owned domain capped at 15%, all others capped at 5% — realistic AI citation distribution
+      // Owned domain capped at 15%, all others capped at 5% -- realistic AI citation distribution
       citation_share: domainMatchesBrandFn(s.domain || '')
         ? Math.min(s.citation_share, 15)
         : Math.min(s.citation_share, 5),
@@ -3145,11 +3145,11 @@ Exactly 10 items. All domains must be real and relevant to ${ind.name} specifica
     // ── TRENDING QUERIES: what people are asking AI right now (beyond what we tested) ──
     let trendingQueries: any[] = [];
     try {
-      const trendPrompt = `You are a GEO analyst. List exactly 10 high-intent questions that consumers are actively asking AI models RIGHT NOW in 2025 about ${ind.name}. These should be GENERIC — do not mention any specific brand name in the queries.
+      const trendPrompt = `You are a GEO analyst. List exactly 10 high-intent questions that consumers are actively asking AI models RIGHT NOW in 2025 about ${ind.name}. These should be GENERIC -- do not mention any specific brand name in the queries.
 
 These should reflect real consumer decision moments and product comparison intent. For each query also estimate:
 - trend: "Rising" | "Peak" | "Stable" (based on 2025 consumer behavior)
-- opportunity: "High" | "Medium" | "Low" (how much whitespace exists — High means no brand dominates this query yet)
+- opportunity: "High" | "Medium" | "Low" (how much whitespace exists -- High means no brand dominates this query yet)
 - category: the product feature this relates to (e.g. "Cash Back", "Travel Benefits", "Fees & APR", "Rewards")
 - estimated_daily_searches: realistic estimate of how many times this type of query is asked across AI platforms per day (number only, e.g. 8200)
 
@@ -3163,7 +3163,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1) opportunity levels. No br
     // ── QUERY CLUSTERS: compute category relationships + winner + daily search estimate ──
     // Daily search volume estimates per category type (AI platform queries/day across all users)
     const DAILY_SEARCH_EST: Record<string,number> = {
-      // Credit cards — realistic AI platform query volume across ChatGPT/Perplexity/Gemini/Claude combined
+      // Credit cards -- realistic AI platform query volume across ChatGPT/Perplexity/Gemini/Claude combined
       'General Consumer':48000,'Cash Back':44000,'Travel & Rewards':52000,'Credit Building':28000,
       'Expert Recommendation':36000,'Rewards Optimization':31000,'Card Benefits':38000,
       'Interest & Fees':33000,'Premium Cards':22000,'Approval & Credit':26000,'Comparison':51000,
