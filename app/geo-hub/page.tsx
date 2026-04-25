@@ -1188,7 +1188,16 @@ export default function GeoHub() {
               const rawSent = result.sentiment;
               const prom = result.prominence;
               const sov = result.share_of_voice;
-              const avgRank = result.avg_rank;
+              // Use same rank logic as Competitors tab — position in GEO-sorted array
+              // This ensures GEO Score tab and Competitors tab always agree
+              const _allBrands = [{GEO:geo, isYou:true}, ...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
+              const _myPos = _allBrands.findIndex((b:any)=>b.isYou);
+              const _computedRank = _myPos >= 0 && _myPos < 5 ? _myPos + 1 : null;
+              // For hardcoded brands avg_rank exists and is reliable — use it
+              // For dynamic brands (no tier data) fall back to computed position
+              const avgRank = result.avg_rank && result.avg_rank !== 0
+                ? result.avg_rank
+                : _computedRank ?? result.avg_rank;
               const badge = scoreBadge(geo);
               const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
               return (
@@ -1537,24 +1546,56 @@ export default function GeoHub() {
                   {/* ── QUERY INTELLIGENCE NETWORK (simplified) ── */}
                   {clusters.length > 0 && (()=>{
                     const fmtV=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
-                    // Bubble size based on total appearances (mentioned count), not volume
+                    // Bubble size based on total appearances (mentioned count)
                     const maxMentioned = Math.max(...clusters.map((c:any)=>c.mentioned), 1);
-                    // Grid layout — no force physics, clean positions
-                    const cols = Math.min(5, clusters.length);
-                    const bubbles = clusters.map((c:any, i:number) => {
-                      const row = Math.floor(i / cols);
-                      const col = i % cols;
-                      const W = 900, H = 320;
-                      const cellW = W / cols;
-                      const cellH = H / Math.ceil(clusters.length / cols);
-                      const seed = (c.category||'').split('').reduce((a:number,ch:string)=>a+ch.charCodeAt(0),0);
-                      const jx = ((seed * 13) % 30) - 15;
-                      const jy = ((seed * 23) % 20) - 10;
-                      const x = col * cellW + cellW / 2 + jx;
-                      const y = row * cellH + cellH / 2 + jy;
-                      // Radius from actual mention count — min 20 max 44
-                      const r = Math.round(20 + (c.mentioned / maxMentioned) * 24);
-                      return {...c, x, y, r};
+
+                    // Sort by group: Winning → Emerging → Gap → Zero presence
+                    // Within each group sort by appearances descending (largest first)
+                    const grouped = [...clusters].sort((a:any, b:any) => {
+                      const groupOrder = (c:any) => c.winRate>=60?0:c.winRate>=30?1:c.winRate>0?2:3;
+                      const gDiff = groupOrder(a) - groupOrder(b);
+                      if(gDiff !== 0) return gDiff;
+                      return b.mentioned - a.mentioned;
+                    });
+
+                    // Layout: pack bubbles into rows, centered
+                    // Each bubble gets radius 20-44 based on appearances
+                    const W = 900, H = 300;
+                    const PADDING = 16;
+                    const positioned = grouped.map((c:any) => ({
+                      ...c,
+                      r: Math.round(20 + (c.mentioned / maxMentioned) * 24)
+                    }));
+
+                    // Row-pack algorithm: fill rows left to right, center each row
+                    const rows: any[][] = [];
+                    let currentRow: any[] = [];
+                    let currentRowW = 0;
+                    const maxRowW = W - PADDING * 2;
+                    positioned.forEach((b:any) => {
+                      const bw = b.r * 2 + 12;
+                      if(currentRow.length > 0 && currentRowW + bw > maxRowW) {
+                        rows.push(currentRow);
+                        currentRow = [b];
+                        currentRowW = bw;
+                      } else {
+                        currentRow.push(b);
+                        currentRowW += bw;
+                      }
+                    });
+                    if(currentRow.length > 0) rows.push(currentRow);
+
+                    // Assign x,y positions — center each row
+                    const rowH = H / rows.length;
+                    const bubbles = rows.flatMap((row, ri) => {
+                      const totalW = row.reduce((s:number, b:any) => s + b.r*2+12, 0);
+                      let cx = (W - totalW) / 2 + PADDING;
+                      return row.map((b:any) => {
+                        const x = cx + b.r;
+                        const y = ri * rowH + rowH / 2;
+                        cx += b.r * 2 + 12;
+                        return {...b, x, y};
+                      });
                     });
                     return (
                       <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
@@ -1577,24 +1618,42 @@ export default function GeoHub() {
                             {filterCat!=='All'&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,padding:'4px 10px',fontSize:'0.68rem',color:'#94A3B8',cursor:'pointer'}}>✕ Clear filter</button>}
                           </div>
                         </div>
-                        <svg viewBox="0 0 900 320" style={{width:'100%',display:'block',background:'#0F172A'}}>
-                          {Array.from({length:18},(_,i)=>Array.from({length:10},(_,j)=>(
-                            <circle key={`${i}-${j}`} cx={i*(900/17)} cy={j*(320/9)} r="1" fill="#1E293B"/>
+                        <svg viewBox={`0 0 900 ${Math.max(280, rows.length * 105)}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
+                          {Array.from({length:18},(_,i)=>Array.from({length:Math.max(10,rows.length*3)},(_,j)=>(
+                            <circle key={`${i}-${j}`} cx={i*(900/17)} cy={j*(Math.max(280,rows.length*105)/(Math.max(10,rows.length*3)-1))} r="1" fill="#1E293B"/>
                           )))}
                           {bubbles.map((b:any)=>{
                             const isSelected = filterCat===b.category;
                             const isUntapped = b.winRate===0 && b.total>0;
                             const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
+                            // Smart label: split into max 2 lines that fit inside the bubble
                             const words = b.category.split(' ');
-                            const label = words.length>2 ? words.slice(0,2).join(' ')+'…' : b.category;
+                            const maxCharsPerLine = Math.max(8, Math.round(b.r * 0.45));
+                            let line1 = '', line2 = '';
+                            words.forEach((w:string) => {
+                              if(line1.length === 0) { line1 = w; }
+                              else if((line1 + ' ' + w).length <= maxCharsPerLine) { line1 += ' ' + w; }
+                              else if(line2.length === 0) { line2 = w; }
+                              else { line2 += ' ' + w; }
+                            });
+                            // Truncate line2 if too long
+                            if(line2.length > maxCharsPerLine) line2 = line2.slice(0, maxCharsPerLine-1) + '…';
+                            const hasTwo = line2.length > 0;
+                            const fontSize = Math.max(7, Math.min(10, b.r * 0.30));
+                            // Vertical offsets
+                            const textY1 = hasTwo ? b.y - b.r*0.35 : b.y - b.r*0.22;
+                            const textY2 = textY1 + fontSize + 2;
+                            const winY = b.y + (hasTwo ? b.r*0.22 : b.r*0.10);
+                            const appY = winY + 9;
                             return (
                               <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setFilterCat(isSelected?'All':b.category);setQueryPage(1);}}>
                                 <circle cx={b.x} cy={b.y} r={b.r+8} fill={nodeColor} opacity="0.07"/>
                                 <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isSelected?1:0.8} stroke={isSelected?'white':nodeColor} strokeWidth={isSelected?2.5:1}/>
                                 {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#EF4444" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.7"/>}
-                                <text x={b.x} y={b.y-(b.r>30?8:5)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.32)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
-                                <text x={b.x} y={b.y+(b.r>30?4:2)} textAnchor="middle" style={{fontSize:Math.max(6,Math.min(8,b.r*0.26)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
-                                {b.r>26&&<text x={b.x} y={b.y+(b.r>30?14:10)} textAnchor="middle" style={{fontSize:6,fill:'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
+                                <text x={b.x} y={textY1} textAnchor="middle" style={{fontSize,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line1}</text>
+                                {hasTwo&&<text x={b.x} y={textY2} textAnchor="middle" style={{fontSize,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line2}</text>}
+                                <text x={b.x} y={winY} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:'rgba(255,255,255,0.9)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                                {b.r>26&&<text x={b.x} y={appY} textAnchor="middle" style={{fontSize:6,fill:'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
                               </g>
                             );
                           })}
