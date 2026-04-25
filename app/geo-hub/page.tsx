@@ -234,7 +234,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
         <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
-        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you\'re not yet the brand AI leads with or recommends first.'}
+        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier — AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you are not yet the brand AI leads with or recommends first.'}
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
@@ -1090,7 +1090,7 @@ export default function GeoHub() {
           </div>
 
           {loading&&(()=>{
-            const brandName = url.replace(/https?:\/\/(www\.)?/,'').split('/')[0].split('.')[0];
+            const brandName = url.replace('https://www.','').replace('http://www.','').replace('https://','').replace('http://','').split('/')[0].split('.')[0];
             const displayName = brandName.charAt(0).toUpperCase()+brandName.slice(1);
             const steps = [
               {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata'},
@@ -1207,7 +1207,7 @@ export default function GeoHub() {
                     <MetricCard label="visibility score" val={vis} color="#7C3AED"/>
                     <MetricCard label="sentiment score" val={rawSent} color="#10B981"/>
                     <MetricCard label="citation score" val={cit} color="#F59E0B"/>
-                    <MetricCard label="avg rank" val={`#${String(avgRank).replace(/^#+/, '')}`} color="#3B82F6"/>
+                    <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`} color="#3B82F6"/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
                   <GeoSummary result={result}/>
@@ -1740,6 +1740,9 @@ export default function GeoHub() {
                       </div>
                     );
                   })()}
+                </div>
+              );
+            })()}
 
 
             {activeTab===6&&(()=>{
