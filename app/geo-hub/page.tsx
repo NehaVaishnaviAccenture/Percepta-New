@@ -1610,7 +1610,7 @@ export default function GeoHub() {
                     const totalPages = Math.ceil(allSorted.length / ROWS_PER_PAGE);
                     const safePage = Math.min(queryPage, Math.max(1, totalPages));
                     const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
-                    const cats2 = ['All',...new Set(rd.map((r:any)=>r.category).filter(Boolean))];
+                    const cats2: string[] = ['All',...new Set(rd.map((r:any)=>(r.category as string)).filter(Boolean))];
                     return (
                       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
