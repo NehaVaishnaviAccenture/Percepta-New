@@ -145,7 +145,7 @@ function buildFeatureDims(
   // ── Dynamic fallback: derive axes from real rd categories ──
   // If rd has data (dynamic brand or any non-fin industry), use actual query categories as axes
   if (rd.length > 0) {
-    const cats = [...new Set(rd.map((r:any) => r.category).filter(Boolean))] as string[];
+    const cats: string[] = Array.from(new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c))));
     // Pick up to 6 categories that have at least some queries
     const topCats = cats.slice(0, 6);
     if (topCats.length >= 3) {
@@ -1508,7 +1508,7 @@ export default function GeoHub() {
               // FIX 3: For retail banking — derive categories from the brand URL / lob
               // The lob already comes from route.ts (e.g. "Savings Accounts", "Checking Accounts")
               // Show category breakdown using actual response_detail categories from the API
-              const cats=['All',...Array.from(new Set(rd.map((r:any)=>r.category))) as string[]];
+              const cats: string[] = ['All',...Array.from(new Set<string>(rd.map((r:any)=>r.category as string)))];
               const catStats:Record<string,{total:number;mentioned:number}>={};
               rd.forEach((r:any)=>{
                 if(!catStats[r.category])catStats[r.category]={total:0,mentioned:0};
@@ -1610,7 +1610,7 @@ export default function GeoHub() {
                     const totalPages = Math.ceil(allSorted.length / ROWS_PER_PAGE);
                     const safePage = Math.min(queryPage, Math.max(1, totalPages));
                     const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
-                    const cats2: string[] = ['All',...new Set(rd.map((r:any)=>(r.category as string)).filter(Boolean))];
+                    const cats2: string[] = ['All',...Array.from(new Set<string>(rd.map((r:any)=>r.category as string).filter((c:string)=>Boolean(c))))];
                     return (
                       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
