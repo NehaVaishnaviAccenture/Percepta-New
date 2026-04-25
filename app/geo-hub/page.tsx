@@ -537,7 +537,7 @@ function GeoSummary({ result }: { result:any }) {
                   {label:'Category',w:160},
                   {label:'Insight', w:'30%'},
                   {label:'Recommendation', w:'30%'},
-                  {label:'GEO Forecast', w:150},
+                  {label:'GEO Opportunity', w:150},
                   {label:'Impact',  w:90},
                 ].map(h=>(
                   <th key={h.label} style={{padding:'10px 14px',textAlign:'left' as const,fontSize:'0.64rem',fontWeight:700,color:'#6B7280',letterSpacing:'.07em',borderBottom:'2px solid #E5E7EB',width:h.w}}>{h.label.toUpperCase()}</th>
@@ -1005,6 +1005,7 @@ export default function GeoHub() {
   const [promptLoading,setPromptLoading]=useState(false);
   const [filterCat,setFilterCat]=useState('All');
   const [selectedCluster,setSelectedCluster]=useState<string|null>(null);
+  const [queryPage,setQueryPage]=useState(1);
   const [cachedActions,setCachedActions]=useState<any[]|null>(null);
   const [actionsLoading,setActionsLoading]=useState(false);
   const [hovBar,setHovBar]=useState<number|null>(null);
@@ -1038,7 +1039,7 @@ export default function GeoHub() {
       setLoadingProgress(100);
       await new Promise(r=>setTimeout(r,400));
       if(data.error)setError(data.error);
-      else{setResult(data);setCachedActions(null);setActionsLoading(false);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
       setError(e.message);
@@ -1533,388 +1534,202 @@ export default function GeoHub() {
                     <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
                   </div>
 
-                  {/* ── QUERY INTELLIGENCE: Force-directed network map ── */}
-                  {bubbleData.length > 0 && (
-                    <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
-                      {/* Header */}
-                      <div style={{background:'#0F172A',padding:'16px 22px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                        <div>
-                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
-                          <div style={{fontSize:'0.72rem',color:'#64748B',marginTop:2}}>Topic clusters sized by AI search volume · Color = your win rate · Lines = topic relatedness · Click any node</div>
-                        </div>
-                        <div style={{display:'flex',alignItems:'center',gap:16}}>
-                          {[{color:'#10B981',label:'Winning (≥60%)'},{color:'#F59E0B',label:'Emerging (30–59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
-                            <div key={i} style={{display:'flex',alignItems:'center',gap:5}}>
-                              <div style={{width:8,height:8,borderRadius:'50%',background:l.color,boxShadow:`0 0 6px ${l.color}`}}/>
-                              <span style={{fontSize:'0.68rem',color:'#94A3B8'}}>{l.label}</span>
-                            </div>
-                          ))}
-                          <div style={{display:'flex',alignItems:'center',gap:5}}>
-                            <div style={{width:8,height:8,borderRadius:'50%',background:'transparent',border:'1.5px dashed #EF4444'}}/>
-                            <span style={{fontSize:'0.68rem',color:'#94A3B8'}}>Zero presence</span>
-                          </div>
-                          {selectedCluster && <button onClick={()=>{setSelectedCluster(null);setFilterCat('All');}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:8,padding:'5px 12px',fontSize:'0.72rem',color:'#94A3B8',cursor:'pointer'}}>← All topics</button>}
-                        </div>
-                      </div>
-
-                      {/* Network SVG */}
-                      {!selectedCluster && (()=>{
-                        const W=980,H=580;
-                        // Force-directed layout: run physics iterations
-                        const nodes = bubbleData.map((b:any,i:number)=>({...b, fx:null, fy:null}));
-                        // Initialize positions on a circle
-                        const n = nodes.length;
-                        nodes.forEach((node:any,i:number)=>{
-                          const angle = (i/n)*Math.PI*2 - Math.PI/2;
-                          const radius = 210 + (i%2===0?30:-30);
-                          node.x = W/2 + radius*Math.cos(angle);
-                          node.y = H/2 + radius*Math.sin(angle);
-                          node.vx = 0; node.vy = 0;
-                        });
-                        // Run 120 force simulation iterations
-                        for(let iter=0;iter<120;iter++){
-                          const alpha = 1 - iter/120;
-                          // Repulsion between all pairs
-                          for(let i=0;i<nodes.length;i++){
-                            for(let j=i+1;j<nodes.length;j++){
-                              const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
-                              const dist=Math.sqrt(dx*dx+dy*dy)||1;
-                              const minDist=(nodes[i].r+nodes[j].r+55);
-                              if(dist<minDist){
-                                const force=(minDist-dist)/dist*0.75*alpha;
-                                nodes[i].vx-=dx*force; nodes[i].vy-=dy*force;
-                                nodes[j].vx+=dx*force; nodes[j].vy+=dy*force;
-                              }
-                            }
-                          }
-                          // Attraction along edges
-                          nodes.forEach((node:any)=>{
-                            (node.related||[]).forEach((rel:any)=>{
-                              const target=nodes.find((nn:any)=>nn.category===rel.category);
-                              if(!target) return;
-                              const dx=target.x-node.x,dy=target.y-node.y;
-                              const dist=Math.sqrt(dx*dx+dy*dy)||1;
-                              const strength=(rel.similarity/100)*0.08*alpha;
-                              node.vx+=dx*strength; node.vy+=dy*strength;
-                              target.vx-=dx*strength; target.vy-=dy*strength;
-                            });
-                          });
-                          // Center gravity
-                          nodes.forEach((node:any)=>{
-                            node.vx+=(W/2-node.x)*0.01*alpha;
-                            node.vy+=(H/2-node.y)*0.01*alpha;
-                          });
-                          // Apply velocity + damping
-                          nodes.forEach((node:any)=>{
-                            node.vx*=0.7; node.vy*=0.7;
-                            node.x+=node.vx; node.y+=node.vy;
-                            // Boundary
-                            node.x=Math.max(node.r+10,Math.min(W-node.r-10,node.x));
-                            node.y=Math.max(node.r+10,Math.min(H-node.r-10,node.y));
-                          });
-                        }
-                        const fmtSearches=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
-                        return (
-                          <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
-                            {/* Grid dots background */}
-                            {Array.from({length:20},(_,i)=>Array.from({length:12},(_,j)=>(
-                              <circle key={`${i}-${j}`} cx={i*(W/19)} cy={j*(H/11)} r="1" fill="#1E293B"/>
-                            )))}
-                            {/* Theme group hulls */}
-                            {(()=>{
-                              const THEMES = [
-                                {name:'Rewards & Cash Back',cats:['Cash Back','Rewards Optimization','No Annual Fee','Flat Rate','Category','Redemption'],color:'#10B981'},
-                                {name:'Travel',cats:['Travel & Rewards','Premium Cards','Card Benefits','Miles & Points','Perks & Benefits'],color:'#818CF8'},
-                                {name:'Family & Everyday',cats:['Family Spending','General Consumer','Expert Recommendation','Comparison'],color:'#F59E0B'},
-                                {name:'Credit & Debt',cats:['Balance Transfer','Credit Building','Approval & Credit','Interest & Fees','Debt Payoff'],color:'#EF4444'},
-                              ];
-                              return THEMES.map(theme=>{
-                                const tn=nodes.filter((n:any)=>theme.cats.includes(n.category));
-                                if(tn.length<2) return null;
-                                const xs=tn.map((n:any)=>n.x),ys=tn.map((n:any)=>n.y);
-                                const maxR=Math.max(...tn.map((n:any)=>n.r));
-                                const pad=maxR+22;
-                                const x1=Math.min(...xs)-pad,y1=Math.min(...ys)-pad;
-                                const x2=Math.max(...xs)+pad,y2=Math.max(...ys)+pad;
-                                return (
-                                  <g key={theme.name}>
-                                    <ellipse cx={(x1+x2)/2} cy={(y1+y2)/2} rx={(x2-x1)/2} ry={(y2-y1)/2} fill={theme.color} opacity="0.05" stroke={theme.color} strokeWidth="1" strokeDasharray="6,4" strokeOpacity="0.25"/>
-                                    <text x={x1+8} y={y1+14} style={{fontSize:9,fill:theme.color,fontFamily:'Inter,sans-serif',fontWeight:700,opacity:0.55,letterSpacing:'0.05em'}}>{theme.name.toUpperCase()}</text>
-                                  </g>
-                                );
-                              });
-                            })()}
-                            {/* Connection lines — drawn first so nodes appear on top */}
-                            {nodes.map((b:any)=>
-                              (b.related||[]).map((rel:any)=>{
-                                const target=nodes.find((nn:any)=>nn.category===rel.category);
-                                if(!target||rel.similarity<15) return null;
-                                const opacity=Math.min(0.6,rel.similarity/100*0.8);
-                                const strokeW=rel.similarity>60?2:rel.similarity>35?1.5:1;
-                                const midX=(b.x+target.x)/2, midY=(b.y+target.y)/2-20;
-                                return <path key={`${b.category}-${rel.category}`}
-                                  d={`M${b.x},${b.y} Q${midX},${midY} ${target.x},${target.y}`}
-                                  fill="none" stroke="#818CF8" strokeWidth={strokeW} opacity={opacity} strokeDasharray={rel.similarity>50?'none':'4,3'}/>;
-                              })
-                            )}
-                            {/* Nodes */}
-                            {nodes.map((b:any)=>{
-                              const isUntapped = b.winRate===0 && b.total>0;
-                              // Untapped = worst kind of Gap — red like Gap but with dashed ring
-                              const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
-                              const glowColor = nodeColor;
-                              const words = b.category.split(' ');
-                              const label = words.length>3 ? words.slice(0,2).join(' ')+'…' : b.category;
-                              const isSelected = selectedCluster===b.category;
-                              return (
-                                <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setSelectedCluster(b.category);setFilterCat(b.category);}}>
-                                  {/* Glow */}
-                                  <circle cx={b.x} cy={b.y} r={b.r+12} fill={glowColor} opacity="0.08"/>
-                                  <circle cx={b.x} cy={b.y} r={b.r+6} fill={glowColor} opacity="0.12"/>
-                                  {/* Main circle */}
-                                  <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isSelected?1:0.82} stroke={isSelected?'white':glowColor} strokeWidth={isSelected?2.5:1}/>
-                                  {/* Category name */}
-                                  <text x={b.x} y={b.y-(b.r>35?10:6)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.32)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
-                                  {/* Win rate */}
-                                  <text x={b.x} y={b.y+(b.r>35?4:2)} textAnchor="middle" style={{fontSize:Math.max(6,Math.min(9,b.r*0.26)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
-                                  {/* Daily searches */}
-                                  {b.r>26&&<text x={b.x} y={b.y+(b.r>32?14:10)} textAnchor="middle" style={{fontSize:6.5,fill:'rgba(255,255,255,0.6)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>~{fmtSearches(b.dailySearches)}/day</text>}
-                                  {/* Winner badge - shown on larger nodes */}
-                                  {b.r>30&&b.topCompetitor&&<text x={b.x} y={b.y+b.r+11} textAnchor="middle" style={{fontSize:6.5,fill:'#94A3B8',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>👑 {b.topCompetitor.split(' ')[0]}</text>}
-                                  {/* Untapped: dashed stroke ring instead of floating label */}
-                                  {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#818CF8" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.7"/>}
-                                </g>
-                              );
-                            })}
-                          </svg>
-                        );
-                      })()}
-
-                      {/* Selected cluster detail panel */}
-                      {selectedCluster && (()=>{
-                        const clusterData = clusters.find((c:any)=>c.category===selectedCluster);
-                        const clusterRows = rd.filter((r:any)=>r.category===selectedCluster).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
-                        const clusterWin = clusterRows.filter((r:any)=>r.mentioned).length;
-                        const clusterRate = Math.round((clusterWin/Math.max(clusterRows.length,1))*100);
-                        const winColor = clusterRate>=60?'#10B981':clusterRate>=30?'#F59E0B':'#EF4444';
-                        const fmtS=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
-                        return (
-                          <div style={{background:'#0F172A',padding:'0'}}>
-                            {/* Cluster stats bar */}
-                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',borderBottom:'1px solid #1E293B'}}>
-                              {[
-                                {label:'Win Rate',val:`${clusterRate}%`,color:winColor},
-                                {label:'Queries Tested',val:`${clusterRows.length}`,color:'white'},
-                                {label:'AI Searches/Day',val:`~${fmtS(clusterData?.dailySearches||0)}`,color:'#818CF8'},
-                                {label:'Top Competitor',val:clusterData?.topCompetitor||'—',color:'#F59E0B'},
-                              ].map((s,i)=>(
-                                <div key={i} style={{padding:'14px 20px',borderRight:i<3?'1px solid #1E293B':'none'}}>
-                                  <div style={{fontSize:'0.62rem',color:'#64748B',fontWeight:600,letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:4}}>{s.label}</div>
-                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:s.color}}>{s.val}</div>
-                                </div>
-                              ))}
-                            </div>
-                            {/* Query table */}
-                            <div style={{background:'white',borderTop:'none'}}>
-                              <table style={{width:'100%',borderCollapse:'collapse'}}>
-                                <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                                <tbody>{clusterRows.map((item:any,i:number)=>{
-                                  const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
-                                  const beater=isMissed&&item.winner_brand?item.winner_brand:null;
-                                  return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
-                                    <td style={{padding:'10px 14px',fontSize:'0.78rem',color:'#9CA3AF',width:28}}>{i+1}</td>
-                                    <td style={{padding:'10px 14px'}}><div style={{display:'flex',gap:6,alignItems:'center',marginBottom:3}}>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.7rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.7rem',fontWeight:600}}>✗ Missed</span>}</div><div style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{item.query}</div></td>
-                                    <td style={{padding:'10px 14px',fontSize:'0.95rem',fontWeight:800,color:rankColor,width:80}}>{rankLabel}</td>
-                                    <td style={{padding:'10px 14px',width:160}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:7,padding:'3px 10px',fontSize:'0.72rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:7,padding:'3px 10px',fontSize:'0.72rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>—</span>}</td>
-                                  </tr>;
-                                })}</tbody>
-                              </table>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                  {/* ── WHERE TO PLAY: Strategic Priority Matrix ── */}
+                  {/* ── QUERY INTELLIGENCE NETWORK (simplified) ── */}
                   {clusters.length > 0 && (()=>{
-                    const fmtV=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
-
-                    // Priority score = volume × (1 - winRate/100) → highest = most urgent gap
-                    // Quadrant logic:
-                    // DEFEND    = high win (≥50%) + high volume (≥35K)  → already winning where it matters
-                    // DOUBLE DOWN = high win (≥50%) + lower volume      → strong but niche, grow the pie
-                    // URGENT GAP  = low win (<50%) + high volume (≥35K) → losing where it matters most
-                    // WHITE SPACE = zero win + any volume                → untapped, no one owns it yet
-
-                    const DEFEND      = clusters.filter((c:any)=>c.winRate>=50 && c.dailySearches>=35000).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
-                    const DOUBLE_DOWN = clusters.filter((c:any)=>c.winRate>=50 && c.dailySearches<35000).sort((a:any,b:any)=>b.winRate-a.winRate);
-                    const URGENT      = clusters.filter((c:any)=>c.winRate>0 && c.winRate<50 && c.dailySearches>=35000).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
-                    const WHITE_SPACE = clusters.filter((c:any)=>c.winRate===0 && c.total>0).sort((a:any,b:any)=>b.dailySearches-a.dailySearches);
-
-                    const QuadCard = ({c, accent, bg, border, label}:{c:any,accent:string,bg:string,border:string,label:string}) => (
-                      <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',background:bg,borderRadius:8,border:`1px solid ${border}`,marginBottom:7,cursor:'pointer'}} onClick={()=>{setSelectedCluster(c.category);setFilterCat(c.category);}}>
-                        <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis'}}>{c.category}</div>
-                          <div style={{fontSize:'0.68rem',color:'#6B7280',marginTop:1,display:'flex',gap:6,alignItems:'center'}}>
-                            <span>{fmtV(c.dailySearches)}</span>
-                            {c.topCompetitor&&<span>· {c.topCompetitor.split(' ')[0]} leads</span>}
+                    const fmtV=(n:number)=>n>=1000?`${(n/1000).toFixed(0)}K`:String(n);
+                    // Bubble size based on total appearances (mentioned count), not volume
+                    const maxMentioned = Math.max(...clusters.map((c:any)=>c.mentioned), 1);
+                    // Grid layout — no force physics, clean positions
+                    const cols = Math.min(5, clusters.length);
+                    const bubbles = clusters.map((c:any, i:number) => {
+                      const row = Math.floor(i / cols);
+                      const col = i % cols;
+                      const W = 900, H = 320;
+                      const cellW = W / cols;
+                      const cellH = H / Math.ceil(clusters.length / cols);
+                      const seed = (c.category||'').split('').reduce((a:number,ch:string)=>a+ch.charCodeAt(0),0);
+                      const jx = ((seed * 13) % 30) - 15;
+                      const jy = ((seed * 23) % 20) - 10;
+                      const x = col * cellW + cellW / 2 + jx;
+                      const y = row * cellH + cellH / 2 + jy;
+                      // Radius from actual mention count — min 20 max 44
+                      const r = Math.round(20 + (c.mentioned / maxMentioned) * 24);
+                      return {...c, x, y, r};
+                    });
+                    return (
+                      <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
+                        <div style={{background:'#0F172A',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                          <div>
+                            <div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
+                            <div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Bubble size = brand appearances · Color = win rate · Click any node to filter queries below</div>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:14}}>
+                            {[{color:'#10B981',label:'Winning (≥60%)'},{color:'#F59E0B',label:'Emerging (30–59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
+                                <div style={{width:7,height:7,borderRadius:'50%',background:l.color}}/>
+                                <span style={{fontSize:'0.65rem',color:'#94A3B8'}}>{l.label}</span>
+                              </div>
+                            ))}
+                            <div style={{display:'flex',alignItems:'center',gap:4}}>
+                              <div style={{width:7,height:7,borderRadius:'50%',background:'transparent',border:'1.5px dashed #EF4444'}}/>
+                              <span style={{fontSize:'0.65rem',color:'#94A3B8'}}>Zero presence</span>
+                            </div>
+                            {filterCat!=='All'&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,padding:'4px 10px',fontSize:'0.68rem',color:'#94A3B8',cursor:'pointer'}}>✕ Clear filter</button>}
                           </div>
                         </div>
-                        <div style={{textAlign:'right' as const,flexShrink:0}}>
-                          <div style={{fontSize:'1.05rem',fontWeight:900,color:accent}}>{c.winRate}%</div>
-                          <div style={{fontSize:'0.6rem',color:accent,whiteSpace:'nowrap' as const}}>win rate</div>
-                        </div>
+                        <svg viewBox="0 0 900 320" style={{width:'100%',display:'block',background:'#0F172A'}}>
+                          {Array.from({length:18},(_,i)=>Array.from({length:10},(_,j)=>(
+                            <circle key={`${i}-${j}`} cx={i*(900/17)} cy={j*(320/9)} r="1" fill="#1E293B"/>
+                          )))}
+                          {bubbles.map((b:any)=>{
+                            const isSelected = filterCat===b.category;
+                            const isUntapped = b.winRate===0 && b.total>0;
+                            const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
+                            const words = b.category.split(' ');
+                            const label = words.length>2 ? words.slice(0,2).join(' ')+'…' : b.category;
+                            return (
+                              <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{setFilterCat(isSelected?'All':b.category);setQueryPage(1);}}>
+                                <circle cx={b.x} cy={b.y} r={b.r+8} fill={nodeColor} opacity="0.07"/>
+                                <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isSelected?1:0.8} stroke={isSelected?'white':nodeColor} strokeWidth={isSelected?2.5:1}/>
+                                {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#EF4444" strokeWidth="1.5" strokeDasharray="3,3" opacity="0.7"/>}
+                                <text x={b.x} y={b.y-(b.r>30?8:5)} textAnchor="middle" style={{fontSize:Math.max(7,Math.min(10,b.r*0.32)),fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{label}</text>
+                                <text x={b.x} y={b.y+(b.r>30?4:2)} textAnchor="middle" style={{fontSize:Math.max(6,Math.min(8,b.r*0.26)),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                                {b.r>26&&<text x={b.x} y={b.y+(b.r>30?14:10)} textAnchor="middle" style={{fontSize:6,fill:'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
+                              </g>
+                            );
+                          })}
+                        </svg>
                       </div>
                     );
+                  })()}
 
-                    const QuadSection = ({title, icon, desc, items, accent, bg, border, emptyMsg}:{title:string,icon:string,desc:string,items:any[],accent:string,bg:string,border:string,emptyMsg:string}) => (
-                      <div style={{background:'white',borderRadius:12,border:`1.5px solid ${border}`,padding:'14px 16px',display:'flex',flexDirection:'column' as const}}>
-                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
-                          <span style={{fontSize:'0.95rem'}}>{icon}</span>
-                          <span style={{fontSize:'0.82rem',fontWeight:800,color:accent}}>{title}</span>
-                        </div>
-                        <div style={{fontSize:'0.68rem',color:'#9CA3AF',marginBottom:10,lineHeight:1.4}}>{desc}</div>
-                        {items.length===0
-                          ? <div style={{fontSize:'0.75rem',color:'#D1D5DB',fontStyle:'italic',textAlign:'center' as const,padding:'12px 0'}}>{emptyMsg}</div>
-                          : items.slice(0,4).map((c:any,i:number)=><QuadCard key={i} c={c} accent={accent} bg={bg} border={border} label={title}/>)
-                        }
-                      </div>
-                    );
-
-                    // Build strategic insight sentence
-                    const topUrgent = URGENT[0], topDefend = DEFEND[0], topWhite = WHITE_SPACE[0];
-                    const insight = [
-                      topDefend ? `<strong>${result.brand_name} is winning where it counts most</strong> — ${topDefend.category} (${topDefend.winRate}% win, ${fmtV(topDefend.dailySearches)}).` : '',
-                      topUrgent ? `Biggest risk: <strong>${topUrgent.category}</strong> has ${fmtV(topUrgent.dailySearches)} daily AI searches but only a ${topUrgent.winRate}% win rate${topUrgent.topCompetitor ? ` — ${topUrgent.topCompetitor.split(' ')[0]} is dominating` : ''}.` : '',
-                      topWhite ? `Best untapped opportunity: <strong>${topWhite.category}</strong> — ${fmtV(topWhite.dailySearches)}/day with zero brand presence and no clear market leader.` : '',
-                    ].filter(Boolean).join(' ');
-
+                  {/* ── PAGINATED QUERY TABLE ── */}
+                  {(()=>{
+                    const ROWS_PER_PAGE = 10;
+                    const allSorted = [...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
+                    const totalPages = Math.ceil(allSorted.length / ROWS_PER_PAGE);
+                    const safePage = Math.min(queryPage, Math.max(1, totalPages));
+                    const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
+                    const cats2 = ['All',...new Set(rd.map((r:any)=>r.category).filter(Boolean))];
                     return (
-                      <div style={{background:'#F8FAFC',borderRadius:16,border:'1px solid #E2E8F0',padding:'20px 24px',marginBottom:20}}>
-                        <div style={{marginBottom:14}}>
-                          <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827',marginBottom:3}}>Where to Play — Strategic Priority Matrix</div>
-                          <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Based on your actual AI query win rate × daily search volume. Click any row to see the prompts.</div>
+                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                          <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>
+                            {filterCat==='All'?'All Queries':'Category: '+filterCat}
+                            <span style={{fontSize:'0.72rem',fontWeight:400,color:'#9CA3AF',marginLeft:8}}>({allSorted.length} queries · page {safePage} of {totalPages})</span>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            <span style={{fontSize:'0.68rem',color:'#9CA3AF'}}>Filter:</span>
+                            <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);}} style={{border:'1px solid #E5E7EB',borderRadius:6,padding:'4px 8px',fontSize:'0.75rem',color:'#374151',background:'white',outline:'none'}}>
+                              {cats2.map(c=><option key={c}>{c}</option>)}
+                            </select>
+                          </div>
                         </div>
-
-                        {/* 2×2 grid */}
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
-                          <QuadSection
-                            title="Defend" icon="🛡️"
-                            desc="High win rate + high volume. You're already winning where it matters. Protect this position."
-                            items={DEFEND} accent="#065F46" bg="#F0FDF4" border="#6EE7B7"
-                            emptyMsg="No dominant high-volume wins yet"
-                          />
-                          <QuadSection
-                            title="Urgent Gap" icon="🚨"
-                            desc="Low win rate + high volume. Losing where the most consumers are looking. Act now."
-                            items={URGENT} accent="#991B1B" bg="#FFF1F2" border="#FCA5A5"
-                            emptyMsg="No urgent high-volume gaps"
-                          />
-                          <QuadSection
-                            title="Double Down" icon="📈"
-                            desc="High win rate + lower volume. You're strong here — grow awareness to bring more people in."
-                            items={DOUBLE_DOWN} accent="#1D4ED8" bg="#EFF6FF" border="#BFDBFE"
-                            emptyMsg="No niche wins yet"
-                          />
-                          <QuadSection
-                            title="White Space" icon="⬜"
-                            desc="Zero brand presence. No competitor owns this either. First mover wins."
-                            items={WHITE_SPACE} accent="#6D28D9" bg="#F5F3FF" border="#DDD6FE"
-                            emptyMsg="No untapped categories found"
-                          />
-                        </div>
-
-                        {/* Strategic insight */}
-                        {insight && (
-                          <div style={{padding:'12px 16px',background:'white',borderRadius:10,border:'1px solid #E5E7EB',fontSize:'0.78rem',color:'#374151',lineHeight:1.7}} dangerouslySetInnerHTML={{__html:'💡 ' + insight}}/>
+                        <table style={{width:'100%',borderCollapse:'collapse'}}>
+                          <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                          <tbody>{pageRows.map((item:any,i:number)=>{
+                            const globalIdx = (safePage-1)*ROWS_PER_PAGE + i + 1;
+                            const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
+                            const beater=isMissed&&item.winner_brand?item.winner_brand:null;
+                            return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                              <td style={{padding:'9px 12px',fontSize:'0.75rem',color:'#9CA3AF',width:28}}>{globalIdx}</td>
+                              <td style={{padding:'9px 12px'}}>
+                                <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:3,flexWrap:'wrap' as const}}>
+                                  <span style={{background:'#F3F4F6',color:'#6B7280',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem'}}>{item.category}</span>
+                                  {item.mentioned?<span style={{color:'#10B981',fontSize:'0.68rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.68rem',fontWeight:600}}>✗ Missed</span>}
+                                </div>
+                                <div style={{fontSize:'0.82rem',color:'#374151',fontWeight:500}}>{item.query}</div>
+                              </td>
+                              <td style={{padding:'9px 12px',fontSize:'0.92rem',fontWeight:800,color:rankColor,width:70}}>{rankLabel}</td>
+                              <td style={{padding:'9px 12px',width:150}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>—</span>}</td>
+                            </tr>;
+                          })}</tbody>
+                        </table>
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14}}>
+                            <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===1?'#F9FAFB':'white',color:safePage===1?'#D1D5DB':'#374151',cursor:safePage===1?'default':'pointer',fontSize:'0.75rem'}}>← Prev</button>
+                            {Array.from({length:Math.min(totalPages,10)},(_,i)=>{
+                              const pg = totalPages<=10 ? i+1 : safePage<=5 ? i+1 : safePage>=totalPages-4 ? totalPages-9+i : safePage-4+i;
+                              return <button key={pg} onClick={()=>setQueryPage(pg)} style={{padding:'5px 10px',borderRadius:6,border:'1px solid '+(pg===safePage?'#7C3AED':'#E5E7EB'),background:pg===safePage?'#7C3AED':'white',color:pg===safePage?'white':'#374151',cursor:'pointer',fontSize:'0.75rem',fontWeight:pg===safePage?700:400}}>{pg}</button>;
+                            })}
+                            <button onClick={()=>setQueryPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===totalPages?'#F9FAFB':'white',color:safePage===totalPages?'#D1D5DB':'#374151',cursor:safePage===totalPages?'default':'pointer',fontSize:'0.75rem'}}>Next →</button>
+                          </div>
                         )}
                       </div>
                     );
                   })()}
 
-                  {/* ── TRENDING QUERIES SECTION ── */}
+                  {/* ── TRENDING QUERIES: What the Market is Asking Right Now ── */}
                   {trendingQs.length > 0 && (()=>{
-                    const highOpp = trendingQs.filter((tq:any)=>tq.opportunity==='High');
-                    const fmtV=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
-
-                    // Normalize category match: find cluster whose category name overlaps with tq.category
+                    const highOpp = trendingQs.filter((tq:any)=>tq.opportunity==='High').slice(0,10);
+                    const fmtVol=(n:number)=>n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
                     const getCluster = (tqCat:string) => {
                       const tl = tqCat.toLowerCase();
                       return clusters.find((c:any)=>{
                         const cl = (c.category||'').toLowerCase();
-                        // Direct include check both ways
                         if(cl.includes(tl)||tl.includes(cl)) return true;
-                        // Word overlap
                         const tWords = tl.split(/[\s&,]+/);
                         const cWords = cl.split(/[\s&,]+/);
                         return tWords.some((w:string)=>w.length>3&&cWords.some((cw:string)=>cw.includes(w)||w.includes(cw)));
                       }) || null;
                     };
-
                     if(highOpp.length===0) return null;
                     return (
                       <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-                        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
                           <span style={{fontSize:'1rem'}}>🔥</span>
                           <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
                         </div>
-                        <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:16}}>
-                          AI-detected high-intent queries trending in {result.ind_label} — beyond what we tested.
-                          <span style={{marginLeft:6,background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.68rem',color:'#6B7280'}}>
-                            ⓘ Volume = est. AI platform queries/day across ChatGPT, Perplexity, Gemini & Claude combined
-                          </span>
-                        </div>
-                        <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:10}}>
-                          High Opportunity Queries <span style={{fontWeight:400,color:'#9CA3AF',fontSize:'0.72rem'}}>— topics where no brand clearly dominates yet</span>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:16}}>
+                          Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry} — beyond what we tested.
+                          <span style={{marginLeft:6,background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem',color:'#6B7280'}}>ⓘ Est. AI platform queries/day across ChatGPT, Perplexity, Gemini & Claude</span>
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                           {highOpp.map((tq:any,i:number)=>{
-                            const trendColor = tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
-                            const trendBg = tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
-                            const cluster = getCluster(tq.category);
-                            // Always use cluster daily volume for consistency with network map
-                            const dailyV = cluster?.dailySearches ?? null;
-                            const brandWinRate = cluster?.winRate ?? null;
-                            const brandWinning = brandWinRate !== null && brandWinRate >= 40;
-                            const topComp = cluster?.topCompetitor || null;
-                            const fmtVol = (n:number) => n>=1000?`~${(n/1000).toFixed(0)}K/day`:`~${n}/day`;
-                            const isOpen = selectedCluster === `trend-${i}`;
+                            const trendColor=tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
+                            const trendBg=tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
+                            const cluster=getCluster(tq.category);
+                            const dailyV=cluster?.dailySearches??null;
+                            const brandWinRate=cluster?.winRate??null;
+                            const brandWinning=brandWinRate!==null&&brandWinRate>=40;
+                            const topComp=cluster?.topCompetitor||null;
+                            const isOpen=selectedCluster===`trend-${i}`;
                             return (
                               <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`,overflow:'hidden'}}>
-                                <div style={{padding:'12px 14px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
-                                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
-                                    <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
-                                    <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
-                                    {dailyV&&<span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#9CA3AF'}}>{fmtVol(dailyV)}</span>}
+                                <div style={{padding:'11px 13px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
+                                  <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:5,flexWrap:'wrap' as const}}>
+                                    <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 7px',fontSize:'0.62rem',fontWeight:700}}>{tq.trend==='Rising'?'↑ Rising':tq.trend==='Peak'?'◉ Peak':'→ Stable'}</span>
+                                    <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 7px',fontSize:'0.62rem',fontWeight:600}}>{tq.category}</span>
+                                    {dailyV&&<span style={{marginLeft:'auto',fontSize:'0.62rem',color:'#9CA3AF'}}>{fmtVol(dailyV)}</span>}
                                   </div>
-                                  <div style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.55,fontWeight:500,marginBottom:8}}>{tq.query}</div>
+                                  <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.5,fontWeight:500,marginBottom:6}}>{tq.query}</div>
                                   <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const}}>
-                                    {topComp&&<span style={{fontSize:'0.68rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'2px 8px',fontWeight:600}}>👑 {topComp.split(' ')[0]} leading</span>}
+                                    {topComp&&<span style={{fontSize:'0.65rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'1px 7px',fontWeight:600}}>👑 {topComp.split(' ')[0]} leading</span>}
                                     {brandWinRate!==null
-                                      ? <span style={{fontSize:'0.68rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'2px 8px'}}>{result.brand_name}: {brandWinRate}% win rate</span>
-                                      : <span style={{fontSize:'0.68rem',color:'#9CA3AF',fontStyle:'italic'}}>No data for this category yet</span>
+                                      ?<span style={{fontSize:'0.65rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win</span>
+                                      :<span style={{fontSize:'0.65rem',color:'#9CA3AF',fontStyle:'italic'}}>New category — not yet tested</span>
                                     }
-                                    <span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#6B7280'}}>{isOpen?'▲ Less':'▼ More'}</span>
+                                    <span style={{marginLeft:'auto',fontSize:'0.62rem',color:'#6B7280'}}>{isOpen?'▲':'▼'}</span>
                                   </div>
                                 </div>
                                 {isOpen&&(
-                                  <div style={{borderTop:'1px solid #E5E7EB',padding:'12px 14px',background:'white'}}>
-                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                                  <div style={{borderTop:'1px solid #E5E7EB',padding:'11px 13px',background:'white'}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginBottom:9}}>
                                       {[
                                         {label:'Currently Leading',val:topComp||'No clear leader',color:'#F59E0B'},
-                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'No data',color:brandWinning?'#10B981':'#EF4444'},
+                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'Not tested',color:brandWinning?'#10B981':'#EF4444'},
                                         {label:'AI Queries / Day',val:dailyV?fmtVol(dailyV):'Est. unavailable',color:'#7C3AED'},
                                         {label:'Trend Signal',val:tq.trend,color:trendColor},
                                       ].map((s,j)=>(
-                                        <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'8px 10px'}}>
-                                          <div style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em',marginBottom:2}}>{s.label.toUpperCase()}</div>
-                                          <div style={{fontSize:'0.88rem',fontWeight:800,color:s.color}}>{s.val}</div>
+                                        <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'7px 9px'}}>
+                                          <div style={{fontSize:'0.58rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em',marginBottom:2}}>{s.label.toUpperCase()}</div>
+                                          <div style={{fontSize:'0.85rem',fontWeight:800,color:s.color}}>{s.val}</div>
                                         </div>
                                       ))}
                                     </div>
-                                    <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6,background:'#F5F3FF',borderRadius:6,padding:'8px 10px'}}>
-                                      💡 <strong>Why this matters:</strong> {topComp?`${topComp.split(' ')[0]} currently leads this query type but hasn't locked in dominance.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is already showing strength here — invest in content to consolidate.`:` ${result.brand_name} has room to own this with targeted AI-optimized content.`):'Consider testing this topic in your next analysis.'}
+                                    <div style={{fontSize:'0.72rem',color:'#6B7280',lineHeight:1.6,background:'#F5F3FF',borderRadius:6,padding:'7px 10px'}}>
+                                      💡 {topComp?`${topComp.split(' ')[0]} currently leads this query type.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is showing strength here — invest to consolidate.`:` ${result.brand_name} has room to own this with targeted content.`):'Consider testing this category in your next analysis.'}
                                     </div>
                                   </div>
                                 )}
@@ -1926,37 +1741,6 @@ export default function GeoHub() {
                     );
                   })()}
 
-                  {/* ── CATEGORY BREAKDOWN (existing) ── */}
-                  {/* ── CATEGORY BREAKDOWN (existing) ── */}
-                  {/* FIX 3: Show product-specific category breakdown — label uses lob from URL */}
-                  <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:10}}>
-                    Appearance Rate by Category
-                    {result.lob && <span style={{marginLeft:10,background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 10px',fontSize:'0.68rem',fontWeight:700}}>{result.lob}</span>}
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:12,marginBottom:20}}>
-                    {Object.entries(catStats).map(([c,v])=><div key={c} style={{background:'white',border:'1px solid #E5E7EB',borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:'0.8rem',fontWeight:600,color:'#111827',marginBottom:7}}>{c}</div><div style={{background:'#F3F4F6',borderRadius:50,height:5,marginBottom:5,overflow:'hidden'}}><div style={{background:'#7C3AED',height:5,borderRadius:50,width:`${Math.round((v.mentioned/Math.max(v.total,1))*100)}%`}}/></div><div style={{display:'flex',justifyContent:'space-between'}}><span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{v.mentioned} of {v.total} queries</span><span style={{fontSize:'0.76rem',fontWeight:700,color:'#7C3AED'}}>{Math.round((v.mentioned/Math.max(v.total,1))*100)}%</span></div></div>)}
-                  </div>
-
-                  <div style={{display:'flex',justifyContent:'flex-end',marginBottom:8}}>
-                    <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Sorted by best rank first</div>
-                  </div>
-
-                  {/* FIX 4: Title now shows actual count, not hardcoded 50 */}
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Queries Run ({sorted.length} shown)</div></div>
-                    <select value={filterCat} onChange={e=>setFilterCat(e.target.value)} style={{border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.82rem',color:'#374151',background:'white',outline:'none'}}>{cats.map(c=><option key={c}>{c}</option>)}</select>
-                  </div>
-
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <thead><tr style={{background:'#FAFAFA'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'9px 14px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                      {/* FIX 4: No .slice(0,50) — show all sorted queries */}
-                      <tbody>{sorted.map((item:any,i:number)=>{const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned,beater=isMissed?getBeater(item):null,isTop=rp===1;return<tr key={i} style={{borderTop:'1px solid #F3F4F6',background:isTop?'#F0FDF4':isMissed?'#FFFBFB':'white'}}><td style={{padding:'12px 14px',fontSize:'0.8rem',color:'#9CA3AF',verticalAlign:'top',width:32}}>{i+1}</td><td style={{padding:'12px 14px',verticalAlign:'top'}}><div style={{display:'flex',gap:8,alignItems:'center',marginBottom:5,flexWrap:'wrap' as const}}><span style={{background:'#EDE9FE',color:'#5B21B6',borderRadius:6,padding:'2px 9px',fontSize:'0.7rem',fontWeight:600}}>{item.category}</span>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.76rem',fontWeight:600}}>✓ Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.76rem',fontWeight:600}}>✗ Not Mentioned</span>}{isMissed&&<span style={{background:'#FEE2E2',color:'#991B1B',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>⚠ Missed</span>}{isTop&&<span style={{background:'#D1FAE5',color:'#065F46',borderRadius:6,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>★ Top Rank</span>}</div><div style={{fontSize:'0.86rem',color:'#374151',fontWeight:500}}>{item.query}</div></td><td style={{padding:'12px 14px',fontSize:'1rem',fontWeight:800,color:rankColor,verticalAlign:'top',width:80}}>{rankLabel}</td><td style={{padding:'12px 14px',verticalAlign:'top',width:160}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#92400E'}}>👑 {beater} #1</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:5,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:8,padding:'3px 10px',fontSize:'0.75rem',fontWeight:700,color:'#065F46'}}>✓ You&apos;re #1</span>:<span style={{fontSize:'0.75rem',color:'#9CA3AF'}}>—</span>}</td></tr>;})}</tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })()}
 
             {activeTab===6&&(()=>{
               const geo=result.overall_geo_score,fin=result.ind_key==='fin';
