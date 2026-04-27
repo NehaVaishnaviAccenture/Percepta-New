@@ -170,10 +170,6 @@ function buildFeatureDims(
   ];
 }
 
-// Keep backward-compatible wrapper for competitor rows (no rd data)
-function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, indKey = 'gen') {
-  return buildFeatureDims(indKey, [], sent, prom, vis, cit, sov);
-
 // Ensure radar dims never all show 0 -- use actual sub-scores as minimum floor
 function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom:number, vis:number, cit:number, sov:number): {label:string,val:number}[] {
   const allZero = dims.every(d => d.val === 0);
@@ -187,6 +183,11 @@ function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom
     { label: 'Authority',     val: Math.round((cit + prom) / 2) },
   ];
 }
+
+// Keep backward-compatible wrapper for competitor rows (no rd data)
+function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, indKey = 'gen') {
+  return buildFeatureDims(indKey, [], sent, prom, vis, cit, sov);
+
 }
 
 function Tooltip({ text }: { text: string }) {
