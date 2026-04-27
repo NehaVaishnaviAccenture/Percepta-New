@@ -2393,7 +2393,7 @@ export async function POST(req: NextRequest) {
 
       const detectPrompt = `You are a brand intelligence analyst. Analyze this webpage and return ONLY valid JSON:
 {
-  "brand_name": "exact brand name",
+  "brand_name": "exact short brand name only (e.g. L'Oreal, Wegovy, Nike) -- NOT img alt text or logo descriptions",
   "industry": "one-line industry description e.g. Beauty & Personal Care, Athletic Apparel, Fast Food",
   "industry_key": "short snake_case key e.g. beauty, apparel, food",
   "competitors": ["Competitor1","Competitor2","Competitor3","Competitor4","Competitor5","Competitor6","Competitor7","Competitor8","Competitor9","Competitor10"],
@@ -2415,7 +2415,18 @@ Rules:
       } catch { detected = {}; }
 
       // Override brand if AI detected it more accurately
-      const detectedBrand = detected.brand_name || brand;
+      // Clean the detected brand name -- strip any img alt text artifacts
+      // (AI sometimes reads alt attributes from logo images)
+      const rawDetectedBrand = detected.brand_name || brand;
+      // Take only the first 30 chars max, strip anything after repeated patterns
+      const detectedBrand = rawDetectedBrand
+        .replace(/([A-Za-z][a-z']+).*\1.*/,'$1') // remove repeated words (alt text pattern)
+        .replace(/Logo.*$/i,'')  // strip "Logo", "LogoAlt" etc
+        .replace(/Alt.*$/i,'')   // strip "Alt" suffixes
+        .replace(/Main.*$/i,'')  // strip "Main" suffixes
+        .trim()
+        .slice(0, 40)
+        || brand;
       dynamicCompetitors = detected.competitors || [];
 
       // Generate 100 dynamic queries across the detected categories
@@ -3317,7 +3328,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1) opportunity levels. No br
     });
 
     return NextResponse.json({
-      brand_name: brand,
+      brand_name: isDynamic ? detectedBrand : brand,
       industry: ind.name,
       ind_key: indKey,
       lob: lobLabel,
