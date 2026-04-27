@@ -1107,11 +1107,11 @@ export default function GeoHub() {
             const steps = [
               {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata'},
               {icon:'🤖', label:'Launching AI queries', detail:'Firing all query batches simultaneously across product categories'},
-              {icon:'💳', label:'Running General Consumer queries', detail:'10 broad brand awareness questions'},
-              {icon:'💰', label:'Running category-specific queries', detail:'Cash Back  .  Travel & Rewards  .  Credit Building'},
-              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all 100 AI responses for ${displayName} references`},
+              {icon:'💳', label:'Running consumer queries', detail:'Broad brand awareness and discovery questions'},
+              {icon:'💰', label:'Running category-specific queries', detail:'Product-specific purchase intent questions'},
+              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all AI responses for ${displayName} references`},
               {icon:'📊', label:'Scoring sentiment & prominence', detail:'Analysing tone and position in each response'},
-              {icon:'🏆', label:'Benchmarking competitors', detail:'Scoring Chase  .  Amex  .  Citi  .  Discover and 6 others'},
+              {icon:'🏆', label:'Benchmarking competitors', detail:'Scoring top competitors across all signals'},
               {icon:'🔗', label:'Building citation network', detail:'Mapping sources and share of voice'},
               {icon:'*', label:'Calculating GEO Score', detail:'Applying weighted formula across all signals'},
             ];
