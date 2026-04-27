@@ -2433,14 +2433,14 @@ Rules:
       const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
       // Ensure exactly 10 categories for even distribution
       const cats10 = cats.slice(0, 10).length === 10 ? cats.slice(0, 10) : [...cats.slice(0, 10), ...Array(10 - cats.slice(0,10).length).fill('General')];
-      const queryGenPrompt = `Generate exactly 250 consumer questions that someone would ask an AI when researching products in the ${detected.industry || 'consumer goods'} industry in the USA.
+      const queryGenPrompt = `Generate exactly 100 consumer questions that someone would ask an AI when researching products in the ${detected.industry || 'consumer goods'} industry in the USA.
 
 Rules:
 - NO brand names in any query -- all questions must be generic consumer questions
-- Distribute EXACTLY 25 questions per category across these 10 categories: ${cats10.join(', ')}
+- Distribute EXACTLY 10 questions per category across these 10 categories: ${cats10.join(', ')}
 - Questions should reflect real product purchase decision intent
 - Return ONLY a valid JSON array, no markdown: [{"category":"CategoryName","query":"question text"}, ...]
-- EXACTLY 250 items total, 25 per category, no more no less`;
+- EXACTLY 100 items total, 10 per category, no more no less`;
 
       let dynamicQueries: string[][] = [];
       try {
@@ -2450,7 +2450,7 @@ Rules:
       } catch { 
         // Fallback: generate simpler queries if parsing fails
         dynamicQueries = cats10.flatMap((cat:string) => 
-          Array.from({length:25}, (_:any, i:number) => [cat, `What should consumers know about ${cat.toLowerCase()} when making a purchase decision? (${i+1})`])
+          Array.from({length:10}, (_:any, i:number) => [cat, `What should consumers know about ${cat.toLowerCase()} when making a purchase decision? (${i+1})`])
         );
       }
 
@@ -2484,7 +2484,7 @@ Rules:
       const brandCtx = isDynamic ? ` The brand being analyzed is ${brand} but do not favour it -- mention it only if genuinely relevant.` : '';
       const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.${brandCtx}\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
       let bt = '';
-      try { bt = await callAI([{ role: 'user', content: prompt }], 0.7, 4096); } catch {}
+      try { bt = await callAI([{ role: 'user', content: prompt }], 0.5, 2048); } catch {}
       batch.forEach((q, j) => {
         const marker = `A${j + 1}:`;
         const nextMarker = `A${j + 2}:`;
@@ -2925,28 +2925,55 @@ Return ONLY valid JSON, no markdown:
       position: getBrandPosition(p.a || '', brand),
     }));
 
+    // ── Run citation + trending in parallel for speed ──
     let citationSources: any[] = [];
-    try {
-      // Get the brand's actual domain for owned media classification
-      const brandDomain = inputHostname;
-      const industryCtx = isDynamic
-        ? `${brand} is a ${ind.name} brand. The brand's own domain is ${brandDomain}.`
-        : `${brand} in ${ind.name}. The brand's own domain is ${brandDomain}.`;
-      const cp = `${industryCtx}
+    let trendingQueriesParallel: any[] = [];
+
+    const brandDomainForCit = inputHostname;
+    const industryCtxForCit = isDynamic
+      ? `${detectedBrand} is a ${ind.name} brand. The brand's own domain is ${brandDomainForCit}.`
+      : `${brand} in ${ind.name}. The brand's own domain is ${brandDomainForCit}.`;
+    const cpParallel = `${industryCtxForCit}
 
 List exactly 10 real domains that AI models actually cite when answering consumer questions about ${brand} and its product category (${ind.name}).
 
 Rules:
-- First entry MUST be ${brandDomain} classified as "Owned Media" with citation_share 10-15%
+- First entry MUST be ${brandDomainForCit} classified as "Owned Media" with citation_share 10-15%
 - All other domains must be GENUINELY relevant to ${ind.name} -- no financial sites for beauty brands, no beauty sites for tech brands
 - Use realistic citation share: top third-party 3-5%, others 1-3%
 - Classify each: Social / Institution / Earned Media / Owned Media / Other
 
 Return ONLY valid JSON array, no markdown:
-[{"rank":1,"domain":"${brandDomain}","category":"Owned Media","citation_share":12,"top_pages":["/products","/about","/faq"]}]
+[{"rank":1,"domain":"${brandDomainForCit}","category":"Owned Media","citation_share":12,"top_pages":["/products","/about","/faq"]}]
 Exactly 10 items. All domains must be real and relevant to ${ind.name} specifically.`;
-      const cr = await callAI([{ role: 'user', content: cp }], 0.1, 800);
-      citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
+
+    const trendPromptParallel = `You are a GEO analyst. List exactly 10 high-intent questions that consumers are actively asking AI models RIGHT NOW in 2025 about ${ind.name}. These should be GENERIC -- do not mention any specific brand name in the queries.
+
+These should reflect real consumer decision moments and product comparison intent. For each query also estimate:
+- trend: "Rising" | "Peak" | "Stable"
+- opportunity: "High" | "Medium" | "Low"
+- category: the product feature this relates to
+- estimated_daily_searches: realistic estimate per day (number only)
+
+Return ONLY valid JSON array, no markdown:
+[{"query":"...","trend":"Rising","opportunity":"High","category":"Cash Back","estimated_daily_searches":8200}]
+Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
+
+    const [citRaw, trendRawP] = await Promise.allSettled([
+      callAI([{ role: 'user', content: cpParallel }], 0.1, 800),
+      callAI([{ role: 'user', content: trendPromptParallel }], 0.4, 1000),
+    ]);
+
+    try {
+      if (citRaw.status === 'fulfilled') {
+        citationSources = JSON.parse(citRaw.value.replace('```json','').replace('```','').trim());
+      }
+    } catch {}
+
+    try {
+      if (trendRawP.status === 'fulfilled') {
+        trendingQueriesParallel = JSON.parse(trendRawP.value.replace('```json','').replace('```','').trim());
+      }
     } catch {}
 
     // For dynamic industries, score competitors from actual allQA response text
@@ -3215,23 +3242,8 @@ Exactly 10 items. All domains must be real and relevant to ${ind.name} specifica
         : Math.min(s.citation_share, 5),
     }));
 
-    // ── TRENDING QUERIES: what people are asking AI right now (beyond what we tested) ──
-    let trendingQueries: any[] = [];
-    try {
-      const trendPrompt = `You are a GEO analyst. List exactly 10 high-intent questions that consumers are actively asking AI models RIGHT NOW in 2025 about ${ind.name}. These should be GENERIC -- do not mention any specific brand name in the queries.
-
-These should reflect real consumer decision moments and product comparison intent. For each query also estimate:
-- trend: "Rising" | "Peak" | "Stable" (based on 2025 consumer behavior)
-- opportunity: "High" | "Medium" | "Low" (how much whitespace exists -- High means no brand dominates this query yet)
-- category: the product feature this relates to (e.g. "Cash Back", "Travel Benefits", "Fees & APR", "Rewards")
-- estimated_daily_searches: realistic estimate of how many times this type of query is asked across AI platforms per day (number only, e.g. 8200)
-
-Return ONLY valid JSON array, no markdown, no brand names in queries:
-[{"query":"...","trend":"Rising","opportunity":"High","category":"Cash Back","estimated_daily_searches":8200}]
-Exactly 10 items. Mix of High (6), Medium (3), Low (1) opportunity levels. No brand names in the query text.`;
-      const trendRaw = await callAI([{ role: 'user', content: trendPrompt }], 0.4, 1000);
-      trendingQueries = JSON.parse(trendRaw.replace('```json','').replace('```','').trim());
-    } catch { trendingQueries = []; }
+    // Trending queries computed in parallel above
+    const trendingQueries: any[] = trendingQueriesParallel;
 
     // ── QUERY CLUSTERS: compute category relationships + winner + daily search estimate ──
     // Daily search volume estimates per category type (AI platform queries/day across all users)
