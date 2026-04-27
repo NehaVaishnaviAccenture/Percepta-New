@@ -607,7 +607,7 @@ function GeoSummary({ result }: { result:any }) {
                           <div style={{display:'inline-flex',flexDirection:'column' as const,alignItems:'center',gap:3,background:'#F0FDF4',border:'1px solid #6EE7B7',borderRadius:10,padding:'8px 12px'}}>
                             <div style={{display:'flex',alignItems:'center',gap:5}}>
                               <span style={{fontSize:'0.88rem',fontWeight:700,color:'#9CA3AF'}}>{rec.scoreNow}</span>
-                              <span style={{color:'#9CA3AF'}}>{'->'}}</span>
+                              <span style={{color:'#9CA3AF'}}>-&gt;</span>
                               <span style={{fontSize:'1.15rem',fontWeight:900,color:'#10B981'}}>{rec.scoreForecast}</span>
                             </div>
                             {delta>0&&<span style={{fontSize:'0.65rem',fontWeight:800,color:'#10B981',background:'#D1FAE5',borderRadius:50,padding:'1px 7px'}}>+{delta} pts</span>}
