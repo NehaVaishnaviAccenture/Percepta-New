@@ -2381,6 +2381,7 @@ export async function POST(req: NextRequest) {
     // ── DYNAMIC FALLBACK: if still 'gen', use AI to detect brand/industry/competitors/queries ──
     let dynamicCompetitors: string[] = [];
     let isDynamic = false;
+    let detectedBrand = brand; // will be overridden for dynamic brands
 
     if (indKey === 'gen') {
       isDynamic = true;
@@ -2416,10 +2417,9 @@ Rules:
 
       // Override brand if AI detected it more accurately
       // Clean the detected brand name -- strip any img alt text artifacts
-      // (AI sometimes reads alt attributes from logo images)
       const rawDetectedBrand = detected.brand_name || brand;
       // Take only the first 30 chars max, strip anything after repeated patterns
-      const detectedBrand = rawDetectedBrand
+      detectedBrand = rawDetectedBrand
         .replace(/([A-Za-z][a-z']+).*\1.*/,'$1') // remove repeated words (alt text pattern)
         .replace(/Logo.*$/i,'')  // strip "Logo", "LogoAlt" etc
         .replace(/Alt.*$/i,'')   // strip "Alt" suffixes
