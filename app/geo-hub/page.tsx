@@ -1074,7 +1074,7 @@ export default function GeoHub() {
           <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* &nbsp;Real Time GEO Scoring</div>
           <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
           <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL  .  Discover your brand&apos;s AI presence</p>
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>(T) &nbsp;Live data  .  Updated in real-time  .  Not cached like competitors</div>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>Live data  .  Updated in real-time  .  Not cached like competitors</div>
         </>}
         {(loading||result)&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -1082,7 +1082,7 @@ export default function GeoHub() {
             <span style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.7)',background:'rgba(255,255,255,0.15)',borderRadius:50,padding:'3px 10px'}}>Real Time GEO Scoring</span>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.7)'}}>(T) Live data</span>
+            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.7)'}}>Live data</span>
           </div>
         </div>}
       </div>
@@ -1200,16 +1200,14 @@ export default function GeoHub() {
               const rawSent = result.sentiment;
               const prom = result.prominence;
               const sov = result.share_of_voice;
-              // Use same rank logic as Competitors tab -- position in GEO-sorted array
-              // This ensures GEO Score tab and Competitors tab always agree
+              // Compute rank consistently: position in GEO-sorted array including self
+              // Same logic used in Competitors tab so both tabs always agree
               const _allBrands = [{GEO:geo, isYou:true}, ...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
               const _myPos = _allBrands.findIndex((b:any)=>b.isYou);
-              const _computedRank = _myPos >= 0 && _myPos < 5 ? _myPos + 1 : null;
-              // For hardcoded brands avg_rank exists and is reliable -- use it
-              // For dynamic brands (no tier data) fall back to computed position
-              const avgRank = result.avg_rank && result.avg_rank !== 0
-                ? result.avg_rank
-                : _computedRank ?? result.avg_rank;
+              const _computedRank = _myPos >= 0 ? _myPos + 1 : null;
+              // Always use computed rank (sequential, no duplicates, matches Competitors tab)
+              // Fall back to API avg_rank only if computation fails
+              const avgRank = _computedRank ?? result.avg_rank;
               const badge = scoreBadge(geo);
               const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
               return (
