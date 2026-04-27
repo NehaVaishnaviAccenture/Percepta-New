@@ -466,11 +466,11 @@ function GeoSummary({ result }: { result:any }) {
       '  "agenticFlag": null OR one short sentence on application/data/approval readiness (recommendations only) }',
       'Brand: '+result.brand_name,
       lobContext,
-      'Industry: '+result.ind_label,
+      'Industry: '+(result.ind_label||result.industry||result.lob||'Consumer Products'),
       'GEO: '+String(geo)+' | Vis: '+String(vis)+' | Sent: '+String(sent)+' | Cit: '+String(cit)+' | SOV: '+String(sov)+' | Prom: '+String(prom),
       'Top Competitor: '+topComp+' (GEO: '+String(topCompGEO)+')',
       oppBreakdown,
-      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Visibility Gap and Content Gap insights tied to the '+String(lossCount)+' lost queries. NEVER recommend comparison pages against competitors. Return ONLY valid JSON no markdown.',
+      'CRITICAL: Exactly 5 insights then 5 recommendations. Sort HIGH to MEDIUM to LOW. Include Visibility Gap and Content Gap insights tied to the '+String(lossCount)+' lost queries. NEVER recommend comparison pages against competitors. If GEO score is below 20, this brand is not yet appearing in AI responses -- focus insights on baseline establishment and content creation. Return ONLY valid JSON no markdown.',
     ].join('\n');
 
     fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})})
@@ -753,10 +753,10 @@ function MarkdownText({ text }: { text:string }) {
       while (i < lines.length) {
         const l = lines[i];
         const lt = l.trim();
-        if (!/^[-**[ok](ok)[ok][ok]👉📌🔑💡⚡🎯]\s/.test(lt) && !/^\s{0,3}[-**]\s/.test(l)) break;
+        if (!/^[-**[ok](ok)[ok][ok]👉📌🔑💡!🎯]\s/.test(lt) && !/^\s{0,3}[-**]\s/.test(l)) break;
         const isIndented = /^\s{4,}/.test(l);
-        const content = lt.replace(/^[-**[ok](ok)[ok][ok]👉📌🔑💡⚡🎯]\s/, '');
-        const emojiMatch = lt.match(/^([[ok](ok)[ok][ok]👉📌🔑💡⚡🎯])\s/);
+        const content = lt.replace(/^[-**[ok](ok)[ok][ok]👉📌🔑💡!🎯]\s/, '');
+        const emojiMatch = lt.match(/^([[ok](ok)[ok][ok]👉📌🔑💡!🎯])\s/);
         const bullet = emojiMatch ? emojiMatch[1] : '*';
         const bulletColor = emojiMatch ? 'inherit' : '#7C3AED';
         items.push(
@@ -866,7 +866,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
   const raw=[
     {label:brand, x:vis, y:sent, cit:cit, isYou:true, isTopComp:false},
     // FIX 1: isTopComp is determined by highest GEO score (already sorted), not hardcoded
-    ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis, y:c.Sen??c.Sent??0, cit:c.Cit??30, isYou:false, isTopComp:c.Brand===topCompBrand}))
+    ...top20.map((c,ci)=>({label:c.Brand, x:c.Vis||0, y:c.Sen??c.Sent??c.Sentiment??c.sentiment??0, cit:c.Cit??c.Citations??30, isYou:false, isTopComp:c.Brand===topCompBrand}))
   ];
 
   const all = raw.map((a,i)=>{
@@ -980,10 +980,10 @@ Order: High first, then Medium, then Low.`;
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{color:'#F59E0B',fontSize:'1.1rem'}}>⚡</span><span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions -- Implementable</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{color:'#F59E0B',fontSize:'1.1rem'}}>!</span><span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions -- Implementable</span></div>
       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:24}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
       {loading?<div style={{display:'flex',alignItems:'center',gap:10,padding:'24px 0',color:'#9CA3AF',fontSize:'0.85rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Generating...<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>
-      :actions.length===0?<div style={{fontSize:'0.84rem',color:'#9CA3AF'}}>No actions generated.</div>
+      :actions.length===0?<div style={{fontSize:'0.84rem',color:'#9CA3AF',padding:'12px 0'}}>Generating recommendations... if this persists, try re-running the analysis.</div>
       :<table style={{width:'100%',borderCollapse:'collapse'}}>
         <thead><tr>{['PRIORITY','SEGMENT','TYPE','ACTION TO TAKE','DELIVERABLE'].map(h=><th key={h} style={{padding:'8px 16px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.08em',borderBottom:'1px solid #F3F4F6'}}>{h}</th>)}</tr></thead>
         <tbody>{actions.map((a,i)=>{const s=ps(a.priority);return<tr key={i} style={{borderBottom:'1px solid #F3F4F6',background:i%2===0?'#FAFAFA':'white'}}><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{background:s.bg,color:s.color,borderRadius:50,padding:'3px 12px',fontSize:'0.75rem',fontWeight:700}}>{a.priority}</span></td><td style={{padding:'18px 16px',verticalAlign:'top'}}><span style={{fontSize:'0.84rem',fontWeight:600,color:'#7C3AED'}}>{a.segment}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.82rem',color:'#374151'}}>{a.type}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',maxWidth:420}}><span style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.65}}>{a.action}</span></td><td style={{padding:'18px 16px',verticalAlign:'top',whiteSpace:'nowrap' as const}}><span style={{fontSize:'0.84rem',fontWeight:700,color:'#7C3AED'}}>{a.deliverable}</span></td></tr>;})}</tbody>
@@ -1068,18 +1068,30 @@ export default function GeoHub() {
 
   return (
     <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
-      <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:'64px 40px 72px',textAlign:'center'}}>
-        <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* &nbsp;Real Time GEO Scoring</div>
-        <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
-        <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL  .  Discover your brand&apos;s AI presence</p>
-        <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>⏱ &nbsp;Live data  .  Updated in real-time  .  Not cached like competitors</div>
+      {/* Compact header when loading or result shown, full hero when idle */}
+      <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:(loading||result)?'16px 40px':'64px 40px 72px',textAlign:'center',transition:'padding 0.3s ease'}}>
+        {!(loading||result)&&<>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* &nbsp;Real Time GEO Scoring</div>
+          <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
+          <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL  .  Discover your brand&apos;s AI presence</p>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>(T) &nbsp;Live data  .  Updated in real-time  .  Not cached like competitors</div>
+        </>}
+        {(loading||result)&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:'1.3rem',fontWeight:900,color:'white',letterSpacing:'-0.5px'}}>GEO Scorecard</span>
+            <span style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.7)',background:'rgba(255,255,255,0.15)',borderRadius:50,padding:'3px 10px'}}>Real Time GEO Scoring</span>
+          </div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.7)'}}>(T) Live data</span>
+          </div>
+        </div>}
       </div>
 
       {!result?(
-        <div style={{padding:'48px 40px 60px'}}>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:24}}>
+        <div style={{padding: loading ? '16px 40px' : '48px 40px 60px'}}>
+          {!loading && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:24}}>
             {bands.map((b,i)=><div key={i} style={{background:b.bg,borderRadius:20,padding:'36px 28px',textAlign:'center',border:`1.5px solid ${b.border}`}}><div style={{fontSize:'0.85rem',fontWeight:700,color:b.color,marginBottom:8}}>{b.range}</div><div style={{fontSize:'1.8rem',fontWeight:900,color:b.color,marginBottom:8}}>{b.label}</div><div style={{fontSize:'0.85rem',color:b.color,lineHeight:1.5}}>{b.desc}</div></div>)}
-          </div>
+          </div>}
           <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -1409,14 +1421,19 @@ export default function GeoHub() {
                 return knownSources.map(s => ({ domain: s.domain, citation_share: s.share }));
               })();
               const brandDomain = result.domain || '';
-              if (brandDomain) { catMap['Owned Media'] = 15; }
+              // No longer pre-seed catMap with 15 -- derive entirely from real source data
               allSourcesToClassify.forEach((s:any) => {
                 const d = (s.domain||'').toLowerCase();
-                const isOwned = brandDomain && d.includes(brandDomain.replace('www.','').split('.')[0]);
+                const isOwned = brandDomain && d.includes(brandDomain.replace('www.','').split('.')[0].toLowerCase());
                 const cat = isOwned ? 'Owned Media' : classifyDomain(d).label;
                 catMap[cat] = (catMap[cat]||0) + (s.citation_share||0);
               });
-              Object.keys(catMap).forEach(k=>{ catMap[k]=Math.min(Math.round(catMap[k]),100); });
+              // Cap owned at 15%, others at 5%, round all
+              Object.keys(catMap).forEach(k=>{
+                catMap[k] = k==='Owned Media'
+                  ? Math.min(Math.round(catMap[k]), 15)
+                  : Math.min(Math.round(catMap[k]), 50);
+              });
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED','Other':'#6B7280','Social':'#F59E0B','Institution':'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
               const DOMAIN_ALIASES: Record<string,string> = {
@@ -1854,7 +1871,7 @@ export default function GeoHub() {
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
                   <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:14}}>Which audience segments is your brand winning vs. losing in AI responses?</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>{segments.map((s,i)=><div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span><span style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span></div><div style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div><div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong> &nbsp; . &nbsp; Dominated by: {s.dominated}</div></div>)}</div>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>⚡</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>GEO Health Summary</span></div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>!</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>GEO Health Summary</span></div>
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Based on how your brand performed across AI queries.</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:24}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>(ok) What is Working Well</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>(ok)</span><span>{s}</span></li>)}</ul></div>
