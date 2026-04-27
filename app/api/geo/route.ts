@@ -2305,7 +2305,24 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
   const avgPos = positions.length ? positions.reduce((a, b) => a + b, 0) / positions.length : 3.5;
   const cp = Math.round(Math.max(10, Math.min(85, 95 - (avgPos - 1) * 15)));
   const cc = Math.round(Math.min(85, cv * 0.65 + cp * 0.25 + (mentions > 0 ? 5 : 0)));
-  const cs = Math.round(Math.min(88, 45 + (mentions > 0 ? 20 : 0) + cp * 0.25));
+  // Sentiment: scan responses for positive vs negative language about this competitor
+  const posWords = ['best','top','recommended','leading','excellent','great','trusted','popular','effective','strong'];
+  const negWords = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing','inferior'];
+  let posCount = 0, negCount = 0;
+  mentionedResponses.forEach(r => {
+    const text = (r.response_preview || r.response || '').toLowerCase();
+    // Only score sentiment in sentences containing the brand name
+    const sentences = text.split(/[.!?]/).filter((s:string) => terms.some((t:string) => s.includes(t)));
+    sentences.forEach((s:string) => {
+      posWords.forEach(w => { if(s.includes(w)) posCount++; });
+      negWords.forEach(w => { if(s.includes(w)) negCount++; });
+    });
+  });
+  const sentBase = mentions > 0 ? 50 : 30;
+  const sentAdj = posCount > 0 || negCount > 0
+    ? Math.round(((posCount - negCount) / Math.max(posCount + negCount, 1)) * 30)
+    : 0;
+  const cs = Math.round(Math.min(90, Math.max(20, sentBase + sentAdj + cp * 0.15)));
   const csov = Math.round(Math.min(80, cv * 0.75 + (mentions > 0 ? 8 : 0)));
   const geo = Math.round(cv * 0.30 + cs * 0.20 + cp * 0.20 + cc * 0.15 + csov * 0.15);
   const avgRank = positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
@@ -2921,11 +2938,56 @@ Exactly 10 items. All domains must be real and relevant to ${ind.name} specifica
       citationSources = JSON.parse(cr.replace('```json','').replace('```','').trim());
     } catch {}
 
-    // For dynamic industries, use AI-detected competitors scored from real query responses
+    // For dynamic industries, score competitors from actual allQA response text
     const compSource = isDynamic ? dynamicCompetitors : ind.comps;
+
+    // Build a flat array of all QA pairs with full response text for competitor scanning
+    const allQAFlat = allQA.filter(Boolean);
+
     let competitors = compSource
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
+        if (isDynamic) {
+          // Score from real allQA responses — count mentions, position, sentiment
+          const cLower = c.toLowerCase();
+          const cWords = cLower.split(' ').filter((w:string) => w.length > 2);
+          const mentionedQAs = allQAFlat.filter((qa:any) => {
+            const text = (qa.a || '').toLowerCase();
+            return cWords.some((w:string) => text.includes(w)) ||
+                   text.includes(cLower);
+          });
+          const total = allQAFlat.length || 1;
+          const mentions = mentionedQAs.length;
+          const mentionRate = Math.round((mentions / total) * 100);
+          // Visibility: how often competitor appears across all queries
+          const cv = Math.round(Math.min(90, mentionRate * 1.2));
+          // Position: where they appear in responses
+          const positions = mentionedQAs.map((qa:any) => getBrandPosition(qa.a || '', c)).filter((p:number) => p > 0);
+          const avgPos = positions.length ? positions.reduce((a:number,b:number) => a+b, 0) / positions.length : 4;
+          const cp = Math.round(Math.max(10, Math.min(85, 95 - (avgPos-1)*15)));
+          // Citations: rough proxy from mention rate
+          const cc = Math.round(Math.min(80, cv * 0.6 + cp * 0.2));
+          // Sentiment: scan for positive/negative words near competitor name
+          const posWords = ['best','top','recommended','leading','excellent','great','effective','popular'];
+          const negWords = ['worst','poor','avoid','expensive','limited','disappointing'];
+          let pos = 0, neg = 0;
+          mentionedQAs.forEach((qa:any) => {
+            const text = (qa.a || '').toLowerCase();
+            const sents = text.split(/[.!?]/).filter((s:string) => s.includes(cLower) || cWords.some((w:string) => s.includes(w)));
+            sents.forEach((s:string) => {
+              posWords.forEach(w => { if(s.includes(w)) pos++; });
+              negWords.forEach(w => { if(s.includes(w)) neg++; });
+            });
+          });
+          const sentBase = mentions > 0 ? 50 : 30;
+          const sentAdj = pos > 0 || neg > 0 ? Math.round(((pos-neg)/Math.max(pos+neg,1))*30) : 0;
+          const cs = Math.round(Math.min(90, Math.max(20, sentBase + sentAdj + cp*0.15)));
+          const csov = Math.round(Math.min(75, cv * 0.7));
+          const geo = Math.round(cv*0.30 + cs*0.20 + cp*0.20 + cc*0.15 + csov*0.15);
+          const avgRank = positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
+          return { Brand: c, GEO: geo, Vis: cv, Cit: cc, Sen: cs, Sov: csov, Prom: cp, Rank: avgRank,
+                   URL: `${c.toLowerCase().replace(/ /g,'')}.com` };
+        }
         const s = scoreCompetitor(c, responsesDetail, ind.awareness || {});
         return { ...s, URL: ind.compUrls?.[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
