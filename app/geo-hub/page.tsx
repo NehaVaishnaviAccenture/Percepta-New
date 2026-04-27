@@ -1094,7 +1094,7 @@ export default function GeoHub() {
             const displayName = brandName.charAt(0).toUpperCase()+brandName.slice(1);
             const steps = [
               {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata'},
-              {icon:'🤖', label:'Launching 100 AI queries', detail:'Firing all query batches simultaneously across 5 categories'},
+              {icon:'🤖', label:'Launching AI queries', detail:'Firing all query batches simultaneously across product categories'},
               {icon:'💳', label:'Running General Consumer queries', detail:'10 broad brand awareness questions'},
               {icon:'💰', label:'Running category-specific queries', detail:'Cash Back  .  Travel & Rewards  .  Credit Building'},
               {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all 100 AI responses for ${displayName} references`},
@@ -1798,6 +1798,11 @@ export default function GeoHub() {
 
               // Category name -> segment definition map
               // Each segment maps one or more query categories from responses_detail
+              // For fin: use hardcoded product-based segment definitions
+              // For any other brand: derive segments dynamically from actual rd categories
+              const topComp1 = (result.competitors||[])[0]?.Brand || 'Top Competitor';
+              const topComp2 = (result.competitors||[])[1]?.Brand || 'Competitor';
+
               const SEG_DEFS = fin ? [
                 { name:'General Consumers',  cats:['General Consumer'],                dominated:'Chase, Citi',                   dominated2:'Amex, Chase' },
                 { name:'Travelers / Rewards', cats:['Travel & Rewards'],                dominated:'Amex, Chase',                   dominated2:'Chase Sapphire' },
@@ -1805,14 +1810,16 @@ export default function GeoHub() {
                 { name:'Credit Builders',     cats:['Credit Building','Approval & Credit'], dominated:'Discover, Capital One',     dominated2:'Secured cards' },
                 { name:'Expert / Premium',    cats:['Expert Recommendation','Premium Cards','Card Benefits'], dominated:'Amex, Chase Sapphire', dominated2:'Amex' },
                 { name:'Small Business',      cats:['Comparison','Interest & Fees'],    dominated:'Amex, Chase Ink',               dominated2:'Chase' },
-              ] : [
-                { name:'General Consumers',  cats:['General Consumer','General Banking','General'], dominated:'Top Competitors', dominated2:'Industry Leaders' },
-                { name:'Expert Seekers',     cats:['Expert Recommendation','Expert'],               dominated:'Industry Leaders', dominated2:'Top Brands' },
-                { name:'Premium Segment',    cats:['Premium','Luxury','Investment','Wealth'],        dominated:'Competitors',     dominated2:'Top Brands' },
-                { name:'Digital Users',      cats:['Digital & Mobile','Digital Experience'],         dominated:'Top Competitors', dominated2:'Leaders' },
-                { name:'Value Seekers',      cats:['Value','No Fees & Access','Flat Rate'],          dominated:'Top Competitors', dominated2:'Leaders' },
-                { name:'Savers',             cats:['Savings Accounts','CD Accounts','High Yield'],   dominated:'Ally, Marcus',    dominated2:'Online banks' },
-              ];
+              ] : (()=>{
+                // Dynamically build segments from actual query categories in responses_detail
+                const uniqueCats = [...new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c)))];
+                return uniqueCats.map((cat:string) => ({
+                  name: cat,
+                  cats: [cat],
+                  dominated: topComp1,
+                  dominated2: topComp2,
+                }));
+              })();
 
               const segRate = (cats: string[]) => {
                 const rows = rd.filter((r:any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
