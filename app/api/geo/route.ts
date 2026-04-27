@@ -2449,8 +2449,21 @@ Rules:
         dynamicQueries = parsed.map((q: any) => [q.category, q.query]);
       } catch { 
         // Fallback: generate simpler queries if parsing fails
+        // Better fallback: varied question templates without numbering
+        const FALLBACK_TEMPLATES = [
+          (c:string) => `What is the best ${c.toLowerCase()} product available right now?`,
+          (c:string) => `How do I choose the right ${c.toLowerCase()}?`,
+          (c:string) => `What are the top-rated ${c.toLowerCase()} brands?`,
+          (c:string) => `What should I look for when buying ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} brand is most recommended?`,
+          (c:string) => `What are the pros and cons of different ${c.toLowerCase()} options?`,
+          (c:string) => `How much should I spend on ${c.toLowerCase()}?`,
+          (c:string) => `What makes a good ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for beginners?`,
+          (c:string) => `What do experts recommend for ${c.toLowerCase()}?`,
+        ];
         dynamicQueries = cats10.flatMap((cat:string) => 
-          Array.from({length:10}, (_:any, i:number) => [cat, `What should consumers know about ${cat.toLowerCase()} when making a purchase decision? (${i+1})`])
+          FALLBACK_TEMPLATES.map((fn:Function) => [cat, fn(cat)])
         );
       }
 
@@ -2494,7 +2507,24 @@ Rules:
           const e = bt.includes(nextMarker) ? bt.indexOf(nextMarker) : bt.length;
           ans = bt.slice(s, e).trim();
         }
-        allQA[batchIdx * BATCH_SIZE + j] = { category: q[0], q: q[1], a: ans || '' };
+        // Detect which competitor won this query (appeared first)
+        const respText = (ans || '').toLowerCase();
+        const qCompetitors = isDynamic ? dynamicCompetitors : (ind.comps || []);
+        let winnerBrand = '';
+        let winnerPos = Infinity;
+        qCompetitors.slice(0,10).forEach((comp:string) => {
+          const compL = comp.toLowerCase();
+          const compWords = compL.split(' ').filter((w:string) => w.length > 2);
+          const idx2 = compWords.reduce((best:number, w:string) => {
+            const pos = respText.indexOf(w);
+            return pos >= 0 && pos < best ? pos : best;
+          }, Infinity);
+          if (idx2 < winnerPos && idx2 < Infinity) {
+            winnerPos = idx2;
+            winnerBrand = comp;
+          }
+        });
+        allQA[batchIdx * BATCH_SIZE + j] = { category: q[0], q: q[1], a: ans || '', winner_brand: winnerBrand || null };
       });
     }));
 
