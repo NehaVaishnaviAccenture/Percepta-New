@@ -1164,7 +1164,7 @@ export default function GeoHub() {
                 <div style={{display:'flex',flexDirection:'column' as const,gap:8,marginBottom:24}}>
                   {completedSteps.map((s,i)=>(
                     <div key={i} style={{display:'flex',alignItems:'center',gap:10,opacity:0.7}}>
-                      <div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>+</div>
+                      <div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>ok</div>
                       <span style={{fontSize:'0.82rem',color:'#6B7280'}}>{s.label}</span>
                     </div>
                   ))}
@@ -1703,7 +1703,8 @@ export default function GeoHub() {
                           <tbody>{pageRows.map((item:any,i:number)=>{
                             const globalIdx = (safePage-1)*ROWS_PER_PAGE + i + 1;
                             const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
-                            const beater=isMissed&&item.winner_brand?item.winner_brand:null;
+                            // Show who beat brand: if missed show winner, if appeared but not #1 also show winner
+                            const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
                             return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
                               <td style={{padding:'9px 12px',fontSize:'0.75rem',color:'#9CA3AF',width:28}}>{globalIdx}</td>
                               <td style={{padding:'9px 12px'}}>
