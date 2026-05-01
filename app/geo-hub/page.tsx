@@ -1879,16 +1879,39 @@ export default function GeoHub() {
               };
 
               // 3-tier thresholds matching Prompts tab bubble colors
-              const WIN_THRESHOLD = 60;      // >=60% = Winning (green)
-              const EMERGING_THRESHOLD = 30; // 30-59% = Emerging (amber)
+              const WIN_THRESHOLD = 60;      // >=60% Winning -- same as Prompts bubble
+              const EMERGING_THRESHOLD = 30; // 30-59% Emerging -- same as Prompts bubble
 
-              const segments = SEG_DEFS.map(def => {
-                const rate = segRate(def.cats);
-                // If no query data for this category, skip it (return null to filter out)
+              // Single source of truth: use query_clusters winRate
+              // This guarantees Prompts network and Recommendations always show identical numbers
+              const getClusterRate = (cats: string[]): number | null => {
+                for (const cat of cats) {
+                  const cluster = clusters.find((c:any) => c.category === cat);
+                  if (cluster) return cluster.winRate;
+                  const fuzzy = clusters.find((c:any) =>
+                    c.category.toLowerCase().includes(cat.toLowerCase()) ||
+                    cat.toLowerCase().includes(c.category.toLowerCase())
+                  );
+                  if (fuzzy) return fuzzy.winRate;
+                }
+                return segRate(cats); // fallback to rd if no cluster
+              };
+
+              const getClusterComp = (cats: string[]): string => {
+                for (const cat of cats) {
+                  const cluster = clusters.find((c:any) => c.category === cat);
+                  if (cluster?.topCompetitor) return cluster.topCompetitor;
+                }
+                return '';
+              };
+
+              const segments = SEG_DEFS.map((def:any) => {
+                const rate = getClusterRate(def.cats);
                 if (rate === null) return null;
                 const isWinning = rate >= WIN_THRESHOLD;
                 const isEmerging = !isWinning && rate >= EMERGING_THRESHOLD;
                 const status = isWinning ? 'Winning' : isEmerging ? 'Emerging' : 'Gap';
+                const topComp = getClusterComp(def.cats);
                 return {
                   name: def.name,
                   status,
@@ -1896,7 +1919,9 @@ export default function GeoHub() {
                   bg: isWinning ? '#F0FDF4' : isEmerging ? '#FFFBEB' : '#FFF1F2',
                   border: isWinning ? '#6EE7B7' : isEmerging ? '#FCD34D' : '#FCA5A5',
                   score: rate,
-                  dominated: isWinning ? filterDominated(def.dominated2) : filterDominated(def.dominated),
+                  dominated: topComp
+                    ? filterDominated(topComp)
+                    : (isWinning ? filterDominated(def.dominated2||'') : filterDominated(def.dominated||'')),
                 };
               }).filter((s): s is NonNullable<typeof s> => s !== null);
               return (
