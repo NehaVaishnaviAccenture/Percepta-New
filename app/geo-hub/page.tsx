@@ -1914,7 +1914,7 @@ export default function GeoHub() {
                     ? filterDominated(topComp)
                     : (isWinning ? filterDominated(def.dominated2||'') : filterDominated(def.dominated||'')),
                 };
-              }).filter((s): s is NonNullable<typeof s> => s !== null);
+              }).filter((s: any): s is NonNullable<typeof s> => s !== null);
               return (
                 <div>
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
