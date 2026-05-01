@@ -2253,17 +2253,17 @@ Rules:
       const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
       // Ensure exactly 10 categories for even distribution
       const cats10 = cats.slice(0, 10).length === 10 ? cats.slice(0, 10) : [...cats.slice(0, 10), ...Array(10 - cats.slice(0,10).length).fill('General')];
-      const queryGenPrompt = `Generate exactly 100 specific, realistic questions that a business decision-maker or consumer would ask an AI when researching ${detected.industry || 'consumer products'} in the USA.
+      const queryGenPrompt = `Generate exactly 300 specific, realistic questions that someone would ask an AI when researching ${detected.industry || 'products and services'} in the USA.
 
 Rules:
 - NO brand names in any query
-- SPECIFIC not generic: instead of "What should I look for?" use "Which company is best for building a real-time sales dashboard under $50K budget?"
-- Questions must reflect REAL decision moments: comparing vendors, evaluating costs, choosing between options, understanding ROI
-- Each question should name specific deliverables, use cases, industries, or budgets where relevant
-- Distribute EXACTLY 10 questions per category across these 10 categories: ${cats10.join(', ')}
-- Mix question types: "which is best for X", "how much does X cost", "what does X include", "which company should I choose for X", "is X worth it for Y"
+- Questions must reflect real decision moments relevant to this specific industry: ${detected.industry || 'this category'}
+- Be specific to what someone actually researches in THIS industry - a beauty brand needs questions about skincare/makeup choices, a consulting firm needs vendor selection questions, a restaurant needs food/dining questions, a credit card needs rewards/fees questions
+- Each question should feel like a real search someone types when deciding whether to buy, use, hire, or choose something in ${detected.industry || 'this space'}
+- Distribute EXACTLY 30 questions per category across these 10 categories: ${cats10.join(', ')}
+- Mix question angles: best options, cost/pricing, comparisons, quality, reputation, fit for specific needs, how to choose
 - Return ONLY a valid JSON array, no markdown: [{"category":"CategoryName","query":"question text"}, ...]
-- EXACTLY 100 items total, 10 per category, no more no less`;
+- EXACTLY 300 items total, 30 per category, no more no less`;
 
       let dynamicQueries: string[][] = [];
       try {
@@ -2273,17 +2273,39 @@ Rules:
       } catch { 
         // Fallback: generate simpler queries if parsing fails
         // Better fallback: varied question templates without numbering
+        // Universal fallback templates - work for ANY industry (product, service, B2B, B2C)
+        // No assumptions about industry type - the category name carries all the context
         const FALLBACK_TEMPLATES = [
-          (c:string) => `What is the best ${c.toLowerCase()} product available right now?`,
-          (c:string) => `How do I choose the right ${c.toLowerCase()}?`,
-          (c:string) => `What are the top-rated ${c.toLowerCase()} brands?`,
-          (c:string) => `What should I look for when buying ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} brand is most recommended?`,
-          (c:string) => `What are the pros and cons of different ${c.toLowerCase()} options?`,
-          (c:string) => `How much should I spend on ${c.toLowerCase()}?`,
-          (c:string) => `What makes a good ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} is best for beginners?`,
-          (c:string) => `What do experts recommend for ${c.toLowerCase()}?`,
+          (c:string) => `What is the best ${c.toLowerCase()} option available right now?`,
+          (c:string) => `How do I choose between different ${c.toLowerCase()} options?`,
+          (c:string) => `Which ${c.toLowerCase()} is most recommended by experts?`,
+          (c:string) => `What should I know before deciding on ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} offers the best value for money?`,
+          (c:string) => `What are the top-rated ${c.toLowerCase()} options in 2025?`,
+          (c:string) => `How do I compare different ${c.toLowerCase()} options?`,
+          (c:string) => `What do people say about ${c.toLowerCase()} after using it?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for someone just starting out?`,
+          (c:string) => `What are the pros and cons of the leading ${c.toLowerCase()} options?`,
+          (c:string) => `How much does ${c.toLowerCase()} typically cost?`,
+          (c:string) => `What makes one ${c.toLowerCase()} option better than another?`,
+          (c:string) => `Which ${c.toLowerCase()} is most trusted and reliable?`,
+          (c:string) => `What should I prioritize when evaluating ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} has the best reputation in the market?`,
+          (c:string) => `What are common mistakes people make when choosing ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for a specific budget?`,
+          (c:string) => `How long does it take to see results from ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is easiest to get started with?`,
+          (c:string) => `What are the key features to look for in ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} has the best customer support?`,
+          (c:string) => `Is ${c.toLowerCase()} worth the investment?`,
+          (c:string) => `Which ${c.toLowerCase()} works best for large organizations?`,
+          (c:string) => `What do industry analysts say about ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for a small team or business?`,
+          (c:string) => `How has ${c.toLowerCase()} evolved in recent years?`,
+          (c:string) => `Which ${c.toLowerCase()} integrates best with existing tools?`,
+          (c:string) => `What ROI can I expect from ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for long-term use?`,
+          (c:string) => `How do I get the most out of ${c.toLowerCase()}?`,
         ];
         dynamicQueries = cats10.flatMap((cat:string) => 
           FALLBACK_TEMPLATES.map((fn:Function) => [cat, fn(cat)])
