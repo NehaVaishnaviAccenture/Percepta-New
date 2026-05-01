@@ -1882,13 +1882,16 @@ export default function GeoHub() {
               const WIN_THRESHOLD = 60;      // >=60% Winning -- same as Prompts bubble
               const EMERGING_THRESHOLD = 30; // 30-59% Emerging -- same as Prompts bubble
 
+              // Use result.query_clusters directly (clusters var is scoped to activeTab===5)
+              const recClusters = result.query_clusters || [];
+
               // Single source of truth: use query_clusters winRate
               // This guarantees Prompts network and Recommendations always show identical numbers
               const getClusterRate = (cats: string[]): number | null => {
                 for (const cat of cats) {
-                  const cluster = clusters.find((c:any) => c.category === cat);
+                  const cluster = recClusters.find((c:any) => c.category === cat);
                   if (cluster) return cluster.winRate;
-                  const fuzzy = clusters.find((c:any) =>
+                  const fuzzy = recClusters.find((c:any) =>
                     c.category.toLowerCase().includes(cat.toLowerCase()) ||
                     cat.toLowerCase().includes(c.category.toLowerCase())
                   );
@@ -1899,7 +1902,7 @@ export default function GeoHub() {
 
               const getClusterComp = (cats: string[]): string => {
                 for (const cat of cats) {
-                  const cluster = clusters.find((c:any) => c.category === cat);
+                  const cluster = recClusters.find((c:any) => c.category === cat);
                   if (cluster?.topCompetitor) return cluster.topCompetitor;
                 }
                 return '';
