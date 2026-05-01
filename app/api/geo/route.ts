@@ -2188,10 +2188,13 @@ export async function POST(req: NextRequest) {
       'massmutual': ['massmutual', 'mass mutual'],
     };
     // For dynamic brands, also include common name variations
-    const baseBrandAliases = [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-'), bl.replace(/[^a-z0-9]/gi,'')];
-    // Also extract key words from brand name (e.g. "L'Oreal Paris" → "loreal", "l'oreal")
-    const brandWords = bl.split(/[\s'\-]+/).filter((w:string) => w.length > 2);
-    const aliases: string[] = MAIN_BRAND_ALIASES[bl] || [...new Set([...baseBrandAliases, ...brandWords])];
+    const baseBrandAliases = [bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-'), bl.replace(/[^a-z0-9]/gi,'').toLowerCase()];
+    // Extract meaningful words - length > 3 to avoid short noise words
+    const brandWords = bl.split(/[\s'\-\.&]+/).filter((w:string) => w.length > 3).map((w:string) => w.toLowerCase());
+    // First significant word alone catches "Accenture" from "Accenture Applied Intelligence"
+    const firstSignificantWord = bl.split(' ').find((w:string) => w.length > 3)?.toLowerCase() || bl.toLowerCase();
+    const allAliases = [...new Set([...baseBrandAliases, ...brandWords, firstSignificantWord].filter((a:string) => a.length > 2))];
+    const aliases: string[] = MAIN_BRAND_ALIASES[bl] || allAliases;
 
     const inputHostname = new URL(url).hostname.replace('www.', '');
     let indKey = getIndustry(inputHostname, pageData) !== 'gen'
@@ -2253,15 +2256,24 @@ Rules:
       const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
       // Ensure exactly 10 categories for even distribution
       const cats10 = cats.slice(0, 10).length === 10 ? cats.slice(0, 10) : [...cats.slice(0, 10), ...Array(10 - cats.slice(0,10).length).fill('General')];
+      // Determine if this is a B2B service/consulting brand vs B2C product brand
+      const isServiceBrand = /consult|service|agency|firm|solution|advisor|partner|outsourc|staffing|integrat/i.test(detected.industry || '');
+      const queryContext = isServiceBrand
+        ? `business decision-makers choosing between ${detected.industry} providers - questions about which firm to hire, vendor selection, pricing, expertise, track record, ROI`
+        : `consumers or buyers researching ${detected.industry} - questions about which product/brand to choose, pricing, quality, reviews, comparisons`;
+
       const queryGenPrompt = `Generate exactly 300 specific, realistic questions that someone would ask an AI when researching ${detected.industry || 'products and services'} in the USA.
 
+Context: These questions are from ${queryContext}.
+
 Rules:
-- NO brand names in any query
-- Questions must reflect real decision moments relevant to this specific industry: ${detected.industry || 'this category'}
-- Be specific to what someone actually researches in THIS industry - a beauty brand needs questions about skincare/makeup choices, a consulting firm needs vendor selection questions, a restaurant needs food/dining questions, a credit card needs rewards/fees questions
-- Each question should feel like a real search someone types when deciding whether to buy, use, hire, or choose something in ${detected.industry || 'this space'}
-- Distribute EXACTLY 30 questions per category across these 10 categories: ${cats10.join(', ')}
-- Mix question angles: best options, cost/pricing, comparisons, quality, reputation, fit for specific needs, how to choose
+- NO brand or company names in any query
+- Questions must be SPECIFIC and REALISTIC - not generic. Include specifics like budget ranges, company sizes, use cases, industries, timeframes
+- Examples for consulting: "Which AI consulting firm is best for a manufacturing company under $2M budget?", "How long does a cloud migration project typically take?", "What should I look for when hiring a data analytics consulting partner?"  
+- Examples for products: "Which skincare brand works best for sensitive skin over 40?", "What cash back credit card has no annual fee and 2% on everything?"
+- Each question should reflect a REAL decision moment someone faces
+- Distribute EXACTLY 30 questions per category: ${cats10.join(', ')}
+- Mix question types across all categories: which is best for X, how much does X cost, how do I choose X, what should I expect from X, which X works for Y situation, is X worth it for Z
 - Return ONLY a valid JSON array, no markdown: [{"category":"CategoryName","query":"question text"}, ...]
 - EXACTLY 300 items total, 30 per category, no more no less`;
 
@@ -2273,42 +2285,74 @@ Rules:
       } catch { 
         // Fallback: generate simpler queries if parsing fails
         // Better fallback: varied question templates without numbering
-        // Universal fallback templates - work for ANY industry (product, service, B2B, B2C)
-        // No assumptions about industry type - the category name carries all the context
-        const FALLBACK_TEMPLATES = [
-          (c:string) => `What is the best ${c.toLowerCase()} option available right now?`,
+        // Smart fallback templates - adapts based on whether brand is service/consulting or product
+        const SERVICE_TEMPLATES = [
+          (c:string) => `Which company is best for ${c.toLowerCase()} for an enterprise client?`,
+          (c:string) => `How do I choose the right ${c.toLowerCase()} firm for my business?`,
+          (c:string) => `What does a ${c.toLowerCase()} engagement typically cost for a mid-size company?`,
+          (c:string) => `Which ${c.toLowerCase()} provider has the best track record?`,
+          (c:string) => `What should I look for when hiring a ${c.toLowerCase()} partner?`,
+          (c:string) => `Which ${c.toLowerCase()} firm is best for a company with under $500K budget?`,
+          (c:string) => `What are the key differences between top ${c.toLowerCase()} providers?`,
+          (c:string) => `Which ${c.toLowerCase()} company works best with Fortune 500 companies?`,
+          (c:string) => `How do I evaluate ${c.toLowerCase()} proposals from different vendors?`,
+          (c:string) => `What ROI should I expect from a ${c.toLowerCase()} investment?`,
+          (c:string) => `Which ${c.toLowerCase()} firm is best for a healthcare company?`,
+          (c:string) => `How long does a typical ${c.toLowerCase()} project take?`,
+          (c:string) => `Which ${c.toLowerCase()} company is best for digital transformation?`,
+          (c:string) => `What certifications should a ${c.toLowerCase()} vendor have?`,
+          (c:string) => `Which ${c.toLowerCase()} firm has the strongest AI capabilities?`,
+          (c:string) => `How do large enterprises choose between ${c.toLowerCase()} providers?`,
+          (c:string) => `Which ${c.toLowerCase()} company is best for a startup or SMB?`,
+          (c:string) => `What does a ${c.toLowerCase()} roadmap typically include?`,
+          (c:string) => `Which ${c.toLowerCase()} firm is best for financial services companies?`,
+          (c:string) => `How do I measure success after hiring a ${c.toLowerCase()} provider?`,
+          (c:string) => `Which ${c.toLowerCase()} company offers the best post-project support?`,
+          (c:string) => `What are the biggest mistakes companies make when choosing ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} firm is best for retail or e-commerce companies?`,
+          (c:string) => `How do I build a business case for investing in ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} provider is best known for innovation?`,
+          (c:string) => `What questions should I ask a ${c.toLowerCase()} vendor in an RFP?`,
+          (c:string) => `Which ${c.toLowerCase()} firm works best for manufacturing companies?`,
+          (c:string) => `What is the typical team size for a ${c.toLowerCase()} project?`,
+          (c:string) => `Which ${c.toLowerCase()} company delivers results fastest?`,
+          (c:string) => `How do I compare ${c.toLowerCase()} firms on value not just price?`,
+        ];
+        const PRODUCT_TEMPLATES = [
+          (c:string) => `What is the best ${c.toLowerCase()} available right now?`,
           (c:string) => `How do I choose between different ${c.toLowerCase()} options?`,
           (c:string) => `Which ${c.toLowerCase()} is most recommended by experts?`,
-          (c:string) => `What should I know before deciding on ${c.toLowerCase()}?`,
+          (c:string) => `What should I know before buying ${c.toLowerCase()}?`,
           (c:string) => `Which ${c.toLowerCase()} offers the best value for money?`,
-          (c:string) => `What are the top-rated ${c.toLowerCase()} options in 2025?`,
-          (c:string) => `How do I compare different ${c.toLowerCase()} options?`,
-          (c:string) => `What do people say about ${c.toLowerCase()} after using it?`,
-          (c:string) => `Which ${c.toLowerCase()} is best for someone just starting out?`,
-          (c:string) => `What are the pros and cons of the leading ${c.toLowerCase()} options?`,
-          (c:string) => `How much does ${c.toLowerCase()} typically cost?`,
-          (c:string) => `What makes one ${c.toLowerCase()} option better than another?`,
+          (c:string) => `What are the top-rated ${c.toLowerCase()} brands?`,
+          (c:string) => `How do I compare ${c.toLowerCase()} options?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for everyday use?`,
+          (c:string) => `What are the pros and cons of leading ${c.toLowerCase()} brands?`,
+          (c:string) => `How much should I spend on ${c.toLowerCase()}?`,
           (c:string) => `Which ${c.toLowerCase()} is most trusted and reliable?`,
-          (c:string) => `What should I prioritize when evaluating ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} has the best reputation in the market?`,
-          (c:string) => `What are common mistakes people make when choosing ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} is best for a specific budget?`,
-          (c:string) => `How long does it take to see results from ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} is easiest to get started with?`,
-          (c:string) => `What are the key features to look for in ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} has the best customer support?`,
-          (c:string) => `Is ${c.toLowerCase()} worth the investment?`,
-          (c:string) => `Which ${c.toLowerCase()} works best for large organizations?`,
-          (c:string) => `What do industry analysts say about ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} is best for a small team or business?`,
-          (c:string) => `How has ${c.toLowerCase()} evolved in recent years?`,
-          (c:string) => `Which ${c.toLowerCase()} integrates best with existing tools?`,
-          (c:string) => `What ROI can I expect from ${c.toLowerCase()}?`,
-          (c:string) => `Which ${c.toLowerCase()} is best for long-term use?`,
-          (c:string) => `How do I get the most out of ${c.toLowerCase()}?`,
+          (c:string) => `What features matter most when choosing ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} has the best reviews?`,
+          (c:string) => `Is ${c.toLowerCase()} worth the price?`,
+          (c:string) => `Which ${c.toLowerCase()} works best for beginners?`,
+          (c:string) => `What are common mistakes when buying ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best on a tight budget?`,
+          (c:string) => `How long does ${c.toLowerCase()} last before needing replacement?`,
+          (c:string) => `Which ${c.toLowerCase()} is easiest to use?`,
+          (c:string) => `What do customers say about ${c.toLowerCase()} after long-term use?`,
+          (c:string) => `Which ${c.toLowerCase()} has the best customer service?`,
+          (c:string) => `Is premium ${c.toLowerCase()} worth it over budget options?`,
+          (c:string) => `Which ${c.toLowerCase()} works best for professionals?`,
+          (c:string) => `What do industry experts say about ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is best for families?`,
+          (c:string) => `How has ${c.toLowerCase()} improved in recent years?`,
+          (c:string) => `Which ${c.toLowerCase()} integrates best with other products?`,
+          (c:string) => `What ROI can I expect from switching to a better ${c.toLowerCase()}?`,
+          (c:string) => `Which ${c.toLowerCase()} is most durable and long-lasting?`,
+          (c:string) => `How do I get the most value from ${c.toLowerCase()}?`,
         ];
+        const TEMPLATES = isServiceBrand ? SERVICE_TEMPLATES : PRODUCT_TEMPLATES;
         dynamicQueries = cats10.flatMap((cat:string) => 
-          FALLBACK_TEMPLATES.map((fn:Function) => [cat, fn(cat)])
+          TEMPLATES.map((fn:Function) => [cat, fn(cat)])
         );
       }
 
@@ -2352,20 +2396,26 @@ Rules:
           const e = bt.includes(nextMarker) ? bt.indexOf(nextMarker) : bt.length;
           ans = bt.slice(s, e).trim();
         }
-        // Detect which competitor won this query (appeared first)
+        // Detect which competitor won this query (appeared first in response)
         const respText = (ans || '').toLowerCase();
         const qCompetitors = isDynamic ? dynamicCompetitors : (ind.comps || []);
         let winnerBrand = '';
         let winnerPos = Infinity;
-        qCompetitors.slice(0,10).forEach((comp:string) => {
+        // Check if brand itself appeared first
+        const brandAppearedAt = aliases.reduce((best:number, a:string) => {
+          const pos = respText.indexOf(a.toLowerCase());
+          return pos >= 0 && pos < best ? pos : best;
+        }, Infinity);
+        qCompetitors.slice(0, 15).forEach((comp:string) => {
           const compL = comp.toLowerCase();
-          const compWords = compL.split(' ').filter((w:string) => w.length > 2);
-          const idx2 = compWords.reduce((best:number, w:string) => {
+          // Use first meaningful word of competitor name
+          const compWords = compL.split(/[\s'\-\.&]+/).filter((w:string) => w.length > 3);
+          const compPos = compWords.reduce((best:number, w:string) => {
             const pos = respText.indexOf(w);
             return pos >= 0 && pos < best ? pos : best;
           }, Infinity);
-          if (idx2 < winnerPos && idx2 < Infinity) {
-            winnerPos = idx2;
+          if (compPos < winnerPos && compPos < Infinity && compPos < brandAppearedAt) {
+            winnerPos = compPos;
             winnerBrand = comp;
           }
         });
@@ -2792,10 +2842,10 @@ Return ONLY valid JSON, no markdown:
     let mentionsDisplay = Math.round((visOverride / 100) * totalQueries);
     let totalQueriesDisplay = totalQueries;
 
-    const responsesDetail = allQA.map(p => ({
+    const responsesDetail = allQA.filter(Boolean).map((p:any) => ({
       category: p.category,
       query: p.q,
-      mentioned: aliases.some(a => (p.a || '').toLowerCase().includes(a)),
+      mentioned: aliases.some((a:string) => (p.a || '').toLowerCase().includes(a.toLowerCase())),
       response_preview: p.a || '',
       position: getBrandPosition(p.a || '', brand),
       winner_brand: p.winner_brand || null,
@@ -3149,7 +3199,9 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       'General':32000,'Miles & Points':43000,'Perks & Benefits':35000,'Value':28000,
       'Debt Payoff':32000,'0% APR':38000,'Fees':29000,
     };
-    const catNames = [...new Set(allQA.map(p => p.category))];
+    // Normalize: use exact categories from allQA (these come from the query array)
+    // For dynamic brands these are the AI-generated categories
+    const catNames = [...new Set(allQA.filter(Boolean).map((p:any) => p.category).filter(Boolean))];
 
     // For each category, find which competitor brand appears most often
     const getTopCompetitor = (catRows: any[]): string => {
