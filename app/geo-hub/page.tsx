@@ -1066,7 +1066,7 @@ export default function GeoHub() {
       setLoadingProgress(100);
       await new Promise(r=>setTimeout(r,400));
       if(data.error)setError(data.error);
-      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
       setError(e.message);
