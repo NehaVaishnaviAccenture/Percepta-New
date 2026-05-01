@@ -1843,6 +1843,7 @@ export default function GeoHub() {
               // Each segment maps one or more query categories from responses_detail
               // For fin: use hardcoded product-based segment definitions
               // For any other brand: derive segments dynamically from actual rd categories
+              const recClusters = result.query_clusters || [];
               const topComp1 = (result.competitors||[])[0]?.Brand || 'Top Competitor';
               const topComp2 = (result.competitors||[])[1]?.Brand || 'Competitor';
 
@@ -1871,9 +1872,6 @@ export default function GeoHub() {
               // 3-tier thresholds matching Prompts tab bubble colors
               const WIN_THRESHOLD = 60;      // >=60% Winning -- same as Prompts bubble
               const EMERGING_THRESHOLD = 30; // 30-59% Emerging -- same as Prompts bubble
-
-              // Use result.query_clusters directly (clusters var is scoped to activeTab===5)
-              const recClusters = result.query_clusters || [];
 
               // Single source of truth: use query_clusters winRate
               // This guarantees Prompts network and Recommendations always show identical numbers
