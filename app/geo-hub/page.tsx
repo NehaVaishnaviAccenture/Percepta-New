@@ -1846,25 +1846,15 @@ export default function GeoHub() {
               const topComp1 = (result.competitors||[])[0]?.Brand || 'Top Competitor';
               const topComp2 = (result.competitors||[])[1]?.Brand || 'Competitor';
 
-              const SEG_DEFS = fin ? [
-                { name:'General Consumers',  cats:['General Consumer'],                dominated:'Chase, Citi',                   dominated2:'Amex, Chase' },
-                { name:'Travelers / Rewards', cats:['Travel & Rewards'],                dominated:'Amex, Chase',                   dominated2:'Chase Sapphire' },
-                { name:'Cashback Seekers',    cats:['Cash Back','Rewards Optimization'], dominated:'Chase, Wells Fargo',            dominated2:'Discover' },
-                { name:'Credit Builders',     cats:['Credit Building','Approval & Credit'], dominated:'Discover, Capital One',     dominated2:'Secured cards' },
-                { name:'Expert / Premium',    cats:['Expert Recommendation','Premium Cards','Card Benefits'], dominated:'Amex, Chase Sapphire', dominated2:'Amex' },
-                { name:'Small Business',      cats:['Comparison','Interest & Fees'],    dominated:'Amex, Chase Ink',               dominated2:'Chase' },
-              ] : (()=>{
-                // Dynamically build segments from actual query categories in responses_detail
-                // Sort by win rate descending so highest performing appear first
-                const uniqueCats = [...new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c)))];
-                return uniqueCats
-                  .map((cat:string) => {
-                    const catRows = rd.filter((r:any) => r.category === cat);
-                    const rate = catRows.length > 0 ? Math.round(catRows.filter((r:any)=>r.mentioned).length / catRows.length * 100) : 0;
-                    return { name: cat, cats: [cat], dominated: topComp1, dominated2: topComp2, _rate: rate };
-                  })
-                  .sort((a:any, b:any) => b._rate - a._rate);
-              })();
+              // Always derive segments directly from query_clusters (same source as Prompts tab)
+              // This guarantees 1:1 match: same categories, same scores, same colors
+              // No remapping, no grouping, no renaming — what Prompts shows is what Recommendations shows
+              const SEG_DEFS = recClusters.map((c:any) => ({
+                name: c.category,
+                cats: [c.category],
+                dominated: c.topCompetitor || topComp1,
+                dominated2: topComp2,
+              }));
 
               const segRate = (cats: string[]) => {
                 // Use exact match first, then fuzzy if no results
