@@ -174,13 +174,23 @@ function buildFeatureDims(
 function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom:number, vis:number, cit:number, sov:number): {label:string,val:number}[] {
   const allZero = dims.every(d => d.val === 0);
   if (!allZero) return dims;
+  // If dims came from real rd categories (product axes), keep them even at 0
+  // Only replace with generic axes if dims are already generic labels
+  const genericLabels = ['Visibility','Sentiment','Authority','Prominence','Share of Voice','Recommendation','Citations'];
+  const hasProductAxes = dims.some(d => !genericLabels.includes(d.label));
+  if (hasProductAxes) {
+    // Keep product categories -- brand just isn't appearing yet
+    // Show a small floor value so the radar is visible (not collapsed to a dot)
+    return dims.map(d => ({ ...d, val: d.val === 0 ? Math.max(d.val, Math.round((vis + sent) / 4)) : d.val }));
+  }
+  // Generic fallback - use actual sub-scores
   return [
-    { label: 'Visibility',    val: vis },
-    { label: 'Sentiment',     val: sent },
-    { label: 'Prominence',    val: prom },
-    { label: 'Citations',     val: cit },
-    { label: 'Share of Voice',val: sov },
-    { label: 'Authority',     val: Math.round((cit + prom) / 2) },
+    { label: 'Visibility',    val: Math.max(vis, 5) },
+    { label: 'Sentiment',     val: Math.max(sent, 5) },
+    { label: 'Prominence',    val: Math.max(prom, 5) },
+    { label: 'Citations',     val: Math.max(cit, 5) },
+    { label: 'Share of Voice',val: Math.max(sov, 5) },
+    { label: 'Authority',     val: Math.max(Math.round((cit + prom) / 2), 5) },
   ];
 }
 
@@ -1845,18 +1855,25 @@ export default function GeoHub() {
                 { name:'Small Business',      cats:['Comparison','Interest & Fees'],    dominated:'Amex, Chase Ink',               dominated2:'Chase' },
               ] : (()=>{
                 // Dynamically build segments from actual query categories in responses_detail
+                // Sort by win rate descending so highest performing appear first
                 const uniqueCats = [...new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c)))];
-                return uniqueCats.map((cat:string) => ({
-                  name: cat,
-                  cats: [cat],
-                  dominated: topComp1,
-                  dominated2: topComp2,
-                }));
+                return uniqueCats
+                  .map((cat:string) => {
+                    const catRows = rd.filter((r:any) => r.category === cat);
+                    const rate = catRows.length > 0 ? Math.round(catRows.filter((r:any)=>r.mentioned).length / catRows.length * 100) : 0;
+                    return { name: cat, cats: [cat], dominated: topComp1, dominated2: topComp2, _rate: rate };
+                  })
+                  .sort((a:any, b:any) => b._rate - a._rate);
               })();
 
               const segRate = (cats: string[]) => {
-                const rows = rd.filter((r:any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
-                if (rows.length === 0) return null; // no data for this category
+                // Use exact match first, then fuzzy if no results
+                let rows = rd.filter((r:any) => cats.some(c => (r.category||'') === c));
+                if (rows.length === 0) {
+                  // Fuzzy fallback
+                  rows = rd.filter((r:any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
+                }
+                if (rows.length === 0) return null;
                 const mentioned = rows.filter((r:any) => r.mentioned).length;
                 return Math.round((mentioned / rows.length) * 100);
               };
