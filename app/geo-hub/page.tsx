@@ -210,7 +210,7 @@ function Tooltip({ text }: { text: string }) {
   );
 }
 
-function MetricCard({ label, val, sub, color='#7C3AED', note }: { label:string; val:any; sub?:string; color?:string; note?:string }) {
+function MetricCard({ label, val, sub, color='#111827', note }: { label:string; val:any; sub?:string; color?:string; note?:string }) {
   return (
     <div style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>
@@ -240,7 +240,10 @@ function GeoGauge({ score, brand }: { score:number; brand:string }) {
         {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
         <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
-      <span style={{background:badge.bg,color:badge.color,borderRadius:50,padding:'5px 18px',fontSize:'0.82rem',fontWeight:700}}>{badge.label}</span>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+        <span style={{fontSize:'0.78rem',fontWeight:700,color:'#374151'}}>GEO Score</span>
+        <Tooltip text="GEO Score = Visibility x 0.30 + Sentiment x 0.20 + Prominence x 0.20 + Citation Share x 0.15 + Share of Voice x 0.15. Scale: 0-44 Poor, 45-69 Needs Work, 70-79 Good, 80-100 Excellent."/>
+      </div>
     </div>
   );
 }
@@ -830,7 +833,7 @@ function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:n
   return (
     <div style={{position:'relative' as const}}>
       <svg viewBox="0 0 400 420" style={{width:'100%'}}>
-        {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill={r===50?'#F5F3FF':'none'} stroke={r===50?'#C4B5FD':'#E5E7EB'} strokeWidth={r===50?1.5:1} strokeDasharray={r===50?'4,3':undefined}/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
+        {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
@@ -1038,6 +1041,7 @@ export default function GeoHub() {
   const [hovBar,setHovBar]=useState<number|null>(null);
   const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
   const [hovNode,setHovNode]=useState<string|null>(null);
+  const [promptCount,setPromptCount]=useState(120);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
 
@@ -1060,7 +1064,7 @@ export default function GeoHub() {
       timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));
     });
     try{
-      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url, promptCount})});
       const data=await res.json();
       timers.forEach(t=>clearTimeout(t));
       setLoadingProgress(100);
@@ -1121,8 +1125,17 @@ export default function GeoHub() {
           </div>}
           <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
+            <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                <span style={{fontSize:'0.72rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Prompts</span>
+                {[50,100,300,500,1000].map(n=><button key={n} onClick={()=>setPromptCount(n)} style={{background:promptCount===n?'#7C3AED':'#F3F4F6',color:promptCount===n?'white':'#6B7280',border:'none',borderRadius:6,padding:'4px 10px',fontSize:'0.75rem',fontWeight:promptCount===n?700:500,cursor:'pointer'}}>{n}</button>)}
+              </div>
+            </div>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
-              <input type="text" value={url} onChange={e=>setUrl(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="https://www.capitalone.com/" style={{flex:1,borderRadius:12,border:'1.5px solid #E5E7EB',padding:'14px 20px',fontSize:'0.95rem',height:52,background:'white',outline:'none',color:'#374151',boxSizing:'border-box' as const}}/>
+              <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #E5E7EB',borderRadius:12,background:'white',overflow:'hidden',height:52}}>
+                <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://</span>
+                <input type="text" value={url.replace(/^https?:\/\//,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl('https://'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="www.capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
+              </div>
               <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>🔍 {loading?'Analysing...':'Run Live AI Analysis'}</button>
             </div>
             {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
@@ -1242,21 +1255,25 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
                     <GeoGauge score={geo} brand={result.brand_name}/>
                     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827',marginBottom:5}}>{result.brand_name}</div>
+                      <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:5}}>
+                        <div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827'}}>{result.brand_name}</div>
+                        {(result.lob||result.ind_label)&&<span style={{fontSize:'0.72rem',fontWeight:600,color:'#7C3AED',background:'#EDE9FE',borderRadius:50,padding:'2px 10px'}}>{result.lob||result.ind_label}</span>}
+                      </div>
                       <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{result.page_url?.slice(0,60)}{result.page_url?.length>60?'...':''}</a>
                       <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
                       <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
                       <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
                     </div>
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:14,marginBottom:16}}>
-                    <MetricCard label="visibility score" val={vis} color="#7C3AED"/>
-                    <MetricCard label="sentiment score" val={rawSent} color="#10B981"/>
-                    <MetricCard label="citation score" val={cit} color="#F59E0B"/>
-                    <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`} color="#3B82F6"/>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:16}}>
+                    <MetricCard label="visibility score" val={vis}/>
+                    <MetricCard label="sentiment score" val={rawSent}/>
+                    <MetricCard label="citation score" val={cit}/>
+                    <MetricCard label="prominence score" val={prom}/>
+                    <MetricCard label="share of voice" val={sov}/>
+                    <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <GeoSummary result={result}/>
                 </div>
               );
             })()}
@@ -1346,6 +1363,7 @@ export default function GeoHub() {
             })()}
 
             {activeTab===2&&(()=>{
+              const geo=result.overall_geo_score;
               const vis=result.visibility,comps=result.competitors||[],allVis=[vis,...comps.map((c:any)=>c.Vis)];
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1,topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
               const gapToTop=vis-(topComp?topComp.Vis:vis),avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
@@ -1357,13 +1375,95 @@ export default function GeoHub() {
                     <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands  .  avg {avgVis}</div></div>
                     <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginBottom:24}}><VisibilityBars brand={result.brand_name} vis={vis} competitors={result.competitors||[]}/></div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                    <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility -- Market Positioning</div>
-                    <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Your brand is highlighted in purple.</div>
-                    {/* FIX 1: pass topCompBrand so star goes on correct brand */}
-                    <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
-                  </div>
+
+{(()=>{
+                    const [showScurve, setShowScurve]=React.useState(false);
+                    return (
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                        <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility -- Market Positioning</div>
+                        <button onClick={()=>setShowScurve(s=>!s)} style={{background:showScurve?'#7C3AED':'#F3F4F6',color:showScurve?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
+                          {showScurve?'Show Scatter':'Show S-Curve'}
+                        </button>
+                      </div>
+                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>{showScurve?'GEO maturity curve showing your position and opportunity':'Each dot = one brand. Your brand is highlighted in purple.'}</div>
+                      {showScurve
+                        ? <ROICurve score={geo}/>
+                        : <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
+                      }
+                    </div>
+                    );
+                  })()}
+                  {/* Sankey: Brand Perception Flow Across Time */}
+                  {(()=>{
+                    const [sankeyPeriod, setSankeyPeriod]=React.useState(2);
+                    // Sample data: 3 time periods showing realistic progression
+                    const periods=[
+                      {label:'Month 1', vis:20, sent:48, cit:30, sov:18, prom:28},
+                      {label:'Month 2', vis:32, sent:58, cit:38, sov:28, prom:36},
+                      {label:'Month 3', vis:vis||48, sent:result.sentiment||65, cit:result.citation_share||48, sov:result.share_of_voice||40, prom:result.prominence||52},
+                    ];
+                    const p=periods[sankeyPeriod-1];
+                    const total=p.vis+p.sent+p.cit+p.sov+p.prom;
+                    const W=760,H=260,padL=100,padR=100,padT=32,padB=32;
+                    const plotW=W-padL-padR,plotH=H-padT-padB;
+                    const metrics=[
+                      {key:'vis',label:'Visibility',val:p.vis,weight:30,color:'#7C3AED'},
+                      {key:'sent',label:'Sentiment',val:p.sent,weight:20,color:'#10B981'},
+                      {key:'prom',label:'Prominence',val:p.prom,weight:20,color:'#3B82F6'},
+                      {key:'cit',label:'Citations',val:p.cit,weight:15,color:'#F59E0B'},
+                      {key:'sov',label:'Share of Voice',val:p.sov,weight:15,color:'#EF4444'},
+                    ];
+                    const geoScore=Math.round(metrics.reduce((s,m)=>s+m.val*m.weight/100,0));
+                    // Layout nodes
+                    const gap=8;
+                    const totalH=plotH;
+                    let leftY=padT;
+                    const leftNodes=metrics.map(m=>{
+                      const h=Math.max(18,(m.weight/100)*totalH);
+                      const node={...m,x1:padL,x2:padL+40,y1:leftY,y2:leftY+h-gap,mid:(leftY+leftY+h-gap)/2};
+                      leftY+=h;
+                      return node;
+                    });
+                    const rightH=plotH*0.7,rightY=padT+(plotH-rightH)/2;
+                    const rightNode={x1:W-padR-40,x2:W-padR,y1:rightY,y2:rightY+rightH,mid:(rightY+rightY+rightH)/2};
+                    const [hovMetric,setHovMetric]=React.useState<string|null>(null);
+                    return (
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginTop:20}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                          <div>
+                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow -- GEO Score Composition</div>
+                            <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginTop:2}}>Sankey diagram showing how each metric flows into your GEO Score over time</div>
+                          </div>
+                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                            {periods.map((_,i)=><button key={i} onClick={()=>setSankeyPeriod(i+1)} style={{background:sankeyPeriod===i+1?'#7C3AED':'#F3F4F6',color:sankeyPeriod===i+1?'white':'#6B7280',border:'none',borderRadius:6,padding:'5px 12px',fontSize:'0.73rem',fontWeight:600,cursor:'pointer'}}>{periods[i].label}</button>)}
+                          </div>
+                        </div>
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',marginTop:8}}>
+                          {leftNodes.map((n,i)=>{
+                            const isH=hovMetric===n.key;
+                            const path=`M${n.x2},${n.y1} C${n.x2+plotW*0.45},${n.y1} ${rightNode.x1-plotW*0.45},${rightNode.y1+i*(rightNode.y2-rightNode.y1)/metrics.length} ${rightNode.x1},${rightNode.y1+i*(rightNode.y2-rightNode.y1)/metrics.length} L${rightNode.x1},${rightNode.y1+(i+1)*(rightNode.y2-rightNode.y1)/metrics.length} C${rightNode.x1-plotW*0.45},${rightNode.y1+(i+1)*(rightNode.y2-rightNode.y1)/metrics.length} ${n.x2+plotW*0.45},${n.y2} ${n.x2},${n.y2} Z`;
+                            return <g key={i} onMouseEnter={()=>setHovMetric(n.key)} onMouseLeave={()=>setHovMetric(null)}>
+                              <path d={path} fill={n.color} opacity={isH?0.5:0.2} style={{transition:'opacity 0.2s'}}/>
+                              <rect x={n.x1} y={n.y1} width={40} height={n.y2-n.y1} fill={n.color} rx={4}/>
+                              <text x={n.x1-6} y={n.mid} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x1-6} y={n.mid+12} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:n.color,fontFamily:'Inter,sans-serif'}}>{n.val}</text>
+                              {isH&&<rect x={n.x2+20} y={n.y1} width={120} height={36} rx={6} fill="#1F2937"/>}
+                              {isH&&<text x={n.x2+80} y={n.y1+14} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.label}: {n.val}</text>}
+                              {isH&&<text x={n.x2+80} y={n.y1+26} textAnchor="middle" style={{fontSize:8,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Weight: {n.weight}% of GEO</text>}
+                            </g>;
+                          })}
+                          <rect x={rightNode.x1} y={rightNode.y1} width={40} height={rightNode.y2-rightNode.y1} fill="#7C3AED" rx={4}/>
+                          <text x={rightNode.x2+8} y={rightNode.mid-10} dominantBaseline="middle" style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
+                          <text x={rightNode.x2+8} y={rightNode.mid+6} dominantBaseline="middle" style={{fontSize:24,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+                          <text x={W/2} y={H-6} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Hover over metrics to see their contribution. Toggle time periods to see progression.</text>
+                        </svg>
+                        <div style={{display:'flex',gap:12,marginTop:8,flexWrap:'wrap' as const}}>
+                          {metrics.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight)</span></div>)}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
@@ -1407,6 +1507,12 @@ export default function GeoHub() {
             })()}
 
             {activeTab===4&&(()=>{
+              const [activeCitCat, setActiveCitCat] = React.useState<string|null>(null);
+              React.useEffect(()=>{
+                const handler=(e:any)=>setActiveCitCat(e.detail);
+                window.addEventListener('citFilter', handler);
+                return()=>window.removeEventListener('citFilter', handler);
+              },[]);
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
               const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
               const domainMatchesBrand = (domain: string) => {
@@ -1497,14 +1603,34 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
-                      {catEntries.length>0?catEntries.map(([cat,pct],i)=><div key={i} style={{marginBottom:14}}><div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}><span style={{fontSize:'0.84rem',color:'#374151',fontWeight:500}}>{cat}</span><span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span></div><div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}><div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.min(Math.round(pct),100)}%`,transition:'width 0.4s'}}/></div></div>):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
+                      {(()=>{
+                      const [citFilter, setCitFilter] = React.useState<string|null>(null);
+                      return catEntries.length>0?catEntries.map(([cat,pct],i)=>{
+                        const isActive = citFilter===cat;
+                        return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>{setCitFilter(isActive?null:cat);const evt=new CustomEvent('citFilter',{detail:isActive?null:cat});window.dispatchEvent(evt);}}>
+                          <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                            <span style={{fontSize:'0.84rem',color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span>
+                            <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span>
+                          </div>
+                          <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}>
+                            <div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.min(Math.round(pct),100)}%`,transition:'width 0.4s'}}/>
+                          </div>
+                          {isActive&&<div style={{fontSize:'0.65rem',color:catColors[cat],marginTop:4,fontWeight:600}}>Filtering right panel</div>}
+                        </div>;
+                      }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>
+                    })()}
                     </div>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px',overflowY:'auto' as const,maxHeight:400}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sources AI is Pulling From -- {result.brand_name}</div>
                       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>Top domains that influence AI responses in your category.</div>
                       <table style={{width:'100%',borderCollapse:'collapse'}}>
                         <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','SHARE %',''].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left' as const,fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                        <tbody>{displaySources.map((s:any,i:number)=>{
+                        <tbody>{displaySources.filter((s:any)=>{
+                          if(!activeCitCat) return true;
+                          const isOwned3 = s.isOwned || domainMatchesBrand(s.domain||'');
+                          const cls3 = isOwned3 ? 'Owned Media' : classifyDomain(s.domain||'').label;
+                          return cls3 === activeCitCat;
+                        }).map((s:any,i:number)=>{
                           const isOwned2 = s.isOwned || domainMatchesBrand(s.domain||'');
                           const cls2 = isOwned2 ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                           const bw2=Math.min(s.citation_share,100);
@@ -1622,7 +1748,7 @@ export default function GeoHub() {
                         <div style={{background:'#0F172A',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                           <div>
                             <div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
-                            <div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Bubble size = brand appearances  .  Color = win rate  .  Click any node to filter queries below</div>
+                            <div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Node size = brand appearances  .  Color = win rate  .  Lines = related categories  .  Click to filter</div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:14}}>
                             {[{color:'#10B981',label:'Winning (>=60%)'},{color:'#F59E0B',label:'Emerging (30-59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
@@ -1639,9 +1765,20 @@ export default function GeoHub() {
                           </div>
                         </div>
                         <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
+                          {/* Dot grid background */}
                           {Array.from({length:19},(_,i)=>Array.from({length:Math.ceil(H/30)},(_,j)=>(
                             <circle key={`${i}-${j}`} cx={i*(W/18)} cy={j*30} r="1" fill="#1E293B"/>
                           )))}
+                          {/* Interconnecting lines between related categories */}
+                          {bubbles.map((b:any)=>(b.related||[]).map((rel:any)=>{
+                            const target=bubbles.find((bb:any)=>bb.category===rel.category);
+                            if(!target||rel.similarity<20) return null;
+                            return <line key={`${b.category}-${rel.category}`}
+                              x1={b.x} y1={b.y} x2={target.x} y2={target.y}
+                              stroke="#334155" strokeWidth={rel.similarity>60?2:1}
+                              strokeDasharray={rel.similarity>60?undefined:"3,4"}
+                              opacity={0.4+(rel.similarity/100)*0.4}/>;
+                          }))}
                           {bubbles.map((b:any)=>{
                             const isSelected = filterCat===b.category;
                             const isUntapped = b.winRate===0 && b.total>0;
@@ -1849,7 +1986,7 @@ export default function GeoHub() {
 
               // Always derive segments directly from query_clusters (same source as Prompts tab)
               // This guarantees 1:1 match: same categories, same scores, same colors
-              // No remapping, no grouping, no renaming — what Prompts shows is what Recommendations shows
+              // No remapping, no grouping, no renaming -- what Prompts shows is what Recommendations shows
               const SEG_DEFS = recClusters.map((c:any) => ({
                 name: c.category,
                 cats: [c.category],
