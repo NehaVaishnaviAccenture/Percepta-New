@@ -1047,6 +1047,7 @@ export default function GeoHub() {
   const [activeCitCat,setActiveCitCat]=useState<string|null>(null);
   const [sankeyPeriod,setSankeyPeriod]=useState(2);
   const [promptCountErr,setPromptCountErr]=useState('');
+  const [hovMetric,setHovMetric]=useState<string|null>(null);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
 
@@ -1441,7 +1442,6 @@ export default function GeoHub() {
                     });
                     const rightH=plotH*0.7,rightY=padT+(plotH-rightH)/2;
                     const rightNode={x1:W-padR-40,x2:W-padR,y1:rightY,y2:rightY+rightH,mid:(rightY+rightY+rightH)/2};
-                    const [hovMetric,setHovMetric]=React.useState<string|null>(null);
                     return (
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginTop:20}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
