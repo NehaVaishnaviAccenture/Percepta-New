@@ -829,16 +829,21 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
 
   const W=960,H=460,padL=56,padR=30,padT=32,padB=56;
   const xVals=all.map(a=>a.jx),yVals=all.map(a=>a.jy);
-  const xMin=Math.max(0,Math.min(...xVals)-6),xMax=Math.max(...xVals)+14;
-  const yMin=Math.max(0,Math.min(...yVals)-6),yMax=Math.min(100,Math.max(...yVals)+14);
+  // Always show full 0-100 scale on both axes for equal quadrant distribution
+  const xMin=0, xMax=100;
+  const yMin=0, yMax=100;
   const sx=(v:number)=>padL+(v-xMin)/(xMax-xMin)*(W-padL-padR);
   const sy=(v:number)=>padT+(yMax-v)/(yMax-yMin)*(H-padT-padB);
-  const avgX=Math.round(raw.reduce((s,a)=>s+a.x,0)/raw.length);
-  const avgY=Math.round(raw.reduce((s,a)=>s+a.y,0)/raw.length);
-  const yTicks=[0,25,50,75,100].filter(v=>v>=yMin&&v<=yMax);
+  // Use MEDIAN not mean -- median is robust to outliers (Chase at 82) so the dividing
+  // lines split the actual data distribution in half rather than being skewed by extremes.
+  const sortedX=[...raw.map(a=>a.x)].sort((a,b)=>a-b);
+  const sortedY=[...raw.map(a=>a.y)].sort((a,b)=>a-b);
+  const medX=sortedX[Math.floor(sortedX.length/2)];
+  const medY=sortedY[Math.floor(sortedY.length/2)];
+  const yTicks=[0,25,50,75,100];
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
-  const bR=(c:number)=>Math.round(4+((c-citMin)/Math.max(citMax-citMin,1))*7);
+  const bR=(c:number)=>Math.round(5+((c-citMin)/Math.max(citMax-citMin,1))*10);
 
   const placements = all.map((a,i)=>{
     const cx2=sx(a.jx), cy2=sy(a.jy), r=bR(a.cit);
@@ -848,12 +853,12 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
     return {cx2, cy2, r, ly:Math.max(padT+6, Math.min(H-padB-6, cy2+offset)), above};
   });
 
-  const midX=sx(avgX), midY=sy(avgY);
+  const midX=sx(medX), midY=sy(medY);
   const qLabels=[
-    {x:padL+8, y:padT+14, text:'High Sentiment  .  Low Visibility', color:'#9CA3AF'},
-    {x:W-padR-8, y:padT+14, text:'High Sentiment  .  High Visibility', color:'#7C3AED', anchor:'end'},
-    {x:padL+8, y:H-padB-8, text:'Low Sentiment  .  Low Visibility', color:'#9CA3AF'},
-    {x:W-padR-8, y:H-padB-8, text:'Low Sentiment  .  High Visibility', color:'#9CA3AF', anchor:'end'},
+    {x:padL+8, y:padT+14, text:'High Sentiment · Low Visibility', color:'#6B7280'},
+    {x:W-padR-8, y:padT+14, text:'High Sentiment · High Visibility', color:'#7C3AED', anchor:'end'},
+    {x:padL+8, y:H-padB-8, text:'Low Sentiment · Low Visibility', color:'#9CA3AF'},
+    {x:W-padR-8, y:H-padB-8, text:'Low Sentiment · High Visibility', color:'#9CA3AF', anchor:'end'},
   ];
 
   return (
@@ -863,50 +868,64 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#7C3AED"/></svg> You</span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> Top Competitor</span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#CBD5E1"/></svg> Others</span>
-          <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>  .  Bubble size = Citation Score  .  <strong style={{color:'#374151'}}>Hover any bubble to see data</strong></span>
+          <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>  ·  Bubble size = Citation Score  ·  Axes split at median  ·  <strong style={{color:'#374151'}}>Hover any bubble</strong></span>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
-        <rect x={padL} y={padT} width={midX-padL} height={midY-padT} fill="#F0FDF4" opacity="0.35"/>
-        <rect x={midX} y={padT} width={W-padR-midX} height={midY-padT} fill="#F5F3FF" opacity="0.45"/>
-        <rect x={padL} y={midY} width={midX-padL} height={H-padB-midY} fill="#F9FAFB" opacity="0.5"/>
-        <rect x={midX} y={midY} width={W-padR-midX} height={H-padB-midY} fill="#FFF7ED" opacity="0.3"/>
+        <rect x={padL} y={padT} width={midX-padL} height={midY-padT} fill="#F0FDF4" opacity="0.4"/>
+        <rect x={midX} y={padT} width={W-padR-midX} height={midY-padT} fill="#F5F3FF" opacity="0.5"/>
+        <rect x={padL} y={midY} width={midX-padL} height={H-padB-midY} fill="#FFF7ED" opacity="0.4"/>
+        <rect x={midX} y={midY} width={W-padR-midX} height={H-padB-midY} fill="#FEF2F2" opacity="0.35"/>
         {yTicks.map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        <line x1={midX} y1={padT} x2={midX} y2={H-padB} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
-        <line x1={padL} y1={midY} x2={W-padR} y2={midY} stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="5,4"/>
+        <line x1={midX} y1={padT} x2={midX} y2={H-padB} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
+        <line x1={padL} y1={midY} x2={W-padR} y2={midY} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
+        {/* Median annotations */}
+        <text x={midX+4} y={padT+10} style={{fontSize:8,fill:'#A78BFA',fontFamily:'Inter,sans-serif'}}>median vis: {medX}</text>
+        <text x={W-padR} y={midY-4} textAnchor="end" style={{fontSize:8,fill:'#A78BFA',fontFamily:'Inter,sans-serif'}}>median sent: {medY}</text>
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         {qLabels.map((q,i)=><text key={i} x={q.x} y={q.y} textAnchor={(q as any).anchor||'start'} style={{fontSize:8,fill:q.color,fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>{q.text}</text>)}
+        {/* Render bubbles first */}
         {all.map((a,i)=>{
           const {cx2,cy2,r}=placements[i];
           const isH=hov===i;
           const fill=a.isYou?'#7C3AED':a.isTopComp?'#EFF6FF':'#CBD5E1';
           const stroke=a.isYou?'#5B21B6':a.isTopComp?'#3B82F6':'#9CA3AF';
           return <g key={`b${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
-            {isH&&<circle cx={cx2} cy={cy2} r={r+4} fill={stroke} opacity="0.12"/>}
-            <circle cx={cx2} cy={cy2} r={r} fill={fill} stroke={stroke} strokeWidth={a.isYou?2:a.isTopComp?2:1}/>
+            {isH&&<circle cx={cx2} cy={cy2} r={r+5} fill={stroke} opacity="0.12"/>}
+            <circle cx={cx2} cy={cy2} r={r} fill={fill} stroke={stroke} strokeWidth={a.isYou?2.5:a.isTopComp?2:1}/>
           </g>;
         })}
+        {/* Render labels second */}
         {all.map((a,i)=>{
           const {cx2,cy2,r,ly,above}=placements[i];
-          const isH=hov===i;
           const lc=a.isYou?'#5B21B6':a.isTopComp?'#1E40AF':'#6B7280';
-          const fs=a.isYou?11:a.isTopComp?10:7;
+          const fs=a.isYou?12:a.isTopComp?11:7;
           const fw=(a.isYou||a.isTopComp)?700:400;
           const leaderY=above?cy2-r:cy2+r;
-          const tipW=176,tipH=52,tx=Math.min(Math.max(cx2-tipW/2,padL+2),W-padR-tipW-2),ty=cy2>padT+70?cy2-tipH-14:cy2+r+10;
           return <g key={`l${i}`} onMouseEnter={()=>setHov(i)} onMouseLeave={()=>setHov(null)} style={{cursor:'pointer'}}>
             <line x1={cx2} y1={leaderY} x2={cx2} y2={above?ly+3:ly-3} stroke={lc} strokeWidth="0.8" strokeDasharray="2,2" opacity="0.4"/>
             <text x={cx2} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs,fill:lc,fontFamily:'Inter,sans-serif',fontWeight:fw,pointerEvents:'none'}}>{a.label}</text>
-            {isH&&<g>
-              <rect x={tx} y={ty} width={tipW} height={tipH} rx={6} fill="#1F2937"/>
-              <text x={tx+10} y={ty+14} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (Top Competitor)':a.isYou?' (You)':''}</text>
-              <text x={tx+10} y={ty+28} style={{fontSize:9,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: {a.x}  .  Sentiment: {a.y}</text>
-              <text x={tx+10} y={ty+42} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>Citation Score: {a.cit}</text>
-            </g>}
           </g>;
         })}
-        {[...Array(19)].map((_,i)=>{const v=i*5;if(v<xMin||v>xMax)return null;return<text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>;})}
+        {/* Render tooltips LAST so they always appear on top of everything */}
+        {all.map((a,i)=>{
+          const {cx2,cy2,r}=placements[i];
+          const isH=hov===i;
+          if(!isH) return null;
+          const tipW=190,tipH=68;
+          // Smart positioning: flip if near right or top edge
+          const tx=cx2+tipW+10>W-padR ? cx2-tipW-10 : cx2+10;
+          const ty=cy2-tipH<padT ? cy2+r+8 : cy2-tipH-8;
+          return <g key={`tip${i}`} style={{pointerEvents:'none'}}>
+            <rect x={tx} y={ty} width={tipW} height={tipH} rx={8} fill="#1F2937" filter="drop-shadow(0 4px 12px rgba(0,0,0,0.35))"/>
+            <text x={tx+12} y={ty+16} style={{fontSize:11,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}{a.isTopComp?' (Top Competitor)':a.isYou?' (You)':''}</text>
+            <text x={tx+12} y={ty+32} style={{fontSize:10,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: <tspan fill='#C4B5FD' fontWeight="700">{a.x}</tspan>   Sentiment: <tspan fill='#6EE7B7' fontWeight="700">{a.y}</tspan></text>
+            <text x={tx+12} y={ty+48} style={{fontSize:10,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Citation Score: <tspan fill='#FCD34D' fontWeight="700">{a.cit}</tspan></text>
+            <text x={tx+12} y={ty+62} style={{fontSize:9,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Quadrant: {a.x>=medX&&a.y>=medY?'High Vis · High Sent':a.x<medX&&a.y>=medY?'Low Vis · High Sent':a.x>=medX&&a.y<medY?'High Vis · Low Sent':'Low Vis · Low Sent'}</text>
+          </g>;
+        })}
+        {[0,10,20,30,40,50,60,70,80,90,100].map(v=><text key={v} x={sx(v)} y={H-padB+16} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>)}
         <text x={(padL+W-padR)/2} y={H-8} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
         <text x={14} y={(padT+H-padB)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT+H-padB)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
       </svg>
@@ -1355,7 +1374,6 @@ export default function GeoHub() {
                         const bx=bPad+i*gW;
                         const subW = (gW*0.8)/allMetrics.length;
                         const isY=c.isYou,isH=hovBar===i;
-                        const tipY=bH-100;
                         return (<g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>
                           {allMetrics.map((m,mi)=>{
                             const val=(c as any)[m.key]||0;
@@ -1364,13 +1382,6 @@ export default function GeoHub() {
                             return <rect key={mi} x={mx} y={bH-mh} width={subW-1} height={mh} fill={m.color} rx={1} opacity={isY?1:0.55}/>;
                           })}
                           <text x={bx+gW/2} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#7C3AED':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>
-                          {isH&&<g>
-                            <rect x={Math.min(bx,bW-160)} y={tipY-10} width={155} height={allMetrics.length*14+20} rx={6} fill="#1F2937"/>
-                            <text x={Math.min(bx,bW-160)+8} y={tipY+4} style={{fontSize:10,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text>
-                            {allMetrics.map((m,mi)=>(
-                              <text key={mi} x={Math.min(bx,bW-160)+8} y={tipY+18+mi*13} style={{fontSize:9,fill:m.color,fontFamily:'Inter,sans-serif'}}>{m.label}: {(c as any)[m.key]||0}</text>
-                            ))}
-                          </g>}
                         </g>);
                       })}
 
@@ -1407,6 +1418,22 @@ export default function GeoHub() {
                           </g>
                         ))}
                       </g>
+                      {/* Tooltip rendered LAST so it overlays everything */}
+                      {hovBar!==null&&(()=>{
+                        const c=top[hovBar];
+                        const bx=bPad+hovBar*gW;
+                        const tipW=160,tipH=allMetrics.length*14+28;
+                        const tx=bx+gW/2+tipW+8>bW-bPad ? bx-tipW-4 : bx+gW/2+4;
+                        const ty=Math.max(0, bH-tipH-20);
+                        return <g style={{pointerEvents:'none'}}>
+                          <rect x={tx} y={ty} width={tipW} height={tipH} rx={8} fill="#1F2937" filter="drop-shadow(0 4px 16px rgba(0,0,0,0.45))"/>
+                          <text x={tx+10} y={ty+14} style={{fontSize:11,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text>
+                          <text x={tx+10} y={ty+26} style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO}</text>
+                          {allMetrics.map((m,mi)=>(
+                            <text key={mi} x={tx+10} y={ty+40+mi*13} style={{fontSize:9,fill:m.color,fontFamily:'Inter,sans-serif',fontWeight:600}}>{m.label}: {(c as any)[m.key]||0}</text>
+                          ))}
+                        </g>;
+                      })()}
                     </svg></div>
                   </div>
 
@@ -1473,58 +1500,175 @@ export default function GeoHub() {
                       {label:'Month 3', vis:vis||48, sent:result.sentiment||65, cit:result.citation_share||48, sov:result.share_of_voice||40, prom:result.prominence||52},
                     ];
                     const p=periods[sankeyPeriod-1];
-                    const W=760,H=260,padL=100,padR=100,padT=32,padB=32;
-                    const plotW=W-padL-padR,plotH=H-padT-padB;
-                    const metrics=[
-                      {key:'vis',label:'Visibility',val:p.vis,weight:30,color:'#7C3AED'},
-                      {key:'sent',label:'Sentiment',val:p.sent,weight:20,color:'#10B981'},
-                      {key:'prom',label:'Prominence',val:p.prom,weight:20,color:'#3B82F6'},
-                      {key:'cit',label:'Citations',val:p.cit,weight:15,color:'#F59E0B'},
-                      {key:'sov',label:'Share of Voice',val:p.sov,weight:15,color:'#EF4444'},
+
+                    // Build a richer Sankey: Sources → Signals → GEO Score → Outcomes
+                    // Like image 4: multi-column flow with crossing streams
+                    const W=900,H=380,padT=20,padB=40;
+
+                    // Column 1: AI Channels (sources)
+                    const channels=[
+                      {label:'ChatGPT',val:Math.round(p.vis*0.38),color:'#10B981'},
+                      {label:'Perplexity',val:Math.round(p.vis*0.25),color:'#3B82F6'},
+                      {label:'Gemini',val:Math.round(p.vis*0.22),color:'#F59E0B'},
+                      {label:'Claude',val:Math.round(p.vis*0.15),color:'#A855F7'},
                     ];
-                    const geoScore=Math.round(metrics.reduce((s,m)=>s+m.val*m.weight/100,0));
-                    const gap2=8;
-                    const totalH=plotH;
-                    let leftY=padT;
-                    const leftNodes=metrics.map(m=>{
-                      const h=Math.max(18,(m.weight/100)*totalH);
-                      const node={...m,x1:padL,x2:padL+40,y1:leftY,y2:leftY+h-gap2,mid:(leftY+leftY+h-gap2)/2};
-                      leftY+=h;
-                      return node;
+                    // Column 2: Signal types
+                    const signals=[
+                      {label:'Visibility',val:p.vis,color:'#7C3AED',weight:30},
+                      {label:'Sentiment',val:p.sent,color:'#10B981',weight:20},
+                      {label:'Prominence',val:p.prom,color:'#3B82F6',weight:20},
+                      {label:'Citations',val:p.cit,color:'#F59E0B',weight:15},
+                      {label:'Share of Voice',val:p.sov,color:'#EF4444',weight:15},
+                    ];
+                    // Column 3: GEO Score (single node)
+                    const geoScore=Math.round(signals.reduce((s,m)=>s+m.val*m.weight/100,0));
+                    // Column 4: Outcomes
+                    const outcomes=[
+                      {label:'AI Mentions',val:Math.round(geoScore*0.35),color:'#059669'},
+                      {label:'Top Rankings',val:Math.round(geoScore*0.28),color:'#7C3AED'},
+                      {label:'Sentiment Wins',val:Math.round(geoScore*0.22),color:'#3B82F6'},
+                      {label:'Citations Earned',val:Math.round(geoScore*0.15),color:'#F59E0B'},
+                    ];
+
+                    const col1X=110, col2X=290, col3X=570, col4X=750;
+                    const nodeW=32;
+                    const plotH=H-padT-padB;
+
+                    // Layout nodes in each column proportionally
+                    const layoutNodes=(items:{label:string,val:number,color:string}[], x:number)=>{
+                      const total=items.reduce((s,n)=>s+n.val,0)||1;
+                      const gap=8;
+                      const usableH=plotH-gap*(items.length-1);
+                      let cy=padT;
+                      return items.map(n=>{
+                        const h=Math.max(20,(n.val/total)*usableH);
+                        const node={...n, x, y:cy, h, mid:cy+h/2};
+                        cy+=h+gap;
+                        return node;
+                      });
+                    };
+
+                    const chanNodes=layoutNodes(channels, col1X);
+                    const sigNodes=layoutNodes(signals, col2X);
+                    const geoH=Math.min(plotH*0.65, 180);
+                    const geoNode={x:col3X,y:padT+(plotH-geoH)/2,h:geoH,mid:padT+(plotH-geoH)/2+geoH/2,label:'GEO Score',val:geoScore,color:'#7C3AED'};
+                    const outcomeNodes=layoutNodes(outcomes, col4X);
+
+                    // Draw curved flow between two nodes
+                    const flow=(x1:number,y1:number,h1:number, x2:number,y2:number,h2:number, color:string, opacity:number)=>{
+                      const mx=(x1+x2)/2;
+                      return `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx},${y2+h2} ${mx},${y1+h1} ${x1},${y1+h1} Z" fill="${color}" opacity="${opacity}"/>`;
+                    };
+
+                    // Map each channel to signals proportionally
+                    const chanToSig: {ch:number,sig:number,chY:number,chH:number,sigY:number,sigH:number,color:string}[]=[];
+                    chanNodes.forEach((ch,ci)=>{
+                      const chFrac=ch.val/(channels.reduce((s,n)=>s+n.val,0)||1);
+                      sigNodes.forEach((sig,si)=>{
+                        const w=ch.h*chFrac*(sig.weight/100)*2;
+                        chanToSig.push({ch:ci,sig:si,chY:ch.mid-w/2,chH:w,sigY:sig.mid-w/2,sigH:w,color:sig.color});
+                      });
                     });
-                    const rightH=plotH*0.7,rightY=padT+(plotH-rightH)/2;
-                    const rightNode={x1:W-padR-40,x2:W-padR,y1:rightY,y2:rightY+rightH,mid:(rightY+rightY+rightH)/2};
+
+                    // Map each signal to GEO proportionally (split GEO height by weight)
+                    const sigToGeo: {si:number,sigY:number,sigH:number,geoY:number,geoH:number,color:string}[]=[];
+                    let geoOffset=geoNode.y;
+                    sigNodes.forEach((sig,si)=>{
+                      const h=geoNode.h*(sig.weight/100);
+                      sigToGeo.push({si,sigY:sig.mid-sig.h*0.4,sigH:sig.h*0.8,geoY:geoOffset,geoH:h,color:sig.color});
+                      geoOffset+=h;
+                    });
+
+                    // Map GEO to outcomes proportionally
+                    const geoToOut: {oi:number,geoY:number,geoH:number,outY:number,outH:number,color:string}[]=[];
+                    let geoOffset2=geoNode.y;
+                    outcomeNodes.forEach((out,oi)=>{
+                      const frac=out.val/(outcomes.reduce((s,n)=>s+n.val,0)||1);
+                      const h=geoNode.h*frac;
+                      geoToOut.push({oi,geoY:geoOffset2,geoH:h,outY:out.mid-out.h*0.45,outH:out.h*0.9,color:out.color});
+                      geoOffset2+=h;
+                    });
+
                     return (
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginTop:20}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
                           <div>
                             <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
-                            <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginTop:2}}>Sankey diagram showing how each metric flows into your GEO Score over time</div>
+                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>Multi-channel AI signal flow showing how each source contributes to your GEO Score and outcomes</div>
                           </div>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <div style={{display:'flex',alignItems:'center',gap:6}}>
                             {periods.map((_,i)=><button key={i} onClick={()=>setSankeyPeriod(i+1)} style={{background:sankeyPeriod===i+1?'#7C3AED':'#F3F4F6',color:sankeyPeriod===i+1?'white':'#6B7280',border:'none',borderRadius:6,padding:'5px 12px',fontSize:'0.73rem',fontWeight:600,cursor:'pointer'}}>{periods[i].label}</button>)}
                           </div>
                         </div>
-                        <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',marginTop:8}}>
-                          {leftNodes.map((n,i)=>{
-                            const isH=hovMetric===n.key;
-                            const path=`M${n.x2},${n.y1} C${n.x2+plotW*0.45},${n.y1} ${rightNode.x1-plotW*0.45},${rightNode.y1+i*(rightNode.y2-rightNode.y1)/metrics.length} ${rightNode.x1},${rightNode.y1+i*(rightNode.y2-rightNode.y1)/metrics.length} L${rightNode.x1},${rightNode.y1+(i+1)*(rightNode.y2-rightNode.y1)/metrics.length} C${rightNode.x1-plotW*0.45},${rightNode.y1+(i+1)*(rightNode.y2-rightNode.y1)/metrics.length} ${n.x2+plotW*0.45},${n.y2} ${n.x2},${n.y2} Z`;
-                            return <g key={i} onMouseEnter={()=>setHovMetric(n.key)} onMouseLeave={()=>setHovMetric(null)}>
-                              <path d={path} fill={n.color} opacity={isH?0.5:0.2} style={{transition:'opacity 0.2s'}}/>
-                              <rect x={n.x1} y={n.y1} width={40} height={n.y2-n.y1} fill={n.color} rx={4}/>
-                              <text x={n.x1-6} y={n.mid} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x1-6} y={n.mid+12} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:n.color,fontFamily:'Inter,sans-serif'}}>{n.val}</text>
-                              {isH&&<rect x={n.x2+20} y={n.y1} width={120} height={36} rx={6} fill="#1F2937"/>}
-                              {isH&&<text x={n.x2+80} y={n.y1+14} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{n.label}: {n.val}</text>}
-                              {isH&&<text x={n.x2+80} y={n.y1+26} textAnchor="middle" style={{fontSize:8,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Weight: {n.weight}% of GEO</text>}
-                            </g>;
+                        <div style={{overflowX:'auto' as const}}>
+                        <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:700,display:'block'}}>
+                          {/* Column headers */}
+                          {[{x:col1X+nodeW/2,label:'AI Channels'},{x:col2X+nodeW/2,label:'GEO Signals'},{x:col3X+nodeW/2,label:'GEO Score'},{x:col4X+nodeW/2,label:'Outcomes'}].map((h,i)=>(
+                            <text key={i} x={h.x} y={padT-6} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.05em',textTransform:'uppercase'}}>{h.label}</text>
+                          ))}
+
+                          {/* Flows: channels → signals (crossing, colorful) */}
+                          {chanToSig.map((f,i)=>{
+                            const mx=(col1X+nodeW+col2X)/2;
+                            return <path key={`cs${i}`}
+                              d={`M${col1X+nodeW},${f.chY} C${mx},${f.chY} ${mx},${f.sigY} ${col2X},${f.sigY} L${col2X},${f.sigY+f.sigH} C${mx},${f.sigY+f.sigH} ${mx},${f.chY+f.chH} ${col1X+nodeW},${f.chY+f.chH} Z`}
+                              fill={f.color} opacity="0.18"/>;
                           })}
-                          <rect x={rightNode.x1} y={rightNode.y1} width={40} height={rightNode.y2-rightNode.y1} fill="#7C3AED" rx={4}/>
-                          <text x={rightNode.x2+8} y={rightNode.mid-10} dominantBaseline="middle" style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
-                          <text x={rightNode.x2+8} y={rightNode.mid+6} dominantBaseline="middle" style={{fontSize:24,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+
+                          {/* Flows: signals → GEO */}
+                          {sigToGeo.map((f,i)=>{
+                            const mx=(col2X+nodeW+col3X)/2;
+                            return <path key={`sg${i}`}
+                              d={`M${col2X+nodeW},${f.sigY} C${mx},${f.sigY} ${mx},${f.geoY} ${col3X},${f.geoY} L${col3X},${f.geoY+f.geoH} C${mx},${f.geoY+f.geoH} ${mx},${f.sigY+f.sigH} ${col2X+nodeW},${f.sigY+f.sigH} Z`}
+                              fill={f.color} opacity="0.22"/>;
+                          })}
+
+                          {/* Flows: GEO → outcomes */}
+                          {geoToOut.map((f,i)=>{
+                            const mx=(col3X+nodeW+col4X)/2;
+                            return <path key={`go${i}`}
+                              d={`M${col3X+nodeW},${f.geoY} C${mx},${f.geoY} ${mx},${f.outY} ${col4X},${f.outY} L${col4X},${f.outY+f.outH} C${mx},${f.outY+f.outH} ${mx},${f.geoY+f.geoH} ${col3X+nodeW},${f.geoY+f.geoH} Z`}
+                              fill={f.color} opacity="0.22"/>;
+                          })}
+
+                          {/* Column 1: Channel nodes */}
+                          {chanNodes.map((n,i)=>(
+                            <g key={`ch${i}`}>
+                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4}/>
+                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
+                            </g>
+                          ))}
+
+                          {/* Column 2: Signal nodes */}
+                          {sigNodes.map((n,i)=>(
+                            <g key={`sig${i}`} onMouseEnter={()=>setHovMetric(n.key||n.label)} onMouseLeave={()=>setHovMetric(null)} style={{cursor:'pointer'}}>
+                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4} opacity={hovMetric===n.label?1:0.85}/>
+                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
+                              {hovMetric===n.label&&<rect x={n.x+nodeW+4} y={n.mid-16} width={96} height={30} rx={5} fill="#1F2937"/>}
+                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid-4} textAnchor="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}: {n.val}</text>}
+                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid+8} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight: {(n as any).weight}%</text>}
+                            </g>
+                          ))}
+
+                          {/* Column 3: GEO Score node */}
+                          <rect x={geoNode.x} y={geoNode.y} width={nodeW} height={geoNode.h} fill="#7C3AED" rx={6}/>
+                          <text x={geoNode.x+nodeW+12} y={geoNode.mid-14} style={{fontSize:12,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
+                          <text x={geoNode.x+nodeW+12} y={geoNode.mid+10} style={{fontSize:28,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+
+                          {/* Column 4: Outcome nodes */}
+                          {outcomeNodes.map((n,i)=>(
+                            <g key={`out${i}`}>
+                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4}/>
+                              <text x={n.x+nodeW+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x+nodeW+6} y={n.mid+7} dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
+                            </g>
+                          ))}
                         </svg>
-                        <div style={{display:'flex',gap:12,marginTop:8,flexWrap:'wrap' as const}}>
-                          {metrics.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:10,height:10,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight)</span></div>)}
+                        </div>
+                        <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
+                          {signals.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:10,height:10,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
                         </div>
                       </div>
                     );
@@ -2102,18 +2246,55 @@ export default function GeoHub() {
             })()}
 
             {activeTab===7&&(()=>(
-              <div>
-                <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Live Prompt Tester</div>
-                <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:20}}>Run any prompt against a live AI model and see how your brand appears in real responses.</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:20}}>{examplePrompts.map((p,i)=><button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:10,padding:'10px 16px',fontSize:'0.82rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',textAlign:'left' as const,lineHeight:1.5}}>{p}</button>)}</div>
-                <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:20,marginBottom:20}}>
-                  <div style={{display:'flex',gap:10}}>
-                    <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask any question -- e.g. What&apos;s the best travel credit card?" style={{flex:1,border:'1.5px solid #E5E7EB',borderRadius:10,padding:'11px 16px',fontSize:'0.9rem',outline:'none',color:'#374151'}}/>
-                    <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'0 22px',fontWeight:700,fontSize:'0.9rem',cursor:'pointer',flexShrink:0}}>{promptLoading?'Asking...':'Ask AI'}</button>
-                  </div>
+              <div style={{display:'flex',flexDirection:'column' as const,height:'calc(100vh - 160px)',minHeight:500}}>
+                <div style={{marginBottom:16}}>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Live Prompt Tester</div>
+                  <div style={{fontSize:'0.8rem',color:'#9CA3AF'}}>Ask any question and see how AI responds about brands in your category.</div>
                 </div>
-                {promptHistory.length>0&&<div style={{display:'flex',flexDirection:'column' as const,gap:16}}>{promptHistory.map((h,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}><div style={{fontSize:'0.82rem',fontWeight:700,color:'#7C3AED',marginBottom:10}}>Q: {h.q}</div><MarkdownText text={h.a}/></div>)}</div>}
-                {promptLoading&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.88rem'}}>Querying AI model...</div>}
+                {/* Suggestion chips */}
+                <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:16}}>
+                  {examplePrompts.map((p,i)=>(
+                    <button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:20,padding:'6px 14px',fontSize:'0.78rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap' as const,transition:'all 0.15s'}}
+                      onMouseEnter={e=>(e.currentTarget.style.background='#EDE9FE')}
+                      onMouseLeave={e=>(e.currentTarget.style.background='#F5F3FF')}
+                    >{p}</button>
+                  ))}
+                </div>
+                {/* Response area - grows with content, centered empty state when empty */}
+                <div style={{flex:1,overflowY:'auto' as const,marginBottom:16,display:'flex',flexDirection:'column' as const,gap:12}}>
+                  {promptHistory.length===0&&!promptLoading?(
+                    <div style={{flex:1,display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',textAlign:'center' as const,padding:'60px 40px',color:'#9CA3AF'}}>
+                      <div style={{width:64,height:64,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.8rem',marginBottom:16}}>🤖</div>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#374151',marginBottom:8}}>Ask the AI anything</div>
+                      <div style={{fontSize:'0.84rem',lineHeight:1.7,maxWidth:400}}>Type a question below or click one of the suggestions above. See exactly how AI responds about {result?.brand_name||'your brand'} and competitors in real time.</div>
+                    </div>
+                  ):(
+                    <>
+                      {promptHistory.map((h,i)=>(
+                        <div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}>
+                          <div style={{background:'#F5F3FF',padding:'10px 18px',borderBottom:'1px solid #EDE9FE',display:'flex',alignItems:'center',gap:8}}>
+                            <span style={{fontSize:'0.7rem',fontWeight:700,color:'#7C3AED',background:'#EDE9FE',borderRadius:50,padding:'2px 8px'}}>Q</span>
+                            <span style={{fontSize:'0.84rem',fontWeight:600,color:'#5B21B6'}}>{h.q}</span>
+                          </div>
+                          <div style={{padding:'16px 18px'}}><MarkdownText text={h.a}/></div>
+                        </div>
+                      ))}
+                      {promptLoading&&(
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}>
+                          <div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
+                          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                          Querying AI model...
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                {/* Input always at bottom */}
+                <div style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',boxShadow:'0 -2px 12px rgba(0,0,0,0.04)'}}>
+                  <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything, e.g. What is the best travel credit card?" style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
+                  <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:promptLoading?'#DDD6FE':'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:promptLoading?'not-allowed':'pointer',flexShrink:0,transition:'background 0.15s'}}>{promptLoading?'Asking...':'Ask AI'}</button>
+                  {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.75rem',color:'#9CA3AF',cursor:'pointer'}}>Clear</button>}
+                </div>
               </div>
             ))()}
 
