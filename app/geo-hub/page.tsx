@@ -14,6 +14,8 @@ const METRIC_TIPS: Record<string,string> = {
   'citation score': 'Reflects how authoritatively AI models reference your brand compared to competitors.',
   'sentiment score': 'Captures the tone and favorability of AI responses when your brand is mentioned.',
   'avg rank': 'Average position when your brand is mentioned within an AI response. #1 means AI names your brand first most often. #3 means two other brands are typically named before yours.',
+  'prominence score': 'Measures how early in AI responses your brand is mentioned. A score of 100 means you are always named first. Lower scores mean competitors are mentioned before you.',
+  'share of voice': 'Your brand mentions as a percentage of all brand mentions across AI responses. Higher = your brand dominates the AI conversation in this category.',
 };
 
 const RADAR_TIPS: Record<string,string> = {
@@ -235,7 +237,7 @@ function GeoGauge({ score, brand }: { score:number; brand:string }) {
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 16px 14px',textAlign:'center'}}>
       <div style={{fontSize:'0.9rem',fontWeight:700,color:'#374151',marginBottom:4}}>{brand}</div>
       <svg viewBox="0 0 320 175" style={{width:'100%',display:'block',overflow:'visible'}}>
-        {seg(0,44,'#FECACA')}{seg(44,69,'#FEF08A')}{seg(69,79,'#BAE6FD')}{seg(79,100,'#BBF7D0')}
+        {seg(0,44,'#FCA5A5')}{seg(44,69,'#FCD34D')}{seg(69,79,'#93C5FD')}{seg(79,100,'#6EE7B7')}
         <line x1={ox(score,mi)} y1={oy(score,mi)} x2={ox(score,mo)} y2={oy(score,mo)} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"/>
         {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
         <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
@@ -835,11 +837,11 @@ function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:n
       <svg viewBox="0 0 400 420" style={{width:'100%'}}>
         {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
-        <polygon points={compPoly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#9CA3AF" fillOpacity="0.12" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="4,3"/>
+{/* competitor polygon removed per design */}
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#7C3AED" fillOpacity="0.18" stroke="#7C3AED" strokeWidth="2"/>
         {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#7C3AED" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;})}
         {dims.map((d,i)=>{const lp=pt(i,R+26);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);return<text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#7C3AED':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;})}
-        <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text><circle cx={58} cy={0} r={5} fill="#9CA3AF" opacity="0.5"/><text x={68} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>Avg Competitor</text></g>
+        <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text></g>
       </svg>
       {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{getRadarTip(dims[hov].label)}</div></div>}
       <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Feature Insight:</strong> Strongest in <strong>{top2.join(' and ')}</strong> -- AI frequently associates your brand with these. Weakest in <strong>{bot2.join(' and ')}</strong> -- competitors dominate these product queries.</div>
@@ -1129,12 +1131,13 @@ export default function GeoHub() {
               <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                 <span style={{fontSize:'0.72rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Prompts</span>
                 {[50,100,300,500,1000].map(n=><button key={n} onClick={()=>setPromptCount(n)} style={{background:promptCount===n?'#7C3AED':'#F3F4F6',color:promptCount===n?'white':'#6B7280',border:'none',borderRadius:6,padding:'4px 10px',fontSize:'0.75rem',fontWeight:promptCount===n?700:500,cursor:'pointer'}}>{n}</button>)}
+                <input type="number" min={10} max={2000} value={promptCount} onChange={e=>{const v=parseInt(e.target.value)||100;setPromptCount(Math.min(2000,Math.max(10,v)));}} style={{width:64,border:'1.5px solid #7C3AED',borderRadius:6,padding:'3px 8px',fontSize:'0.75rem',color:'#7C3AED',fontWeight:700,outline:'none',textAlign:'center' as const}}/>
               </div>
             </div>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
               <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #E5E7EB',borderRadius:12,background:'white',overflow:'hidden',height:52}}>
-                <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://</span>
-                <input type="text" value={url.replace(/^https?:\/\//,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl('https://'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="www.capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
+                <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://www.</span>
+                <input type="text" value={url.replace(/^https?:\/\/(www\.)?/,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl('https://www.'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
               </div>
               <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>🔍 {loading?'Analysing...':'Run Live AI Analysis'}</button>
             </div>
@@ -1274,6 +1277,12 @@ export default function GeoHub() {
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
                   </div>
                   <WhatScoreMeans score={geo} brand={result.brand_name}/>
+                  <div style={{marginTop:16}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+                      <SankeyChart result={result}/>
+                      <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
+                    </div>
+                  </div>
                 </div>
               );
             })()}
@@ -1377,20 +1386,20 @@ export default function GeoHub() {
                   </div>
 
 {(()=>{
-                    const [showScurve, setShowScurve]=React.useState(false);
+                    const showSc = selectedCluster==='_scurve_toggle';
                     return (
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility -- Market Positioning</div>
-                        <button onClick={()=>setShowScurve(s=>!s)} style={{background:showScurve?'#7C3AED':'#F3F4F6',color:showScurve?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
-                          {showScurve?'Show Scatter':'Show S-Curve'}
+                        <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
+                          {showSc?'Show Scatter':'Show S-Curve'}
                         </button>
                       </div>
-                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>{showScurve?'GEO maturity curve showing your position and opportunity':'Each dot = one brand. Your brand is highlighted in purple.'}</div>
-                      {showScurve
-                        ? <ROICurve score={geo}/>
-                        : <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
-                      }
+                       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>{showSc?'GEO maturity curve showing your position and opportunity':'Each dot = one brand. Your brand is highlighted in purple.'}</div>
+                       {showSc
+                         ? <ROICurve score={geo}/>
+                         : <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
+                       }
                     </div>
                     );
                   })()}
@@ -1603,11 +1612,9 @@ export default function GeoHub() {
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
-                      {(()=>{
-                      const [citFilter, setCitFilter] = React.useState<string|null>(null);
-                      return catEntries.length>0?catEntries.map(([cat,pct],i)=>{
-                        const isActive = citFilter===cat;
-                        return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>{setCitFilter(isActive?null:cat);const evt=new CustomEvent('citFilter',{detail:isActive?null:cat});window.dispatchEvent(evt);}}>
+                      {catEntries.length>0?catEntries.map(([cat,pct],i)=>{
+                        const isActive = activeCitCat===cat;
+                        return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>{const evt=new CustomEvent('citFilter',{detail:isActive?null:cat});window.dispatchEvent(evt);}}>
                           <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
                             <span style={{fontSize:'0.84rem',color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span>
                             <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span>
@@ -1617,8 +1624,7 @@ export default function GeoHub() {
                           </div>
                           {isActive&&<div style={{fontSize:'0.65rem',color:catColors[cat],marginTop:4,fontWeight:600}}>Filtering right panel</div>}
                         </div>;
-                      }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>
-                    })()}
+                      }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
                     </div>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px',overflowY:'auto' as const,maxHeight:400}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sources AI is Pulling From -- {result.brand_name}</div>
