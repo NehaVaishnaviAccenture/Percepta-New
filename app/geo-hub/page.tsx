@@ -244,7 +244,7 @@ function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
         <span style={{fontSize:'0.95rem',fontWeight:800,color:'#7C3AED'}}>What does your score mean?</span>
       </div>
       <p style={{fontSize:'0.84rem',color:'#374151',lineHeight:1.75,margin:'0 0 14px'}}>
-        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier -- AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you are not yet the brand AI leads with or recommends first.'}
+        Think of the GEO Score like a credit score for AI. At <strong>{score}</strong>, <strong>{brand}</strong> {score >= 80 ? 'is in the top tier. AI consistently leads with your brand as the primary recommendation.' : score >= 70 ? 'has crossed the efficiency threshold where AI models consistently feature your brand near the top of responses.' : 'is below the 70 threshold where AI models consistently feature a brand at the top of responses. You appear in results, but you are not yet the brand AI leads with or recommends first.'}
       </p>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
         {scoreBands.map((b,i)=>(
@@ -315,18 +315,18 @@ function ROICurve({ score }: { score: number }) {
         <text x={(padL+W-padR)/2} y={padT+plotH+22} textAnchor="middle" style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:600}}>GEO Maturity</text>
         <text x={12} y={padT+plotH/2} textAnchor="middle" transform={`rotate(-90,12,${padT+plotH/2})`} style={{fontSize:10,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('you')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={youCX} cy={youCY} r={9} fill="#7C3AED" stroke="white" strokeWidth="2"/>
+          <circle cx={youCX} cy={youCY} r={7} fill="#7C3AED" stroke="white" strokeWidth="2"/>
           <text x={youCX} y={youCY+18} textAnchor="middle" style={{fontSize:7,fontWeight:700,fill:'#5B21B6',fontFamily:'Inter,sans-serif'}}>You ({score})</text>
           {hov==='you'&&<><rect x={youCX-52} y={youCY+28} width={104} height={20} rx={4} fill="#1F2937"/><text x={youCX} y={youCY+39} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: {score}</text></>}
         </g>
         {/* CHANGE: Goal (70) text is now #1E88E5 blue (same as Leader legend), "Opportunity Zone" removed */}
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={goalCX} cy={goalCY} r={7} fill="#1E88E5" stroke="white" strokeWidth="2"/>
+          <circle cx={goalCX} cy={goalCY} r={9} fill="#1E88E5" stroke="white" strokeWidth="2"/>
           <text x={goalCX-12} y={goalCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#1E88E5',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
           {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
         </g>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={authCX} cy={authCY} r={7} fill="#43A047" stroke="white" strokeWidth="2"/>
+          <circle cx={authCX} cy={authCY} r={12} fill="#43A047" stroke="white" strokeWidth="2"/>
           <text x={authCX-12} y={authCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
           {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
@@ -480,7 +480,7 @@ function GeoSummary({ result }: { result:any }) {
         <ROICurve score={geo}/>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginTop:14}}>
           {[
-            {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' -- Category leader':geo>=70?' -- Above threshold':' -- Below efficiency threshold')},
+            {label:'Current GEO Score', val:geo, color:geo>=80?'#10B981':geo>=70?'#7C3AED':'#F59E0B', sub:badge.label+(geo>=80?' · Category leader':geo>=70?' · Above threshold':' · Below efficiency threshold')},
             {label:'Opportunity Score', val:projected, color:'#10B981', sub:'Your reachable GEO score'},
             {label:'GEO Unlock', val:`+${opportunityGain} pts`, color:'#7C3AED', sub:'Your GEO gap to close'},
           ].map((c,i)=>(
@@ -764,7 +764,7 @@ function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:n
         <g transform="translate(20,398)"><circle cx={6} cy={0} r={5} fill="#7C3AED" opacity="0.7"/><text x={16} y={0} dominantBaseline="middle" style={{fontSize:10,fill:'#374151',fontFamily:'Inter,sans-serif'}}>You</text></g>
       </svg>
       {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999,boxShadow:'0 4px 12px rgba(0,0,0,0.25)'}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{getRadarTip(dims[hov].label)}</div></div>}
-      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Feature Insight:</strong> Strongest in <strong>{top2.join(' and ')}</strong> -- AI frequently associates your brand with these. Weakest in <strong>{bot2.join(' and ')}</strong> -- competitors dominate these product queries.</div>
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:4}}>💡 <strong>Feature Insight:</strong> Strongest in <strong>{top2.join(' and ')}</strong> · AI frequently associates your brand with these. Weakest in <strong>{bot2.join(' and ')}</strong> · competitors dominate these product queries.</div>
     </div>
   );
 }
@@ -801,7 +801,7 @@ function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, i
         {rows.map((r,ri)=>[<div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#7C3AED':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,whiteSpace:'nowrap' as const,overflow:'hidden',textOverflow:'ellipsis',display:'flex',alignItems:'center',justifyContent:'flex-end'}}>{r.name}</div>,...r.scores.map((val,ci)=>{const k=`${ri}-${ci}`,{bg,text}=cellColor(val),isH=hovCell===k;return<div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)} style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #7C3AED':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>{isH?val:''}</div>;})])}
       </div>
       <div style={{display:'flex',alignItems:'center',gap:14,marginTop:12,flexWrap:'wrap' as const}}>{[{bg:'#5B21B6',label:'Strong (80+)'},{bg:'#8B5CF6',label:'Good (60-79)'},{bg:'#C4B5FD',label:'Moderate (40-59)'},{bg:'#F3F4F6',label:'Weak (<40)',border:'1px solid #E5E7EB'}].map((l,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:l.bg,border:l.border}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>{l.label}</span></div>)}<div style={{display:'flex',alignItems:'center',gap:5}}><div style={{width:11,height:11,borderRadius:2,background:'#C4B5FD',border:'2px solid #7C3AED'}}/><span style={{fontSize:'0.68rem',color:'#6B7280'}}>Your brand</span></div></div>
-      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) -- ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}).</div>
+      <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 14px',fontSize:'0.78rem',color:'#5B21B6',marginTop:10}}>💡 <strong>Insight:</strong> Strongest in <strong>{strongest?.dim}</strong> ({strongest?.score}) · ahead of {strongest?.beaten}/{compRows.length} competitors. Weakest in <strong>{weakest?.dim}</strong> ({weakest?.score}).</div>
     </div>
   );
 }
@@ -931,7 +931,7 @@ Order: High first, then Medium, then Low.`;
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{color:'#F59E0B',fontSize:'1.1rem'}}>!</span><span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions -- Implementable</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{color:'#F59E0B',fontSize:'1.1rem'}}>!</span><span style={{fontSize:'1.1rem',fontWeight:800,color:'#111827'}}>Priority Actions Implementable</span></div>
       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:24}}>Each action is specific, buildable, and mapped to a workstream deliverable.</div>
       {loading?<div style={{display:'flex',alignItems:'center',gap:10,padding:'24px 0',color:'#9CA3AF',fontSize:'0.85rem'}}><div style={{width:16,height:16,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Generating...<style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style></div>
       :actions.length===0?<div style={{fontSize:'0.84rem',color:'#9CA3AF',padding:'12px 0'}}>Generating recommendations... if this persists, try re-running the analysis.</div>
@@ -1061,7 +1061,7 @@ export default function GeoHub() {
                 <span style={{fontSize:'0.8rem',fontWeight:700,color:'#111827'}}>Select number of AI prompts to run</span>
                 <span style={{fontSize:'0.72rem',color:'#EF4444',fontWeight:600,background:'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>Required</span>
               </div>
-              <div style={{display:'flex',gap:8,alignItems:'stretch',flexWrap:'wrap' as const}}>
+              <div style={{display:'flex',gap:6,alignItems:'flex-end',flexWrap:'wrap' as const}}>
                 {[50,100,300,500,1000].map(n=>(
                   <button
                     key={n}
@@ -1070,28 +1070,28 @@ export default function GeoHub() {
                       background:promptCount===n?'#7C3AED':'white',
                       color:promptCount===n?'white':'#374151',
                       border:promptCount===n?'2px solid #7C3AED':'2px solid #D1D5DB',
-                      borderRadius:10,
-                      padding:'10px 20px',
-                      fontSize:'0.88rem',
+                      borderRadius:7,
+                      padding:'5px 12px',
+                      fontSize:'0.75rem',
                       fontWeight:700,
                       cursor:'pointer',
                       transition:'all 0.15s',
                       display:'flex',
                       flexDirection:'column' as const,
                       alignItems:'center',
-                      gap:2,
-                      minWidth:72,
+                      gap:1,
+                      minWidth:52,
                     }}
                   >
-                    <span style={{fontSize:'1.1rem',fontWeight:900}}>{n}</span>
-                    <span style={{fontSize:'0.62rem',fontWeight:500,opacity:0.75}}>
-                      {n===50?'Quick':n===100?'Standard':n===300?'Deep':n===500?'Thorough':'Max'}
+                    <span style={{fontSize:'0.82rem',fontWeight:900}}>{n}</span>
+                    <span style={{fontSize:'0.56rem',fontWeight:500,opacity:0.72}}>
+                      {n===50?'Quick':n===100?'Standard':n===300?'Deep':n===500?'Thorough':'Extended'}
                     </span>
                   </button>
                 ))}
-                {/* CHANGE: Custom number input - clearly labeled as "Enter custom" */}
-                <div style={{display:'flex',flexDirection:'column' as const,gap:3,minWidth:110}}>
-                  <label style={{fontSize:'0.62rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'0.06em'}}>Enter custom #</label>
+                {/* Custom number input */}
+                <div style={{display:'flex',flexDirection:'column' as const,gap:2,minWidth:100}}>
+                  <label style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'0.06em'}}>Custom (max 10,000)</label>
                   <input
                     type="number"
                     placeholder="e.g. 200"
@@ -1101,14 +1101,14 @@ export default function GeoHub() {
                       const v=parseInt(raw);
                       if(raw===''){setPromptCountErr('');return;}
                       if(isNaN(v)){return;}
-                      if(v>10000){setPromptCountErr('Max 10,000');setPromptCount(v);}
+                      if(v>10000){setPromptCountErr('Max is 10,000');setPromptCount(Math.min(v,10000));}
                       else{setPromptCount(v);setPromptCountSelected(true);setPromptCountErr('');}
                     }}
                     style={{
-                      border:`2px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,
-                      borderRadius:10,
-                      padding:'9px 12px',
-                      fontSize:'0.88rem',
+                      border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,
+                      borderRadius:7,
+                      padding:'5px 10px',
+                      fontSize:'0.78rem',
                       fontWeight:700,
                       color:'#374151',
                       outline:'none',
@@ -1116,12 +1116,13 @@ export default function GeoHub() {
                       width:'100%',
                     }}
                   />
-                  {promptCountErr&&<div style={{fontSize:'0.62rem',color:'#EF4444',fontWeight:600}}>{promptCountErr}</div>}
+                  {promptCountErr
+                    ? <div style={{fontSize:'0.58rem',color:'#EF4444',fontWeight:600}}>{promptCountErr}</div>
+                    : <div style={{fontSize:'0.58rem',color:'#9CA3AF'}}>More prompts = longer run time</div>
+                  }
                 </div>
               </div>
-              <div style={{marginTop:8,fontSize:'0.72rem',color:'#9CA3AF'}}>
-                Currently selected: <strong style={{color:'#7C3AED'}}>{promptCount} prompts</strong> — more prompts = higher accuracy, longer run time
-              </div>
+
             </div>
 
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
@@ -1333,12 +1334,12 @@ export default function GeoHub() {
 
               return (
                 <div>
-                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors -- {result.ind_label}</div>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors {result.ind_label}</div>
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your GEO Score</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>{geo}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>ranked #{myRank} of {top.length} brands</div></div>
-                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'--':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close -- strong opportunity':'Gap to close'}</div></div>
-                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'--'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close -- defend':'Comfortable but not safe'):'Leading the category'}</div></div>
+                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'--':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close, strong opportunity':'Gap to close'}</div></div>
+                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'--'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close, defend your position':'Comfortable but not safe'):'Leading the category'}</div></div>
                   </div>
 
                   {/* CHANGE: Combined bar chart (sub-metrics) + GEO line chart overlay */}
@@ -1452,7 +1453,7 @@ export default function GeoHub() {
                     return (
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                        <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility -- Market Positioning</div>
+                        <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility Market Positioning</div>
                         <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
                           {showSc?'Show Scatter':'Show S-Curve'}
                         </button>
@@ -1497,7 +1498,7 @@ export default function GeoHub() {
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginTop:20}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                           <div>
-                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow -- GEO Score Composition</div>
+                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
                             <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginTop:2}}>Sankey diagram showing how each metric flows into your GEO Score over time</div>
                           </div>
                           <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -1535,7 +1536,7 @@ export default function GeoHub() {
             {activeTab===3&&(()=>{
               const rawSent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
               const cit=result.citation_share,sov=result.share_of_voice;
-              const smood=rawSent>=70?'AI speaks favorably about your brand':rawSent>=45?'AI tone is neutral -- room to improve':'AI tone is negative or missing';
+              const smood=rawSent>=70?'AI speaks favorably about your brand':rawSent>=45?'AI tone is neutral, room to improve':'AI tone is negative or missing';
               const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
                 <div>
@@ -1670,17 +1671,28 @@ export default function GeoHub() {
                         </div>;
                       }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
                     </div>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px',overflowY:'auto' as const,maxHeight:400}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sources AI is Pulling From -- {result.brand_name}</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>Top domains that influence AI responses in your category.</div>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px',overflowY:'auto' as const,maxHeight:420}}>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sources AI is Pulling From {result.brand_name}</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>
+                        {activeCitCat
+                          ? <span>Filtered: <strong style={{color:catColors[activeCitCat]||'#7C3AED'}}>{activeCitCat}</strong> sources — <button onClick={()=>setActiveCitCat(null)} style={{background:'none',border:'none',color:'#7C3AED',fontSize:'0.72rem',fontWeight:600,cursor:'pointer',padding:0}}>Clear filter</button></span>
+                          : 'Top 10 domains influencing AI responses. Click a category on the left to filter.'}
+                      </div>
                       <table style={{width:'100%',borderCollapse:'collapse'}}>
                         <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','SHARE %',''].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left' as const,fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                        <tbody>{displaySources.filter((s:any)=>{
-                          if(!activeCitCat) return true;
-                          const isOwned3 = s.isOwned || domainMatchesBrand(s.domain||'');
-                          const cls3 = isOwned3 ? 'Owned Media' : classifyDomain(s.domain||'').label;
-                          return cls3 === activeCitCat;
-                        }).map((s:any,i:number)=>{
+                        <tbody>{(()=>{
+                          const filtered = displaySources.filter((s:any)=>{
+                            if(!activeCitCat) return true;
+                            const isOwned3 = s.isOwned || domainMatchesBrand(s.domain||'');
+                            const cls3 = isOwned3 ? 'Owned Media' : classifyDomain(s.domain||'').label;
+                            return cls3 === activeCitCat;
+                          });
+                          // When no category selected: show top 10. When filtered: show all matching (could be few)
+                          const toShow = activeCitCat ? filtered : filtered.slice(0, 10);
+                          if(toShow.length === 0) {
+                            return <tr><td colSpan={5} style={{padding:'16px 10px',textAlign:'center' as const,fontSize:'0.8rem',color:'#9CA3AF'}}>No sources found for {activeCitCat}. This category has very low citation share.</td></tr>;
+                          }
+                          return toShow.map((s:any,i:number)=>{
                           const isOwned2 = s.isOwned || domainMatchesBrand(s.domain||'');
                           const cls2 = isOwned2 ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
                           const bw2=Math.min(s.citation_share,100);
@@ -1696,7 +1708,8 @@ export default function GeoHub() {
                             </tr>
                             {isExp2&&<tr style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'6px 10px 10px 24px'}}><div style={{fontSize:'0.7rem',fontWeight:600,color:'#7C3AED',marginBottom:6}}>Top pages from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:4}}>{realUrls2.map((url:string,ui:number)=><div key={ui} style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:14,height:14,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.55rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.72rem',color:'#4F46E5',textDecoration:'none'}}>{url}</a></div>)}</div></td></tr>}
                           </React.Fragment>;
-                        })}</tbody>
+                          });
+                        })()}</tbody>
                       </table>
                     </div>
                   </div>
@@ -1949,7 +1962,7 @@ export default function GeoHub() {
                           <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
                         </div>
                         <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:16}}>
-                          Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry} -- beyond what we tested.
+                          Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry} beyond what we tested.
                         </div>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                           {highOpp.map((tq:any,i:number)=>{
@@ -1973,7 +1986,7 @@ export default function GeoHub() {
                                     {topComp&&<span style={{fontSize:'0.65rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'1px 7px',fontWeight:600}}>👑 {topComp} leading</span>}
                                     {brandWinRate!==null
                                       ?<span style={{fontSize:'0.65rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win</span>
-                                      :<span style={{fontSize:'0.65rem',color:'#9CA3AF',fontStyle:'italic'}}>New category -- not yet tested</span>
+                                      :<span style={{fontSize:'0.65rem',color:'#9CA3AF',fontStyle:'italic'}}>New category, not yet tested</span>
                                     }
                                     <span style={{marginLeft:'auto',fontSize:'0.62rem',color:'#6B7280'}}>{isOpen?'^':'v'}</span>
                                   </div>
