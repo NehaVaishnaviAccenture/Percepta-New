@@ -1044,6 +1044,9 @@ export default function GeoHub() {
   const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
   const [hovNode,setHovNode]=useState<string|null>(null);
   const [promptCount,setPromptCount]=useState(120);
+  const [activeCitCat,setActiveCitCat]=useState<string|null>(null);
+  const [sankeyPeriod,setSankeyPeriod]=useState(2);
+  const [promptCountErr,setPromptCountErr]=useState('');
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
 
@@ -1130,8 +1133,11 @@ export default function GeoHub() {
             <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:12}}>
               <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
                 <span style={{fontSize:'0.72rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'.06em'}}>Prompts</span>
-                {[50,100,300,500,1000].map(n=><button key={n} onClick={()=>setPromptCount(n)} style={{background:promptCount===n?'#7C3AED':'#F3F4F6',color:promptCount===n?'white':'#6B7280',border:'none',borderRadius:6,padding:'4px 10px',fontSize:'0.75rem',fontWeight:promptCount===n?700:500,cursor:'pointer'}}>{n}</button>)}
-                <input type="number" min={10} max={2000} value={promptCount} onChange={e=>{const v=parseInt(e.target.value)||100;setPromptCount(Math.min(2000,Math.max(10,v)));}} style={{width:64,border:'1.5px solid #7C3AED',borderRadius:6,padding:'3px 8px',fontSize:'0.75rem',color:'#7C3AED',fontWeight:700,outline:'none',textAlign:'center' as const}}/>
+                {[50,100,300,500,1000].map(n=><button key={n} onClick={()=>{setPromptCount(n);setPromptCountErr('');}} style={{background:promptCount===n?'#7C3AED':'#F3F4F6',color:promptCount===n?'white':'#6B7280',border:'none',borderRadius:6,padding:'4px 10px',fontSize:'0.75rem',fontWeight:promptCount===n?700:500,cursor:'pointer'}}>{n}</button>)}
+                <div style={{position:'relative' as const}}>
+                  <input type="number" value={promptCount} onChange={e=>{const raw=e.target.value;const v=parseInt(raw);if(raw===''){setPromptCount(0);setPromptCountErr('');return;}if(isNaN(v)){return;}if(v>10000){setPromptCountErr('Max 10,000');setPromptCount(v);}else{setPromptCount(v);setPromptCountErr('');}}} style={{width:72,border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,borderRadius:6,padding:'3px 8px',fontSize:'0.75rem',color:'#374151',fontWeight:600,outline:'none',textAlign:'center' as const,background:'white'}} placeholder="other"/>
+                  {promptCountErr&&<div style={{position:'absolute' as const,top:'100%',left:0,fontSize:'0.6rem',color:'#EF4444',whiteSpace:'nowrap' as const,marginTop:2}}>{promptCountErr}</div>}
+                </div>
               </div>
             </div>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
@@ -1405,7 +1411,6 @@ export default function GeoHub() {
                   })()}
                   {/* Sankey: Brand Perception Flow Across Time */}
                   {(()=>{
-                    const [sankeyPeriod, setSankeyPeriod]=React.useState(2);
                     // Sample data: 3 time periods showing realistic progression
                     const periods=[
                       {label:'Month 1', vis:20, sent:48, cit:30, sov:18, prom:28},
@@ -1516,12 +1521,6 @@ export default function GeoHub() {
             })()}
 
             {activeTab===4&&(()=>{
-              const [activeCitCat, setActiveCitCat] = React.useState<string|null>(null);
-              React.useEffect(()=>{
-                const handler=(e:any)=>setActiveCitCat(e.detail);
-                window.addEventListener('citFilter', handler);
-                return()=>window.removeEventListener('citFilter', handler);
-              },[]);
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
               const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
               const domainMatchesBrand = (domain: string) => {
@@ -1614,7 +1613,7 @@ export default function GeoHub() {
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
                       {catEntries.length>0?catEntries.map(([cat,pct],i)=>{
                         const isActive = activeCitCat===cat;
-                        return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>{const evt=new CustomEvent('citFilter',{detail:isActive?null:cat});window.dispatchEvent(evt);}}>
+                        return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>setActiveCitCat(isActive?null:cat)}>
                           <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
                             <span style={{fontSize:'0.84rem',color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span>
                             <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span>
