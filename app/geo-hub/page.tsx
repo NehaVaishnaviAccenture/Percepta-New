@@ -1534,8 +1534,8 @@ export default function GeoHub() {
                     const nodeW=32;
                     const plotH=H-padT-padB;
 
-                    // Layout nodes in each column proportionally
-                    const layoutNodes=(items:{label:string,val:number,color:string}[], x:number)=>{
+                    // Layout nodes in each column proportionally — generic so extra props (weight, key) are preserved
+                    const layoutNodes=<T extends {label:string,val:number,color:string}>(items:T[], x:number)=>{
                       const total=items.reduce((s,n)=>s+n.val,0)||1;
                       const gap=8;
                       const usableH=plotH-gap*(items.length-1);
@@ -1642,13 +1642,13 @@ export default function GeoHub() {
 
                           {/* Column 2: Signal nodes */}
                           {sigNodes.map((n,i)=>(
-                            <g key={`sig${i}`} onMouseEnter={()=>setHovMetric(n.key||n.label)} onMouseLeave={()=>setHovMetric(null)} style={{cursor:'pointer'}}>
+                            <g key={`sig${i}`} onMouseEnter={()=>setHovMetric(n.label)} onMouseLeave={()=>setHovMetric(null)} style={{cursor:'pointer'}}>
                               <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4} opacity={hovMetric===n.label?1:0.85}/>
                               <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
                               <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
                               {hovMetric===n.label&&<rect x={n.x+nodeW+4} y={n.mid-16} width={96} height={30} rx={5} fill="#1F2937"/>}
                               {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid-4} textAnchor="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}: {n.val}</text>}
-                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid+8} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight: {(n as any).weight}%</text>}
+                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid+8} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight: {n.weight}%</text>}
                             </g>
                           ))}
 
