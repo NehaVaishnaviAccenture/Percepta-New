@@ -2151,7 +2151,8 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
 
 export async function POST(req: NextRequest) {
   try {
-    const { url } = await req.json();
+    const { url, promptCount } = await req.json();
+    const MAX_QUERIES = promptCount ? Math.min(Math.max(promptCount, 10), 1000) : 120;
     const pageData = await fetchPageContent(url);
     if (!pageData.ok) return NextResponse.json({ error: (pageData as any).error }, { status: 400 });
 
@@ -2371,7 +2372,7 @@ Rules:
     }
 
     const ind = INDUSTRY_DATA[indKey] || INDUSTRY_DATA['gen'];
-    const queries: string[][] = ind.queries;
+    const queries: string[][] = ind.queries.slice(0, MAX_QUERIES);
     const allQA: any[] = new Array(queries.length);
 
     const BATCH_SIZE = 25;
