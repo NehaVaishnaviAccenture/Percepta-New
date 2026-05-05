@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from 'react';
 
 const bands = [
-  { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80-100', label: 'Excellent', desc: 'Well optimized for AI citation' },
-  { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70-79', label: 'Good', desc: 'Minor improvements recommended' },
-  { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45-69', label: 'Needs Work', desc: 'Several issues to address' },
-  { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0-44', label: 'Poor', desc: 'Major optimization needed' },
+  { bg: '#E8F5E9', border: '#43A047', color: '#43A047', range: '80-100', label: 'Excellent', desc: 'Well optimized for AI citation' },
+  { bg: '#E3F2FD', border: '#1E88E5', color: '#1E88E5', range: '70-79', label: 'Good', desc: 'Minor improvements recommended' },
+  { bg: '#FBE9E7', border: '#FF7043', color: '#FF7043', range: '45-69', label: 'Needs Work', desc: 'Several issues to address' },
+  { bg: '#FFEBEE', border: '#F44336', color: '#F44336', range: '0-44', label: 'Poor', desc: 'Major optimization needed' },
 ];
 
 const METRIC_TIPS: Record<string,string> = {
@@ -58,10 +58,10 @@ function getRadarTip(label: string): string {
 const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt','FAQ'];
 
 function scoreBadge(s: number) {
-  if (s >= 80) return { label: 'Excellent', color: '#065F46', bg: '#D1FAE5' };
-  if (s >= 70) return { label: 'Good', color: '#1E40AF', bg: '#DBEAFE' };
-  if (s >= 45) return { label: 'Needs Work', color: '#92400E', bg: '#FEF3C7' };
-  return { label: 'Poor', color: '#991B1B', bg: '#FEE2E2' };
+  if (s >= 80) return { label: 'Excellent', color: '#43A047', bg: '#E8F5E9' };
+  if (s >= 70) return { label: 'Good', color: '#1E88E5', bg: '#E3F2FD' };
+  if (s >= 45) return { label: 'Needs Work', color: '#FF7043', bg: '#FBE9E7' };
+  return { label: 'Poor', color: '#F44336', bg: '#FFEBEE' };
 }
 
 function classifyDomain(d: string) {
@@ -237,7 +237,7 @@ function GeoGauge({ score, brand }: { score:number; brand:string }) {
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 16px 14px',textAlign:'center'}}>
       <div style={{fontSize:'0.9rem',fontWeight:700,color:'#374151',marginBottom:4}}>{brand}</div>
       <svg viewBox="0 0 320 175" style={{width:'100%',display:'block',overflow:'visible'}}>
-        {seg(0,44,'#FCA5A5')}{seg(44,69,'#FCD34D')}{seg(69,79,'#93C5FD')}{seg(79,100,'#6EE7B7')}
+        {seg(0,44,'#F44336')}{seg(44,69,'#FF7043')}{seg(69,79,'#FDD835')}{seg(79,100,'#43A047')}
         <line x1={ox(score,mi)} y1={oy(score,mi)} x2={ox(score,mo)} y2={oy(score,mo)} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"/>
         {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
         <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{score}</text>
@@ -252,10 +252,10 @@ function GeoGauge({ score, brand }: { score:number; brand:string }) {
 
 function WhatScoreMeans({ score, brand }: { score:number; brand:string }) {
   const scoreBands = [
-    { range:'0-44', label:'Poor', color:'#991B1B', bg:'#FFF1F2', border:'#FCA5A5', desc:'Rarely mentioned. AI lacks enough signals to surface you reliably.' },
-    { range:'45-69', label:'Needs Work', color:'#92400E', bg:'#FFFBEB', border:'#FCD34D', desc:'Appears in lists but not as a primary recommendation. Missing key signals.' },
-    { range:'70-79', label:'Good', color:'#1E40AF', bg:'#EFF6FF', border:'#93C5FD', desc:'AI crosses the confidence threshold. Frequent top-3 placements begin.' },
-    { range:'80-100', label:'Excellent', color:'#065F46', bg:'#ECFDF5', border:'#6EE7B7', desc:'Dominant brand signal. AI leads with you as the primary recommendation.' },
+    { range:'0-44', label:'Poor', color:'#F44336', bg:'#FFEBEE', border:'#F44336', desc:'Rarely mentioned. AI lacks enough signals to surface you reliably.' },
+    { range:'45-69', label:'Needs Work', color:'#FF7043', bg:'#FBE9E7', border:'#FF7043', desc:'Appears in lists but not as a primary recommendation. Missing key signals.' },
+    { range:'70-79', label:'Good', color:'#1E88E5', bg:'#E3F2FD', border:'#1E88E5', desc:'AI crosses the confidence threshold. Frequent top-3 placements begin.' },
+    { range:'80-100', label:'Excellent', color:'#43A047', bg:'#E8F5E9', border:'#43A047', desc:'Dominant brand signal. AI leads with you as the primary recommendation.' },
   ];
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:16}}>
@@ -303,11 +303,11 @@ function ROICurve({ score }: { score: number }) {
   const goalCX = sx(goalX), goalCY = sy(70);
   const authCX = sx(authX), authCY = sy(80);
   const stages = [
-    { label: 'Fragmented', range: '0-44', color: '#EF4444' },
-    { label: 'Emerging', range: '45-55', color: '#F59E0B' },
-    { label: 'Competitive', range: '56-69', color: '#3B82F6' },
-    { label: 'Leader', range: '70-79', color: '#10B981' },
-    { label: 'Authority', range: '80+', color: '#7C3AED' },
+    { label: 'Fragmented', range: '0-44', color: '#E53935' },
+    { label: 'Emerging', range: '45-55', color: '#FB8C00' },
+    { label: 'Competitive', range: '56-69', color: '#FDD835' },
+    { label: 'Leader', range: '70-79', color: '#1E88E5' },
+    { label: 'Authority', range: '80+', color: '#43A047' },
   ];
   return (
     <div style={{ background: '#F8FAFC', borderRadius: 12 }}>
@@ -339,13 +339,13 @@ function ROICurve({ score }: { score: number }) {
           {hov==='you'&&<><rect x={youCX-52} y={youCY+28} width={104} height={20} rx={4} fill="#1F2937"/><text x={youCX} y={youCY+39} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: {score}</text></>}
         </g>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('goal')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={goalCX} cy={goalCY} r={7} fill="#F59E0B" stroke="white" strokeWidth="2"/>
+          <circle cx={goalCX} cy={goalCY} r={7} fill="#1E88E5" stroke="white" strokeWidth="2"/>
           <text x={goalCX-12} y={goalCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#92400E',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
           <text x={goalCX-12} y={goalCY-3} textAnchor="end" style={{fontSize:6,fill:'#92400E',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>&quot;Opportunity Zone&quot;</text>
           {hov==='goal'&&<><rect x={goalCX-118} y={goalCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={goalCX-66} y={goalCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text></>}
         </g>
         <g style={{cursor:'pointer'}} onMouseEnter={()=>setHov('auth')} onMouseLeave={()=>setHov(null)}>
-          <circle cx={authCX} cy={authCY} r={7} fill="#10B981" stroke="white" strokeWidth="2"/>
+          <circle cx={authCX} cy={authCY} r={7} fill="#43A047" stroke="white" strokeWidth="2"/>
           <text x={authCX-12} y={authCY-12} textAnchor="end" style={{fontSize:7,fontWeight:700,fill:'#065F46',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
           {hov==='auth'&&<><rect x={authCX-118} y={authCY+10} width={104} height={20} rx={4} fill="#1F2937"/><text x={authCX-66} y={authCY+21} textAnchor="middle" style={{fontSize:9,fill:'white',fontWeight:700,fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text></>}
         </g>
