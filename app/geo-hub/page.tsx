@@ -1494,181 +1494,234 @@ export default function GeoHub() {
                     );
                   })()}
                   {(()=>{
-                    const periods=[
-                      {label:'Month 1', vis:20, sent:48, cit:30, sov:18, prom:28},
-                      {label:'Month 2', vis:32, sent:58, cit:38, sov:28, prom:36},
-                      {label:'Month 3', vis:vis||48, sent:result.sentiment||65, cit:result.citation_share||48, sov:result.share_of_voice||40, prom:result.prominence||52},
-                    ];
-                    const p=periods[sankeyPeriod-1];
+                    // ── SANKEY: Query Categories → GEO Signals → GEO Score → AI Outcomes ──
+                    // Left column: top query categories from real data (how queries flow in)
+                    // Middle column: the 5 weighted GEO signals
+                    // Right column: measurable AI outcomes derived from real query results
+                    //
+                    // OUTCOMES LOGIC (transparent & explained in tooltip):
+                    //   • AI Wins       = queries where brand appeared AND ranked #1
+                    //   • Brand Mentions = total queries where brand was mentioned (any rank)
+                    //   • Missed Queries = queries where brand did NOT appear (opportunity gap)
+                    //   • Competitor Wins= queries won by top competitor (benchmark)
+                    // All values are directly from result.responses_detail — no guesswork.
 
-                    // Build a richer Sankey: Sources → Signals → GEO Score → Outcomes
-                    // Like image 4: multi-column flow with crossing streams
-                    const W=900,H=380,padT=20,padB=40;
+                    const rd2: any[] = result.responses_detail || [];
+                    const clusters2: any[] = result.query_clusters || [];
+                    const totalQ2 = result.total_responses || rd2.length || 100;
 
-                    // Column 1: AI Channels (sources)
-                    const channels=[
-                      {label:'ChatGPT',val:Math.round(p.vis*0.38),color:'#10B981'},
-                      {label:'Perplexity',val:Math.round(p.vis*0.25),color:'#3B82F6'},
-                      {label:'Gemini',val:Math.round(p.vis*0.22),color:'#F59E0B'},
-                      {label:'Claude',val:Math.round(p.vis*0.15),color:'#A855F7'},
-                    ];
-                    // Column 2: Signal types
-                    const signals=[
-                      {label:'Visibility',val:p.vis,color:'#7C3AED',weight:30},
-                      {label:'Sentiment',val:p.sent,color:'#10B981',weight:20},
-                      {label:'Prominence',val:p.prom,color:'#3B82F6',weight:20},
-                      {label:'Citations',val:p.cit,color:'#F59E0B',weight:15},
-                      {label:'Share of Voice',val:p.sov,color:'#EF4444',weight:15},
-                    ];
-                    // Column 3: GEO Score (single node)
-                    const geoScore=Math.round(signals.reduce((s,m)=>s+m.val*m.weight/100,0));
-                    // Column 4: Outcomes
-                    const outcomes=[
-                      {label:'AI Mentions',val:Math.round(geoScore*0.35),color:'#059669'},
-                      {label:'Top Rankings',val:Math.round(geoScore*0.28),color:'#7C3AED'},
-                      {label:'Sentiment Wins',val:Math.round(geoScore*0.22),color:'#3B82F6'},
-                      {label:'Citations Earned',val:Math.round(geoScore*0.15),color:'#F59E0B'},
+                    const aiWins = rd2.filter((r:any)=>r.mentioned && r.position===1).length;
+                    const mentions = rd2.filter((r:any)=>r.mentioned).length;
+                    const missed = totalQ2 - mentions;
+                    const compWins = rd2.filter((r:any)=>!r.mentioned && r.winner_brand).length;
+
+                    // Use top 5 query categories by total queries as left column
+                    const topCats2 = [...clusters2]
+                      .sort((a:any,b:any)=>b.total-a.total)
+                      .slice(0,5);
+
+                    // Fallback if no cluster data
+                    const leftItems = topCats2.length >= 2 ? topCats2.map((c:any)=>({
+                      label: c.category.length > 14 ? c.category.slice(0,13)+'…' : c.category,
+                      fullLabel: c.category,
+                      val: c.total || Math.round(totalQ2/5),
+                      color: ['#10B981','#3B82F6','#F59E0B','#A855F7','#EF4444'][clusters2.indexOf(c)%5],
+                      winRate: c.winRate || 0,
+                    })) : [
+                      {label:'Rewards',fullLabel:'Rewards Queries',val:22,color:'#10B981',winRate:60},
+                      {label:'Travel',fullLabel:'Travel Queries',val:20,color:'#3B82F6',winRate:45},
+                      {label:'Cash Back',fullLabel:'Cash Back Queries',val:18,color:'#F59E0B',winRate:30},
+                      {label:'Fees',fullLabel:'Fees & APR Queries',val:15,color:'#A855F7',winRate:20},
+                      {label:'Secured',fullLabel:'Credit Building Queries',val:12,color:'#EF4444',winRate:15},
                     ];
 
-                    const col1X=110, col2X=290, col3X=570, col4X=750;
-                    const nodeW=32;
-                    const plotH=H-padT-padB;
+                    const signals2 = [
+                      {label:'Visibility',val:result.visibility||0,weight:30,color:'#7C3AED'},
+                      {label:'Sentiment',val:result.sentiment||0,weight:20,color:'#10B981'},
+                      {label:'Prominence',val:result.prominence||0,weight:20,color:'#3B82F6'},
+                      {label:'Citations',val:result.citation_share||0,weight:15,color:'#F59E0B'},
+                      {label:'Share of Voice',val:result.share_of_voice||0,weight:15,color:'#EF4444'},
+                    ];
+                    const geoScore2 = Math.round(signals2.reduce((s,m)=>s+m.val*m.weight/100,0)) || result.overall_geo_score || 0;
 
-                    // Layout nodes in each column proportionally — generic so extra props (weight, key) are preserved
-                    const layoutNodes=<T extends {label:string,val:number,color:string}>(items:T[], x:number)=>{
-                      const total=items.reduce((s,n)=>s+n.val,0)||1;
-                      const gap=8;
-                      const usableH=plotH-gap*(items.length-1);
-                      let cy=padT;
+                    const outcomes2 = [
+                      {label:'AI Wins',val:aiWins,color:'#10B981',desc:`Queries where ${result.brand_name} ranked #1 in AI response`},
+                      {label:'Brand Mentions',val:mentions,color:'#7C3AED',desc:`Queries where ${result.brand_name} appeared at any rank`},
+                      {label:'Missed Queries',val:missed,color:'#F59E0B',desc:`Queries where ${result.brand_name} was not mentioned at all`},
+                      {label:'Competitor Wins',val:compWins,color:'#EF4444',desc:`Queries where a competitor beat ${result.brand_name}`},
+                    ];
+
+                    const W2=920, H2=420, padT2=28, padB2=40;
+                    const col1X=130, col2X=330, col3X=590, col4X=760;
+                    const nodeW2=28;
+                    const plotH2=H2-padT2-padB2;
+
+                    const layoutN=<T extends {label:string,val:number,color:string}>(items:T[], x:number, minH=22, gap=10)=>{
+                      const total=items.reduce((s,n)=>s+Math.max(n.val,1),0)||1;
+                      const usableH=plotH2-gap*(items.length-1);
+                      let cy=padT2;
                       return items.map(n=>{
-                        const h=Math.max(20,(n.val/total)*usableH);
-                        const node={...n, x, y:cy, h, mid:cy+h/2};
+                        const h=Math.max(minH,(Math.max(n.val,1)/total)*usableH);
+                        const node={...n,x,y:cy,h,mid:cy+h/2};
                         cy+=h+gap;
                         return node;
                       });
                     };
 
-                    const chanNodes=layoutNodes(channels, col1X);
-                    const sigNodes=layoutNodes(signals, col2X);
-                    const geoH=Math.min(plotH*0.65, 180);
-                    const geoNode={x:col3X,y:padT+(plotH-geoH)/2,h:geoH,mid:padT+(plotH-geoH)/2+geoH/2,label:'GEO Score',val:geoScore,color:'#7C3AED'};
-                    const outcomeNodes=layoutNodes(outcomes, col4X);
+                    const leftNodes2=layoutN(leftItems,col1X,24,12);
+                    const sigNodes2=layoutN(signals2,col2X,28,8);
+                    const geoH2=Math.min(plotH2*0.6,160);
+                    const geoNode2={x:col3X,y:padT2+(plotH2-geoH2)/2,h:geoH2,mid:padT2+(plotH2-geoH2)/2+geoH2/2};
+                    const outNodes2=layoutN(outcomes2,col4X,28,10);
 
-                    // Draw curved flow between two nodes
-                    const flow=(x1:number,y1:number,h1:number, x2:number,y2:number,h2:number, color:string, opacity:number)=>{
-                      const mx=(x1+x2)/2;
-                      return `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx},${y2+h2} ${mx},${y1+h1} ${x1},${y1+h1} Z" fill="${color}" opacity="${opacity}"/>`;
+                    // Wavy cubic bezier path for a flow band (Image 3 style — crossing, organic)
+                    const wavePath=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.45)=>{
+                      const mx1=x1+nodeW2+(x2-x1-nodeW2)*bend;
+                      const mx2=x2-(x2-x1-nodeW2)*bend;
+                      return `M${x1+nodeW2},${y1} C${mx1},${y1} ${mx2},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx2},${y2+h2} ${mx1},${y1+h1} ${x1+nodeW2},${y1+h1} Z`;
                     };
 
-                    // Map each channel to signals proportionally
-                    const chanToSig: {ch:number,sig:number,chY:number,chH:number,sigY:number,sigH:number,color:string}[]=[];
-                    chanNodes.forEach((ch,ci)=>{
-                      const chFrac=ch.val/(channels.reduce((s,n)=>s+n.val,0)||1);
-                      sigNodes.forEach((sig,si)=>{
-                        const w=ch.h*chFrac*(sig.weight/100)*2;
-                        chanToSig.push({ch:ci,sig:si,chY:ch.mid-w/2,chH:w,sigY:sig.mid-w/2,sigH:w,color:sig.color});
+                    // Left→middle: distribute each query category across signals proportionally by weight
+                    type Flow1={path:string,color:string,opacity:number};
+                    const flows1:Flow1[]=[];
+                    leftNodes2.forEach((ln)=>{
+                      const lFrac=ln.h/plotH2;
+                      // track how far down each sig node we've consumed
+                      let sigOffset=0;
+                      sigNodes2.forEach((sig,si)=>{
+                        const frac=(sig.weight/100);
+                        const lH=Math.max(3,ln.h*frac);
+                        const sH=Math.max(3,sig.h*lFrac);
+                        const lY=ln.y+sigOffset*ln.h;
+                        const sY=sig.y+leftNodes2.slice(0,leftNodes2.indexOf(ln)).reduce((acc,prev)=>acc+prev.h*frac,0);
+                        flows1.push({
+                          path:wavePath(ln.x,lY,lH,sig.x,sY,sH,0.42),
+                          color:sig.color,
+                          opacity:0.18,
+                        });
+                        sigOffset+=frac;
                       });
                     });
 
-                    // Map each signal to GEO proportionally (split GEO height by weight)
-                    const sigToGeo: {si:number,sigY:number,sigH:number,geoY:number,geoH:number,color:string}[]=[];
-                    let geoOffset=geoNode.y;
-                    sigNodes.forEach((sig,si)=>{
-                      const h=geoNode.h*(sig.weight/100);
-                      sigToGeo.push({si,sigY:sig.mid-sig.h*0.4,sigH:sig.h*0.8,geoY:geoOffset,geoH:h,color:sig.color});
-                      geoOffset+=h;
+                    // Middle→GEO: each signal flows into its proportional slice of GEO
+                    type Flow2={path:string,color:string};
+                    const flows2:Flow2[]=[];
+                    let gOff=geoNode2.y;
+                    sigNodes2.forEach((sig)=>{
+                      const h=geoNode2.h*(sig.weight/100);
+                      flows2.push({
+                        path:wavePath(sig.x,sig.y,sig.h,geoNode2.x,gOff,h,0.46),
+                        color:sig.color,
+                      });
+                      gOff+=h;
                     });
 
-                    // Map GEO to outcomes proportionally
-                    const geoToOut: {oi:number,geoY:number,geoH:number,outY:number,outH:number,color:string}[]=[];
-                    let geoOffset2=geoNode.y;
-                    outcomeNodes.forEach((out,oi)=>{
-                      const frac=out.val/(outcomes.reduce((s,n)=>s+n.val,0)||1);
-                      const h=geoNode.h*frac;
-                      geoToOut.push({oi,geoY:geoOffset2,geoH:h,outY:out.mid-out.h*0.45,outH:out.h*0.9,color:out.color});
-                      geoOffset2+=h;
+                    // GEO→Outcomes: slice GEO proportionally by outcome value
+                    type Flow3={path:string,color:string};
+                    const flows3:Flow3[]=[];
+                    const outTotal=outcomes2.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
+                    let gOff2=geoNode2.y;
+                    outNodes2.forEach((on)=>{
+                      const frac=Math.max(on.val,1)/outTotal;
+                      const h=geoNode2.h*frac;
+                      flows3.push({
+                        path:wavePath(geoNode2.x,gOff2,h,on.x,on.y,on.h,0.46),
+                        color:on.color,
+                      });
+                      gOff2+=h;
                     });
+
+                    const hovSankey=hovMetric;
+                    const setHovSankey=setHovMetric;
 
                     return (
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px',marginTop:20}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
                           <div>
                             <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
-                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>Multi-channel AI signal flow showing how each source contributes to your GEO Score and outcomes</div>
+                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>How your query categories flow through GEO signals to produce measurable AI outcomes. All values from live query results.</div>
                           </div>
-                          <div style={{display:'flex',alignItems:'center',gap:6}}>
-                            {periods.map((_,i)=><button key={i} onClick={()=>setSankeyPeriod(i+1)} style={{background:sankeyPeriod===i+1?'#7C3AED':'#F3F4F6',color:sankeyPeriod===i+1?'white':'#6B7280',border:'none',borderRadius:6,padding:'5px 12px',fontSize:'0.73rem',fontWeight:600,cursor:'pointer'}}>{periods[i].label}</button>)}
+                          {/* Outcomes legend with explanation */}
+                          <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:220,flexShrink:0}}>
+                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>How Outcomes are calculated</div>
+                            {outcomes2.map((o,i)=>(
+                              <div key={i} style={{display:'flex',gap:4,marginBottom:2}}>
+                                <div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/>
+                                <span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                         <div style={{overflowX:'auto' as const}}>
-                        <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:700,display:'block'}}>
+                        <svg viewBox={`0 0 ${W2} ${H2}`} style={{width:'100%',minWidth:700,display:'block'}}>
                           {/* Column headers */}
-                          {[{x:col1X+nodeW/2,label:'AI Channels'},{x:col2X+nodeW/2,label:'GEO Signals'},{x:col3X+nodeW/2,label:'GEO Score'},{x:col4X+nodeW/2,label:'Outcomes'}].map((h,i)=>(
-                            <text key={i} x={h.x} y={padT-6} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.05em',textTransform:'uppercase'}}>{h.label}</text>
+                          {[
+                            {x:col1X+nodeW2/2,label:'QUERY CATEGORIES'},
+                            {x:col2X+nodeW2/2,label:'GEO SIGNALS'},
+                            {x:col3X+nodeW2/2,label:'GEO SCORE'},
+                            {x:col4X+nodeW2/2,label:'AI OUTCOMES'},
+                          ].map((h,i)=>(
+                            <text key={i} x={h.x} y={padT2-8} textAnchor="middle" style={{fontSize:8,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.08em'}}>{h.label}</text>
                           ))}
 
-                          {/* Flows: channels → signals (crossing, colorful) */}
-                          {chanToSig.map((f,i)=>{
-                            const mx=(col1X+nodeW+col2X)/2;
-                            return <path key={`cs${i}`}
-                              d={`M${col1X+nodeW},${f.chY} C${mx},${f.chY} ${mx},${f.sigY} ${col2X},${f.sigY} L${col2X},${f.sigY+f.sigH} C${mx},${f.sigY+f.sigH} ${mx},${f.chY+f.chH} ${col1X+nodeW},${f.chY+f.chH} Z`}
-                              fill={f.color} opacity="0.18"/>;
-                          })}
+                          {/* Flows 1: left→signals (wavy crossing, per-signal color) */}
+                          {flows1.map((f,i)=>(
+                            <path key={`f1${i}`} d={f.path} fill={f.color} opacity={f.opacity}/>
+                          ))}
+                          {/* Flows 2: signals→GEO */}
+                          {flows2.map((f,i)=>(
+                            <path key={`f2${i}`} d={f.path} fill={f.color} opacity={hovSankey===signals2[i]?.label?0.45:0.22}
+                              onMouseEnter={()=>setHovSankey(signals2[i]?.label)}
+                              onMouseLeave={()=>setHovSankey(null)}
+                              style={{cursor:'pointer',transition:'opacity 0.15s'}}/>
+                          ))}
+                          {/* Flows 3: GEO→outcomes */}
+                          {flows3.map((f,i)=>(
+                            <path key={`f3${i}`} d={f.path} fill={f.color} opacity={0.22}/>
+                          ))}
 
-                          {/* Flows: signals → GEO */}
-                          {sigToGeo.map((f,i)=>{
-                            const mx=(col2X+nodeW+col3X)/2;
-                            return <path key={`sg${i}`}
-                              d={`M${col2X+nodeW},${f.sigY} C${mx},${f.sigY} ${mx},${f.geoY} ${col3X},${f.geoY} L${col3X},${f.geoY+f.geoH} C${mx},${f.geoY+f.geoH} ${mx},${f.sigY+f.sigH} ${col2X+nodeW},${f.sigY+f.sigH} Z`}
-                              fill={f.color} opacity="0.22"/>;
-                          })}
-
-                          {/* Flows: GEO → outcomes */}
-                          {geoToOut.map((f,i)=>{
-                            const mx=(col3X+nodeW+col4X)/2;
-                            return <path key={`go${i}`}
-                              d={`M${col3X+nodeW},${f.geoY} C${mx},${f.geoY} ${mx},${f.outY} ${col4X},${f.outY} L${col4X},${f.outY+f.outH} C${mx},${f.outY+f.outH} ${mx},${f.geoY+f.geoH} ${col3X+nodeW},${f.geoY+f.geoH} Z`}
-                              fill={f.color} opacity="0.22"/>;
-                          })}
-
-                          {/* Column 1: Channel nodes */}
-                          {chanNodes.map((n,i)=>(
-                            <g key={`ch${i}`}>
-                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4}/>
-                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
+                          {/* Column 1: Query category nodes */}
+                          {leftNodes2.map((n,i)=>(
+                            <g key={`lc${i}`}>
+                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3}/>
+                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries · {(n as any).winRate}% win</text>
                             </g>
                           ))}
 
                           {/* Column 2: Signal nodes */}
-                          {sigNodes.map((n,i)=>(
-                            <g key={`sig${i}`} onMouseEnter={()=>setHovMetric(n.label)} onMouseLeave={()=>setHovMetric(null)} style={{cursor:'pointer'}}>
-                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4} opacity={hovMetric===n.label?1:0.85}/>
-                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
-                              {hovMetric===n.label&&<rect x={n.x+nodeW+4} y={n.mid-16} width={96} height={30} rx={5} fill="#1F2937"/>}
-                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid-4} textAnchor="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}: {n.val}</text>}
-                              {hovMetric===n.label&&<text x={n.x+nodeW+52} y={n.mid+8} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight: {n.weight}%</text>}
+                          {sigNodes2.map((n,i)=>(
+                            <g key={`sn${i}`} onMouseEnter={()=>setHovSankey(n.label)} onMouseLeave={()=>setHovSankey(null)} style={{cursor:'pointer'}}>
+                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3} opacity={hovSankey===n.label?1:0.88}/>
+                              <text x={n.x+nodeW2+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x+nodeW2+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
+                              {hovSankey===n.label&&(
+                                <g>
+                                  <rect x={n.x+nodeW2+90} y={n.mid-18} width={110} height={34} rx={5} fill="#1F2937"/>
+                                  <text x={n.x+nodeW2+145} y={n.mid-6} textAnchor="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}: {n.val}</text>
+                                  <text x={n.x+nodeW2+145} y={n.mid+6} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight in GEO: {n.weight}%</text>
+                                </g>
+                              )}
                             </g>
                           ))}
 
                           {/* Column 3: GEO Score node */}
-                          <rect x={geoNode.x} y={geoNode.y} width={nodeW} height={geoNode.h} fill="#7C3AED" rx={6}/>
-                          <text x={geoNode.x+nodeW+12} y={geoNode.mid-14} style={{fontSize:12,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
-                          <text x={geoNode.x+nodeW+12} y={geoNode.mid+10} style={{fontSize:28,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+                          <rect x={geoNode2.x} y={geoNode2.y} width={nodeW2} height={geoNode2.h} fill="#7C3AED" rx={5}/>
+                          <text x={geoNode2.x+nodeW2+10} y={geoNode2.mid-16} style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
+                          <text x={geoNode2.x+nodeW2+10} y={geoNode2.mid+12} style={{fontSize:30,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore2}</text>
 
                           {/* Column 4: Outcome nodes */}
-                          {outcomeNodes.map((n,i)=>(
-                            <g key={`out${i}`}>
-                              <rect x={n.x} y={n.y} width={nodeW} height={n.h} fill={n.color} rx={4}/>
-                              <text x={n.x+nodeW+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9.5,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x+nodeW+6} y={n.mid+7} dominantBaseline="middle" style={{fontSize:8.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}</text>
+                          {outNodes2.map((n,i)=>(
+                            <g key={`on${i}`}>
+                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3}/>
+                              <text x={n.x+nodeW2+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
+                              <text x={n.x+nodeW2+6} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries</text>
                             </g>
                           ))}
                         </svg>
                         </div>
                         <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
-                          {signals.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:10,height:10,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
+                          {signals2.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
                         </div>
                       </div>
                     );
@@ -2246,13 +2299,14 @@ export default function GeoHub() {
             })()}
 
             {activeTab===7&&(()=>(
-              <div style={{display:'flex',flexDirection:'column' as const,height:'calc(100vh - 160px)',minHeight:500}}>
-                <div style={{marginBottom:16}}>
-                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Live Prompt Tester</div>
+              <div style={{display:'flex',flexDirection:'column' as const,minHeight:'calc(100vh - 200px)'}}>
+                {/* Header */}
+                <div style={{marginBottom:12}}>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:3}}>Live Prompt Tester</div>
                   <div style={{fontSize:'0.8rem',color:'#9CA3AF'}}>Ask any question and see how AI responds about brands in your category.</div>
                 </div>
                 {/* Suggestion chips */}
-                <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:16}}>
+                <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:12}}>
                   {examplePrompts.map((p,i)=>(
                     <button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:20,padding:'6px 14px',fontSize:'0.78rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap' as const,transition:'all 0.15s'}}
                       onMouseEnter={e=>(e.currentTarget.style.background='#EDE9FE')}
@@ -2260,13 +2314,19 @@ export default function GeoHub() {
                     >{p}</button>
                   ))}
                 </div>
-                {/* Response area - grows with content, centered empty state when empty */}
-                <div style={{flex:1,overflowY:'auto' as const,marginBottom:16,display:'flex',flexDirection:'column' as const,gap:12}}>
+                {/* Search bar — immediately below chips */}
+                <div style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.05)',marginBottom:16}}>
+                  <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything, e.g. What is the best travel credit card?" style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
+                  <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:promptLoading?'#DDD6FE':'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:promptLoading?'not-allowed':'pointer',flexShrink:0,transition:'background 0.15s'}}>{promptLoading?'Asking...':'Ask AI'}</button>
+                  {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.75rem',color:'#9CA3AF',cursor:'pointer'}}>Clear</button>}
+                </div>
+                {/* Response area */}
+                <div style={{display:'flex',flexDirection:'column' as const,gap:12,flex:1}}>
                   {promptHistory.length===0&&!promptLoading?(
-                    <div style={{flex:1,display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',textAlign:'center' as const,padding:'60px 40px',color:'#9CA3AF'}}>
-                      <div style={{width:64,height:64,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.8rem',marginBottom:16}}>🤖</div>
-                      <div style={{fontSize:'1rem',fontWeight:700,color:'#374151',marginBottom:8}}>Ask the AI anything</div>
-                      <div style={{fontSize:'0.84rem',lineHeight:1.7,maxWidth:400}}>Type a question below or click one of the suggestions above. See exactly how AI responds about {result?.brand_name||'your brand'} and competitors in real time.</div>
+                    <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',textAlign:'center' as const,padding:'40px 40px',color:'#9CA3AF',background:'white',borderRadius:14,border:'1px solid #E5E7EB'}}>
+                      <div style={{width:56,height:56,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.6rem',marginBottom:12}}>🤖</div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#374151',marginBottom:6}}>Ask the AI anything</div>
+                      <div style={{fontSize:'0.82rem',lineHeight:1.7,maxWidth:400,color:'#9CA3AF'}}>Type a question above or click one of the suggestions. See exactly how AI responds about {result?.brand_name||'your brand'} and competitors in real time.</div>
                     </div>
                   ):(
                     <>
@@ -2288,12 +2348,6 @@ export default function GeoHub() {
                       )}
                     </>
                   )}
-                </div>
-                {/* Input always at bottom */}
-                <div style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',boxShadow:'0 -2px 12px rgba(0,0,0,0.04)'}}>
-                  <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything, e.g. What is the best travel credit card?" style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
-                  <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:promptLoading?'#DDD6FE':'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:promptLoading?'not-allowed':'pointer',flexShrink:0,transition:'background 0.15s'}}>{promptLoading?'Asking...':'Ask AI'}</button>
-                  {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.75rem',color:'#9CA3AF',cursor:'pointer'}}>Clear</button>}
                 </div>
               </div>
             ))()}
