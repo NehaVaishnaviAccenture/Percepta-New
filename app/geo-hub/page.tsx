@@ -987,6 +987,7 @@ export default function GeoHub() {
   const [sankeyPeriod,setSankeyPeriod]=useState(2);
   const [promptCountErr,setPromptCountErr]=useState('');
   const [hovMetric,setHovMetric]=useState<string|null>(null);
+  const [hovGoal,setHovGoal]=useState<'goal'|'auth'|null>(null);
   // CHANGE: track if user has explicitly selected a prompt count
   const [promptCountSelected,setPromptCountSelected]=useState(true);
   // CHANGE: highlighted bubble connections
@@ -1524,20 +1525,41 @@ export default function GeoHub() {
                           <line x1={padL3} y1={midY3} x2={W3-padR3} y2={midY3} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
                           <line x1={padL3} y1={H3-padB3} x2={W3-padR3} y2={H3-padB3} stroke="#D1D5DB" strokeWidth="1.5"/>
                           <line x1={padL3} y1={padT3} x2={padL3} y2={H3-padB3} stroke="#D1D5DB" strokeWidth="1.5"/>
-                          {/* S-curve overlay — only when showOverlay */}
-                          {showOverlay&&<>
-                            <path d={sCurveD} fill="none" stroke="#7C3AED" strokeWidth="2.5" opacity="0.7"/>
-                            {/* Shaded area between current score and goal */}
-                            <path
-                              d={`${sCurvePts.slice(scoreToX(score),goalX+1).map((p,i)=>`${i===0?'M':'L'}${sx3(p.x).toFixed(1)},${sy3(p.y).toFixed(1)}`).join(' ')} L${sx3(goalX)},${padT3+H3-padB3-padT3} L${sx3(scoreToX(score))},${padT3+H3-padB3-padT3} Z`}
-                              fill="#EDE9FE" opacity="0.3"/>
-                            {/* Goal dot */}
-                            <circle cx={sx3(goalX)} cy={sy3(70)} r={9} fill="#1E88E5" stroke="white" strokeWidth="2"/>
-                            <text x={sx3(goalX)-12} y={sy3(70)-14} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#1E88E5',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
-                            {/* Authority dot */}
-                            <circle cx={sx3(authX)} cy={sy3(80)} r={12} fill="#43A047" stroke="white" strokeWidth="2"/>
-                            <text x={sx3(authX)-12} y={sy3(80)-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#43A047',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
-                          </>}
+                          {/* S-curve overlay — only when showOverlay. Render AFTER bubbles so always on top */}
+                          {showOverlay&&(()=>{
+                            return<>
+                              {/* Shaded opportunity gap */}
+                              {score<70&&<path
+                                d={`${sCurvePts.slice(scoreToX(score),goalX+1).map((p,i)=>`${i===0?'M':'L'}${sx3(p.x).toFixed(1)},${sy3(p.y).toFixed(1)}`).join(' ')} L${sx3(goalX)},${H3-padB3} L${sx3(scoreToX(score))},${H3-padB3} Z`}
+                                fill="#EDE9FE" opacity="0.28"/>}
+                              {/* The S-curve line itself */}
+                              <path d={sCurveD} fill="none" stroke="#7C3AED" strokeWidth="3" opacity="0.75"/>
+                              {/* GEO Score label on line */}
+                              <text x={sx3(10)} y={sy3(curveY(10))-10} style={{fontSize:8,fill:'#7C3AED',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>GEO Score curve</text>
+                              {/* Authority dot — LARGEST, always on top */}
+                              <g style={{cursor:'pointer'}} onMouseEnter={()=>setHovGoal('auth')} onMouseLeave={()=>setHovGoal(null)}>
+                                <circle cx={sx3(authX)} cy={sy3(80)} r={14} fill="#43A047" stroke="white" strokeWidth="2.5"/>
+                                <text x={sx3(authX)} y={sy3(80)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:7.5,fontWeight:800,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>80</text>
+                                <text x={sx3(authX)+18} y={sy3(80)-14} style={{fontSize:9,fontWeight:700,fill:'#43A047',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
+                                {hovGoal==='auth'&&<>
+                                  <rect x={sx3(authX)+16} y={sy3(80)-42} width={148} height={42} rx={7} fill="#1F2937"/>
+                                  <text x={sx3(authX)+90} y={sy3(80)-28} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>GEO Score: 80</text>
+                                  <text x={sx3(authX)+90} y={sy3(80)-14} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>AI consistently leads with you</text>
+                                </>}
+                              </g>
+                              {/* Goal dot — medium, also above bubbles */}
+                              <g style={{cursor:'pointer'}} onMouseEnter={()=>setHovGoal('goal')} onMouseLeave={()=>setHovGoal(null)}>
+                                <circle cx={sx3(goalX)} cy={sy3(70)} r={11} fill="#1E88E5" stroke="white" strokeWidth="2.5"/>
+                                <text x={sx3(goalX)} y={sy3(70)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:7,fontWeight:800,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>70</text>
+                                <text x={sx3(goalX)+15} y={sy3(70)-12} style={{fontSize:9,fontWeight:700,fill:'#1E88E5',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
+                                {hovGoal==='goal'&&<>
+                                  <rect x={sx3(goalX)+13} y={sy3(70)-40} width={148} height={42} rx={7} fill="#1F2937"/>
+                                  <text x={sx3(goalX)+87} y={sy3(70)-26} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>GEO Score: 70</text>
+                                  <text x={sx3(goalX)+87} y={sy3(70)-12} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Efficiency threshold</text>
+                                </>}
+                              </g>
+                            </>;
+                          })()}
                           {/* Bubbles */}
                           {all2.map((a,i)=>{
                             const{cx4,cy4,r}=placements3[i];
@@ -1585,10 +1607,11 @@ export default function GeoHub() {
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility Market Positioning</div>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          {showSc&&<div style={{display:'flex',alignItems:'center',gap:10,fontSize:'0.7rem',color:'#6B7280'}}>
-                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#7C3AED" strokeWidth="2.5" strokeDasharray="none"/></svg> S-Curve</span>
-                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#1E88E5"/></svg> Goal (70)</span>
-                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="5" fill="#43A047"/></svg> Authority (80)</span>
+                          {showSc&&<div style={{display:'flex',alignItems:'center',gap:12,fontSize:'0.7rem',color:'#6B7280'}}>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="#7C3AED" strokeWidth="3"/></svg><span style={{color:'#7C3AED',fontWeight:700}}>GEO Score</span></span>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="12" height="12"><circle cx="6" cy="6" r="5.5" fill="#1E88E5"/></svg><span>Goal — GEO 70</span></span>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="14" height="14"><circle cx="7" cy="7" r="6.5" fill="#43A047"/></svg><span>Authority — GEO 80</span></span>
+                            <span style={{fontSize:'0.64rem',color:'#9CA3AF',fontStyle:'italic'}}>Hover dots for detail</span>
                           </div>}
                           <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
                             {showSc?'Hide S-Curve':'Show S-Curve'}
@@ -1699,7 +1722,9 @@ export default function GeoHub() {
                     const W4=920,H4=420,padT4=28,padB4=40;
                     const col1=130,col2=330,col3=590,col4=760,nW4=28;
                     const plotH4=H4-padT4-padB4;
-                    const [hovPath,setHovPath]=useState<string|null>(null);
+                    // Use hovMetric (already a top-level state) as the sankey hover key
+                    const hovPath=hovMetric;
+                    const setHovPath=setHovMetric;
 
                     const layoutN4=<T extends{label:string,val:number,color:string}>(items:T[],x:number,minH=24,gap=10)=>{
                       const total=items.reduce((s,n)=>s+Math.max(n.val,1),0)||1;
