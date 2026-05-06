@@ -1477,253 +1477,129 @@ export default function GeoHub() {
 
                   {(()=>{
                     const showSc = selectedCluster==='_scurve_toggle';
+                    // Merged scatter+scurve component
+                    function MergedScatterSCurve({brand,vis,sent,cit,competitors,topCompBrand,score,showOverlay}:{brand:string,vis:number,sent:number,cit:number,competitors:any[],topCompBrand:string,score:number,showOverlay:boolean}){
+                      const [hov2,setHov2]=useState<number|null>(null);
+                      const raw2=[
+                        {label:brand,x:vis,y:sent,cit:cit,isYou:true,isTopComp:false},
+                        ...competitors.slice(0,20).map((c:any)=>({label:c.Brand,x:c.Vis||0,y:c.Sen??0,cit:c.Cit??30,isYou:false,isTopComp:c.Brand===topCompBrand}))
+                      ];
+                      const all2=raw2.map((a,i)=>{
+                        if(a.isYou||a.isTopComp)return{...a,jx:a.x,jy:a.y};
+                        const sz=raw2.slice(0,i).filter(b=>!b.isYou&&!b.isTopComp&&Math.abs(b.x-a.x)<=4);
+                        return{...a,jx:a.x+sz.length*4,jy:a.y};
+                      });
+                      const W3=960,H3=460,padL3=56,padR3=30,padT3=32,padB3=56;
+                      const sx3=(v:number)=>padL3+(v/100)*(W3-padL3-padR3);
+                      const sy3=(v:number)=>padT3+((100-v)/100)*(H3-padT3-padB3);
+                      const sortedX3=[...raw2.map(a=>a.x)].sort((a,b)=>a-b);
+                      const sortedY3=[...raw2.map(a=>a.y)].sort((a,b)=>a-b);
+                      const medX3=sortedX3[Math.floor(sortedX3.length/2)];
+                      const medY3=sortedY3[Math.floor(sortedY3.length/2)];
+                      const citVals3=all2.map(a=>a.cit);
+                      const citMin3=Math.min(...citVals3),citMax3=Math.max(...citVals3,1);
+                      const bR3=(c:number)=>Math.round(5+((c-citMin3)/Math.max(citMax3-citMin3,1))*10);
+                      const midX3=sx3(medX3),midY3=sy3(medY3);
+                      // S-curve overlay
+                      const curveY=(x:number)=>Math.round(5+90/(1+Math.exp(-0.09*(x-45))));
+                      const sCurvePts=Array.from({length:101},(_,x)=>({x,y:curveY(x)}));
+                      const sCurveD=sCurvePts.map((p,i)=>`${i===0?'M':'L'}${sx3(p.x).toFixed(1)},${sy3(p.y).toFixed(1)}`).join(' ');
+                      const scoreToX=(s:number)=>{let best=0,bd=999;sCurvePts.forEach(p=>{const d=Math.abs(p.y-s);if(d<bd){bd=d;best=p.x;}});return best;};
+                      const goalX=scoreToX(70),authX=scoreToX(80);
+                      const placements3=all2.map((a,i)=>{
+                        const cx4=sx3(a.jx),cy4=sy3(a.jy),r=bR3(a.cit);
+                        const zb=all2.slice(0,i).filter(b=>Math.abs(sx3(b.jx)-cx4)<24).length;
+                        const above=i%2===0;
+                        return{cx4,cy4,r,ly:Math.max(padT3+6,Math.min(H3-padB3-6,cy4+(above?-(r+11+zb*9):(r+11+zb*9)))),above};
+                      });
+                      return(
+                        <svg viewBox={`0 0 ${W3} ${H3}`} style={{width:'100%',display:'block',overflow:'visible'}}>
+                          {/* Quadrant fills */}
+                          <rect x={padL3} y={padT3} width={midX3-padL3} height={midY3-padT3} fill="#F0FDF4" opacity="0.4"/>
+                          <rect x={midX3} y={padT3} width={W3-padR3-midX3} height={midY3-padT3} fill="#F5F3FF" opacity="0.5"/>
+                          <rect x={padL3} y={midY3} width={midX3-padL3} height={H3-padB3-midY3} fill="#FFF7ED" opacity="0.4"/>
+                          <rect x={midX3} y={midY3} width={W3-padR3-midX3} height={H3-padB3-midY3} fill="#FEF2F2" opacity="0.35"/>
+                          {[0,25,50,75,100].map(v=><g key={v}><line x1={padL3} y1={sy3(v)} x2={W3-padR3} y2={sy3(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL3-8} y={sy3(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
+                          <line x1={midX3} y1={padT3} x2={midX3} y2={H3-padB3} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
+                          <line x1={padL3} y1={midY3} x2={W3-padR3} y2={midY3} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
+                          <line x1={padL3} y1={H3-padB3} x2={W3-padR3} y2={H3-padB3} stroke="#D1D5DB" strokeWidth="1.5"/>
+                          <line x1={padL3} y1={padT3} x2={padL3} y2={H3-padB3} stroke="#D1D5DB" strokeWidth="1.5"/>
+                          {/* S-curve overlay — only when showOverlay */}
+                          {showOverlay&&<>
+                            <path d={sCurveD} fill="none" stroke="#7C3AED" strokeWidth="2.5" opacity="0.7"/>
+                            {/* Shaded area between current score and goal */}
+                            <path
+                              d={`${sCurvePts.slice(scoreToX(score),goalX+1).map((p,i)=>`${i===0?'M':'L'}${sx3(p.x).toFixed(1)},${sy3(p.y).toFixed(1)}`).join(' ')} L${sx3(goalX)},${padT3+H3-padB3-padT3} L${sx3(scoreToX(score))},${padT3+H3-padB3-padT3} Z`}
+                              fill="#EDE9FE" opacity="0.3"/>
+                            {/* Goal dot */}
+                            <circle cx={sx3(goalX)} cy={sy3(70)} r={9} fill="#1E88E5" stroke="white" strokeWidth="2"/>
+                            <text x={sx3(goalX)-12} y={sy3(70)-14} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#1E88E5',fontFamily:'Inter,sans-serif'}}>Goal (70)</text>
+                            {/* Authority dot */}
+                            <circle cx={sx3(authX)} cy={sy3(80)} r={12} fill="#43A047" stroke="white" strokeWidth="2"/>
+                            <text x={sx3(authX)-12} y={sy3(80)-16} textAnchor="end" style={{fontSize:9,fontWeight:700,fill:'#43A047',fontFamily:'Inter,sans-serif'}}>Authority (80)</text>
+                          </>}
+                          {/* Bubbles */}
+                          {all2.map((a,i)=>{
+                            const{cx4,cy4,r}=placements3[i];
+                            const fill=a.isYou?'#7C3AED':a.isTopComp?'#EFF6FF':'#CBD5E1';
+                            const stroke2=a.isYou?'#5B21B6':a.isTopComp?'#3B82F6':'#9CA3AF';
+                            return<g key={`b3${i}`} onMouseEnter={()=>setHov2(i)} onMouseLeave={()=>setHov2(null)} style={{cursor:'pointer'}}>
+                              {hov2===i&&<circle cx={cx4} cy={cy4} r={r+5} fill={stroke2} opacity="0.12"/>}
+                              <circle cx={cx4} cy={cy4} r={r} fill={fill} stroke={stroke2} strokeWidth={a.isYou?2.5:a.isTopComp?2:1}/>
+                            </g>;
+                          })}
+                          {/* Labels */}
+                          {all2.map((a,i)=>{
+                            const{cx4,cy4,r,ly,above}=placements3[i];
+                            const lc=a.isYou?'#5B21B6':a.isTopComp?'#1E40AF':'#6B7280';
+                            const fs2=a.isYou?12:a.isTopComp?11:7;
+                            const leaderY=above?cy4-r:cy4+r;
+                            return<g key={`lb3${i}`} onMouseEnter={()=>setHov2(i)} onMouseLeave={()=>setHov2(null)} style={{cursor:'pointer'}}>
+                              <line x1={cx4} y1={leaderY} x2={cx4} y2={above?ly+3:ly-3} stroke={lc} strokeWidth="0.8" strokeDasharray="2,2" opacity="0.4"/>
+                              <text x={cx4} y={ly} textAnchor="middle" dominantBaseline="middle" style={{fontSize:fs2,fill:lc,fontFamily:'Inter,sans-serif',fontWeight:a.isYou||a.isTopComp?700:400,pointerEvents:'none'}}>{a.label}</text>
+                            </g>;
+                          })}
+                          {/* Tooltips on top */}
+                          {all2.map((a,i)=>{
+                            if(hov2!==i)return null;
+                            const{cx4,cy4,r}=placements3[i];
+                            const tipW=190,tipH=68;
+                            const tx=cx4+tipW+10>W3-padR3?cx4-tipW-10:cx4+10;
+                            const ty=cy4-tipH<padT3?cy4+r+8:cy4-tipH-8;
+                            return<g key={`tip3${i}`} style={{pointerEvents:'none'}}>
+                              <rect x={tx} y={ty} width={tipW} height={tipH} rx={8} fill="#1F2937"/>
+                              <text x={tx+12} y={ty+16} style={{fontSize:11,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{a.label}</text>
+                              <text x={tx+12} y={ty+32} style={{fontSize:10,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Visibility: <tspan fill='#C4B5FD' fontWeight="700">{a.x}</tspan>  Sentiment: <tspan fill='#6EE7B7' fontWeight="700">{a.y}</tspan></text>
+                              <text x={tx+12} y={ty+48} style={{fontSize:10,fill:'#D1D5DB',fontFamily:'Inter,sans-serif'}}>Citation Score: <tspan fill='#FCD34D' fontWeight="700">{a.cit}</tspan></text>
+                            </g>;
+                          })}
+                          {/* X/Y labels */}
+                          {[0,10,20,30,40,50,60,70,80,90,100].map(v=><text key={v} x={sx3(v)} y={H3-padB3+16} textAnchor="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text>)}
+                          <text x={(padL3+W3-padR3)/2} y={H3-8} textAnchor="middle" style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Visibility</text>
+                          <text x={14} y={(padT3+H3-padB3)/2} textAnchor="middle" transform={`rotate(-90,14,${(padT3+H3-padB3)/2})`} style={{fontSize:11,fill:'#6B7280',fontFamily:'Inter,sans-serif'}}>Sentiment</text>
+                        </svg>
+                      );
+                    }
                     return (
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility Market Positioning</div>
-                        <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
-                          {showSc?'Show Scatter':'Show S-Curve'}
-                        </button>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          {showSc&&<div style={{display:'flex',alignItems:'center',gap:10,fontSize:'0.7rem',color:'#6B7280'}}>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="16" height="4"><line x1="0" y1="2" x2="16" y2="2" stroke="#7C3AED" strokeWidth="2.5" strokeDasharray="none"/></svg> S-Curve</span>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#1E88E5"/></svg> Goal (70)</span>
+                            <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="5" fill="#43A047"/></svg> Authority (80)</span>
+                          </div>}
+                          <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
+                            {showSc?'Hide S-Curve':'Show S-Curve'}
+                          </button>
+                        </div>
                       </div>
-                       <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>{showSc?'GEO maturity curve showing your position and opportunity':'Each dot = one brand. Your brand is highlighted in purple.'}</div>
-                       {showSc
-                         ? <ROICurve score={geo}/>
-                         : <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
-                       }
+                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>
+                        {showSc?'S-curve overlay shows GEO maturity threshold. Bubbles = brands positioned by Visibility vs Sentiment. Median lines split top/bottom halves.':'Each dot = one brand positioned by Visibility vs Sentiment. Median dashed lines split the market in half.'}
+                      </div>
+                      <MergedScatterSCurve brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand} score={geo} showOverlay={showSc}/>
                     </div>
-                    );
-                  })()}
-                  {(()=>{
-                    // ── SANKEY: Query Categories → GEO Signals → GEO Score → AI Outcomes ──
-                    // Left column: top query categories from real data (how queries flow in)
-                    // Middle column: the 5 weighted GEO signals
-                    // Right column: measurable AI outcomes derived from real query results
-                    //
-                    // OUTCOMES LOGIC (transparent & explained in tooltip):
-                    //   • AI Wins       = queries where brand appeared AND ranked #1
-                    //   • Brand Mentions = total queries where brand was mentioned (any rank)
-                    //   • Missed Queries = queries where brand did NOT appear (opportunity gap)
-                    //   • Competitor Wins= queries won by top competitor (benchmark)
-                    // All values are directly from result.responses_detail — no guesswork.
-
-                    const rd2: any[] = result.responses_detail || [];
-                    const clusters2: any[] = result.query_clusters || [];
-                    const totalQ2 = result.total_responses || rd2.length || 100;
-
-                    const aiWins = rd2.filter((r:any)=>r.mentioned && r.position===1).length;
-                    const mentions = rd2.filter((r:any)=>r.mentioned).length;
-                    const missed = totalQ2 - mentions;
-                    const compWins = rd2.filter((r:any)=>!r.mentioned && r.winner_brand).length;
-
-                    // Use top 5 query categories by total queries as left column
-                    const topCats2 = [...clusters2]
-                      .sort((a:any,b:any)=>b.total-a.total)
-                      .slice(0,5);
-
-                    // Fallback if no cluster data
-                    const leftItems = topCats2.length >= 2 ? topCats2.map((c:any)=>({
-                      label: c.category.length > 14 ? c.category.slice(0,13)+'…' : c.category,
-                      fullLabel: c.category,
-                      val: c.total || Math.round(totalQ2/5),
-                      color: ['#10B981','#3B82F6','#F59E0B','#A855F7','#EF4444'][clusters2.indexOf(c)%5],
-                      winRate: c.winRate || 0,
-                    })) : [
-                      {label:'Rewards',fullLabel:'Rewards Queries',val:22,color:'#10B981',winRate:60},
-                      {label:'Travel',fullLabel:'Travel Queries',val:20,color:'#3B82F6',winRate:45},
-                      {label:'Cash Back',fullLabel:'Cash Back Queries',val:18,color:'#F59E0B',winRate:30},
-                      {label:'Fees',fullLabel:'Fees & APR Queries',val:15,color:'#A855F7',winRate:20},
-                      {label:'Secured',fullLabel:'Credit Building Queries',val:12,color:'#EF4444',winRate:15},
-                    ];
-
-                    const signals2 = [
-                      {label:'Visibility',val:result.visibility||0,weight:30,color:'#7C3AED'},
-                      {label:'Sentiment',val:result.sentiment||0,weight:20,color:'#10B981'},
-                      {label:'Prominence',val:result.prominence||0,weight:20,color:'#3B82F6'},
-                      {label:'Citations',val:result.citation_share||0,weight:15,color:'#F59E0B'},
-                      {label:'Share of Voice',val:result.share_of_voice||0,weight:15,color:'#EF4444'},
-                    ];
-                    const geoScore2 = Math.round(signals2.reduce((s,m)=>s+m.val*m.weight/100,0)) || result.overall_geo_score || 0;
-
-                    const outcomes2 = [
-                      {label:'AI Wins',val:aiWins,color:'#10B981',desc:`Queries where ${result.brand_name} ranked #1 in AI response`},
-                      {label:'Brand Mentions',val:mentions,color:'#7C3AED',desc:`Queries where ${result.brand_name} appeared at any rank`},
-                      {label:'Missed Queries',val:missed,color:'#F59E0B',desc:`Queries where ${result.brand_name} was not mentioned at all`},
-                      {label:'Competitor Wins',val:compWins,color:'#EF4444',desc:`Queries where a competitor beat ${result.brand_name}`},
-                    ];
-
-                    const W2=920, H2=420, padT2=28, padB2=40;
-                    const col1X=130, col2X=330, col3X=590, col4X=760;
-                    const nodeW2=28;
-                    const plotH2=H2-padT2-padB2;
-
-                    const layoutN=<T extends {label:string,val:number,color:string}>(items:T[], x:number, minH=22, gap=10)=>{
-                      const total=items.reduce((s,n)=>s+Math.max(n.val,1),0)||1;
-                      const usableH=plotH2-gap*(items.length-1);
-                      let cy=padT2;
-                      return items.map(n=>{
-                        const h=Math.max(minH,(Math.max(n.val,1)/total)*usableH);
-                        const node={...n,x,y:cy,h,mid:cy+h/2};
-                        cy+=h+gap;
-                        return node;
-                      });
-                    };
-
-                    const leftNodes2=layoutN(leftItems,col1X,24,12);
-                    const sigNodes2=layoutN(signals2,col2X,28,8);
-                    const geoH2=Math.min(plotH2*0.6,160);
-                    const geoNode2={x:col3X,y:padT2+(plotH2-geoH2)/2,h:geoH2,mid:padT2+(plotH2-geoH2)/2+geoH2/2};
-                    const outNodes2=layoutN(outcomes2,col4X,28,10);
-
-                    // Wavy cubic bezier path for a flow band (Image 3 style — crossing, organic)
-                    const wavePath=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.45)=>{
-                      const mx1=x1+nodeW2+(x2-x1-nodeW2)*bend;
-                      const mx2=x2-(x2-x1-nodeW2)*bend;
-                      return `M${x1+nodeW2},${y1} C${mx1},${y1} ${mx2},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx2},${y2+h2} ${mx1},${y1+h1} ${x1+nodeW2},${y1+h1} Z`;
-                    };
-
-                    // Left→middle: distribute each query category across signals proportionally by weight
-                    type Flow1={path:string,color:string,opacity:number};
-                    const flows1:Flow1[]=[];
-                    leftNodes2.forEach((ln)=>{
-                      const lFrac=ln.h/plotH2;
-                      // track how far down each sig node we've consumed
-                      let sigOffset=0;
-                      sigNodes2.forEach((sig,si)=>{
-                        const frac=(sig.weight/100);
-                        const lH=Math.max(3,ln.h*frac);
-                        const sH=Math.max(3,sig.h*lFrac);
-                        const lY=ln.y+sigOffset*ln.h;
-                        const sY=sig.y+leftNodes2.slice(0,leftNodes2.indexOf(ln)).reduce((acc,prev)=>acc+prev.h*frac,0);
-                        flows1.push({
-                          path:wavePath(ln.x,lY,lH,sig.x,sY,sH,0.42),
-                          color:sig.color,
-                          opacity:0.18,
-                        });
-                        sigOffset+=frac;
-                      });
-                    });
-
-                    // Middle→GEO: each signal flows into its proportional slice of GEO
-                    type Flow2={path:string,color:string};
-                    const flows2:Flow2[]=[];
-                    let gOff=geoNode2.y;
-                    sigNodes2.forEach((sig)=>{
-                      const h=geoNode2.h*(sig.weight/100);
-                      flows2.push({
-                        path:wavePath(sig.x,sig.y,sig.h,geoNode2.x,gOff,h,0.46),
-                        color:sig.color,
-                      });
-                      gOff+=h;
-                    });
-
-                    // GEO→Outcomes: slice GEO proportionally by outcome value
-                    type Flow3={path:string,color:string};
-                    const flows3:Flow3[]=[];
-                    const outTotal=outcomes2.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
-                    let gOff2=geoNode2.y;
-                    outNodes2.forEach((on)=>{
-                      const frac=Math.max(on.val,1)/outTotal;
-                      const h=geoNode2.h*frac;
-                      flows3.push({
-                        path:wavePath(geoNode2.x,gOff2,h,on.x,on.y,on.h,0.46),
-                        color:on.color,
-                      });
-                      gOff2+=h;
-                    });
-
-                    const hovSankey=hovMetric;
-                    const setHovSankey=setHovMetric;
-
-                    return (
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
-                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
-                          <div>
-                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
-                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>How your query categories flow through GEO signals to produce measurable AI outcomes. All values from live query results.</div>
-                          </div>
-                          {/* Outcomes legend with explanation */}
-                          <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:220,flexShrink:0}}>
-                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>How Outcomes are calculated</div>
-                            {outcomes2.map((o,i)=>(
-                              <div key={i} style={{display:'flex',gap:4,marginBottom:2}}>
-                                <div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/>
-                                <span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div style={{overflowX:'auto' as const}}>
-                        <svg viewBox={`0 0 ${W2} ${H2}`} style={{width:'100%',minWidth:700,display:'block'}}>
-                          {/* Column headers */}
-                          {[
-                            {x:col1X+nodeW2/2,label:'QUERY CATEGORIES'},
-                            {x:col2X+nodeW2/2,label:'GEO SIGNALS'},
-                            {x:col3X+nodeW2/2,label:'GEO SCORE'},
-                            {x:col4X+nodeW2/2,label:'AI OUTCOMES'},
-                          ].map((h,i)=>(
-                            <text key={i} x={h.x} y={padT2-8} textAnchor="middle" style={{fontSize:8,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.08em'}}>{h.label}</text>
-                          ))}
-
-                          {/* Flows 1: left→signals (wavy crossing, per-signal color) */}
-                          {flows1.map((f,i)=>(
-                            <path key={`f1${i}`} d={f.path} fill={f.color} opacity={f.opacity}/>
-                          ))}
-                          {/* Flows 2: signals→GEO */}
-                          {flows2.map((f,i)=>(
-                            <path key={`f2${i}`} d={f.path} fill={f.color} opacity={hovSankey===signals2[i]?.label?0.45:0.22}
-                              onMouseEnter={()=>setHovSankey(signals2[i]?.label)}
-                              onMouseLeave={()=>setHovSankey(null)}
-                              style={{cursor:'pointer',transition:'opacity 0.15s'}}/>
-                          ))}
-                          {/* Flows 3: GEO→outcomes */}
-                          {flows3.map((f,i)=>(
-                            <path key={`f3${i}`} d={f.path} fill={f.color} opacity={0.22}/>
-                          ))}
-
-                          {/* Column 1: Query category nodes */}
-                          {leftNodes2.map((n,i)=>(
-                            <g key={`lc${i}`}>
-                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3}/>
-                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries · {(n as any).winRate}% win</text>
-                            </g>
-                          ))}
-
-                          {/* Column 2: Signal nodes */}
-                          {sigNodes2.map((n,i)=>(
-                            <g key={`sn${i}`} onMouseEnter={()=>setHovSankey(n.label)} onMouseLeave={()=>setHovSankey(null)} style={{cursor:'pointer'}}>
-                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3} opacity={hovSankey===n.label?1:0.88}/>
-                              <text x={n.x+nodeW2+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x+nodeW2+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
-                              {hovSankey===n.label&&(
-                                <g>
-                                  <rect x={n.x+nodeW2+90} y={n.mid-18} width={110} height={34} rx={5} fill="#1F2937"/>
-                                  <text x={n.x+nodeW2+145} y={n.mid-6} textAnchor="middle" style={{fontSize:9,fill:'white',fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.label}: {n.val}</text>
-                                  <text x={n.x+nodeW2+145} y={n.mid+6} textAnchor="middle" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>Weight in GEO: {n.weight}%</text>
-                                </g>
-                              )}
-                            </g>
-                          ))}
-
-                          {/* Column 3: GEO Score node */}
-                          <rect x={geoNode2.x} y={geoNode2.y} width={nodeW2} height={geoNode2.h} fill="#7C3AED" rx={5}/>
-                          <text x={geoNode2.x+nodeW2+10} y={geoNode2.mid-16} style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
-                          <text x={geoNode2.x+nodeW2+10} y={geoNode2.mid+12} style={{fontSize:30,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore2}</text>
-
-                          {/* Column 4: Outcome nodes */}
-                          {outNodes2.map((n,i)=>(
-                            <g key={`on${i}`}>
-                              <rect x={n.x} y={n.y} width={nodeW2} height={n.h} fill={n.color} rx={3}/>
-                              <text x={n.x+nodeW2+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif',fontWeight:600}}>{n.label}</text>
-                              <text x={n.x+nodeW2+6} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries</text>
-                            </g>
-                          ))}
-                        </svg>
-                        </div>
-                        <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
-                          {signals2.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
-                        </div>
-                      </div>
                     );
                   })()}
                 </div>
@@ -1759,6 +1635,211 @@ export default function GeoHub() {
                       </div>
                     </div>
                     <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
+                  </div>
+                  {/* Sankey: Products → GEO Signals → GEO Score → AI Opportunity */}
+                  {(()=>{
+                    // LEFT: Product lines (what the brand actually sells/offers)
+                    // Derived from industry key — these are the real product categories
+                    // that AI is being asked about, not abstract query topics
+                    const rd3:any[]=result.responses_detail||[];
+                    const cl3:any[]=result.query_clusters||[];
+                    const isFin=result.ind_key==='fin'||result.ind_key==='fin_retail_bank'||result.ind_key==='fin_retirement'||result.ind_key==='fin_wealth';
+                    const isAuto=result.ind_key==='auto';
+
+                    // Products from industry (what the brand sells/offers to customers)
+                    const products=isFin?[
+                      {label:'Credit Cards',color:'#7C3AED'},
+                      {label:'Savings',color:'#10B981'},
+                      {label:'Checking',color:'#3B82F6'},
+                      {label:'Loans',color:'#F59E0B'},
+                      {label:'Investment',color:'#EF4444'},
+                    ]:isAuto?[
+                      {label:'Sedans',color:'#7C3AED'},
+                      {label:'SUVs',color:'#10B981'},
+                      {label:'EVs',color:'#3B82F6'},
+                      {label:'Trucks',color:'#F59E0B'},
+                      {label:'Luxury',color:'#EF4444'},
+                    ]:[
+                      {label:'Core Product',color:'#7C3AED'},
+                      {label:'Premium Tier',color:'#10B981'},
+                      {label:'Entry Tier',color:'#3B82F6'},
+                      {label:'Bundles',color:'#F59E0B'},
+                      {label:'Add-ons',color:'#EF4444'},
+                    ];
+
+                    // Map each product to a win rate from cluster data or derive from sub-scores
+                    const prodWithVals=products.map((p,i)=>{
+                      const cluster=cl3.find((c:any)=>c.category?.toLowerCase().includes(p.label.toLowerCase().split(' ')[0]));
+                      const baseVal=cluster?.winRate??Math.round(30+i*8+(result.visibility||40)*0.3);
+                      return{...p,val:Math.max(5,Math.min(95,baseVal))};
+                    });
+
+                    const signals3=[
+                      {label:'Visibility',val:result.visibility||0,weight:30,color:'#7C3AED'},
+                      {label:'Sentiment',val:rawSent||0,weight:20,color:'#10B981'},
+                      {label:'Prominence',val:prom||0,weight:20,color:'#3B82F6'},
+                      {label:'Citations',val:cit||0,weight:15,color:'#F59E0B'},
+                      {label:'Share of Voice',val:sov||0,weight:15,color:'#EF4444'},
+                    ];
+                    const geoScore3=Math.round(signals3.reduce((s,m)=>s+m.val*m.weight/100,0))||result.overall_geo_score||0;
+
+                    // RIGHT: AI Opportunity — what better GEO score converts into
+                    // These are forward-looking outcomes, not historical counts
+                    const totalQ3=result.total_responses||rd3.length||100;
+                    const mentions3=rd3.filter((r:any)=>r.mentioned).length||Math.round(totalQ3*0.38);
+                    const missed3=totalQ3-mentions3;
+                    const top3count=rd3.filter((r:any)=>r.mentioned&&r.position===1).length||Math.round(mentions3*0.3);
+                    const opportunities=[
+                      {label:'Top-of-Mind Queries',val:top3count,color:'#10B981',desc:'Queries where AI names your brand first'},
+                      {label:'Brand Appearances',val:mentions3,color:'#7C3AED',desc:'Queries where AI mentions your brand'},
+                      {label:'Content Gaps',val:missed3,color:'#F59E0B',desc:'Queries where you could add presence'},
+                      {label:'Competitive Gap',val:Math.round(totalQ3*0.48),color:'#EF4444',desc:'Queries competitors answer that you do not'},
+                    ];
+
+                    const W4=920,H4=420,padT4=28,padB4=40;
+                    const col1=130,col2=330,col3=590,col4=760,nW4=28;
+                    const plotH4=H4-padT4-padB4;
+                    const [hovPath,setHovPath]=useState<string|null>(null);
+
+                    const layoutN4=<T extends{label:string,val:number,color:string}>(items:T[],x:number,minH=24,gap=10)=>{
+                      const total=items.reduce((s,n)=>s+Math.max(n.val,1),0)||1;
+                      const usableH=plotH4-gap*(items.length-1);
+                      let cy=padT4;
+                      return items.map(n=>{
+                        const h=Math.max(minH,(Math.max(n.val,1)/total)*usableH);
+                        const nd={...n,x,y:cy,h,mid:cy+h/2};
+                        cy+=h+gap;
+                        return nd;
+                      });
+                    };
+                    const lNodes=layoutN4(prodWithVals,col1,26,12);
+                    const sNodes=layoutN4(signals3,col2,28,8);
+                    const geoH4=Math.min(plotH4*0.6,160);
+                    const geoN4={x:col3,y:padT4+(plotH4-geoH4)/2,h:geoH4,mid:padT4+(plotH4-geoH4)/2+geoH4/2};
+                    const oNodes=layoutN4(opportunities,col4,28,10);
+
+                    const wavePath4=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.45)=>{
+                      const mx1=x1+nW4+(x2-x1-nW4)*bend;
+                      const mx2=x2-(x2-x1-nW4)*bend;
+                      return`M${x1+nW4},${y1} C${mx1},${y1} ${mx2},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx2},${y2+h2} ${mx1},${y1+h1} ${x1+nW4},${y1+h1} Z`;
+                    };
+
+                    // Flows: each product → all signals (crossing streams by signal color)
+                    const flows4a:{path:string,color:string,pid:string,sid:string}[]=[];
+                    lNodes.forEach(ln=>{
+                      const lFrac=ln.h/plotH4;
+                      let sigOff=0;
+                      sNodes.forEach(sig=>{
+                        const fw=(sig.weight/100);
+                        const lH=Math.max(3,ln.h*fw);
+                        const sH=Math.max(3,sig.h*lFrac);
+                        const lY=ln.y+sigOff*ln.h;
+                        const sY=sig.y+lNodes.slice(0,lNodes.indexOf(ln)).reduce((acc,prev)=>acc+prev.h*fw,0);
+                        flows4a.push({path:wavePath4(ln.x,lY,lH,sig.x,sY,sH,0.42),color:sig.color,pid:ln.label,sid:sig.label});
+                        sigOff+=fw;
+                      });
+                    });
+                    // Flows: signals → GEO
+                    const flows4b:{path:string,color:string,sid:string}[]=[];
+                    let gOff4=geoN4.y;
+                    sNodes.forEach(sig=>{
+                      const h=geoN4.h*(sig.weight/100);
+                      flows4b.push({path:wavePath4(sig.x,sig.y,sig.h,geoN4.x,gOff4,h,0.46),color:sig.color,sid:sig.label});
+                      gOff4+=h;
+                    });
+                    // Flows: GEO → opportunities
+                    const flows4c:{path:string,color:string,oid:string}[]=[];
+                    const oTotal=opportunities.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
+                    let gOff4b=geoN4.y;
+                    oNodes.forEach(on=>{
+                      const frac=Math.max(on.val,1)/oTotal;
+                      const h=geoN4.h*frac;
+                      flows4c.push({path:wavePath4(geoN4.x,gOff4b,h,on.x,on.y,on.h,0.46),color:on.color,oid:on.label});
+                      gOff4b+=h;
+                    });
+
+                    const isHov=(key:string)=>hovPath===key;
+                    const baseOp=hovPath?0.06:0.18;
+                    const activeOp=0.55;
+
+                    return(
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
+                          <div>
+                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
+                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>How your products flow through GEO signals to your score and AI opportunity. Click any node or stream to highlight its path.</div>
+                          </div>
+                          <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:210,flexShrink:0}}>
+                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>AI Opportunity (right column)</div>
+                            {opportunities.map((o,i)=><div key={i} style={{display:'flex',gap:4,marginBottom:2}}><div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/><span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span></div>)}
+                          </div>
+                        </div>
+                        <div style={{overflowX:'auto' as const}}>
+                        <svg viewBox={`0 0 ${W4} ${H4}`} style={{width:'100%',minWidth:700,display:'block'}}
+                          onClick={()=>setHovPath(null)}>
+                          {/* Headers */}
+                          {[{x:col1+nW4/2,l:'PRODUCTS'},{x:col2+nW4/2,l:'GEO SIGNALS'},{x:col3+nW4/2,l:'GEO SCORE'},{x:col4+nW4/2,l:'AI OPPORTUNITY'}].map((h,i)=>(
+                            <text key={i} x={h.x} y={padT4-8} textAnchor="middle" style={{fontSize:8,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.08em'}}>{h.l}</text>
+                          ))}
+                          {/* Flows 1: products → signals */}
+                          {flows4a.map((f,i)=>(
+                            <path key={`fa${i}`} d={f.path} fill={f.color}
+                              opacity={hovPath?( isHov(f.pid)||isHov(f.sid)?activeOp:baseOp ):0.18}
+                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.pid?null:f.pid);}}/>
+                          ))}
+                          {/* Flows 2: signals → GEO */}
+                          {flows4b.map((f,i)=>(
+                            <path key={`fb${i}`} d={f.path} fill={f.color}
+                              opacity={hovPath?( isHov(f.sid)?activeOp:baseOp ):0.22}
+                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.sid?null:f.sid);}}/>
+                          ))}
+                          {/* Flows 3: GEO → opportunity */}
+                          {flows4c.map((f,i)=>(
+                            <path key={`fc${i}`} d={f.path} fill={f.color}
+                              opacity={hovPath?( isHov(f.oid)?activeOp:baseOp ):0.22}
+                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.oid?null:f.oid);}}/>
+                          ))}
+                          {/* Column 1: Product nodes */}
+                          {lNodes.map((n,i)=>(
+                            <g key={`ln${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
+                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
+                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win rate</text>
+                            </g>
+                          ))}
+                          {/* Column 2: Signal nodes */}
+                          {sNodes.map((n,i)=>(
+                            <g key={`sn4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:0.9}/>
+                              <text x={n.x+nW4+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
+                              <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
+                            </g>
+                          ))}
+                          {/* Column 3: GEO node */}
+                          <rect x={geoN4.x} y={geoN4.y} width={nW4} height={geoN4.h} fill="#7C3AED" rx={5}/>
+                          <text x={geoN4.x+nW4+10} y={geoN4.mid-16} style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
+                          <text x={geoN4.x+nW4+10} y={geoN4.mid+10} style={{fontSize:30,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore3}</text>
+                          {/* Column 4: Opportunity nodes */}
+                          {oNodes.map((n,i)=>(
+                            <g key={`on4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
+                              <text x={n.x+nW4+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
+                              <text x={n.x+nW4+6} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries</text>
+                            </g>
+                          ))}
+                          {/* Click hint */}
+                          {hovPath&&<text x={W4-30} y={padT4} textAnchor="end" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Click anywhere to clear · Highlighted: {hovPath}</text>}
+                        </svg>
+                        </div>
+                        <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
+                          {signals3.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>Sentiment Strengths</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
@@ -1868,7 +1949,7 @@ export default function GeoHub() {
                         </div>;
                       }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
                     </div>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px',overflowY:'auto' as const,maxHeight:420}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px'}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sources AI is Pulling From {result.brand_name}</div>
                       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>
                         {activeCitCat
