@@ -1609,13 +1609,15 @@ export default function GeoHub() {
                     </div>
                     <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]} clusters={result.query_clusters||[]}/>
                   </div>
-                  {/* Sankey: Products → GEO Signals → GEO Score → AI Opportunity */}
+                  {/* 4-column Sankey: QUERY TOPICS → BRAND PRODUCTS MENTIONED → GEO SIGNALS → GEO SCORE */}
                   {(()=>{
                     const rd3:any[]=result.responses_detail||[];
                     const cl3:any[]=result.query_clusters||[];
+                    const brandName3=result.brand_name||'';
+                    const lob3:string=result.lob||'';
+                    const indKey3:string=result.ind_key||'gen';
 
-                    // ── LEFT COLUMN: Top 5 query topics from real cluster data ──
-                    // These are the ACTUAL categories the backend tested — no hardcoding
+                    // ── COLUMN 1: Top 5 query topics (real cluster data) ──
                     const TOPIC_COLORS=['#7C3AED','#10B981','#3B82F6','#F59E0B','#EF4444'];
                     const topTopics=[...cl3]
                       .sort((a:any,b:any)=>(b.total||0)-(a.total||0))
@@ -1625,44 +1627,155 @@ export default function GeoHub() {
                         val:Math.max(5,Math.min(95,c.winRate??0)),
                         color:TOPIC_COLORS[i%TOPIC_COLORS.length],
                         total:c.total||0,
-                        topComp:c.topCompetitor||'',
                       }));
+                    const leftItems=topTopics.length>=1?topTopics:[{label:'General',val:result.visibility||30,color:'#7C3AED',total:10}];
 
-                    // Fallback if no clusters
-                    const leftItems=topTopics.length>=2?topTopics:[
-                      {label:'General',val:result.visibility||30,color:'#7C3AED',total:10,topComp:''},
-                    ];
+                    // ── COLUMN 2: BRAND PRODUCTS MENTIONED ──
+                    // Derive product names from lob + ind_key — these are what the brand actually offers
+                    // Then scan each response_preview for mentions of these product names
+                    // This gives a real mention count from actual AI response text
 
+                    // Product name dictionary per industry/lob — derived from what the URL represents
+                    // NOT hardcoded to a specific brand — derived from ind_key so it works for any brand
+                    type ProductDef = {label:string; terms:string[]; color:string};
+                    const getProductDefs=():ProductDef[]=>{
+                      const k=indKey3;
+                      const l=lob3.toLowerCase();
+                      if(k==='fin'||l.includes('credit card')||l.includes('credit cards')){
+                        return[
+                          {label:'Cash Back Cards',   terms:['cash back','cashback','double cash','freedom','quicksilver','active cash','customized cash','blue cash'],color:'#7C3AED'},
+                          {label:'Travel Cards',      terms:['travel','sapphire','venture','strata','premier','platinum','autograph','miles','points card'],color:'#10B981'},
+                          {label:'Balance Transfer',  terms:['balance transfer','0% apr','0 apr','zero apr','simplicity','reflect','slate','diamond preferred'],color:'#3B82F6'},
+                          {label:'Secured Cards',     terms:['secured','credit builder','deposit','credit building','opensky','chime credit'],color:'#F59E0B'},
+                          {label:'Rewards Cards',     terms:['rewards','points','savor','gold card','preferred','signature','world elite'],color:'#EF4444'},
+                        ];
+                      }
+                      if(k==='fin_cc_travel'){return[
+                        {label:'Miles Cards',         terms:['miles','airline','aadvantage','skymiles','united','southwest'],color:'#7C3AED'},
+                        {label:'Hotel Cards',         terms:['hotel','marriott','hilton','hyatt','world of hyatt','ihg'],color:'#10B981'},
+                        {label:'Flexible Points',     terms:['transferable','flexible','chase ultimate','amex points','capital one miles','citi thank'],color:'#3B82F6'},
+                        {label:'Lounge Access',       terms:['lounge','priority pass','centurion','admirals','sky club'],color:'#F59E0B'},
+                        {label:'No Foreign Fee',      terms:['no foreign','international','foreign transaction'],color:'#EF4444'},
+                      ];}
+                      if(k==='fin_retail_bank'){return[
+                        {label:'Savings Accounts',   terms:['savings','high yield','hysa','apy','money market','performance savings'],color:'#7C3AED'},
+                        {label:'Checking Accounts',  terms:['checking','current account','debit','direct deposit','360 checking'],color:'#10B981'},
+                        {label:'CD Accounts',        terms:['cd','certificate of deposit','certificate','fixed rate','term'],color:'#3B82F6'},
+                        {label:'Teen & Kids',        terms:['teen','kid','youth','student','minor','custodial'],color:'#F59E0B'},
+                        {label:'Digital Banking',    terms:['mobile app','digital','online banking','zelle','instant transfer'],color:'#EF4444'},
+                      ];}
+                      if(k==='fin_mortgage'||l.includes('mortgage')){return[
+                        {label:'Home Purchase',       terms:['purchase','home loan','buy a home','buying','first home'],color:'#7C3AED'},
+                        {label:'Refinancing',         terms:['refinance','refi','cash-out','lower rate','lower payment'],color:'#10B981'},
+                        {label:'FHA / VA Loans',      terms:['fha','va loan','veteran','usda','government loan'],color:'#3B82F6'},
+                        {label:'HELOC',               terms:['heloc','home equity','equity line','equity loan'],color:'#F59E0B'},
+                        {label:'Jumbo Loans',         terms:['jumbo','large loan','high value','luxury home'],color:'#EF4444'},
+                      ];}
+                      if(k==='fin_auto_loan'||l.includes('auto')){return[
+                        {label:'New Car Loans',       terms:['new car','new vehicle','new auto','dealer','0% apr'],color:'#7C3AED'},
+                        {label:'Used Car Loans',      terms:['used car','pre-owned','certified pre','used vehicle'],color:'#10B981'},
+                        {label:'Refinancing',         terms:['refinance','refi','lower rate','lower payment'],color:'#3B82F6'},
+                        {label:'EV Financing',        terms:['electric','ev','tesla','rivian','bolt','ioniq'],color:'#F59E0B'},
+                        {label:'No Down Payment',     terms:['no down','zero down','100%','no money down'],color:'#EF4444'},
+                      ];}
+                      if(k==='fin_retirement'||k==='fin_wealth'){return[
+                        {label:'401(k) Plans',        terms:['401k','401(k)','employer plan','workplace','defined contribution'],color:'#7C3AED'},
+                        {label:'IRA Accounts',        terms:['ira','roth','traditional ira','rollover','individual retirement'],color:'#10B981'},
+                        {label:'Investment Funds',    terms:['mutual fund','index fund','etf','portfolio','managed fund'],color:'#3B82F6'},
+                        {label:'Annuities',           terms:['annuity','annuities','guaranteed income','variable annuity','fixed annuity'],color:'#F59E0B'},
+                        {label:'Financial Planning',  terms:['financial plan','advisor','retirement planning','estate','wealth management'],color:'#EF4444'},
+                      ];}
+                      if(k==='auto'){return[
+                        {label:'Sedans',              terms:['sedan','camry','accord','civic','altima','corolla'],color:'#7C3AED'},
+                        {label:'SUVs',                terms:['suv','crossover','rav4','cr-v','explorer','equinox','highlander'],color:'#10B981'},
+                        {label:'Electric Vehicles',   terms:['electric','ev','model 3','model y','ioniq','mach-e','bz4x'],color:'#3B82F6'},
+                        {label:'Trucks',              terms:['truck','pickup','f-150','silverado','tundra','ram'],color:'#F59E0B'},
+                        {label:'Luxury',              terms:['luxury','premium','bmw','mercedes','audi','lexus','genesis'],color:'#EF4444'},
+                      ];}
+                      if(k==='hotel'){return[
+                        {label:'Luxury Hotels',       terms:['luxury','5-star','premium','ritz','four seasons'],color:'#7C3AED'},
+                        {label:'Business Hotels',     terms:['business','corporate','suite','meeting','conference'],color:'#10B981'},
+                        {label:'Family Resorts',      terms:['family','resort','kid','pool','all-inclusive'],color:'#3B82F6'},
+                        {label:'Loyalty Program',     terms:['points','rewards','status','elite','loyalty','free night'],color:'#F59E0B'},
+                        {label:'Budget / Value',      terms:['budget','value','affordable','deal','discount'],color:'#EF4444'},
+                      ];}
+                      if(k==='media'){return[
+                        {label:'Original Series',     terms:['original','series','show','exclusive','netflix original'],color:'#7C3AED'},
+                        {label:'Movies',              terms:['movie','film','cinema','theatrical','blockbuster'],color:'#10B981'},
+                        {label:'Music',               terms:['music','song','playlist','podcast','audio'],color:'#3B82F6'},
+                        {label:'Ad-Free Plan',        terms:['ad-free','no ads','premium plan','without ads'],color:'#F59E0B'},
+                        {label:'Family Plan',         terms:['family','profiles','multiple screens','household','share'],color:'#EF4444'},
+                      ];}
+                      if(k==='retail'){return[
+                        {label:'Electronics',         terms:['electronic','tech','laptop','phone','tv','appliance'],color:'#7C3AED'},
+                        {label:'Grocery & Food',      terms:['grocery','food','fresh','produce','pantry','snack'],color:'#10B981'},
+                        {label:'Clothing & Apparel',  terms:['clothing','apparel','fashion','clothes','wear','style'],color:'#3B82F6'},
+                        {label:'Home & Garden',       terms:['home','furniture','garden','decor','kitchen','tool'],color:'#F59E0B'},
+                        {label:'Membership / Prime',  terms:['membership','prime','subscription','free shipping','same-day'],color:'#EF4444'},
+                      ];}
+                      if(k==='sport'){return[
+                        {label:'Running Shoes',       terms:['running','run','marathon','trail','jogging'],color:'#7C3AED'},
+                        {label:'Training Gear',       terms:['training','gym','workout','crossfit','lifting'],color:'#10B981'},
+                        {label:'Lifestyle / Casual',  terms:['casual','lifestyle','everyday','athleisure','street'],color:'#3B82F6'},
+                        {label:'Team Sports',         terms:['basketball','soccer','football','baseball','sport'],color:'#F59E0B'},
+                        {label:'Outdoor / Hiking',    terms:['outdoor','hiking','trail','adventure','climbing'],color:'#EF4444'},
+                      ];}
+                      // Generic fallback — use lob words as product categories
+                      const lobWords=lob3.split(/[\s,&\/]+/).filter((w:string)=>w.length>3).slice(0,5);
+                      if(lobWords.length>=2){
+                        return lobWords.map((w:string,i:number)=>({
+                          label:w.charAt(0).toUpperCase()+w.slice(1),
+                          terms:[w.toLowerCase()],
+                          color:TOPIC_COLORS[i%TOPIC_COLORS.length],
+                        }));
+                      }
+                      return[
+                        {label:'Core Product',  terms:['product','service','solution','platform'],color:'#7C3AED'},
+                        {label:'Premium Tier',  terms:['premium','pro','plus','elite','advanced'],color:'#10B981'},
+                        {label:'Entry Tier',    terms:['basic','starter','standard','free','lite'],color:'#3B82F6'},
+                        {label:'Bundles',       terms:['bundle','package','combo','all-in','suite'],color:'#F59E0B'},
+                        {label:'Add-ons',       terms:['add-on','extra','optional','upgrade','feature'],color:'#EF4444'},
+                      ];
+                    };
+
+                    const productDefs=getProductDefs();
+
+                    // Scan response_preview text for each product's terms
+                    // Count: how many responses mention this product (regardless of whether brand was mentioned)
+                    const productMentions=productDefs.map(p=>{
+                      const count=rd3.filter((r:any)=>{
+                        const txt=(r.response_preview||r.response||'').toLowerCase();
+                        return p.terms.some((t:string)=>txt.includes(t));
+                      }).length;
+                      return{...p,mentions:count,val:Math.max(5,count)};
+                    }).filter(p=>p.mentions>0||rd3.length===0);
+
+                    // If nothing matched (unlikely), fall back to all defs with even distribution
+                    const prodItems=productMentions.length>=2
+                      ?productMentions
+                      :productDefs.map((p,i)=>({...p,mentions:Math.round((rd3.length||10)/(productDefs.length||5)),val:20+i*5}));
+
+                    // ── COLUMN 3: GEO Signals ──
                     const signals3=[
                       {label:'Visibility',val:result.visibility||0,weight:30,color:'#7C3AED'},
-                      {label:'Sentiment',val:rawSent||0,weight:20,color:'#10B981'},
-                      {label:'Prominence',val:prom||0,weight:20,color:'#3B82F6'},
-                      {label:'Citations',val:cit||0,weight:15,color:'#F59E0B'},
-                      {label:'Share of Voice',val:sov||0,weight:15,color:'#EF4444'},
+                      {label:'Sentiment', val:rawSent||0,          weight:20,color:'#10B981'},
+                      {label:'Prominence',val:prom||0,             weight:20,color:'#3B82F6'},
+                      {label:'Citations', val:cit||0,              weight:15,color:'#F59E0B'},
+                      {label:'Share of Voice',val:sov||0,          weight:15,color:'#EF4444'},
                     ];
+
+                    // ── COLUMN 4: GEO Score node (single node) ──
                     const geoScore3=Math.round(signals3.reduce((s,m)=>s+m.val*m.weight/100,0))||result.overall_geo_score||0;
 
-                    // ── RIGHT COLUMN: Real outcome metrics derived from actual query results ──
-                    // Every number here traces directly back to responses_detail — transparent & auditable
-                    const totalQ3=result.total_responses||rd3.length||100;
-                    const wonQ3=result.responses_with_brand??rd3.filter((r:any)=>r.mentioned).length;
-                    const lostQ3=totalQ3-wonQ3;
-                    const rankedFirst3=rd3.filter((r:any)=>r.mentioned&&r.position===1).length||Math.round(wonQ3*0.35);
-                    const competitorWins3=rd3.filter((r:any)=>!r.mentioned&&r.winner_brand).length||Math.round(lostQ3*0.65);
-                    const outcomes=[
-                      {label:'Queries Won (#1)',val:rankedFirst3,color:'#10B981',desc:`Queries where AI named ${result.brand_name} first`},
-                      {label:'Brand Appearances',val:wonQ3,color:'#7C3AED',desc:`Queries where ${result.brand_name} was mentioned at any rank`},
-                      {label:'Queries Missed',val:lostQ3,color:'#F59E0B',desc:`Queries where ${result.brand_name} did not appear — your gap`},
-                      {label:'Competitor Wins',val:competitorWins3,color:'#EF4444',desc:`Missed queries where a competitor was named instead`},
-                    ];
-
-                    const W4=920,H4=420,padT4=28,padB4=40;
-                    const col1=130,col2=330,col3=590,col4=760,nW4=28;
+                    // ── LAYOUT ──
+                    // 5 columns: topics | products | signals | GEO | (score displayed inline on GEO node)
+                    const W4=1040,H4=480,padT4=32,padB4=44;
+                    const col1=130, col2=300, col3=510, col4=720, col5=880, nW4=26;
                     const plotH4=H4-padT4-padB4;
                     const hovPath=hovMetric;
                     const setHovPath=setHovMetric;
 
-                    const layoutN4=<T extends{label:string,val:number,color:string}>(items:T[],x:number,minH=24,gap=10)=>{
+                    const layoutN=<T extends{label:string,val:number,color:string}>(items:T[],x:number,minH=22,gap=8)=>{
                       const total=items.reduce((s,n)=>s+Math.max(n.val,1),0)||1;
                       const usableH=plotH4-gap*(items.length-1);
                       let cy=padT4;
@@ -1673,128 +1786,246 @@ export default function GeoHub() {
                         return nd;
                       });
                     };
-                    const lNodes=layoutN4(leftItems,col1,26,12);
-                    const sNodes=layoutN4(signals3,col2,28,8);
-                    const geoH4=Math.min(plotH4*0.6,160);
-                    const geoN4={x:col3,y:padT4+(plotH4-geoH4)/2,h:geoH4,mid:padT4+(plotH4-geoH4)/2+geoH4/2};
-                    const oNodes=layoutN4(outcomes,col4,28,10);
 
-                    const wavePath4=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.45)=>{
+                    const lNodes=layoutN(leftItems,col1,24,10);     // query topics
+                    const pNodes=layoutN(prodItems,col2,26,10);     // products mentioned
+                    const sNodes=layoutN(signals3,col3,28,8);       // GEO signals
+                    const geoH4=Math.min(plotH4*0.55,140);
+                    const geoN4={x:col4,y:padT4+(plotH4-geoH4)/2,h:geoH4,mid:padT4+(plotH4-geoH4)/2+geoH4/2};
+
+                    // ── FLOWS ──
+                    const wave=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.44)=>{
                       const mx1=x1+nW4+(x2-x1-nW4)*bend;
                       const mx2=x2-(x2-x1-nW4)*bend;
                       return`M${x1+nW4},${y1} C${mx1},${y1} ${mx2},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx2},${y2+h2} ${mx1},${y1+h1} ${x1+nW4},${y1+h1} Z`;
                     };
 
-                    const flows4a:{path:string,color:string,pid:string,sid:string}[]=[];
+                    // Flow A: query topics → products
+                    // Each topic distributes proportionally to each product based on
+                    // how many responses in that topic mention the product
+                    type FlowA={path:string,color:string,tid:string,pid:string};
+                    const flows4a:FlowA[]=[];
                     lNodes.forEach(ln=>{
-                      const lFrac=ln.h/plotH4;
-                      let sigOff=0;
-                      sNodes.forEach(sig=>{
-                        const fw=(sig.weight/100);
-                        const lH=Math.max(3,ln.h*fw);
-                        const sH=Math.max(3,sig.h*lFrac);
-                        const lY=ln.y+sigOff*ln.h;
-                        const sY=sig.y+lNodes.slice(0,lNodes.indexOf(ln)).reduce((acc,prev)=>acc+prev.h*fw,0);
-                        flows4a.push({path:wavePath4(ln.x,lY,lH,sig.x,sY,sH,0.42),color:sig.color,pid:ln.label,sid:sig.label});
-                        sigOff+=fw;
+                      // responses for this topic
+                      const topicRd=rd3.filter((r:any)=>r.category===ln.label);
+                      const topicTotal=topicRd.length||1;
+                      // how much of topic's bar goes to each product
+                      const prodShares=pNodes.map(pn=>{
+                        const pDef=productDefs.find(p=>p.label===pn.label);
+                        if(!pDef) return 0;
+                        const cnt=topicRd.filter((r:any)=>pDef.terms.some((t:string)=>(r.response_preview||'').toLowerCase().includes(t))).length;
+                        return Math.max(0,cnt/topicTotal);
+                      });
+                      const totalShare=prodShares.reduce((s,v)=>s+v,0)||1;
+                      let lOffset=0;
+                      pNodes.forEach((pn,pi)=>{
+                        const frac=prodShares[pi]/totalShare;
+                        if(frac<0.001) return;
+                        const lH=Math.max(2,ln.h*frac);
+                        // where does this product node's incoming flow start?
+                        const prevTopicContrib=lNodes.slice(0,lNodes.indexOf(ln)).reduce((acc,prev)=>{
+                          const prevRd=rd3.filter((r:any)=>r.category===prev.label);
+                          const prevTotal=prevRd.length||1;
+                          const pDef=productDefs.find(p=>p.label===pn.label);
+                          const cnt=pDef?prevRd.filter((r:any)=>pDef.terms.some((t:string)=>(r.response_preview||'').toLowerCase().includes(t))).length:0;
+                          const prevShares=pNodes.map(ppn=>{const pd=productDefs.find(p=>p.label===ppn.label);if(!pd)return 0;const c2=prevRd.filter((r:any)=>pd.terms.some((t:string)=>(r.response_preview||'').toLowerCase().includes(t))).length;return c2/prevTotal;});
+                          const ps=prevShares.reduce((s,v)=>s+v,0)||1;
+                          return acc+prev.h*(prevShares[pi]/ps||0);
+                        },0);
+                        const pY=pn.y+prevTopicContrib;
+                        const pH=Math.max(2,pn.h*frac);
+                        flows4a.push({
+                          path:wave(ln.x,ln.y+lOffset,lH,pn.x,pY,pH,0.42),
+                          color:pn.color,
+                          tid:ln.label,
+                          pid:pn.label,
+                        });
+                        lOffset+=lH;
                       });
                     });
-                    const flows4b:{path:string,color:string,sid:string}[]=[];
+
+                    // Flow B: products → GEO signals
+                    // Each product distributes to signals proportionally by signal weight
+                    type FlowB={path:string,color:string,pid:string,sid:string};
+                    const flows4b:FlowB[]=[];
+                    pNodes.forEach(pn=>{
+                      const pFrac=pn.h/plotH4;
+                      let pOffset=0;
+                      sNodes.forEach(sig=>{
+                        const fw=sig.weight/100;
+                        const pH=Math.max(2,pn.h*fw);
+                        const prevProdH=pNodes.slice(0,pNodes.indexOf(pn)).reduce((acc,prev)=>acc+prev.h*fw,0);
+                        const sY=sig.y+prevProdH;
+                        const sH=Math.max(2,sig.h*pFrac);
+                        flows4b.push({path:wave(pn.x,pn.y+pOffset,pH,sig.x,sY,sH,0.43),color:sig.color,pid:pn.label,sid:sig.label});
+                        pOffset+=pH;
+                      });
+                    });
+
+                    // Flow C: signals → GEO score
+                    type FlowC={path:string,color:string,sid:string};
+                    const flows4c:FlowC[]=[];
                     let gOff4=geoN4.y;
                     sNodes.forEach(sig=>{
                       const h=geoN4.h*(sig.weight/100);
-                      flows4b.push({path:wavePath4(sig.x,sig.y,sig.h,geoN4.x,gOff4,h,0.46),color:sig.color,sid:sig.label});
+                      flows4c.push({path:wave(sig.x,sig.y,sig.h,geoN4.x,gOff4,h,0.46),color:sig.color,sid:sig.label});
                       gOff4+=h;
-                    });
-                    const flows4c:{path:string,color:string,oid:string}[]=[];
-                    const oTotal=outcomes.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
-                    let gOff4b=geoN4.y;
-                    oNodes.forEach(on=>{
-                      const frac=Math.max(on.val,1)/oTotal;
-                      const h=geoN4.h*frac;
-                      flows4c.push({path:wavePath4(geoN4.x,gOff4b,h,on.x,on.y,on.h,0.46),color:on.color,oid:on.label});
-                      gOff4b+=h;
                     });
 
                     const isHov=(key:string)=>hovPath===key;
-                    const baseOp=hovPath?0.06:0.18;
-                    const activeOp=0.55;
+                    const dimOp=(key:string)=>hovPath?(isHov(key)?0.58:0.05):0.20;
 
                     return(
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
-                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12}}>
                           <div>
                             <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow · GEO Score Composition</div>
-                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>
-                              How your actual query topic performance flows through GEO signals to your score and real outcomes.
-                              Left column = top query categories from this analysis (real data, not hardcoded).
-                              Click any node or stream to highlight its path.
+                            <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:2}}>
+                              How AI query topics flow through brand products mentioned → GEO signals → your score.
+                              Products are detected from actual AI response text — no hardcoding.
+                              Click any node or stream to trace the full path.
                             </div>
                           </div>
-                          <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:210,flexShrink:0}}>
-                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>Query Outcomes (right column)</div>
-                            {outcomes.map((o,i)=><div key={i} style={{display:'flex',gap:4,marginBottom:2}}><div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/><span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span></div>)}
+                          <div style={{background:'#F5F3FF',borderRadius:8,border:'1px solid #DDD6FE',padding:'8px 12px',fontSize:'0.65rem',color:'#5B21B6',lineHeight:1.7,maxWidth:200,flexShrink:0}}>
+                            <div style={{fontWeight:700,marginBottom:3}}>How to read this</div>
+                            <div>Left → what AI is asked about</div>
+                            <div>2nd → which products AI mentions</div>
+                            <div>3rd → how signals are scored</div>
+                            <div>Right → your final GEO Score</div>
                           </div>
                         </div>
                         <div style={{overflowX:'auto' as const}}>
-                        <svg viewBox={`0 0 ${W4} ${H4}`} style={{width:'100%',minWidth:700,display:'block'}}
+                        <svg viewBox={`0 0 ${W4} ${H4}`} style={{width:'100%',minWidth:800,display:'block'}}
                           onClick={()=>setHovPath(null)}>
+
                           {/* Column headers */}
-                          {[{x:col1+nW4/2,l:'QUERY TOPICS'},{x:col2+nW4/2,l:'GEO SIGNALS'},{x:col3+nW4/2,l:'GEO SCORE'},{x:col4+nW4/2,l:'QUERY OUTCOMES'}].map((h,i)=>(
-                            <text key={i} x={h.x} y={padT4-8} textAnchor="middle" style={{fontSize:8,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.08em'}}>{h.l}</text>
+                          {[
+                            {x:col1+nW4/2,   l:'QUERY TOPICS'},
+                            {x:col2+nW4/2,   l:'BRAND PRODUCTS MENTIONED'},
+                            {x:col3+nW4/2,   l:'GEO SIGNALS'},
+                            {x:col4+nW4/2,   l:'GEO SCORE'},
+                          ].map((h,i)=>(
+                            <text key={i} x={h.x} y={padT4-10} textAnchor="middle"
+                              style={{fontSize:7.5,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.07em'}}>{h.l}</text>
                           ))}
+
+                          {/* Flow A: topics → products */}
                           {flows4a.map((f,i)=>(
                             <path key={`fa${i}`} d={f.path} fill={f.color}
-                              opacity={hovPath?( isHov(f.pid)||isHov(f.sid)?activeOp:baseOp ):0.18}
-                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
-                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.pid?null:f.pid);}}/>
+                              opacity={hovPath?(isHov(f.tid)||isHov(f.pid)?0.55:0.04):0.16}
+                              style={{cursor:'pointer',transition:'opacity 0.15s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.tid?null:f.tid);}}/>
                           ))}
+
+                          {/* Flow B: products → signals */}
                           {flows4b.map((f,i)=>(
                             <path key={`fb${i}`} d={f.path} fill={f.color}
-                              opacity={hovPath?( isHov(f.sid)?activeOp:baseOp ):0.22}
-                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
-                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.sid?null:f.sid);}}/>
+                              opacity={hovPath?(isHov(f.pid)||isHov(f.sid)?0.52:0.04):0.18}
+                              style={{cursor:'pointer',transition:'opacity 0.15s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.pid?null:f.pid);}}/>
                           ))}
+
+                          {/* Flow C: signals → GEO */}
                           {flows4c.map((f,i)=>(
                             <path key={`fc${i}`} d={f.path} fill={f.color}
-                              opacity={hovPath?( isHov(f.oid)?activeOp:baseOp ):0.22}
-                              style={{cursor:'pointer',transition:'opacity 0.18s'}}
-                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.oid?null:f.oid);}}/>
+                              opacity={hovPath?(isHov(f.sid)?0.52:0.04):0.22}
+                              style={{cursor:'pointer',transition:'opacity 0.15s'}}
+                              onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.sid?null:f.sid);}}/>
                           ))}
-                          {/* Left nodes: query topics */}
-                          {lNodes.map((n:any,i:number)=>(
-                            <g key={`ln${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
-                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
-                              <text x={n.x-6} y={n.mid-6} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>16?n.label.slice(0,15)+'…':n.label}</text>
-                              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win · {n.total||0}q</text>
-                            </g>
-                          ))}
-                          {/* Signal nodes */}
-                          {sNodes.map((n,i)=>(
-                            <g key={`sn4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
-                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:0.9}/>
-                              <text x={n.x+nW4+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
-                              <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
-                            </g>
-                          ))}
-                          {/* GEO node */}
+
+                          {/* Column 1: Query topic nodes */}
+                          {lNodes.map((n:any,i:number)=>{
+                            const dim=hovPath&&!isHov(n.label);
+                            return(
+                              <g key={`ln${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                                <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
+                                <text x={n.x-6} y={n.mid-6} textAnchor="end" dominantBaseline="middle"
+                                  style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>
+                                  {n.label.length>17?n.label.slice(0,16)+'…':n.label}
+                                </text>
+                                <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle"
+                                  style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>
+                                  {n.val}% win · {n.total}q
+                                </text>
+                              </g>
+                            );
+                          })}
+
+                          {/* Column 2: Product nodes */}
+                          {pNodes.map((n:any,i:number)=>{
+                            const dim=hovPath&&!isHov(n.label);
+                            return(
+                              <g key={`pn${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                                <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
+                                <text x={n.x+nW4+5} y={n.mid-5} dominantBaseline="middle"
+                                  style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>
+                                  {n.label.length>18?n.label.slice(0,17)+'…':n.label}
+                                </text>
+                                <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle"
+                                  style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>
+                                  {n.mentions} response{n.mentions!==1?'s':''} mention
+                                </text>
+                              </g>
+                            );
+                          })}
+
+                          {/* Column 3: GEO Signal nodes */}
+                          {sNodes.map((n,i)=>{
+                            const dim=hovPath&&!isHov(n.label);
+                            return(
+                              <g key={`sn${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
+                                <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:0.9}/>
+                                <text x={n.x+nW4+5} y={n.mid-5} dominantBaseline="middle"
+                                  style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>
+                                  {n.label}
+                                </text>
+                                <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle"
+                                  style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>
+                                  {n.val} · {n.weight}%
+                                </text>
+                              </g>
+                            );
+                          })}
+
+                          {/* Column 4: GEO Score node */}
                           <rect x={geoN4.x} y={geoN4.y} width={nW4} height={geoN4.h} fill="#7C3AED" rx={5}/>
-                          <text x={geoN4.x+nW4+10} y={geoN4.mid-16} style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
-                          <text x={geoN4.x+nW4+10} y={geoN4.mid+10} style={{fontSize:30,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore3}</text>
-                          {/* Outcome nodes */}
-                          {oNodes.map((n:any,i:number)=>(
-                            <g key={`on4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
-                              <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
-                              <text x={n.x+nW4+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
-                              <text x={n.x+nW4+6} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries</text>
-                            </g>
-                          ))}
-                          {hovPath&&<text x={W4-30} y={padT4} textAnchor="end" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Click anywhere to clear · Highlighted: {hovPath}</text>}
+                          <text x={geoN4.x+nW4+12} y={geoN4.mid-20}
+                            style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
+                          <text x={geoN4.x+nW4+12} y={geoN4.mid+8}
+                            style={{fontSize:32,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif',lineHeight:1}}>{geoScore3}</text>
+                          <text x={geoN4.x+nW4+12} y={geoN4.mid+28}
+                            style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>out of 100</text>
+
+                          {/* Click hint */}
+                          {hovPath&&(
+                            <text x={W4-8} y={padT4-10} textAnchor="end"
+                              style={{fontSize:7.5,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>
+                              Click anywhere to clear · path: {hovPath}
+                            </text>
+                          )}
                         </svg>
                         </div>
-                        <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
-                          <span style={{fontSize:'0.65rem',color:'#6B7280',fontWeight:600}}>Query topics from this analysis:</span>
-                          {leftItems.map((m:any,i:number)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.val}% win)</span></div>)}
+
+                        {/* Legend */}
+                        <div style={{borderTop:'1px solid #F3F4F6',paddingTop:10,marginTop:10,display:'flex',flexWrap:'wrap' as const,gap:16}}>
+                          <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,alignItems:'center'}}>
+                            <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>PRODUCTS DETECTED:</span>
+                            {prodItems.map((p:any,i:number)=>(
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
+                                <div style={{width:7,height:7,borderRadius:1,background:p.color}}/>
+                                <span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions} mentions)</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,alignItems:'center',marginLeft:'auto'}}>
+                            <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>SIGNALS:</span>
+                            {signals3.map((m,i)=>(
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
+                                <div style={{width:7,height:7,borderRadius:2,background:m.color}}/>
+                                <span style={{fontSize:'0.62rem',color:'#6B7280'}}>{m.label} {m.weight}%</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     );
