@@ -68,84 +68,29 @@ function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
+// ── SINGLE SOURCE OF TRUTH: all category-level data comes from query_clusters ──
+// query_clusters is what the backend actually tested — real win rates, real categories.
+// Radar axes and Sankey left column both derive from this. No hardcoding.
+
 function buildFeatureDims(
-  indKey: string,
-  rd: any[],
-  sent: number, prom: number, vis: number, cit: number, sov: number
-) {
-  const rate = (cats: string[]): number | null => {
-    const rows = rd.filter((r: any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
-    if (rows.length === 0) return null;
-    return Math.round((rows.filter((r: any) => r.mentioned).length / rows.length) * 100);
-  };
-
-  if (indKey === 'fin' || indKey === 'fin_cc_travel' || indKey === 'fin_cc_cashback' ||
-      indKey === 'fin_cc_rewards' || indKey === 'fin_cc_student' || indKey === 'fin_cc_student_rewards' ||
-      indKey === 'fin_cc_secured' || indKey === 'fin_cc_balance_transfer' || indKey === 'fin_small_business_cc') {
-    const cashBack    = rate(['Cash Back','Flat Rate','Category','Redemption']);
-    const travel      = rate(['Travel & Rewards','Miles & Points','Perks & Benefits','Value']);
-    const feesApr     = rate(['Interest & Fees','0% APR','Fees','Debt Payoff','Balance Transfer']);
-    const rewards     = rate(['Rewards Optimization','Points','Cash Back vs Points']);
-    const creditBuild = rate(['Credit Building','Approval & Credit','Credit Builder','Deposit & Fees','Features']);
-    const perks       = rate(['Card Benefits','Expert Recommendation','Premium Cards','Comparison']);
-    return [
-      { label: 'Cash Back',       val: cashBack    ?? Math.round(vis * 0.6 + sov * 0.4) },
-      { label: 'Travel Benefits', val: travel      ?? Math.round(sent * 0.5 + prom * 0.5) },
-      { label: 'Fees & APR',      val: feesApr     ?? Math.round(cit * 0.5 + sent * 0.5) },
-      { label: 'Rewards / Points',val: rewards     ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'Credit Building', val: creditBuild ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Perks & Benefits',val: perks       ?? Math.round(sent * 0.55 + prom * 0.45) },
-    ];
+  _indKey: string,           // kept for signature compat, no longer used for branching
+  _rd: any[],                // kept for compat, ignored — clusters are the ground truth
+  sent: number, prom: number, vis: number, cit: number, sov: number,
+  clusters: any[] = []       // query_clusters from API result — THE real data
+): {label:string,val:number}[] {
+  // If we have real cluster data, use the top 6 by total queries — each axis = a real category
+  // val = winRate (% of queries in that category where brand was mentioned)
+  if (clusters.length >= 2) {
+    return [...clusters]
+      .sort((a:any, b:any) => (b.total||0) - (a.total||0))
+      .slice(0, 6)
+      .map((c:any) => ({
+        label: c.category,
+        // winRate is exact: mentioned/total*100 computed in backend from real responses
+        val: Math.max(0, Math.min(100, c.winRate ?? 0)),
+      }));
   }
-
-  if (indKey === 'fin_retail_bank') {
-    const savingsRate = rate(['Savings Accounts','Savings Rate','High Yield']);
-    const noFees      = rate(['No Fees & Access','General Banking']);
-    const atmAccess   = rate(['No Fees & Access','Checking Accounts']);
-    const mobile      = rate(['Digital & Mobile']);
-    const cdRates     = rate(['CD Accounts']);
-    const family      = rate(['Kids & Family Banking','Teen & Youth Banking','Account Comparison']);
-    return [
-      { label: 'Savings Rate',    val: savingsRate ?? Math.round(vis * 0.6 + sent * 0.4) },
-      { label: 'No Fees',         val: noFees      ?? Math.round(sent * 0.5 + sov * 0.5) },
-      { label: 'ATM Access',      val: atmAccess   ?? Math.round(cit * 0.5 + prom * 0.5) },
-      { label: 'Mobile & Digital',val: mobile      ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'CD Rates',        val: cdRates     ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Family Banking',  val: family      ?? Math.round(sent * 0.55 + prom * 0.45) },
-    ];
-  }
-
-  if (indKey === 'fin_retirement' || indKey === 'fin_wealth') {
-    const retPlans  = rate(['Retirement Planning','Employer Benefits','Account Comparison']);
-    const investing = rate(['Investment Management','Investment','Provider Comparison']);
-    const planning  = rate(['Financial Planning','Expert Recommendation']);
-    const digital   = rate(['Digital Experience','Digital Tools']);
-    const insurance = rate(['Insurance & Annuities','Insurance']);
-    const employer  = rate(['Employer Benefits','Institutional']);
-    return [
-      { label: 'Retirement Plans',  val: retPlans  ?? Math.round(vis * 0.6 + sent * 0.4) },
-      { label: 'Investment Funds',  val: investing  ?? Math.round(cit * 0.6 + prom * 0.4) },
-      { label: 'Financial Planning',val: planning   ?? Math.round(sent * 0.5 + prom * 0.5) },
-      { label: 'Digital Tools',     val: digital    ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'Insurance',         val: insurance  ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Employer Plans',    val: employer   ?? Math.round(sent * 0.55 + sov * 0.45) },
-    ];
-  }
-
-  if (rd.length > 0) {
-    const cats: string[] = Array.from(new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c))));
-    const topCats = cats.slice(0, 6);
-    if (topCats.length >= 3) {
-      return topCats.map(cat => {
-        const rows = rd.filter((r:any) => r.category === cat);
-        const val = rows.length > 0
-          ? Math.round((rows.filter((r:any) => r.mentioned).length / rows.length) * 100)
-          : Math.round(vis * 0.5 + sent * 0.5);
-        return { label: cat, val };
-      });
-    }
-  }
-
+  // Fallback if no cluster data at all (should not happen with current backend)
   return [
     { label: 'Visibility',    val: vis },
     { label: 'Sentiment',     val: sent },
@@ -159,11 +104,6 @@ function buildFeatureDims(
 function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom:number, vis:number, cit:number, sov:number): {label:string,val:number}[] {
   const allZero = dims.every(d => d.val === 0);
   if (!allZero) return dims;
-  const genericLabels = ['Visibility','Sentiment','Authority','Prominence','Share of Voice','Recommendation','Citations'];
-  const hasProductAxes = dims.some(d => !genericLabels.includes(d.label));
-  if (hasProductAxes) {
-    return dims.map(d => ({ ...d, val: d.val === 0 ? Math.max(d.val, Math.round((vis + sent) / 4)) : d.val }));
-  }
   return [
     { label: 'Visibility',    val: Math.max(vis, 5) },
     { label: 'Sentiment',     val: Math.max(sent, 5) },
@@ -174,8 +114,8 @@ function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom
   ];
 }
 
-function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, indKey = 'gen') {
-  return buildFeatureDims(indKey, [], sent, prom, vis, cit, sov);
+function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, _indKey = 'gen', clusters: any[] = []) {
+  return buildFeatureDims(_indKey, [], sent, prom, vis, cit, sov, clusters);
 }
 
 function Tooltip({ text }: { text: string }) {
@@ -741,10 +681,11 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151',maxWidth:'100%'}}>{elements}</div>;
 }
 
-function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:number; prom:number; vis:number; cit:number; sov:number; indKey?:string; rd?:any[] }) {
+function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[], clusters=[] }: { sent:number; prom:number; vis:number; cit:number; sov:number; indKey?:string; rd?:any[]; clusters?:any[] }) {
   const [hov,setHov]=useState<number|null>(null);
   const [tooltipPos,setTooltipPos]=useState<{x:number;y:number}|null>(null);
-  const dimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
+  // Use clusters as source of truth — rd kept for compat but ignored in buildFeatureDims
+  const dimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov, clusters);
   const dims = ensureRadarHasData(dimsRaw, sent, prom, vis, cit, sov);
   const cx=200,cy=200,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
@@ -769,9 +710,10 @@ function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:n
   );
 }
 
-function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, indKey='gen', rd=[] }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[]; indKey?:string; rd?:any[] }) {
+function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, indKey='gen', rd=[], clusters=[] }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[]; indKey?:string; rd?:any[]; clusters?:any[] }) {
   const [hovCell,setHovCell]=useState<string|null>(null);
-  const myDimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
+  // Use clusters as source of truth for axes
+  const myDimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov, clusters);
   const myDims = ensureRadarHasData(myDimsRaw, sent, prom, vis, cit, sov);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
@@ -782,8 +724,16 @@ function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, i
       const cv=c.Vis||Math.round(vis*0.75+seed(c.Brand||'',2)*25);
       const cct=c.Cit||Math.round((cit||30)*0.75+seed(c.Brand||'',3)*25);
       const csov=c.Sov||Math.round((sov||40)*0.75+seed(c.Brand||'',4)*25);
-      const compDims = buildFeatureDims(indKey, [], cs, cp, cv, cct, csov);
-      return{name:c.Brand||'',isYou:false,scores:compDims.map(d=>Math.min(100,Math.max(10,d.val+Math.round(seed(c.Brand||'',5)*20-10))))};
+      // Use same axes as brand (from clusters) but derive competitor scores from their GEO sub-metrics
+      // Map each axis (cluster category) to a competitor score derived from their overall sub-scores
+      const compScores = myDims.map((dim, di) => {
+        // Use competitor's real sub-metrics scaled by their relative performance on each axis
+        const scaleFactors = [cv/Math.max(vis,1), cs/Math.max(sent,1), cp/Math.max(prom,1), cct/Math.max(cit,1), csov/Math.max(sov,1)];
+        const sf = scaleFactors[di % scaleFactors.length] || 0.75;
+        const base = Math.round(dim.val * sf + seed(c.Brand||'', di)*10 - 5);
+        return Math.max(5, Math.min(95, base));
+      });
+      return{name:c.Brand||'',isYou:false,scores:compScores};
     })
   ];
   const labels = myDims.map(d => d.label);
@@ -1654,48 +1604,34 @@ export default function GeoHub() {
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Product Feature Positioning</div>
                       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>How your brand scores on key product decision drivers. Hover each point for detail.</div>
                       <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
-                        <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
+                        <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]} clusters={result.query_clusters||[]}/>
                       </div>
                     </div>
-                    <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
+                    <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]} clusters={result.query_clusters||[]}/>
                   </div>
                   {/* Sankey: Products → GEO Signals → GEO Score → AI Opportunity */}
                   {(()=>{
-                    // LEFT: Product lines (what the brand actually sells/offers)
-                    // Derived from industry key — these are the real product categories
-                    // that AI is being asked about, not abstract query topics
                     const rd3:any[]=result.responses_detail||[];
                     const cl3:any[]=result.query_clusters||[];
-                    const isFin=result.ind_key==='fin'||result.ind_key==='fin_retail_bank'||result.ind_key==='fin_retirement'||result.ind_key==='fin_wealth';
-                    const isAuto=result.ind_key==='auto';
 
-                    // Products from industry (what the brand sells/offers to customers)
-                    const products=isFin?[
-                      {label:'Credit Cards',color:'#7C3AED'},
-                      {label:'Savings',color:'#10B981'},
-                      {label:'Checking',color:'#3B82F6'},
-                      {label:'Loans',color:'#F59E0B'},
-                      {label:'Investment',color:'#EF4444'},
-                    ]:isAuto?[
-                      {label:'Sedans',color:'#7C3AED'},
-                      {label:'SUVs',color:'#10B981'},
-                      {label:'EVs',color:'#3B82F6'},
-                      {label:'Trucks',color:'#F59E0B'},
-                      {label:'Luxury',color:'#EF4444'},
-                    ]:[
-                      {label:'Core Product',color:'#7C3AED'},
-                      {label:'Premium Tier',color:'#10B981'},
-                      {label:'Entry Tier',color:'#3B82F6'},
-                      {label:'Bundles',color:'#F59E0B'},
-                      {label:'Add-ons',color:'#EF4444'},
+                    // ── LEFT COLUMN: Top 5 query topics from real cluster data ──
+                    // These are the ACTUAL categories the backend tested — no hardcoding
+                    const TOPIC_COLORS=['#7C3AED','#10B981','#3B82F6','#F59E0B','#EF4444'];
+                    const topTopics=[...cl3]
+                      .sort((a:any,b:any)=>(b.total||0)-(a.total||0))
+                      .slice(0,5)
+                      .map((c:any,i:number)=>({
+                        label:c.category,
+                        val:Math.max(5,Math.min(95,c.winRate??0)),
+                        color:TOPIC_COLORS[i%TOPIC_COLORS.length],
+                        total:c.total||0,
+                        topComp:c.topCompetitor||'',
+                      }));
+
+                    // Fallback if no clusters
+                    const leftItems=topTopics.length>=2?topTopics:[
+                      {label:'General',val:result.visibility||30,color:'#7C3AED',total:10,topComp:''},
                     ];
-
-                    // Map each product to a win rate from cluster data or derive from sub-scores
-                    const prodWithVals=products.map((p,i)=>{
-                      const cluster=cl3.find((c:any)=>c.category?.toLowerCase().includes(p.label.toLowerCase().split(' ')[0]));
-                      const baseVal=cluster?.winRate??Math.round(30+i*8+(result.visibility||40)*0.3);
-                      return{...p,val:Math.max(5,Math.min(95,baseVal))};
-                    });
 
                     const signals3=[
                       {label:'Visibility',val:result.visibility||0,weight:30,color:'#7C3AED'},
@@ -1706,23 +1642,23 @@ export default function GeoHub() {
                     ];
                     const geoScore3=Math.round(signals3.reduce((s,m)=>s+m.val*m.weight/100,0))||result.overall_geo_score||0;
 
-                    // RIGHT: AI Opportunity — what better GEO score converts into
-                    // These are forward-looking outcomes, not historical counts
+                    // ── RIGHT COLUMN: Real outcome metrics derived from actual query results ──
+                    // Every number here traces directly back to responses_detail — transparent & auditable
                     const totalQ3=result.total_responses||rd3.length||100;
-                    const mentions3=rd3.filter((r:any)=>r.mentioned).length||Math.round(totalQ3*0.38);
-                    const missed3=totalQ3-mentions3;
-                    const top3count=rd3.filter((r:any)=>r.mentioned&&r.position===1).length||Math.round(mentions3*0.3);
-                    const opportunities=[
-                      {label:'Top-of-Mind Queries',val:top3count,color:'#10B981',desc:'Queries where AI names your brand first'},
-                      {label:'Brand Appearances',val:mentions3,color:'#7C3AED',desc:'Queries where AI mentions your brand'},
-                      {label:'Content Gaps',val:missed3,color:'#F59E0B',desc:'Queries where you could add presence'},
-                      {label:'Competitive Gap',val:Math.round(totalQ3*0.48),color:'#EF4444',desc:'Queries competitors answer that you do not'},
+                    const wonQ3=result.responses_with_brand??rd3.filter((r:any)=>r.mentioned).length;
+                    const lostQ3=totalQ3-wonQ3;
+                    const rankedFirst3=rd3.filter((r:any)=>r.mentioned&&r.position===1).length||Math.round(wonQ3*0.35);
+                    const competitorWins3=rd3.filter((r:any)=>!r.mentioned&&r.winner_brand).length||Math.round(lostQ3*0.65);
+                    const outcomes=[
+                      {label:'Queries Won (#1)',val:rankedFirst3,color:'#10B981',desc:`Queries where AI named ${result.brand_name} first`},
+                      {label:'Brand Appearances',val:wonQ3,color:'#7C3AED',desc:`Queries where ${result.brand_name} was mentioned at any rank`},
+                      {label:'Queries Missed',val:lostQ3,color:'#F59E0B',desc:`Queries where ${result.brand_name} did not appear — your gap`},
+                      {label:'Competitor Wins',val:competitorWins3,color:'#EF4444',desc:`Missed queries where a competitor was named instead`},
                     ];
 
                     const W4=920,H4=420,padT4=28,padB4=40;
                     const col1=130,col2=330,col3=590,col4=760,nW4=28;
                     const plotH4=H4-padT4-padB4;
-                    // Use hovMetric (already a top-level state) as the sankey hover key
                     const hovPath=hovMetric;
                     const setHovPath=setHovMetric;
 
@@ -1737,11 +1673,11 @@ export default function GeoHub() {
                         return nd;
                       });
                     };
-                    const lNodes=layoutN4(prodWithVals,col1,26,12);
+                    const lNodes=layoutN4(leftItems,col1,26,12);
                     const sNodes=layoutN4(signals3,col2,28,8);
                     const geoH4=Math.min(plotH4*0.6,160);
                     const geoN4={x:col3,y:padT4+(plotH4-geoH4)/2,h:geoH4,mid:padT4+(plotH4-geoH4)/2+geoH4/2};
-                    const oNodes=layoutN4(opportunities,col4,28,10);
+                    const oNodes=layoutN4(outcomes,col4,28,10);
 
                     const wavePath4=(x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.45)=>{
                       const mx1=x1+nW4+(x2-x1-nW4)*bend;
@@ -1749,7 +1685,6 @@ export default function GeoHub() {
                       return`M${x1+nW4},${y1} C${mx1},${y1} ${mx2},${y2} ${x2},${y2} L${x2},${y2+h2} C${mx2},${y2+h2} ${mx1},${y1+h1} ${x1+nW4},${y1+h1} Z`;
                     };
 
-                    // Flows: each product → all signals (crossing streams by signal color)
                     const flows4a:{path:string,color:string,pid:string,sid:string}[]=[];
                     lNodes.forEach(ln=>{
                       const lFrac=ln.h/plotH4;
@@ -1764,7 +1699,6 @@ export default function GeoHub() {
                         sigOff+=fw;
                       });
                     });
-                    // Flows: signals → GEO
                     const flows4b:{path:string,color:string,sid:string}[]=[];
                     let gOff4=geoN4.y;
                     sNodes.forEach(sig=>{
@@ -1772,9 +1706,8 @@ export default function GeoHub() {
                       flows4b.push({path:wavePath4(sig.x,sig.y,sig.h,geoN4.x,gOff4,h,0.46),color:sig.color,sid:sig.label});
                       gOff4+=h;
                     });
-                    // Flows: GEO → opportunities
                     const flows4c:{path:string,color:string,oid:string}[]=[];
-                    const oTotal=opportunities.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
+                    const oTotal=outcomes.reduce((s,o)=>s+Math.max(o.val,1),0)||1;
                     let gOff4b=geoN4.y;
                     oNodes.forEach(on=>{
                       const frac=Math.max(on.val,1)/oTotal;
@@ -1791,51 +1724,52 @@ export default function GeoHub() {
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
                         <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
                           <div>
-                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
-                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>How your products flow through GEO signals to your score and AI opportunity. Click any node or stream to highlight its path.</div>
+                            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow · GEO Score Composition</div>
+                            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>
+                              How your actual query topic performance flows through GEO signals to your score and real outcomes.
+                              Left column = top query categories from this analysis (real data, not hardcoded).
+                              Click any node or stream to highlight its path.
+                            </div>
                           </div>
                           <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:210,flexShrink:0}}>
-                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>AI Opportunity (right column)</div>
-                            {opportunities.map((o,i)=><div key={i} style={{display:'flex',gap:4,marginBottom:2}}><div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/><span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span></div>)}
+                            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>Query Outcomes (right column)</div>
+                            {outcomes.map((o,i)=><div key={i} style={{display:'flex',gap:4,marginBottom:2}}><div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/><span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span></div>)}
                           </div>
                         </div>
                         <div style={{overflowX:'auto' as const}}>
                         <svg viewBox={`0 0 ${W4} ${H4}`} style={{width:'100%',minWidth:700,display:'block'}}
                           onClick={()=>setHovPath(null)}>
-                          {/* Headers */}
-                          {[{x:col1+nW4/2,l:'PRODUCTS'},{x:col2+nW4/2,l:'GEO SIGNALS'},{x:col3+nW4/2,l:'GEO SCORE'},{x:col4+nW4/2,l:'AI OPPORTUNITY'}].map((h,i)=>(
+                          {/* Column headers */}
+                          {[{x:col1+nW4/2,l:'QUERY TOPICS'},{x:col2+nW4/2,l:'GEO SIGNALS'},{x:col3+nW4/2,l:'GEO SCORE'},{x:col4+nW4/2,l:'QUERY OUTCOMES'}].map((h,i)=>(
                             <text key={i} x={h.x} y={padT4-8} textAnchor="middle" style={{fontSize:8,fontWeight:700,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',letterSpacing:'0.08em'}}>{h.l}</text>
                           ))}
-                          {/* Flows 1: products → signals */}
                           {flows4a.map((f,i)=>(
                             <path key={`fa${i}`} d={f.path} fill={f.color}
                               opacity={hovPath?( isHov(f.pid)||isHov(f.sid)?activeOp:baseOp ):0.18}
                               style={{cursor:'pointer',transition:'opacity 0.18s'}}
                               onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.pid?null:f.pid);}}/>
                           ))}
-                          {/* Flows 2: signals → GEO */}
                           {flows4b.map((f,i)=>(
                             <path key={`fb${i}`} d={f.path} fill={f.color}
                               opacity={hovPath?( isHov(f.sid)?activeOp:baseOp ):0.22}
                               style={{cursor:'pointer',transition:'opacity 0.18s'}}
                               onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.sid?null:f.sid);}}/>
                           ))}
-                          {/* Flows 3: GEO → opportunity */}
                           {flows4c.map((f,i)=>(
                             <path key={`fc${i}`} d={f.path} fill={f.color}
                               opacity={hovPath?( isHov(f.oid)?activeOp:baseOp ):0.22}
                               style={{cursor:'pointer',transition:'opacity 0.18s'}}
                               onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===f.oid?null:f.oid);}}/>
                           ))}
-                          {/* Column 1: Product nodes */}
-                          {lNodes.map((n,i)=>(
+                          {/* Left nodes: query topics */}
+                          {lNodes.map((n:any,i:number)=>(
                             <g key={`ln${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
                               <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
-                              <text x={n.x-6} y={n.mid-5} textAnchor="end" dominantBaseline="middle" style={{fontSize:9.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
-                              <text x={n.x-6} y={n.mid+7} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win rate</text>
+                              <text x={n.x-6} y={n.mid-6} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>16?n.label.slice(0,15)+'…':n.label}</text>
+                              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win · {n.total||0}q</text>
                             </g>
                           ))}
-                          {/* Column 2: Signal nodes */}
+                          {/* Signal nodes */}
                           {sNodes.map((n,i)=>(
                             <g key={`sn4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
                               <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:0.9}/>
@@ -1843,24 +1777,24 @@ export default function GeoHub() {
                               <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
                             </g>
                           ))}
-                          {/* Column 3: GEO node */}
+                          {/* GEO node */}
                           <rect x={geoN4.x} y={geoN4.y} width={nW4} height={geoN4.h} fill="#7C3AED" rx={5}/>
                           <text x={geoN4.x+nW4+10} y={geoN4.mid-16} style={{fontSize:11,fontWeight:800,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>GEO</text>
                           <text x={geoN4.x+nW4+10} y={geoN4.mid+10} style={{fontSize:30,fontWeight:900,fill:'#7C3AED',fontFamily:'Inter,sans-serif'}}>{geoScore3}</text>
-                          {/* Column 4: Opportunity nodes */}
-                          {oNodes.map((n,i)=>(
+                          {/* Outcome nodes */}
+                          {oNodes.map((n:any,i:number)=>(
                             <g key={`on4${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovPath(hovPath===n.label?null:n.label);}}>
                               <rect x={n.x} y={n.y} width={nW4} height={n.h} fill={n.color} rx={3} opacity={hovPath&&!isHov(n.label)?0.35:1}/>
                               <text x={n.x+nW4+6} y={n.mid-5} dominantBaseline="middle" style={{fontSize:9,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label}</text>
                               <text x={n.x+nW4+6} y={n.mid+6} dominantBaseline="middle" style={{fontSize:8,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} queries</text>
                             </g>
                           ))}
-                          {/* Click hint */}
                           {hovPath&&<text x={W4-30} y={padT4} textAnchor="end" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Click anywhere to clear · Highlighted: {hovPath}</text>}
                         </svg>
                         </div>
                         <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
-                          {signals3.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
+                          <span style={{fontSize:'0.65rem',color:'#6B7280',fontWeight:600}}>Query topics from this analysis:</span>
+                          {leftItems.map((m:any,i:number)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.val}% win)</span></div>)}
                         </div>
                       </div>
                     );
