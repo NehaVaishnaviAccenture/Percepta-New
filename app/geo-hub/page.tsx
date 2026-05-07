@@ -1741,19 +1741,42 @@ export default function GeoHub() {
                     const productDefs=getProductDefs();
 
                     // Scan response_preview text for each product's terms
-                    // Count: how many responses mention this product (regardless of whether brand was mentioned)
+                    // Count: how many AI responses contain this product type's keywords
+                    // Cap at rd3.length so we never show more than total queries run
+                    const totalRd3=rd3.length||100;
                     const productMentions=productDefs.map(p=>{
-                      const count=rd3.filter((r:any)=>{
-                        const txt=(r.response_preview||r.response||'').toLowerCase();
-                        return p.terms.some((t:string)=>txt.includes(t));
-                      }).length;
-                      return{...p,mentions:count,val:Math.max(5,count)};
+                      const count=Math.min(
+                        rd3.filter((r:any)=>{
+                          const txt=(r.response_preview||r.response||'').toLowerCase();
+                          return p.terms.some((t:string)=>txt.includes(t));
+                        }).length,
+                        totalRd3
+                      );
+                      const pct=Math.round((count/totalRd3)*100);
+                      return{...p,mentions:count,pct,val:Math.max(5,count)};
                     }).filter(p=>p.mentions>0||rd3.length===0);
 
-                    // If nothing matched (unlikely), fall back to all defs with even distribution
-                    const prodItems=productMentions.length>=2
-                      ?productMentions
-                      :productDefs.map((p,i)=>({...p,mentions:Math.round((rd3.length||10)/(productDefs.length||5)),val:20+i*5}));
+                    // Sort by mention count descending so highest is on top
+                    const sortedMentions=[...productMentions].sort((a:any,b:any)=>b.mentions-a.mentions);
+
+                    // Color by rank: top 2 = green shades, middle = yellow/orange, bottom = red
+                    // This makes color reflect actual performance not arbitrary position
+                    const PERF_COLORS=['#10B981','#34D399','#F59E0B','#FB923C','#EF4444'];
+                    const prodItemsRaw=sortedMentions.map((p:any,i:number)=>({
+                      ...p,
+                      color:PERF_COLORS[Math.min(i,PERF_COLORS.length-1)],
+                    }));
+
+                    // If nothing matched (unlikely), fall back to even distribution
+                    const prodItems:any[]=prodItemsRaw.length>=2
+                      ?prodItemsRaw
+                      :productDefs.map((p,i)=>({
+                        ...p,
+                        mentions:Math.round(totalRd3/(productDefs.length||5)),
+                        pct:Math.round(100/(productDefs.length||5)),
+                        val:20+i*5,
+                        color:PERF_COLORS[Math.min(i,PERF_COLORS.length-1)],
+                      }));
 
                     // ── COLUMN 3: GEO Signals ──
                     const signals3=[
@@ -1845,20 +1868,32 @@ export default function GeoHub() {
                     });
 
                     // Flow B: products → GEO signals
-                    // Each product distributes to signals proportionally by signal weight
+                    // Each product sends a slice of each signal bar proportional to that product's
+                    // share of total mentions. We track a per-signal offset so streams stack correctly.
                     type FlowB={path:string,color:string,pid:string,sid:string};
                     const flows4b:FlowB[]=[];
-                    pNodes.forEach(pn=>{
-                      const pFrac=pn.h/plotH4;
+                    // Per-signal: track how much of the signal bar has been used so far
+                    const sigOffsets:Record<string,number>={};
+                    sNodes.forEach(sig=>{sigOffsets[sig.label]=sig.y;});
+                    const totalMentions4b=prodItems.reduce((s:number,p:any)=>s+Math.max(p.val,1),0)||1;
+                    pNodes.forEach((pn:any)=>{
                       let pOffset=0;
                       sNodes.forEach(sig=>{
                         const fw=sig.weight/100;
+                        // Height this product contributes to this signal bar
                         const pH=Math.max(2,pn.h*fw);
-                        const prevProdH=pNodes.slice(0,pNodes.indexOf(pn)).reduce((acc,prev)=>acc+prev.h*fw,0);
-                        const sY=sig.y+prevProdH;
-                        const sH=Math.max(2,sig.h*pFrac);
-                        flows4b.push({path:wave(pn.x,pn.y+pOffset,pH,sig.x,sY,sH,0.43),color:sig.color,pid:pn.label,sid:sig.label});
+                        // Height of this product's slice within the signal bar
+                        const pShare=Math.max(pn.val,1)/totalMentions4b;
+                        const sH=Math.max(2,sig.h*pShare);
+                        const sY=sigOffsets[sig.label];
+                        flows4b.push({
+                          path:wave(pn.x,pn.y+pOffset,pH,sig.x,sY,sH,0.43),
+                          color:pn.color,
+                          pid:pn.label,
+                          sid:sig.label,
+                        });
                         pOffset+=pH;
+                        sigOffsets[sig.label]+=sH;
                       });
                     });
 
@@ -1963,7 +1998,7 @@ export default function GeoHub() {
                                 </text>
                                 <text x={n.x+nW4+5} y={n.mid+6} dominantBaseline="middle"
                                   style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>
-                                  {n.mentions} response{n.mentions!==1?'s':''} mention
+                                  {n.pct??Math.round((n.mentions/Math.max(totalRd3,1))*100)}% of AI responses ({n.mentions}/{totalRd3})
                                 </text>
                               </g>
                             );
@@ -2013,7 +2048,7 @@ export default function GeoHub() {
                             {prodItems.map((p:any,i:number)=>(
                               <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
                                 <div style={{width:7,height:7,borderRadius:1,background:p.color}}/>
-                                <span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions} mentions)</span>
+                                <span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.pct??Math.round((p.mentions/Math.max(totalRd3,1))*100)}% · {p.mentions}/{totalRd3})</span>
                               </div>
                             ))}
                           </div>
