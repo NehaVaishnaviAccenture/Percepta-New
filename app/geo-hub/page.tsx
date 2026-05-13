@@ -713,6 +713,126 @@ function SCurveChart({ score, competitors, brand }: { score: number; competitors
   );
 }
 
+// S-Curve matching image 7: white bg, purple curve, shaded opportunity zone, 3 dots (You/Goal/Authority), stage labels below
+function SCurveImage7({ score, brand }: { score: number; brand: string }) {
+  const [hov, setHov] = useState<string|null>(null);
+  const W = 860, H = 360, padL = 68, padR = 30, padT = 28, padB = 72;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const curve = (x: number) => 5 + 90 / (1 + Math.exp(-0.09 * (x - 45)));
+  const pts = Array.from({ length: 201 }, (_, i) => ({ x: i / 2, y: curve(i / 2) }));
+  const sx = (v: number) => padL + (v / 100) * plotW;
+  const sy = (v: number) => padT + ((100 - v) / 100) * plotH;
+  const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ');
+
+  // Find x on curve for a given y score
+  const scoreToX = (s: number) => {
+    let best = 0, bestDiff = 999;
+    pts.forEach(p => { const d = Math.abs(p.y - s); if (d < bestDiff) { bestDiff = d; best = p.x; } });
+    return best;
+  };
+
+  const youX = scoreToX(score), goalX = scoreToX(70), authX = scoreToX(80);
+  const youPX = sx(youX), youPY = sy(score);
+  const goalPX = sx(goalX), goalPY = sy(70);
+  const authPX = sx(authX), authPY = sy(80);
+
+  // Shaded opportunity zone between you and goal (only if score < 70)
+  const shadePts = score < 70 ? pts.filter(p => p.x >= youX && p.x <= goalX) : [];
+  const shadeD = shadePts.length > 1
+    ? `${shadePts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')} L${sx(goalX)},${padT + plotH} L${sx(youX)},${padT + plotH} Z`
+    : '';
+
+  const stages = [
+    { label: 'Fragmented', range: '0–44', color: '#EF4444' },
+    { label: 'Emerging', range: '45–55', color: '#F59E0B' },
+    { label: 'Competitive', range: '56–69', color: '#6366F1' },
+    { label: 'Leader', range: '70–79', color: '#1E88E5' },
+    { label: 'Authority', range: '80+', color: '#10B981' },
+  ];
+
+  const yGridLines = [0, 25, 50, 75, 100];
+  const xGridLines = [0, 20, 40, 60, 80, 100];
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
+      {/* Title */}
+      <text x={padL + plotW / 2} y={16} textAnchor="middle" style={{ fontSize: 14, fontWeight: 700, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>Where You Are vs Your Opportunity</text>
+
+      {/* Y grid */}
+      {yGridLines.map(v => (
+        <g key={v}>
+          <line x1={padL} y1={sy(v)} x2={padL + plotW} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1" />
+          <text x={padL - 8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+        </g>
+      ))}
+
+      {/* X grid */}
+      {xGridLines.map(v => (
+        <g key={v}>
+          <line x1={sx(v)} y1={padT} x2={sx(v)} y2={padT + plotH} stroke="#E5E7EB" strokeWidth="1" />
+          <text x={sx(v)} y={padT + plotH + 14} textAnchor="middle" style={{ fontSize: 10, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>{v}</text>
+        </g>
+      ))}
+
+      {/* Axes */}
+      <line x1={padL} y1={padT + plotH} x2={padL + plotW} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
+      <line x1={padL} y1={padT} x2={padL} y2={padT + plotH} stroke="#D1D5DB" strokeWidth="1.5" />
+
+      {/* Y axis label */}
+      <text x={18} y={padT + plotH / 2} textAnchor="middle" transform={`rotate(-90,18,${padT + plotH / 2})`} style={{ fontSize: 11, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>GEO Score</text>
+
+      {/* Shaded opportunity zone */}
+      {shadeD && <path d={shadeD} fill="#EDE9FE" opacity="0.5" />}
+
+      {/* Goal dashed line */}
+      <line x1={padL} y1={sy(70)} x2={padL + plotW} y2={sy(70)} stroke="#A100FF" strokeWidth="1.5" strokeDasharray="6,4" />
+      <text x={padL + plotW + 4} y={sy(70)} dominantBaseline="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#A100FF', fontFamily: 'Inter,sans-serif' }}>70</text>
+
+      {/* The curve */}
+      <path d={pathD} fill="none" stroke="#A100FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+
+      {/* Opportunity Zone label */}
+      {score < 70 && (
+        <text x={(youPX + goalPX) / 2} y={sy(score) + (sy(70) - sy(score)) / 2 + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>"Opportunity Zone"</text>
+      )}
+
+      {/* Authority dot (green) */}
+      <g onMouseEnter={() => setHov('auth')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
+        <circle cx={authPX} cy={authPY} r={14} fill="#10B981" />
+        {hov === 'auth' && <><rect x={authPX + 16} y={authPY - 22} width={130} height={40} rx={6} fill="#1F2937" /><text x={authPX + 81} y={authPY - 8} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: 'white', fontFamily: 'Inter,sans-serif' }}>Authority (80)</text><text x={authPX + 81} y={authPY + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO Score: 80</text></>}
+        <text x={authPX} y={authPY} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 8, fontWeight: 800, fill: 'white', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>80</text>
+        <text x={authPX} y={authPY - 20} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#10B981', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>Authority (80)</text>
+      </g>
+
+      {/* Goal dot (orange/amber) */}
+      <g onMouseEnter={() => setHov('goal')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
+        <circle cx={goalPX} cy={goalPY} r={14} fill="#F59E0B" />
+        {hov === 'goal' && <><rect x={goalPX + 16} y={goalPY - 22} width={120} height={40} rx={6} fill="#1F2937" /><text x={goalPX + 76} y={goalPY - 8} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: 'white', fontFamily: 'Inter,sans-serif' }}>Goal (70)</text><text x={goalPX + 76} y={goalPY + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO Score: 70</text></>}
+        <text x={goalPX} y={goalPY} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 8, fontWeight: 800, fill: 'white', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>70</text>
+        <text x={goalPX} y={goalPY - 20} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#D97706', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>Goal (70)</text>
+      </g>
+
+      {/* You dot (purple) */}
+      <g onMouseEnter={() => setHov('you')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
+        <circle cx={youPX} cy={youPY} r={14} fill="#7C3AED" />
+        {hov === 'you' && <><rect x={youPX - 80} y={youPY + 20} width={160} height={40} rx={6} fill="#1F2937" /><text x={youPX} y={youPY + 34} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: 'white', fontFamily: 'Inter,sans-serif' }}>{brand}: {score}</text><text x={youPX} y={youPY + 50} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>Your current GEO Score</text></>}
+        <text x={youPX} y={youPY} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 8, fontWeight: 800, fill: 'white', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>{score}</text>
+        <text x={youPX} y={youPY + 22} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>You ({score})</text>
+      </g>
+
+      {/* X axis label */}
+      <text x={padL + plotW / 2} y={padT + plotH + 32} textAnchor="middle" style={{ fontSize: 11, fill: '#6B7280', fontFamily: 'Inter,sans-serif' }}>GEO Maturity</text>
+
+      {/* Stage labels at bottom */}
+      {stages.map((s, i) => (
+        <text key={i} x={padL + plotW * (i === 0 ? 0.12 : i === 1 ? 0.32 : i === 2 ? 0.5 : i === 3 ? 0.68 : 0.88)} y={padT + plotH + 52} textAnchor="middle" style={{ fontSize: 9, fontWeight: 700, fill: s.color, fontFamily: 'Inter,sans-serif' }}>
+          {s.label} <tspan style={{ fontWeight: 400, fill: '#9CA3AF' }}>{s.range}</tspan>
+        </text>
+      ))}
+    </svg>
+  );
+}
+
 function PriorityActionsTable({ result, cachedActions, setCachedActions, actionsLoading, setActionsLoading }: { result:any; cachedActions:any[]|null; setCachedActions:(a:any[])=>void; actionsLoading:boolean; setActionsLoading:(b:boolean)=>void }) {
   const actions = cachedActions || [], loading = actionsLoading;
   useEffect(()=>{
@@ -942,13 +1062,13 @@ export default function GeoHub() {
               const resolvedRank=(c:any)=>{const pos=top.findIndex(t=>t.Brand===c.Brand&&t.isYou===c.isYou);if(pos<0||pos>=5)return '--';return `#${pos+1}`;};
 
               const bW=Math.max(700,top.length*80),bH=160,bPad=40,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
-              // Colorful metric bars
+              // Accenture-themed neutral palette: purples, charcoal, grey
               const allMetrics=[
-                {key:'Vis',label:'Visibility',color:'#A100FF',lightColor:'#E9D5FF'},
-                {key:'Cit',label:'Citations',color:'#0EA5E9',lightColor:'#BAE6FD'},
-                {key:'Sen',label:'Sentiment',color:'#10B981',lightColor:'#A7F3D0'},
-                {key:'Sov',label:'Share of Voice',color:'#F59E0B',lightColor:'#FDE68A'},
-                {key:'Prom',label:'Prominence',color:'#EF4444',lightColor:'#FECACA'},
+                {key:'Vis',label:'Visibility',color:'#A100FF',lightColor:'#D4ADFF'},
+                {key:'Cit',label:'Citations',color:'#460073',lightColor:'#9B7FBB'},
+                {key:'Sen',label:'Sentiment',color:'#1F2937',lightColor:'#6B7280'},
+                {key:'Sov',label:'Share of Voice',color:'#7500C0',lightColor:'#BCA0D8'},
+                {key:'Prom',label:'Prominence',color:'#374151',lightColor:'#9CA3AF'},
               ];
 
               return (
@@ -1055,18 +1175,37 @@ export default function GeoHub() {
                     <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
-                    <button onClick={()=>setVisView('scatter')} style={{background:visView==='scatter'?'#A100FF':'white',color:visView==='scatter'?'white':'#374151',border:'1.5px solid '+(visView==='scatter'?'#A100FF':'#E5E7EB'),borderRadius:8,padding:'7px 18px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>Scatter Plot</button>
-                    <button onClick={()=>setVisView('scurve')} style={{background:visView==='scurve'?'#A100FF':'white',color:visView==='scurve'?'white':'#374151',border:'1.5px solid '+(visView==='scurve'?'#A100FF':'#E5E7EB'),borderRadius:8,padding:'7px 18px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>S-Curve</button>
-                    <span style={{fontSize:'0.72rem',color:'#9CA3AF'}}>Switch views to analyze your competitive position</span>
+                    {visView==='scatter'&&(
+                      <button onClick={()=>setVisView('scurve')} style={{marginLeft:'auto',background:'white',color:'#374151',border:'1.5px solid #E5E7EB',borderRadius:8,padding:'7px 16px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s',boxShadow:'0 1px 4px rgba(0,0,0,0.08)'}}>Show S-Curve</button>
+                    )}
+                    {visView==='scurve'&&(
+                      <button onClick={()=>setVisView('scatter')} style={{marginLeft:'auto',background:'#A100FF',color:'white',border:'1.5px solid #A100FF',borderRadius:8,padding:'7px 16px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>Show Scatter Plot</button>
+                    )}
                   </div>
                   {visView==='scatter'&&(
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                      <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment vs. Visibility Market Positioning</div>
-                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand. Bubble size reflects Citation Score.</div>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                        <div>
+                          <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment vs. Visibility Market Positioning</div>
+                          <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginTop:2}}>Each dot = one brand. Bubble size reflects Citation Score.</div>
+                        </div>
+                        <button onClick={()=>setVisView('scurve')} style={{background:'white',color:'#374151',border:'1.5px solid #E5E7EB',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',fontWeight:600,cursor:'pointer',boxShadow:'0 1px 4px rgba(0,0,0,0.07)',whiteSpace:'nowrap' as const}}>Show S-Curve</button>
+                      </div>
                       <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={comps} topCompBrand={topCompBrand}/>
                     </div>
                   )}
-                  {visView==='scurve'&&<SCurveChart score={geo} competitors={comps} brand={result.brand_name}/>}
+                  {visView==='scurve'&&(
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                        <div>
+                          <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Where You Are vs Your Opportunity</div>
+                          <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginTop:2}}>Your GEO Score on the AI maturity curve. The shaded zone shows your path to 70 (Goal).</div>
+                        </div>
+                        <button onClick={()=>setVisView('scatter')} style={{background:'#A100FF',color:'white',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap' as const}}>Show Scatter Plot</button>
+                      </div>
+                      <SCurveImage7 score={geo} brand={result.brand_name}/>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -1119,17 +1258,17 @@ export default function GeoHub() {
               const displaySources=allSrc.map((s:any,i:number)=>({...s,rank:i+1,isOwned:domainMatchesBrand(s.domain||'')}));
               return (
                 <div>
-                  {/* White scorecards with description text like sentiment tab */}
+                  {/* White scorecards with sentiment-style status labels */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
                     <div style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
                       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>Citation Score<Tooltip text="How often and prominently AI models cite your brand."/></div>
                       <div style={{fontSize:'2.4rem',fontWeight:900,color:'#A100FF',lineHeight:1,marginBottom:6}}>{cit}</div>
-                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>Measures how authoritatively AI references your brand across queries. Higher scores mean AI treats your brand as a trusted source.</div>
+                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>{cit>=70?'AI frequently cites your brand as an authority — strong trust signal':cit>=45?'AI occasionally cites your brand — citation authority is building':'AI rarely cites your brand — low trust signal in responses'}</div>
                     </div>
                     <div style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
                       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>Share of Voice<Tooltip text="Your share of all brand mentions in AI responses."/></div>
                       <div style={{fontSize:'2.4rem',fontWeight:900,color:'#A100FF',lineHeight:1,marginBottom:6}}>{sov}</div>
-                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>Your brand mentions as a percentage of all brand mentions across AI responses. Reflects how much of the AI conversation you own vs. competitors.</div>
+                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>{sov>=70?'You dominate the AI conversation — competitors rarely get more airtime':sov>=45?'You have a noticeable share — competitors still outpace you':'Competitors own the majority of AI conversations in your space'}</div>
                     </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
@@ -1179,6 +1318,18 @@ export default function GeoHub() {
               const grouped=[...clusters].sort((a:any,b:any)=>{const g=(c:any)=>c.winRate>=60?0:c.winRate>=30?1:c.winRate>0?2:3;return g(a)!==g(b)?g(a)-g(b):b.mentioned-a.mentioned;});
               const nB=grouped.length,W=940,VPAD=52,COLS=Math.min(5,Math.ceil(Math.sqrt(nB*1.2))),ROWS2=Math.ceil(nB/COLS),cellW=Math.min(160,W/COLS),cellH=105,totalGridW=COLS*cellW,gridOffsetX=(W-totalGridW)/2,H=ROWS2*cellH+VPAD;
               const bubbles=grouped.map((c:any,i:number)=>{const col=i%COLS,row=Math.floor(i/COLS),lastRowCount=nB%COLS||COLS,isLastRow=row===ROWS2-1,offsetX=isLastRow?(COLS-lastRowCount)*cellW/2:0,x=gridOffsetX+offsetX+col*cellW+cellW/2,y=VPAD/2+row*cellH+cellH/2,r=Math.round(28+(c.mentioned/maxMentioned)*18);return{...c,x,y,r};});
+              // Build connection map: connect bubbles with similarity score >= 20 (or nearby if no related)
+              const connections: {x1:number;y1:number;x2:number;y2:number;highlighted:boolean;dashed:boolean}[] = [];
+              bubbles.forEach((b:any) => {
+                (b.related||[]).forEach((rel:any) => {
+                  const target = bubbles.find((bb:any) => bb.category === rel.category);
+                  if (!target || rel.similarity < 15) return;
+                  // avoid duplicates
+                  if (b.category > rel.category) return;
+                  const isHighlightedConn = highlightedBubble && (b.category === highlightedBubble || rel.category === highlightedBubble);
+                  connections.push({x1:b.x,y1:b.y,x2:target.x,y2:target.y,highlighted:!!isHighlightedConn,dashed:rel.similarity<40});
+                });
+              });
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
@@ -1195,6 +1346,16 @@ export default function GeoHub() {
                       </div>
                     </div>
                     <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
+                      {/* Connection lines between related nodes */}
+                      {connections.map((conn, ci) => (
+                        <line key={`conn${ci}`}
+                          x1={conn.x1} y1={conn.y1} x2={conn.x2} y2={conn.y2}
+                          stroke={conn.highlighted ? '#A78BFA' : '#334155'}
+                          strokeWidth={conn.highlighted ? 2.5 : 1.5}
+                          strokeDasharray={conn.dashed ? '4,4' : undefined}
+                          opacity={highlightedBubble ? (conn.highlighted ? 0.9 : 0.08) : 0.35}
+                        />
+                      ))}
                       {bubbles.map((b:any)=>{
                         const isSelected=filterCat===b.category,isHighlighted=highlightedBubble===b.category,isDimmed=!!highlightedBubble&&!isHighlighted;
                         const nodeColor=b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
@@ -1240,11 +1401,69 @@ export default function GeoHub() {
                       <button onClick={()=>setQueryPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:'white',color:'#374151',cursor:'pointer',fontSize:'0.75rem'}}>Next</button>
                     </div>)}
                   </div>
+
+                  {/* Trending queries — image 3 style, 2-col card grid with drilldown */}
+                  {trendingQs.length>0&&(()=>{
+                    const oppOrder=(o:string)=>o==='High'?0:o==='Medium'?1:2;
+                    const highOpp=[...trendingQs].map((tq:any)=>({...tq,query:(tq.query||'').replace(/\bin\s+20\d{2}\b/gi,'').replace(/\s+/g,' ').trim()})).sort((a:any,b:any)=>oppOrder(a.opportunity)-oppOrder(b.opportunity)).slice(0,10);
+                    if(!highOpp.length)return null;
+                    const getCluster=(tqCat:string)=>clusters.find((c:any)=>{const cl=(c.category||'').toLowerCase(),tl=tqCat.toLowerCase();return cl.includes(tl)||tl.includes(cl)||cl.split(/[\s&,]+/).some((w:string)=>w.length>3&&tl.includes(w));});
+                    return (
+                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}><span style={{fontSize:'1.1rem'}}>🔥</span><div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div></div>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:16}}>Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry}.</div>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                          {highOpp.map((tq:any,i:number)=>{
+                            const trendColor=tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
+                            const trendBg=tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
+                            const cluster=getCluster(tq.category);
+                            const brandWinRate=cluster?.winRate??null,brandWinning=brandWinRate!==null&&brandWinRate>=40;
+                            const topCompName=cluster?.topCompetitor||null;
+                            const isOpen=selectedCluster===`trend-${i}`;
+                            return (
+                              <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1.5px solid ${isOpen?'#A100FF':'#E5E7EB'}`,overflow:'hidden'}}>
+                                <div style={{padding:'12px 14px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:6,flexWrap:'wrap' as const}}>
+                                    <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{tq.trend}</span>
+                                    <span style={{background:'#F5F0FF',color:'#A100FF',borderRadius:50,padding:'2px 8px',fontSize:'0.65rem',fontWeight:600}}>{tq.category}</span>
+                                  </div>
+                                  <div style={{fontSize:'0.85rem',color:'#111827',lineHeight:1.5,fontWeight:500,marginBottom:8}}>{tq.query}</div>
+                                  <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const}}>
+                                    {topCompName&&<span style={{fontSize:'0.68rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'2px 8px',fontWeight:600}}>👑 {topCompName} leading</span>}
+                                    {brandWinRate!==null?<span style={{fontSize:'0.68rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'2px 8px'}}>{result.brand_name}: {brandWinRate}% win</span>:<span style={{fontSize:'0.68rem',color:'#9CA3AF',fontStyle:'italic'}}>New category</span>}
+                                    <span style={{marginLeft:'auto',fontSize:'0.65rem',color:'#9CA3AF'}}>{isOpen?'▲':'▼'}</span>
+                                  </div>
+                                </div>
+                                {isOpen&&(
+                                  <div style={{borderTop:'1px solid #E5E7EB',padding:'12px 14px',background:'white'}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:8}}>
+                                      {[
+                                        {label:'Currently Leading',val:topCompName||'No clear leader',color:'#F59E0B'},
+                                        {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'Not tested',color:brandWinning?'#10B981':'#EF4444'},
+                                        {label:'Trend Signal',val:tq.trend,color:trendColor},
+                                        {label:'Opportunity',val:tq.opportunity||'--',color:'#A100FF'},
+                                      ].map((s,j)=>(
+                                        <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'8px 10px'}}>
+                                          <div style={{fontSize:'0.6rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em',marginBottom:3,textTransform:'uppercase' as const}}>{s.label}</div>
+                                          <div style={{fontSize:'0.88rem',fontWeight:800,color:s.color}}>{s.val}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6,background:'#F5F0FF',borderRadius:6,padding:'8px 10px'}}>
+                                      💡 {topCompName?`${topCompName.split(' ')[0]} currently leads this query type.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is showing strength — double down.`:` ${result.brand_name} has room to own this with targeted content.`):'Consider testing this category.'}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
-
-            {/* TAB 6: Recommendations */}
             {activeTab===6&&(()=>{
               const rd2=result.responses_detail||[],recClusters=result.query_clusters||[];
               const topComp1=(result.competitors||[])[0]?.Brand||'Top Competitor';
