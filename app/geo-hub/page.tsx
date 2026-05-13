@@ -228,23 +228,38 @@ function SankeyFlowChart({ result }: { result: any }) {
   const vis: number = result.visibility || 0;
   const cit: number = result.citation_share || 0;
   const sov: number = result.share_of_voice || 0;
-  const totalRd = rd.length || 100;
+  // Use actual number of responses run, fall back to result field or rd length
+  const totalRd = result.total_responses || rd.length || 100;
 
   const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
 
+  // Query topic nodes: use real cluster.total (actual queries in that category across all prompts run)
   const topTopics = [...cl]
-    .sort((a:any,b:any) => (b.total||0)-(a.total||0))
+    .sort((a:any,b:any) => (b.total||b.mentioned||0)-(a.total||a.mentioned||0))
     .slice(0, 5)
     .map((c:any, i:number) => ({
       label: c.category,
       val: Math.max(5, Math.min(95, c.winRate ?? 0)),
       color: TOPIC_COLORS[i % TOPIC_COLORS.length],
-      total: c.total || 0,
+      // Use c.total (total queries in category) if available, else c.mentioned, else estimate
+      total: c.total || c.mentioned || Math.round(totalRd / Math.max(cl.length, 1)),
     }));
-  const leftItems = topTopics.length >= 1 ? topTopics : [{label:'General', val: vis || 30, color: TOPIC_COLORS[0], total: 10}];
+  const leftItems = topTopics.length >= 1 ? topTopics : [{label:'General', val: vis || 30, color: TOPIC_COLORS[0], total: totalRd}];
 
   const productDefs = getProductDefs(indKey, lob);
-  const productMentions = computeProductMentions(productDefs, rd);
+
+  // FIXED: Product mention count — count how many responses mention each product term.
+  // A single response can match multiple products (overlap expected), so pct shows per-product coverage.
+  // We show X/totalRd where X = responses that mention the product.
+  const productMentions = productDefs.map(p => {
+    const count = rd.filter((r:any) => {
+      const txt = (r.response_preview || r.response || '').toLowerCase();
+      return p.terms.some((t:string) => txt.includes(t));
+    }).length;
+    const pct = totalRd > 0 ? Math.round((count / totalRd) * 100) : 0;
+    return { ...p, mentions: count, pct, val: Math.max(5, count) };
+  }).filter(p => p.mentions > 0 || rd.length === 0);
+
   const sortedMentions = [...productMentions].sort((a:any,b:any) => b.mentions - a.mentions);
   const PERF_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
   const prodItems: any[] = sortedMentions.length >= 1
@@ -312,20 +327,7 @@ function SankeyFlowChart({ result }: { result: any }) {
       const frac = prodShares[pi] / totalShare;
       if (frac < 0.001) return;
       const lH = Math.max(2, ln.h * frac);
-      const prevTopicContrib = lNodes.slice(0, lNodes.indexOf(ln)).reduce((acc, prev) => {
-        const prevRd = rd.filter((r:any) => r.category === prev.label);
-        const prevTotal = prevRd.length || 1;
-        const pDef = productDefs.find(p => p.label === pn.label);
-        const prevShares = pNodes.map(ppn => {
-          const pd = productDefs.find(p => p.label === ppn.label);
-          if (!pd) return 0;
-          const c2 = prevRd.filter((r:any) => pd.terms.some((t:string) => (r.response_preview||'').toLowerCase().includes(t))).length;
-          return c2 / prevTotal;
-        });
-        const ps = prevShares.reduce((s,v) => s+v, 0) || 1;
-        return acc + prev.h * (prevShares[pi] / ps || 0);
-      }, 0);
-      const pY = pn.y + prevTopicContrib;
+      const pY = pn.y;
       const pH = Math.max(2, pn.h * frac);
       flowsA.push({ path: wave(ln.x, ln.y+lOffset, lH, pn.x, pY, pH, 0.42), color: pn.color, tid: ln.label, pid: pn.label });
       lOffset += lH;
@@ -411,17 +413,18 @@ function SankeyFlowChart({ result }: { result: any }) {
               <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
             </g>);
           })}
-          {/* GEO node: full plotH bar */}
+          {/* GEO node: full plotH bar — label says "GEO Score" */}
           <rect x={geoN.x} y={geoN.y} width={nW} height={geoN.h} fill="#A100FF" rx={5}/>
-          <text x={geoN.x+nW+12} y={geoN.mid-20} style={{fontSize:11,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>GEO</text>
-          <text x={geoN.x+nW+12} y={geoN.mid+8} style={{fontSize:32,fontWeight:900,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
-          <text x={geoN.x+nW+12} y={geoN.mid+28} style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>out of 100</text>
+          <text x={geoN.x+nW+12} y={geoN.mid-28} style={{fontSize:10,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>GEO</text>
+          <text x={geoN.x+nW+12} y={geoN.mid-16} style={{fontSize:10,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>Score</text>
+          <text x={geoN.x+nW+12} y={geoN.mid+14} style={{fontSize:36,fontWeight:900,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+          <text x={geoN.x+nW+12} y={geoN.mid+36} style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>out of 100</text>
         </svg>
       </div>
       <div style={{borderTop:'1px solid #F3F4F6',paddingTop:10,marginTop:10,display:'flex',flexWrap:'wrap' as const,gap:16}}>
         <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,alignItems:'center'}}>
-          <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>PRODUCTS DETECTED:</span>
-          {prodItems.map((p:any,i:number)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:7,height:7,borderRadius:1,background:p.color}}/><span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions}/{totalRd})</span></div>))}
+          <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>PRODUCTS DETECTED ({totalRd} total responses):</span>
+          {prodItems.map((p:any,i:number)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:7,height:7,borderRadius:1,background:p.color}}/><span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions} responses · {p.pct}%)</span></div>))}
         </div>
       </div>
     </div>
@@ -1003,30 +1006,48 @@ export default function GeoHub() {
             })()}
 
 
-            {/* TAB 0: GEO Score — Sankey only, no GeoSummary/BusinessImpact/ROICurve/WhatScoreMeans */}
+            {/* TAB 0: GEO Score */}
             {activeTab===0&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,rawSent=result.sentiment,prom=result.prominence,sov=result.share_of_voice,avgRank=result.avg_rank;
               const badge=scoreBadge(geo);
               const industryLabel=result.ind_label||result.industry||'Financial Services';
+              // Dynamic explanation: top 3 weakest signals
+              const metrics=[
+                {name:'Visibility',val:vis,note:vis<50?'rarely appears in AI responses':vis<70?'appears infrequently':'strong'},
+                {name:'Prominence',val:prom,note:prom<50?'mentioned at the bottom of responses':prom<70?'appears mid-list':'named early'},
+                {name:'Share of Voice',val:sov,note:sov<50?'competitors dominating AI conversation':sov<70?'modest share of AI mentions':'strong share'},
+                {name:'Citation',val:cit,note:cit<50?'rarely top pick for authoritative reference':cit<70?'occasionally cited':'frequently cited'},
+                {name:'Sentiment',val:rawSent,note:rawSent<50?'neutral or negative AI tone':rawSent<70?'mostly neutral AI tone':'positive AI tone'},
+              ].sort((a,b)=>a.val-b.val);
+              const weakest=metrics.slice(0,3);
+              const explanationParts=weakest.map(m=>`${m.name} (${m.val}), ${m.note}`).join('; ');
+              const explanation=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by ${explanationParts}.`;
+              const scoreBands=[
+                {range:'0-44',label:'Poor',color:'#F44336',bg:'#FFEBEE',border:'#F44336',desc:'Rarely mentioned. AI lacks enough signals to surface you reliably.'},
+                {range:'45-69',label:'Needs Work',color:'#FF7043',bg:'#FBE9E7',border:'#FF7043',desc:'Appears in lists but not as a primary recommendation. Missing key signals.'},
+                {range:'70-79',label:'Good',color:'#F9A825',bg:'#FFFDE7',border:'#FDD835',desc:'AI crosses the confidence threshold. Frequent top-3 placements begin.'},
+                {range:'80-100',label:'Excellent',color:'#43A047',bg:'#E8F5E9',border:'#43A047',desc:'Dominant brand signal. AI leads with you as the primary recommendation.'},
+              ];
               return (
                 <div>
-                  <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
+                  <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:14}}>
                     <GeoGauge score={geo}/>
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:5}}>
+                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
+                      <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
                         <div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827'}}>{result.brand_name}</div>
                         <div style={{display:'flex',gap:6,flexWrap:'wrap' as const}}>
                           {result.lob&&<span style={{fontSize:'0.72rem',fontWeight:600,color:'#A100FF',background:'#F5F0FF',borderRadius:50,padding:'2px 10px'}}>{result.lob}</span>}
                           <span style={{fontSize:'0.72rem',fontWeight:600,color:'#374151',background:'#F3F4F6',borderRadius:50,padding:'2px 10px'}}>{industryLabel}</span>
                         </div>
                       </div>
-                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#A100FF',fontSize:'0.84rem'}}>{(result.page_url||'').slice(0,60)}{(result.page_url||'').length>60?'...':''}</a>
-                      <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
+                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#A100FF',fontSize:'0.82rem'}}>{(result.page_url||'').slice(0,60)}{(result.page_url||'').length>60?'...':''}</a>
+                      <div style={{margin:'10px 0 4px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
                       <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
+                      <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.7,marginTop:10}}>{explanation}</div>
                     </div>
                   </div>
-                  {/* Metric cards — white background only */}
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:16}}>
+                  {/* Metric cards */}
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10,marginBottom:14}}>
                     <MetricCard label="visibility score" val={vis}/>
                     <MetricCard label="sentiment score" val={rawSent}/>
                     <MetricCard label="citation score" val={cit}/>
@@ -1034,7 +1055,21 @@ export default function GeoHub() {
                     <MetricCard label="share of voice" val={sov}/>
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
                   </div>
-                  {/* Sankey only — no GeoSummary, BusinessImpact, ROICurve, WhatScoreMeans */}
+                  {/* What does your score mean — score band cards */}
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:14}}>
+                    <div style={{fontSize:'0.75rem',fontWeight:700,color:'#A100FF',marginBottom:2}}>^ What does your score mean?</div>
+                    <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.7,marginBottom:12}}>Think of the GEO Score like a credit score for AI. At <strong>{geo}</strong>, <strong>{result.brand_name}</strong> {geo>=80?'is in the top tier. AI consistently leads with your brand as the primary recommendation.':geo>=70?'has crossed the efficiency threshold where AI models consistently feature your brand near the top.':'is below the 70 threshold where AI models consistently feature a brand at the top of responses.'}</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:10}}>
+                      {scoreBands.map((b,i)=>(
+                        <div key={i} style={{background:b.bg,borderRadius:10,border:`1.5px solid ${b.border}`,padding:'10px 12px'}}>
+                          <div style={{fontSize:'0.72rem',fontWeight:700,color:b.color,marginBottom:2}}>{b.range}</div>
+                          <div style={{fontSize:'0.88rem',fontWeight:800,color:b.color,marginBottom:4}}>{b.label}</div>
+                          <div style={{fontSize:'0.72rem',color:b.color,lineHeight:1.5}}>{b.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Sankey */}
                   <SankeyFlowChart result={result}/>
                 </div>
               );
