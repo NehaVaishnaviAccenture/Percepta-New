@@ -418,8 +418,8 @@ function SankeyFlowChart({ result }: { result: any }) {
   const lNodes = layoutN(leftItems, col1, 24, 10);
   const pNodes = layoutN(prodItems, col2, 26, 10);
   const sNodes = layoutN(signals, col3, 28, 8);
-  const geoH = Math.min(plotH * 0.55, 140);
-  const geoN = { x: col4, y: padT + (plotH - geoH) / 2, h: geoH, mid: padT + (plotH - geoH) / 2 + geoH / 2 };
+  const geoH = plotH;
+  const geoN = { x: col4, y: padT, h: geoH, mid: padT + geoH / 2 };
 
   const wave = (x1:number,y1:number,h1:number,x2:number,y2:number,h2:number,bend=0.44) => {
     const mx1 = x1+nW+(x2-x1-nW)*bend;
@@ -1054,10 +1054,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
   const W=960,H=460,padL=56,padR=30,padT=32,padB=56;
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+((100-v)/100)*(H-padT-padB);
-  const sortedX=[...raw.map(a=>a.x)].sort((a,b)=>a-b);
-  const sortedY=[...raw.map(a=>a.y)].sort((a,b)=>a-b);
-  const medX=sortedX[Math.floor(sortedX.length/2)];
-  const medY=sortedY[Math.floor(sortedY.length/2)];
   const citVals=all.map(a=>a.cit);
   const citMin=Math.min(...citVals),citMax=Math.max(...citVals,1);
   const bR=(c:number)=>Math.round(5+((c-citMin)/Math.max(citMax-citMin,1))*10);
@@ -1068,7 +1064,6 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
     const offset = above ? -(r+11+zoneBefore*9) : (r+11+zoneBefore*9);
     return {cx2, cy2, r, ly:Math.max(padT+6, Math.min(H-padB-6, cy2+offset)), above};
   });
-  const midX=sx(medX), midY=sy(medY);
   return (
     <div style={{background:'#F8FAFC',borderRadius:12,padding:'8px 0 0'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'4px 14px 0'}}>
@@ -1076,19 +1071,11 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#A100FF"/></svg> You</span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#EFF6FF" stroke="#3B82F6" strokeWidth="1.5"/></svg> Top Competitor</span>
           <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#CBD5E1"/></svg> Others</span>
-          <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>· Bubble size = Citation Score · Axes split at median</span>
+          <span style={{color:'#9CA3AF',fontSize:'0.68rem'}}>· Bubble size = Citation Score</span>
         </div>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',overflow:'visible'}}>
-        <rect x={padL} y={padT} width={midX-padL} height={midY-padT} fill="#F0FDF4" opacity="0.4"/>
-        <rect x={midX} y={padT} width={W-padR-midX} height={midY-padT} fill="#F5F0FF" opacity="0.5"/>
-        <rect x={padL} y={midY} width={midX-padL} height={H-padB-midY} fill="#FFF7ED" opacity="0.4"/>
-        <rect x={midX} y={midY} width={W-padR-midX} height={H-padB-midY} fill="#FEF2F2" opacity="0.35"/>
         {[0,25,50,75,100].map(v=><g key={v}><line x1={padL} y1={sy(v)} x2={W-padR} y2={sy(v)} stroke="#E5E7EB" strokeWidth="1"/><text x={padL-8} y={sy(v)} textAnchor="end" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-        <line x1={midX} y1={padT} x2={midX} y2={H-padB} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
-        <line x1={padL} y1={midY} x2={W-padR} y2={midY} stroke="#C4B5FD" strokeWidth="1.5" strokeDasharray="6,4"/>
-        <text x={midX+4} y={padT+10} style={{fontSize:8,fill:'#A78BFA',fontFamily:'Inter,sans-serif'}}>median vis: {medX}</text>
-        <text x={W-padR} y={midY-4} textAnchor="end" style={{fontSize:8,fill:'#A78BFA',fontFamily:'Inter,sans-serif'}}>median sent: {medY}</text>
         <line x1={padL} y1={H-padB} x2={W-padR} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         <line x1={padL} y1={padT} x2={padL} y2={H-padB} stroke="#D1D5DB" strokeWidth="1.5"/>
         {all.map((a,i)=>{
@@ -1550,18 +1537,8 @@ export default function GeoHub() {
                     <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
                   </div>
 
-                  <WhatScoreMeans score={geo} brand={result.brand_name}/>
-
-                  {/* CHANGED: Sankey is now here instead of the old SankeyChart composition */}
+                  {/* Sankey */}
                   <SankeyFlowChart result={result}/>
-
-                  {/* GEO Summary + Business Impact */}
-                  <div style={{marginTop:16}}>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-                      <GeoSummary result={result}/>
-                      <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
-                    </div>
-                  </div>
                 </div>
               );
             })()}
@@ -1614,15 +1591,14 @@ export default function GeoHub() {
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
 
-              // Less colorful bar chart: use monochrome palette for bars
               const bW=Math.max(700,top.length*80),bH=160,bPad=40,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
-              // Monochrome metrics: dark for you, grey shades for others
+              // Distinct metric colors: vivid for you, distinct muted tones for others
               const allMetrics = [
-                {key:'Vis',label:'Visibility',color:'#460073'},
-                {key:'Cit',label:'Citations',color:'#7500C0'},
-                {key:'Sen',label:'Sentiment',color:'#9CA3AF'},
-                {key:'Sov',label:'Share of Voice',color:'#D1D5DB'},
-                {key:'Prom',label:'Prominence',color:'#E5E7EB'},
+                {key:'Vis',label:'Visibility',color:'#A100FF'},
+                {key:'Cit',label:'Citations',color:'#0EA5E9'},
+                {key:'Sen',label:'Sentiment',color:'#10B981'},
+                {key:'Sov',label:'Share of Voice',color:'#F59E0B'},
+                {key:'Prom',label:'Prominence',color:'#EF4444'},
               ];
 
               return (
@@ -1652,8 +1628,9 @@ export default function GeoHub() {
                               const val=(c as any)[m.key]||0;
                               const mh=((val)/100)*bMH;
                               const mx=bx+gW*0.1+mi*subW;
-                              // You = vivid purple shades, others = grey shades
-                              const barColor = isY ? m.color : (mi===0?'#D1D5DB':mi===1?'#E5E7EB':mi===2?'#F3F4F6':mi===3?'#F9FAFB':'#FAFAFA');
+                              // You = vivid metric color, others = lighter muted version of same color
+                              const otherColors = ['#E9D5FF','#BAE6FD','#A7F3D0','#FDE68A','#FECACA'];
+                              const barColor = isY ? m.color : otherColors[mi] || '#E5E7EB';
                               return <rect key={mi} x={mx} y={bH-mh} width={subW-1} height={mh} fill={barColor} rx={1} opacity={isY?1:0.85}/>;
                             })}
                             <text x={bx+gW/2} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#A100FF':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text>
@@ -1710,7 +1687,7 @@ export default function GeoHub() {
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['#','BRAND / URL','GEO SCORE','GAP','VISIBILITY','CITATIONS','SENTIMENT','SOV','PROMINENCE','AVG. RANK'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left' as const,fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c:any,i:number)=>{
-                        const gcol=c.GEO>=80?'#10B981':c.GEO>=60?'#A100FF':'#374151';
+                        const gcol=c.isYou?'#A100FF':'#374151';
                         const gap2=c.isYou?null:c.GEO-geo;
                         // FIX: only highlight "You" row with purple left border, not all rows
                         return <tr key={i} style={{
@@ -1754,8 +1731,8 @@ export default function GeoHub() {
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-                    <div style={{background:'#F5F0FF',borderRadius:12,border:'1px solid #E9D5FF',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#A100FF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#A100FF'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands · avg {avgVis}</div></div>
-                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#A100FF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#A100FF'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands · avg {avgVis}</div></div>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
 
                   {/* Toggle between scatter and S-curve */}
@@ -1768,7 +1745,7 @@ export default function GeoHub() {
                   {visView==='scatter'&&(
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
                       <div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Sentiment Score vs. Visibility Market Positioning</div>
-                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand positioned by Visibility vs Sentiment. Median dashed lines split the market in half.</div>
+                      <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Each dot = one brand positioned by Visibility vs Sentiment. Bubble size reflects Citation Score.</div>
                       <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={result.competitors||[]} topCompBrand={topCompBrand}/>
                     </div>
                   )}
@@ -1859,7 +1836,16 @@ export default function GeoHub() {
               return (
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
-                    {[{label:'Citation Score',val:cit,tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#A100FF',lineHeight:1,marginBottom:6}}>{val}</div></div>)}
+                    {[
+                      {label:'Citation Score',val:cit,tip:'How often and prominently AI models cite your brand.',desc:'Measures how authoritatively AI references your brand across queries. Higher scores mean AI treats your brand as a trusted source.'},
+                      {label:'Share of Voice',val:sov,tip:'Your share of all brand mentions in AI responses.',desc:'Your brand mentions as a percentage of all brand mentions across AI responses. Reflects how much of the AI conversation you own vs. competitors.'}
+                    ].map(({label,val,tip,desc})=>(
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div>
+                        <div style={{fontSize:'2.4rem',fontWeight:900,color:'#A100FF',lineHeight:1,marginBottom:6}}>{val}</div>
+                        <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6,marginTop:8}}>{desc}</div>
+                      </div>
+                    ))}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
