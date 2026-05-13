@@ -487,7 +487,7 @@ function RadarChart({ result }: { result: any }) {
   const top2=sorted2.slice(0,2).map(d=>d.label),bot2=sorted2.slice(-2).map(d=>d.label);
   return (
     <div style={{position:'relative' as const}}>
-      <svg viewBox="0 0 400 420" style={{width:'100%'}}>
+      <svg viewBox="0 0 400 340" style={{width:'100%'}}>
         {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#A100FF" fillOpacity="0.18" stroke="#A100FF" strokeWidth="2"/>
@@ -568,7 +568,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
     const sameZone = raw.slice(0,i).filter(b=>!b.isYou&&!b.isTopComp&&Math.abs(b.x-a.x)<=4);
     return {...a, jx:a.x + sameZone.length*4, jy:a.y};
   });
-  const W=960,H=460,padL=56,padR=30,padT=32,padB=56;
+  const W=960,H=360,padL=56,padR=30,padT=24,padB=48;
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+((100-v)/100)*(H-padT-padB);
   const citVals=all.map(a=>a.cit);
@@ -716,7 +716,7 @@ function SCurveChart({ score, competitors, brand }: { score: number; competitors
 // S-Curve matching image 7: white bg, purple curve, shaded opportunity zone, 3 dots (You/Goal/Authority), stage labels below
 function SCurveImage7({ score, brand }: { score: number; brand: string }) {
   const [hov, setHov] = useState<string|null>(null);
-  const W = 860, H = 360, padL = 68, padR = 30, padT = 28, padB = 72;
+  const W = 860, H = 300, padL = 68, padR = 30, padT = 24, padB = 68;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const curve = (x: number) => 5 + 90 / (1 + Math.exp(-0.09 * (x - 45)));
   const pts = Array.from({ length: 201 }, (_, i) => ({ x: i / 2, y: curve(i / 2) }));
@@ -784,17 +784,12 @@ function SCurveImage7({ score, brand }: { score: number; brand: string }) {
       {/* Shaded opportunity zone */}
       {shadeD && <path d={shadeD} fill="#EDE9FE" opacity="0.5" />}
 
-      {/* Goal dashed line */}
+      {/* Goal dashed line — solid, no dotted axis line */}
       <line x1={padL} y1={sy(70)} x2={padL + plotW} y2={sy(70)} stroke="#A100FF" strokeWidth="1.5" strokeDasharray="6,4" />
       <text x={padL + plotW + 4} y={sy(70)} dominantBaseline="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#A100FF', fontFamily: 'Inter,sans-serif' }}>70</text>
 
       {/* The curve */}
       <path d={pathD} fill="none" stroke="#A100FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Opportunity Zone label */}
-      {score < 70 && (
-        <text x={(youPX + goalPX) / 2} y={sy(score) + (sy(70) - sy(score)) / 2 + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontStyle: 'italic' }}>"Opportunity Zone"</text>
-      )}
 
       {/* Authority dot (green) */}
       <g onMouseEnter={() => setHov('auth')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
@@ -1170,38 +1165,30 @@ export default function GeoHub() {
               return (
                 <div>
                   {/* White background scorecards */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#A100FF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#A100FF'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands · avg {avgVis}</div></div>
-                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
-                  </div>
-                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:16}}>
-                    {visView==='scatter'&&(
-                      <button onClick={()=>setVisView('scurve')} style={{marginLeft:'auto',background:'white',color:'#374151',border:'1.5px solid #E5E7EB',borderRadius:8,padding:'7px 16px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s',boxShadow:'0 1px 4px rgba(0,0,0,0.08)'}}>Show S-Curve</button>
-                    )}
-                    {visView==='scurve'&&(
-                      <button onClick={()=>setVisView('scatter')} style={{marginLeft:'auto',background:'#A100FF',color:'white',border:'1.5px solid #A100FF',borderRadius:8,padding:'7px 16px',fontSize:'0.8rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>Show Scatter Plot</button>
-                    )}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'14px 18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#A100FF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:4}}>Your Visibility</div><div style={{fontSize:'1.8rem',fontWeight:800,color:'#A100FF'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands</div></div>
+                    <div style={{background:'white',borderRadius:12,border:'1px solid #E5E7EB',padding:'14px 18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:4}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'1.8rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
                   </div>
                   {visView==='scatter'&&(
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
                         <div>
-                          <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment vs. Visibility Market Positioning</div>
-                          <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginTop:2}}>Each dot = one brand. Bubble size reflects Citation Score.</div>
+                          <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Sentiment vs. Visibility Market Positioning</div>
+                          <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:1}}>Each dot = one brand. Bubble size reflects Citation Score.</div>
                         </div>
-                        <button onClick={()=>setVisView('scurve')} style={{background:'white',color:'#374151',border:'1.5px solid #E5E7EB',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',fontWeight:600,cursor:'pointer',boxShadow:'0 1px 4px rgba(0,0,0,0.07)',whiteSpace:'nowrap' as const}}>Show S-Curve</button>
+                        <button onClick={()=>setVisView('scurve')} style={{background:'white',color:'#374151',border:'1.5px solid #E5E7EB',borderRadius:8,padding:'5px 12px',fontSize:'0.76rem',fontWeight:600,cursor:'pointer',boxShadow:'0 1px 3px rgba(0,0,0,0.07)',whiteSpace:'nowrap' as const,flexShrink:0,marginLeft:12}}>Show S-Curve</button>
                       </div>
                       <ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={comps} topCompBrand={topCompBrand}/>
                     </div>
                   )}
                   {visView==='scurve'&&(
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px'}}>
+                      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                         <div>
-                          <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Where You Are vs Your Opportunity</div>
-                          <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginTop:2}}>Your GEO Score on the AI maturity curve. The shaded zone shows your path to 70 (Goal).</div>
+                          <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Where You Are vs Your Opportunity</div>
+                          <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:1}}>Your GEO Score on the AI maturity curve. Shaded zone = your path to 70.</div>
                         </div>
-                        <button onClick={()=>setVisView('scatter')} style={{background:'#A100FF',color:'white',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.78rem',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap' as const}}>Show Scatter Plot</button>
+                        <button onClick={()=>setVisView('scatter')} style={{background:'#A100FF',color:'white',border:'none',borderRadius:8,padding:'5px 12px',fontSize:'0.76rem',fontWeight:600,cursor:'pointer',whiteSpace:'nowrap' as const,flexShrink:0,marginLeft:12}}>Show Scatter Plot</button>
                       </div>
                       <SCurveImage7 score={geo} brand={result.brand_name}/>
                     </div>
@@ -1217,24 +1204,24 @@ export default function GeoHub() {
               const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
                 <div>
-                  {/* White background metric cards */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+                  {/* White background metric cards — compact */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12,marginBottom:12}}>
                     {[
                       {label:'sentiment score',val:rawSent,sub:smood,tip:'How positively AI describes your brand.'},
                       {label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},
                       {label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}
                     ].map(({label,val,sub,tip}:any)=>(
-                      <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
-                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div>
-                        <div style={{fontSize:'1.8rem',fontWeight:800,color:'#A100FF',lineHeight:1}}>{val}</div>
-                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
+                      <div key={label} style={{background:'white',borderRadius:12,padding:'14px 16px',border:'1px solid #E5E7EB'}}>
+                        <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>{label}<Tooltip text={tip}/></div>
+                        <div style={{fontSize:'1.6rem',fontWeight:800,color:'#A100FF',lineHeight:1}}>{val}</div>
+                        <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:2}}>{sub}</div>
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Product Feature Positioning</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Same product categories as the Sankey diagram.</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,alignItems:'stretch'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px',display:'flex',flexDirection:'column' as const}}>
+                      <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Positioning</div>
+                      <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:2}}>Same product categories as the Sankey diagram.</div>
                       <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
                         <RadarChart result={result}/>
                       </div>
@@ -1263,7 +1250,7 @@ export default function GeoHub() {
                     <div style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
                       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>Citation Score<Tooltip text="How often and prominently AI models cite your brand."/></div>
                       <div style={{fontSize:'2.4rem',fontWeight:900,color:'#A100FF',lineHeight:1,marginBottom:6}}>{cit}</div>
-                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>{cit>=70?'AI frequently cites your brand as an authority — strong trust signal':cit>=45?'AI occasionally cites your brand — citation authority is building':'AI rarely cites your brand — low trust signal in responses'}</div>
+                      <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.6}}>{cit>=70?'AI frequently cites your brand as an authority — strong trust signal':cit>=45?'AI occasionally cites your brand in responses':'AI rarely cites your brand — low trust signal in responses'}</div>
                     </div>
                     <div style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}>
                       <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>Share of Voice<Tooltip text="Your share of all brand mentions in AI responses."/></div>
@@ -1318,16 +1305,14 @@ export default function GeoHub() {
               const grouped=[...clusters].sort((a:any,b:any)=>{const g=(c:any)=>c.winRate>=60?0:c.winRate>=30?1:c.winRate>0?2:3;return g(a)!==g(b)?g(a)-g(b):b.mentioned-a.mentioned;});
               const nB=grouped.length,W=940,VPAD=52,COLS=Math.min(5,Math.ceil(Math.sqrt(nB*1.2))),ROWS2=Math.ceil(nB/COLS),cellW=Math.min(160,W/COLS),cellH=105,totalGridW=COLS*cellW,gridOffsetX=(W-totalGridW)/2,H=ROWS2*cellH+VPAD;
               const bubbles=grouped.map((c:any,i:number)=>{const col=i%COLS,row=Math.floor(i/COLS),lastRowCount=nB%COLS||COLS,isLastRow=row===ROWS2-1,offsetX=isLastRow?(COLS-lastRowCount)*cellW/2:0,x=gridOffsetX+offsetX+col*cellW+cellW/2,y=VPAD/2+row*cellH+cellH/2,r=Math.round(28+(c.mentioned/maxMentioned)*18);return{...c,x,y,r};});
-              // Build connection map: connect bubbles with similarity score >= 20 (or nearby if no related)
-              const connections: {x1:number;y1:number;x2:number;y2:number;highlighted:boolean;dashed:boolean}[] = [];
+              // Build connection map: connect bubbles with similarity score >= 15
+              const connections: {x1:number;y1:number;x2:number;y2:number;cat1:string;cat2:string;dashed:boolean}[] = [];
               bubbles.forEach((b:any) => {
                 (b.related||[]).forEach((rel:any) => {
                   const target = bubbles.find((bb:any) => bb.category === rel.category);
                   if (!target || rel.similarity < 15) return;
-                  // avoid duplicates
-                  if (b.category > rel.category) return;
-                  const isHighlightedConn = highlightedBubble && (b.category === highlightedBubble || rel.category === highlightedBubble);
-                  connections.push({x1:b.x,y1:b.y,x2:target.x,y2:target.y,highlighted:!!isHighlightedConn,dashed:rel.similarity<40});
+                  if (b.category > rel.category) return; // avoid duplicates
+                  connections.push({x1:b.x,y1:b.y,x2:target.x,y2:target.y,cat1:b.category,cat2:rel.category,dashed:rel.similarity<40});
                 });
               });
               return (
@@ -1347,30 +1332,50 @@ export default function GeoHub() {
                     </div>
                     <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
                       {/* Connection lines between related nodes */}
-                      {connections.map((conn, ci) => (
-                        <line key={`conn${ci}`}
-                          x1={conn.x1} y1={conn.y1} x2={conn.x2} y2={conn.y2}
-                          stroke={conn.highlighted ? '#A78BFA' : '#334155'}
-                          strokeWidth={conn.highlighted ? 2.5 : 1.5}
-                          strokeDasharray={conn.dashed ? '4,4' : undefined}
-                          opacity={highlightedBubble ? (conn.highlighted ? 0.9 : 0.08) : 0.35}
-                        />
-                      ))}
+                      {connections.map((conn, ci) => {
+                        const isHighlightedConn = highlightedBubble && (conn.cat1 === highlightedBubble || conn.cat2 === highlightedBubble);
+                        return (
+                          <line key={`conn${ci}`}
+                            x1={conn.x1} y1={conn.y1} x2={conn.x2} y2={conn.y2}
+                            stroke={isHighlightedConn ? '#A78BFA' : '#334155'}
+                            strokeWidth={isHighlightedConn ? 2.5 : 1.5}
+                            strokeDasharray={conn.dashed ? '4,4' : undefined}
+                            opacity={highlightedBubble ? (isHighlightedConn ? 0.9 : 0.06) : 0.35}
+                          />
+                        );
+                      })}
                       {bubbles.map((b:any)=>{
-                        const isSelected=filterCat===b.category,isHighlighted=highlightedBubble===b.category,isDimmed=!!highlightedBubble&&!isHighlighted;
+                        const isHighlighted=highlightedBubble===b.category;
+                        // find all categories directly connected to the highlighted node
+                        const connectedCats = highlightedBubble ? new Set<string>(
+                          connections
+                            .filter(c => c.cat1 === highlightedBubble || c.cat2 === highlightedBubble)
+                            .flatMap(c => [c.cat1, c.cat2])
+                            .filter(cat => cat !== highlightedBubble)
+                        ) : new Set<string>();
+                        const isConnected = !!highlightedBubble && !isHighlighted && connectedCats.has(b.category);
+                        const isDimmed = !!highlightedBubble && !isHighlighted && !isConnected;
+                        const isSelected=filterCat===b.category;
                         const nodeColor=b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
                         const words=b.category.split(' ');const maxChars=Math.round(b.r*0.52);let line1='',line2='';
                         words.forEach((w:string)=>{if(!line1){line1=w;}else if((line1+' '+w).length<=maxChars){line1+=' '+w;}else if(!line2){line2=w;}else if((line2+' '+w).length<=maxChars){line2+=' '+w;}});
                         const hasTwo=line2.length>0,fontSize=b.r>=38?9.5:b.r>=32?9:8,lineH=fontSize+2;
                         const totalTextH=hasTwo?lineH*2+8+lineH:lineH+8+lineH,textStartY=b.y-totalTextH/2+fontSize;
                         const winY=(hasTwo?textStartY+lineH:textStartY)+lineH+4,appY=winY+lineH;
+                        // Highlighted: full bright + white ring; Connected: full bright + purple ring; Dimmed: very faint
+                        const bubbleFillOpacity = isDimmed ? 0.15 : 1;
+                        const strokeColor = isHighlighted ? 'white' : isConnected ? '#A78BFA' : 'none';
+                        const strokeW = isHighlighted ? 4 : isConnected ? 3 : 0;
+                        const glowR = isHighlighted ? b.r + 10 : isConnected ? b.r + 6 : 0;
+                        const textFill = isDimmed ? 'rgba(255,255,255,0.15)' : 'white';
                         return (<g key={b.category} style={{cursor:'pointer'}} onClick={()=>{if(filterCat===b.category&&highlightedBubble===b.category){setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}else{setFilterCat(b.category);setQueryPage(1);setHighlightedBubble(b.category);}}}>
-                          <circle cx={b.x} cy={b.y} r={b.r+8} fill={nodeColor} opacity={isDimmed?0.02:isHighlighted?0.2:0.07}/>
-                          <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isDimmed?0.25:isHighlighted?1:0.8} stroke={isHighlighted?'white':nodeColor} strokeWidth={isHighlighted?3:isSelected?2.5:1}/>
-                          <text x={b.x} y={textStartY} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line1}</text>
-                          {hasTwo&&<text x={b.x} y={textStartY+lineH} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line2}</text>}
-                          <text x={b.x} y={winY} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:isDimmed?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.9)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
-                          {b.r>26&&<text x={b.x} y={appY} textAnchor="middle" style={{fontSize:6,fill:isDimmed?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
+                          {/* Glow ring for highlighted and connected */}
+                          {(isHighlighted||isConnected)&&<circle cx={b.x} cy={b.y} r={glowR} fill="none" stroke={isHighlighted?'rgba(255,255,255,0.3)':'rgba(167,139,250,0.4)'} strokeWidth={isHighlighted?3:2}/>}
+                          <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={bubbleFillOpacity} stroke={strokeColor} strokeWidth={strokeW}/>
+                          <text x={b.x} y={textStartY} textAnchor="middle" style={{fontSize,fontWeight:700,fill:textFill,fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line1}</text>
+                          {hasTwo&&<text x={b.x} y={textStartY+lineH} textAnchor="middle" style={{fontSize,fontWeight:700,fill:textFill,fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line2}</text>}
+                          <text x={b.x} y={winY} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:isDimmed?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.9)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                          {b.r>26&&<text x={b.x} y={appY} textAnchor="middle" style={{fontSize:6,fill:isDimmed?'rgba(255,255,255,0.05)':'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
                         </g>);
                       })}
                     </svg>
