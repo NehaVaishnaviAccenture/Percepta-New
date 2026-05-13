@@ -1017,7 +1017,7 @@ function SentimentHeatmap({ result }: { result: any }) {
         <div/>{shortLabels.map((lbl,i)=><div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{lbl}</div>)}
         {rows.map((r,ri)=>[
           <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#A100FF':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,display:'flex',alignItems:'center',justifyContent:'flex-end',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{r.name}</div>,
-          ...r.scores.map((val,ci)=>{
+          ...r.scores.map((val:number,ci:number)=>{
             const k=`${ri}-${ci}`,{bg,text}=cellColor(val),isH=hovCell===k;
             return <div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)} style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.68rem',fontWeight:700,color:text,cursor:'default',transition:'transform 0.1s',transform:isH?'scale(1.04)':'scale(1)',border:r.isYou?'2px solid #A100FF':'2px solid transparent',boxSizing:'border-box' as const,minHeight:24}}>{isH?val:''}</div>;
           })
