@@ -1249,129 +1249,6 @@ function PriorityActionsTable({ result, cachedActions, setCachedActions, actions
   );
 }
 
-export default function GeoHub() {
-  const [url,setUrl]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [loadingStep,setLoadingStep]=useState(0);
-  const [loadingProgress,setLoadingProgress]=useState(0);
-  const [result,setResult]=useState<any>(null);
-  const [error,setError]=useState('');
-  const [activeTab,setActiveTab]=useState(0);
-  const [promptInput,setPromptInput]=useState('');
-  const [promptHistory,setPromptHistory]=useState<{q:string;a:string}[]>([]);
-  const [promptLoading,setPromptLoading]=useState(false);
-  const [filterCat,setFilterCat]=useState('All');
-  const [selectedCluster,setSelectedCluster]=useState<string|null>(null);
-  const [queryPage,setQueryPage]=useState(1);
-  const [cachedActions,setCachedActions]=useState<any[]|null>(null);
-  const [actionsLoading,setActionsLoading]=useState(false);
-  const [hovBar,setHovBar]=useState<number|null>(null);
-  const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
-  const [promptCount,setPromptCount]=useState(100);
-  const [activeCitCat,setActiveCitCat]=useState<string|null>(null);
-  const [promptCountErr,setPromptCountErr]=useState('');
-  const [highlightedBubble,setHighlightedBubble]=useState<string|null>(null);
-  // FIX 8: showSCurve toggles between ScatterPlot and SCurveStandalone — two separate components
-  const [showSCurve,setShowSCurve]=useState(false);
-
-  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
-
-  async function runAnalysis(){
-    if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
-    setError('');setLoading(true);setLoadingStep(0);setLoadingProgress(0);
-    const steps=[{step:0,progress:5,delay:200},{step:1,progress:12,delay:1500},{step:2,progress:25,delay:3500},{step:3,progress:40,delay:5500},{step:4,progress:55,delay:7500},{step:5,progress:68,delay:9500},{step:6,progress:78,delay:11500},{step:7,progress:88,delay:13500},{step:8,progress:95,delay:15500}];
-    const timers:ReturnType<typeof setTimeout>[]=[];
-    steps.forEach(({step,progress,delay})=>{timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));});
-    try{
-      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,promptCount})});
-      const data=await res.json();
-      timers.forEach(t=>clearTimeout(t));setLoadingProgress(100);
-      await new Promise(r=>setTimeout(r,400));
-      if(data.error)setError(data.error);
-      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);setShowSCurve(false);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
-    }catch(e:any){timers.forEach(t=>clearTimeout(t));setError(e.message);}
-    setLoading(false);
-  }
-
-  async function runPrompt(q?:string){
-    const query=q||promptInput;if(!query.trim())return;setPromptLoading(true);if(!q)setPromptInput('');
-    try{const res=await fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:query,system:result?`You are a knowledgeable consumer advisor. The user is researching ${result.brand_name} in the ${result.ind_label} industry. Answer accurately and naturally.`:undefined})});const data=await res.json();setPromptHistory(h=>[{q:query,a:data.response},...h]);}catch{}
-    setPromptLoading(false);
-  }
-
-  const examplePrompts=result?.ind_key==='fin'?['Compare invite-only credit cards for high net worth individuals','What is the best credit card for someone who travels internationally?','Which bank offers the best rewards for small business owners?','Best first credit card for someone with no credit history','Compare Chase Sapphire Reserve vs Capital One Venture X for travel']:['What are the most trusted brands right now?','Best companies for customer service','Compare top brands for value and quality','Which companies are leading in innovation?','Best brands recommended by experts'];
-
-  return (
-    <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
-      <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:(loading||result)?'16px 40px':'64px 40px 72px',textAlign:'center',transition:'padding 0.3s ease'}}>
-        {!(loading||result)&&<>
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* &nbsp;Real Time GEO Scoring</div>
-          <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
-          <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL . Discover your brand&apos;s AI presence</p>
-        </>}
-        {(loading||result)&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:'1.3rem',fontWeight:900,color:'white',letterSpacing:'-0.5px'}}>GEO Scorecard</span><span style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.7)',background:'rgba(255,255,255,0.15)',borderRadius:50,padding:'3px 10px'}}>Real Time GEO Scoring</span></div>
-          <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.7)'}}>Live data</span>
-        </div>}
-      </div>
-
-      {!result?(
-        <div style={{padding:loading?'16px 40px':'48px 40px 60px'}}>
-          {!loading&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:24}}>{bands.map((b,i)=><div key={i} style={{background:b.bg,borderRadius:20,padding:'36px 28px',textAlign:'center',border:`1.5px solid ${b.border}`}}><div style={{fontSize:'0.85rem',fontWeight:700,color:b.color,marginBottom:8}}>{b.range}</div><div style={{fontSize:'1.8rem',fontWeight:900,color:b.color,marginBottom:8}}>{b.label}</div><div style={{fontSize:'0.85rem',color:b.color,lineHeight:1.5}}>{b.desc}</div></div>)}</div>}
-          <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
-            <div style={{marginBottom:18}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}><div style={{width:8,height:8,borderRadius:'50%',background:'#EF4444'}}/><span style={{fontSize:'0.8rem',fontWeight:700,color:'#111827'}}>Select number of AI prompts to run</span><span style={{fontSize:'0.72rem',color:'#EF4444',fontWeight:600,background:'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>Required</span></div>
-              <div style={{display:'flex',gap:6,alignItems:'flex-end',flexWrap:'wrap' as const}}>
-                {[50,100,300,500,1000].map(n=><button key={n} onClick={()=>{setPromptCount(n);setPromptCountErr('');}} style={{background:promptCount===n?'#7C3AED':'white',color:promptCount===n?'white':'#374151',border:promptCount===n?'2px solid #7C3AED':'2px solid #D1D5DB',borderRadius:7,padding:'5px 12px',fontSize:'0.75rem',fontWeight:700,cursor:'pointer',display:'flex',flexDirection:'column' as const,alignItems:'center',gap:1,minWidth:52}}><span style={{fontSize:'0.82rem',fontWeight:900}}>{n}</span><span style={{fontSize:'0.56rem',fontWeight:500,opacity:0.72}}>{n===50?'Quick':n===100?'Standard':n===300?'Deep':n===500?'Thorough':'Extended'}</span></button>)}
-                <div style={{display:'flex',flexDirection:'column' as const,gap:2,minWidth:100}}><label style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'0.06em'}}>Custom (max 10,000)</label><input type="number" placeholder="e.g. 200" value={promptCount&&![50,100,300,500,1000].includes(promptCount)?promptCount:''} onChange={e=>{const v=parseInt(e.target.value);if(isNaN(v))return;if(v>10000){setPromptCountErr('Max is 10,000');setPromptCount(Math.min(v,10000));}else{setPromptCount(v);setPromptCountErr('');}}} style={{border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,borderRadius:7,padding:'5px 10px',fontSize:'0.78rem',fontWeight:700,color:'#374151',outline:'none',background:'white',width:'100%'}}/>{promptCountErr?<div style={{fontSize:'0.58rem',color:'#EF4444',fontWeight:600}}>{promptCountErr}</div>:<div style={{fontSize:'0.58rem',color:'#9CA3AF'}}>More prompts = longer run time</div>}</div>
-              </div>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
-            <div style={{display:'flex',gap:12,alignItems:'center'}}>
-              <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #E5E7EB',borderRadius:12,background:'white',overflow:'hidden',height:52}}>
-                <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://www.</span>
-                <input type="text" value={url.replace(/^https?:\/\/(www\.)?/,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl('https://www.'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
-              </div>
-              <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>&#x1F50D; {loading?'Analysing...':'Run Live AI Analysis'}</button>
-            </div>
-            {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
-          </div>
-          {loading&&(()=>{
-            const brandName=url.replace('https://www.','').replace('http://www.','').replace('https://','').replace('http://','').split('/')[0].split('.')[0];
-            const displayName=brandName.charAt(0).toUpperCase()+brandName.slice(1);
-            const steps=[{icon:'&#x1F310;',label:'Fetching brand page',detail:'Reading website content and metadata'},{icon:'&#x1F916;',label:'Launching AI queries',detail:'Firing all query batches simultaneously'},{icon:'&#x1F4B3;',label:'Running consumer queries',detail:'Broad brand awareness questions'},{icon:'&#x1F4B0;',label:'Running category-specific queries',detail:'Product-specific questions'},{icon:'&#x1F50D;',label:'Detecting brand mentions',detail:`Scanning all AI responses for ${displayName} references`},{icon:'&#x1F4CA;',label:'Scoring sentiment & prominence',detail:'Analysing tone and position'},{icon:'&#x1F3C6;',label:'Benchmarking competitors',detail:'Scoring top competitors across all signals'},{icon:'&#x1F517;',label:'Building citation network',detail:'Mapping sources and share of voice'},{icon:'#',label:'Calculating GEO Score',detail:'Applying weighted formula'}];
-            const currentStep=steps[Math.min(loadingStep,steps.length-1)];
-            const completedSteps=steps.slice(0,loadingStep);
-            return(<div style={{marginTop:32,background:'white',borderRadius:20,border:'1px solid #E5E7EB',padding:'36px 40px',overflow:'hidden'}}>
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}} @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
-              <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:28}}>
-                <div style={{width:48,height:48,borderRadius:'50%',background:'linear-gradient(135deg,#7C3AED,#9333EA)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0}}>&#x1F50D;</div>
-                <div><div style={{fontSize:'1.2rem',fontWeight:800,color:'#111827'}}>Analysing {displayName}</div><div style={{fontSize:'0.82rem',color:'#9CA3AF',marginTop:2}}>{url}</div></div>
-                <div style={{marginLeft:'auto',textAlign:'right' as const}}><div style={{fontSize:'2rem',fontWeight:900,color:'#7C3AED',lineHeight:1}}>{loadingProgress}%</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>complete</div></div>
-              </div>
-              <div style={{background:'#F3F4F6',borderRadius:50,height:8,marginBottom:28,overflow:'hidden'}}><div style={{background:'linear-gradient(90deg,#7C3AED,#9333EA)',height:8,borderRadius:50,width:`${loadingProgress}%`,transition:'width 0.8s ease',position:'relative' as const}}><div style={{position:'absolute' as const,right:0,top:0,width:20,height:8,background:'rgba(255,255,255,0.4)',borderRadius:50,animation:'pulse 1s infinite'}}/></div></div>
-              <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:12,animation:'slideIn 0.3s ease'}}>
-                <div style={{width:32,height:32,borderRadius:'50%',background:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',flexShrink:0}} dangerouslySetInnerHTML={{__html:currentStep.icon}}/>
-                <div style={{flex:1}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#7C3AED'}}>{currentStep.label}</div><div style={{fontSize:'0.76rem',color:'#9CA3AF',marginTop:2}}>{currentStep.detail}</div></div>
-                <div style={{width:20,height:20,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
-              </div>
-              <div style={{display:'flex',flexDirection:'column' as const,gap:8,marginBottom:24}}>{completedSteps.map((s,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:10,opacity:0.7}}><div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>ok</div><span style={{fontSize:'0.82rem',color:'#6B7280'}}>{s.label}</span></div>)}</div>
-            </div>);
-          })()}
-        </div>
-      ):(
-        <div>
-          <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
-            {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',whiteSpace:'nowrap' as const}}>{t}</button>)}
-            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0}}><button onClick={()=>{setResult(null);setUrl('');setShowSCurve(false);try{sessionStorage.clear();}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer'}}>New Analysis</button></div>
-          </div>
-
-          <div style={{padding:'28px 40px 60px'}}>
-            {(()=>{
-              if(result.ind_key==='fin'){const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,rank:'N/A'}};const t=CFT[result.brand_name];if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}if(!result.lob)result.lob='Credit Cards';}
-              return null;
-            })()}
-            {(()=>{const comps=result.competitors||[],sorted=[...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));result._topCompBrand=sorted.length>0?sorted[0].Brand:'';return null;})()}
 
 export default function GeoHub() {
   const [url,setUrl]=useState('');
@@ -1430,12 +1307,12 @@ export default function GeoHub() {
 
   return(
     <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}`}</style>
       <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:(loading||result)?'16px 40px':'64px 40px 72px',textAlign:'center',transition:'padding 0.3s ease'}}>
         {!(loading||result)&&<>
           <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* Real Time GEO Scoring</div>
           <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
           <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL · Discover your brand&apos;s AI presence</p>
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>Live data · Updated in real-time · Not cached like competitors</div>
         </>}
         {(loading||result)&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
@@ -1458,7 +1335,7 @@ export default function GeoHub() {
                 {[50,100,300,500,1000].map(n=>(<button key={n} onClick={()=>{setPromptCount(n);setPromptCountErr('');}} style={{background:promptCount===n?'#7C3AED':'white',color:promptCount===n?'white':'#374151',border:promptCount===n?'2px solid #7C3AED':'2px solid #D1D5DB',borderRadius:7,padding:'5px 12px',fontSize:'0.75rem',fontWeight:700,cursor:'pointer',display:'flex',flexDirection:'column' as const,alignItems:'center',gap:1,minWidth:52}}><span style={{fontSize:'0.82rem',fontWeight:900}}>{n}</span><span style={{fontSize:'0.56rem',fontWeight:500,opacity:0.72}}>{n===50?'Quick':n===100?'Standard':n===300?'Deep':n===500?'Thorough':'Extended'}</span></button>))}
                 <div style={{display:'flex',flexDirection:'column' as const,gap:2,minWidth:100}}>
                   <label style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'0.06em'}}>Custom (max 10,000)</label>
-                  <input type="number" placeholder="e.g. 200" value={promptCount&&![50,100,300,500,1000].includes(promptCount)?promptCount:''} onChange={e=>{const v=parseInt(e.target.value);if(isNaN(v))return;if(v>10000){setPromptCountErr('Max is 10,000');setPromptCount(10000);}else{setPromptCount(v);setPromptCountErr('');}}} style={{border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,borderRadius:7,padding:'5px 10px',fontSize:'0.78rem',fontWeight:700,color:'#374151',outline:'none',background:'white',width:'100%'}}/>
+                  <input type="number" placeholder="e.g. 200" value={promptCount&&![50,100,300,500,1000].includes(promptCount)?promptCount:''} onChange={e=>{const v=parseInt(e.target.value);if(isNaN(v))return;if(v>10000){setPromptCountErr('Max is 10,000');setPromptCount(10000);}else{setPromptCount(v);setPromptCountErr('');}}} style={{border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,borderRadius:7,padding:'5px 10px',fontSize:'0.78rem',color:'#374151',outline:'none',background:'white',width:'100%'}}/>
                   {promptCountErr?<div style={{fontSize:'0.58rem',color:'#EF4444',fontWeight:600}}>{promptCountErr}</div>:<div style={{fontSize:'0.58rem',color:'#9CA3AF'}}>More prompts = longer run time</div>}
                 </div>
               </div>
@@ -1469,30 +1346,28 @@ export default function GeoHub() {
                 <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://www.</span>
                 <input type="text" value={url.replace(/^https?:\/\/(www\.)?/,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl('https://www.'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
               </div>
-              <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>🔍 {loading?'Analysing...':'Run Live AI Analysis'}</button>
+              <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>Run Live AI Analysis</button>
             </div>
             {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
           </div>
           {loading&&(()=>{
-            const brandName=url.replace('https://www.','').replace('http://www.','').replace('https://','').replace('http://','').split('/')[0].split('.')[0];
+            const brandName=url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0].split('.')[0];
             const displayName=brandName.charAt(0).toUpperCase()+brandName.slice(1);
-            const loadSteps=[{icon:'🌐',label:'Fetching brand page',detail:'Reading website content and metadata'},{icon:'🤖',label:'Launching AI queries',detail:'Firing all query batches simultaneously'},{icon:'💳',label:'Running consumer queries',detail:'Broad brand awareness and discovery questions'},{icon:'💰',label:'Running category-specific queries',detail:'Product-specific purchase intent questions'},{icon:'🔍',label:'Detecting brand mentions',detail:`Scanning AI responses for ${displayName} references`},{icon:'📊',label:'Scoring sentiment & prominence',detail:'Analysing tone and position in each response'},{icon:'🏆',label:'Benchmarking competitors',detail:'Scoring top competitors across all signals'},{icon:'🔗',label:'Building citation network',detail:'Mapping sources and share of voice'},{icon:'#',label:'Calculating GEO Score',detail:'Applying weighted formula across all signals'}];
-            const currentStep=loadSteps[Math.min(loadingStep,loadSteps.length-1)],completedSteps=loadSteps.slice(0,loadingStep);
+            const loadSteps=[{label:'Fetching brand page'},{label:'Launching AI queries'},{label:'Running consumer queries'},{label:'Running category-specific queries'},{label:'Detecting brand mentions',detail:`Scanning AI responses for ${displayName} references`},{label:'Scoring sentiment & prominence'},{label:'Benchmarking competitors'},{label:'Building citation network'},{label:'Calculating GEO Score'}];
+            const currentStep=loadSteps[Math.min(loadingStep,loadSteps.length-1)];
+            const completedSteps=loadSteps.slice(0,loadingStep);
             return(
-              <div style={{marginTop:32,background:'white',borderRadius:20,border:'1px solid #E5E7EB',padding:'36px 40px',overflow:'hidden'}}>
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}} @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
+              <div style={{marginTop:32,background:'white',borderRadius:20,border:'1px solid #E5E7EB',padding:'36px 40px'}}>
                 <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:28}}>
-                  <div style={{width:48,height:48,borderRadius:'50%',background:'linear-gradient(135deg,#7C3AED,#9333EA)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0}}>🔍</div>
-                  <div><div style={{fontSize:'1.2rem',fontWeight:800,color:'#111827'}}>Analysing {displayName}</div><div style={{fontSize:'0.82rem',color:'#9CA3AF',marginTop:2}}>{url}</div></div>
-                  <div style={{marginLeft:'auto',textAlign:'right' as const}}><div style={{fontSize:'2rem',fontWeight:900,color:'#7C3AED',lineHeight:1}}>{loadingProgress}%</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>complete</div></div>
+                  <div style={{flex:1}}><div style={{fontSize:'1.2rem',fontWeight:800,color:'#111827'}}>Analysing {displayName}</div><div style={{fontSize:'0.82rem',color:'#9CA3AF',marginTop:2}}>{url}</div></div>
+                  <div style={{textAlign:'right' as const}}><div style={{fontSize:'2rem',fontWeight:900,color:'#7C3AED',lineHeight:1}}>{loadingProgress}%</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>complete</div></div>
                 </div>
                 <div style={{background:'#F3F4F6',borderRadius:50,height:8,marginBottom:28,overflow:'hidden'}}><div style={{background:'linear-gradient(90deg,#7C3AED,#9333EA)',height:8,borderRadius:50,width:`${loadingProgress}%`,transition:'width 0.8s ease'}}/></div>
                 <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:12}}>
-                  <div style={{width:32,height:32,borderRadius:'50%',background:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',flexShrink:0}}>{currentStep.icon}</div>
-                  <div style={{flex:1}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#7C3AED'}}>{currentStep.label}</div><div style={{fontSize:'0.76rem',color:'#9CA3AF',marginTop:2}}>{currentStep.detail}</div></div>
+                  <div style={{flex:1}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#7C3AED'}}>{currentStep.label}</div></div>
                   <div style={{width:20,height:20,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
                 </div>
-                <div style={{display:'flex',flexDirection:'column' as const,gap:8,marginBottom:24}}>
+                <div style={{display:'flex',flexDirection:'column' as const,gap:8}}>
                   {completedSteps.map((s,i)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:10,opacity:0.7}}><div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>ok</div><span style={{fontSize:'0.82rem',color:'#6B7280'}}>{s.label}</span></div>))}
                 </div>
               </div>
@@ -1502,169 +1377,34 @@ export default function GeoHub() {
       ):(
         <div>
           <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
-            {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
+            {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',whiteSpace:'nowrap' as const}}>{t}</button>)}
             <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0,padding:'0 8px'}}>
-              <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer'}}>New Analysis</button>
+              <button onClick={()=>{setResult(null);setUrl('');setShowSCurve(false);try{sessionStorage.clear();}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer'}}>New Analysis</button>
             </div>
           </div>
-
           <div style={{padding:'28px 40px 60px'}}>
 
-            {/* TAB 0: GEO Score — FIX 1: SankeyGeoFlow replaces old SankeyChart */}
-            {activeTab===0&&(()=>{
-              const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,rawSent=result.sentiment,prom=result.prominence,sov=result.share_of_voice;
-              const allBrands=[{GEO:geo,isYou:true},...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
-              const myPos=allBrands.findIndex((b:any)=>b.isYou),avgRank=myPos>=0?myPos+1:result.avg_rank;
-              const badge=scoreBadge(geo),industryLabel=result.ind_label||result.industry||'Financial Services';
-              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
-              return(
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
-                    <GeoGauge score={geo}/>
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:5}}><div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827'}}>{result.brand_name}</div><div style={{display:'flex',gap:6,flexWrap:'wrap' as const}}>{result.lob&&<span style={{fontSize:'0.72rem',fontWeight:600,color:'#7C3AED',background:'#EDE9FE',borderRadius:50,padding:'2px 10px'}}>{result.lob}</span>}<span style={{fontSize:'0.72rem',fontWeight:600,color:'#374151',background:'#F3F4F6',borderRadius:50,padding:'2px 10px'}}>{industryLabel}</span></div></div>
-                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{result.page_url?.slice(0,60)}{result.page_url?.length>60?'...':''}</a>
-                      <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
-                      <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
-                      <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
-                    </div>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:16}}>
-                    <MetricCard label="visibility score" val={vis}/>
-                    <MetricCard label="sentiment score" val={rawSent}/>
-                    <MetricCard label="citation score" val={cit}/>
-                    <MetricCard label="prominence score" val={prom}/>
-                    <MetricCard label="share of voice" val={sov}/>
-                    <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
-                  </div>
-                  <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  {/* FIX 1: SankeyGeoFlow on GEO Score tab */}
-                  <SankeyGeoFlow result={result}/>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginTop:16}}>
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px'}}><ROICurve score={geo}/></div>
-                    <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
-                  </div>
-                  <div style={{marginTop:20}}><GeoSummary result={result}/></div>
-                </div>
-              );
-            })()}
-
-            {/* TAB 1: Competitors — FIX 2: correct You row, FIX 3: muted colors */}
-            {activeTab===1&&(()=>{
-              const CLIENT_FIN_TIERS:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,prom:74,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,prom:66,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,prom:52,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,prom:44,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,prom:40,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,prom:32,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,prom:26,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,prom:20,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,prom:16,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,prom:14,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,prom:18,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,prom:11,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,prom:15,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,prom:17,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,prom:10,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,prom:11,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,prom:13,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,prom:10,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,prom:9,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,prom:9,rank:'N/A'}};
-              const _ct=result.ind_key==='fin'?(CLIENT_FIN_TIERS[result.brand_name]||null):null;
-              const geo=_ct?_ct.geo:result.overall_geo_score,vis=_ct?_ct.vis:result.visibility,cit=_ct?_ct.cit:result.citation_share,sent=_ct?_ct.sent:result.sentiment,sov=_ct?_ct.sov:result.share_of_voice,prom=_ct?_ct.prom:(result.prominence||0),avgRank=_ct?_ct.rank:result.avg_rank;
-
-              // FIX 2: Build brand entry explicitly with isYou:true, then merge+sort
-              const brandEntry={Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Prom:prom,Rank:avgRank,isYou:true};
-              const compEntries=(result.competitors||[]).slice(0,9).map((c:any)=>({...c,Prom:c.Prom||Math.round((c.Vis||0)*0.85),isYou:false}));
-              const top=[brandEntry,...compEntries].sort((a:any,b:any)=>b.GEO-a.GEO);
-
-              const resolvedRank=(c:any)=>{const pos=top.findIndex((t:any)=>c.isYou?t.isYou:t.Brand===c.Brand);if(pos<0)return '--';const rank=pos+1;if(rank>5)return '--';return `#${rank}`;};
-              const myRank=top.findIndex((c:any)=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
-              const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
-
-              // FIX 3: Muted Accenture bar colors, black GEO line
-              const allMetrics=[{key:'Vis',label:'Visibility',color:'#94A3B8'},{key:'Cit',label:'Citations',color:'#64748B'},{key:'Sen',label:'Sentiment',color:'#7500C0'},{key:'Sov',label:'Share of Voice',color:'#460073'},{key:'Prom',label:'Prominence',color:'#A100FF'}];
-              const bW=Math.max(700,top.length*80),bH=160,bPad=40,gW=(bW-bPad*2)/top.length,bMH=bH-bPad;
-
-              return(
-                <div>
-                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors</div>
-                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your GEO Score</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>{geo}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>ranked #{myRank} of {top.length} brands</div></div>
-                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'--':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close, strong opportunity':'Gap to close'}</div></div>
-                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'--'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close, defend your position':'Comfortable but not safe'):'Leading the category'}</div></div>
-                  </div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
-                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score & Signal Breakdown</div>
-                    <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Muted bars = sub-metrics per brand. Black line = GEO Score.</div>
-                    <div style={{overflowX:'auto' as const}}>
-                    <svg viewBox={`0 0 ${bW} ${bH+60}`} style={{width:'100%',minWidth:top.length*80,display:'block'}} onMouseLeave={()=>setHovBar(null)}>
-                      {[0,25,50,75,100].map(v=><g key={v}><line x1={bPad} y1={bH-(v/100)*bMH} x2={bW-bPad} y2={bH-(v/100)*bMH} stroke="#F3F4F6" strokeWidth="1"/><text x={bPad-4} y={bH-(v/100)*bMH} textAnchor="end" dominantBaseline="middle" style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{v}</text></g>)}
-                      {top.map((c:any,i:number)=>{const bx=bPad+i*gW,subW=(gW*0.8)/allMetrics.length,isY=c.isYou;return(<g key={i} onMouseEnter={()=>setHovBar(i)} style={{cursor:'pointer'}}>{allMetrics.map((m,mi)=>{const val=(c as any)[m.key]||0,mh=((val)/100)*bMH,mx=bx+gW*0.1+mi*subW;return<rect key={mi} x={mx} y={bH-mh} width={subW-1} height={mh} fill={m.color} rx={1} opacity={isY?1:0.55}/>;})}<text x={bx+gW/2} y={bH+13} textAnchor="middle" style={{fontSize:9,fill:isY?'#460073':'#6B7280',fontFamily:'Inter,sans-serif',fontWeight:isY?700:400}}>{(c.Brand||'').split(' ')[0]}</text></g>);})}
-                      {(()=>{const pts=top.map((c:any,i:number)=>({x:bPad+i*gW+gW/2,y:bH-((c.GEO||0)/100)*bMH,geo:c.GEO||0,isYou:c.isYou}));const pathD=pts.map((p,i)=>`${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');return<><path d={pathD} fill="none" stroke="#111827" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>{pts.map((p,i)=><g key={i}><circle cx={p.x} cy={p.y} r={p.isYou?7:5} fill={p.isYou?'#460073':'#111827'} stroke="white" strokeWidth="1.5"/><text x={p.x} y={p.y-10} textAnchor="middle" style={{fontSize:9,fontWeight:700,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{p.geo}</text></g>)}</>;})()}
-                      <g transform={`translate(${bPad},${bH+32})`}><circle cx={6} cy={0} r={4} fill="#111827" stroke="white" strokeWidth="1"/><line x1={1} y1={0} x2={11} y2={0} stroke="#111827" strokeWidth="2"/><text x={18} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#111827',fontFamily:'Inter,sans-serif',fontWeight:700}}>GEO Score (line)</text>{allMetrics.map((m,i)=><g key={i} transform={`translate(${110+i*90},0)`}><rect x={0} y={-5} width={10} height={10} fill={m.color} rx={2}/><text x={14} y={0} dominantBaseline="middle" style={{fontSize:9,fill:'#374151',fontFamily:'Inter,sans-serif'}}>{m.label}</text></g>)}</g>
-                      {hovBar!==null&&(()=>{const c=top[hovBar],bx=bPad+hovBar*gW,tipW=160,tipH=allMetrics.length*14+28,tx=bx+gW/2+tipW+8>bW-bPad?bx-tipW-4:bx+gW/2+4,ty=Math.max(0,bH-tipH-20);return<g style={{pointerEvents:'none'}}><rect x={tx} y={ty} width={tipW} height={tipH} rx={8} fill="#1F2937" filter="drop-shadow(0 4px 16px rgba(0,0,0,0.45))"/><text x={tx+10} y={ty+14} style={{fontSize:11,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif'}}>{c.Brand}</text><text x={tx+10} y={ty+26} style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>GEO: {c.GEO}</text>{allMetrics.map((m,mi)=><text key={mi} x={tx+10} y={ty+40+mi*13} style={{fontSize:9,fill:m.color,fontFamily:'Inter,sans-serif',fontWeight:600}}>{m.label}: {(c as any)[m.key]||0}</text>)}</g>;})()}
-                    </svg></div>
-                  </div>
-                  {/* FIX 2: Only isYou===true gets purple border — never by brand name match */}
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <thead><tr style={{background:'#FAFAFA'}}>{['#','BRAND / URL','GEO SCORE','GAP','VISIBILITY','CITATIONS','SENTIMENT','SOV','PROMINENCE','AVG. RANK'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left' as const,fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                      <tbody>{top.map((c:any,i:number)=>{
-                        const gcol=c.GEO>=80?'#10B981':c.GEO>=60?'#7C3AED':'#374151',gap2=c.isYou?null:c.GEO-geo;
-                        return<tr key={i} style={{background:c.isYou?'#F5F3FF':'white',borderTop:'1px solid #F3F4F6',borderLeft:c.isYou?'3px solid #7C3AED':'none'}}>
-                          <td style={{padding:'11px 12px',fontSize:'0.8rem',color:'#9CA3AF'}}>{i+1}</td>
-                          <td style={{padding:'11px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><span style={{fontSize:'0.84rem',fontWeight:c.isYou?700:600,color:'#111827'}}>{c.Brand}</span>{c.isYou&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:5,padding:'1px 7px',fontSize:'0.68rem',fontWeight:700}}>You</span>}</div><div style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{c.URL}</div></td>
-                          <td style={{padding:'11px 12px',fontSize:'0.95rem',fontWeight:800,color:gcol}}>{c.GEO}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:gap2===null?'#9CA3AF':gap2>0?'#EF4444':'#10B981'}}>{gap2===null?'--':`${gap2>0?'-':'+'}${Math.abs(gap2)} pts`}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Vis}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sen}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sov}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Prom}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:'#7C3AED'}}>{resolvedRank(c)}</td>
-                        </tr>;
-                      })}</tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* TAB 2: Visibility — FIX 8: ScatterPlot and SCurveStandalone are fully separate */}
-            {activeTab===2&&(()=>{
-              const geo=result.overall_geo_score,vis=result.visibility,comps=result.competitors||[];
-              const allVis=[vis,...comps.map((c:any)=>c.Vis)],myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1;
-              const topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
-              const gapToTop=vis-(topComp?topComp.Vis:vis),avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
-              const topCompBrand=result._topCompBrand||(comps.length>0?comps[0].Brand:'');
-              return(
-                <div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands · avg {avgVis}</div></div>
-                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
-                  </div>
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                      <div>
-                        <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>{showSCurve?'GEO Maturity S-Curve':'Sentiment vs Visibility Market Positioning'}</div>
-                        <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginTop:2}}>{showSCurve?'Your position on the AI visibility maturity curve.':'Each dot = one brand positioned by Visibility vs Sentiment.'}</div>
-                      </div>
-                      {/* FIX 8: Toggle between two completely separate components */}
-                      <button onClick={()=>setShowSCurve(!showSCurve)} style={{background:showSCurve?'#7C3AED':'#F3F4F6',color:showSCurve?'white':'#6B7280',border:'none',borderRadius:8,padding:'7px 16px',fontSize:'0.78rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s',flexShrink:0}}>
-                        {showSCurve?'← Scatter Plot':'Show S-Curve →'}
-                      </button>
-                    </div>
-                    {!showSCurve&&<ScatterPlot brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={comps} topCompBrand={topCompBrand}/>}
-                    {showSCurve&&<SCurveStandalone score={geo} competitors={comps} brand={result.brand_name}/>}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* FIN tier override */}
+            {/* FIN tier override + topCompBrand */}
             {(()=>{
               if(result.ind_key==='fin'){
-                const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'}};
+                const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'}};
                 const t=CFT[result.brand_name];
                 if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
               }
-              const comps=result.competitors||[];const sorted=[...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));result._topCompBrand=sorted.length>0?sorted[0].Brand:'';
+              const comps=result.competitors||[];
+              const sorted=[...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
+              result._topCompBrand=sorted.length>0?sorted[0].Brand:'';
               return null;
             })()}
 
-            {/* TAB 0: GEO Score — FIX 1: SankeyGeoFlow here, NOT Sentiment tab */}
+            {/* TAB 0: GEO Score — SankeyGeoFlow here (FIX 1) */}
             {activeTab===0&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share,rawSent=result.sentiment,prom=result.prominence,sov=result.share_of_voice;
-              const _allBrands=[{GEO:geo,isYou:true},...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
-              const _myPos=_allBrands.findIndex((b:any)=>b.isYou);
-              const avgRank=(_myPos>=0?_myPos+1:null)??result.avg_rank;
+              const allBrands=[{GEO:geo,isYou:true},...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
+              const myPos=allBrands.findIndex((b:any)=>b.isYou);
+              const avgRank=(myPos>=0?myPos+1:null)??result.avg_rank;
               const badge=scoreBadge(geo);
               const industryLabel=result.ind_label||result.industry||'Financial Services';
-              const summaryText=`GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
               return(
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
@@ -1677,10 +1417,10 @@ export default function GeoHub() {
                           <span style={{fontSize:'0.72rem',fontWeight:600,color:'#374151',background:'#F3F4F6',borderRadius:50,padding:'2px 10px'}}>{industryLabel}</span>
                         </div>
                       </div>
-                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{result.page_url?.slice(0,60)}{result.page_url?.length>60?'...':''}</a>
+                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{(result.page_url||'').slice(0,60)}{(result.page_url||'').length>60?'...':''}</a>
                       <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
                       <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
-                      <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
+                      <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>GEO Score of {geo} reflects {vis}% Visibility but is held back by Prominence ({prom}), Share of Voice ({sov}), and Citations ({cit}).</div>
                     </div>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:16}}>
@@ -1694,35 +1434,31 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 1: Competitors — FIX 2: correct "You" row; FIX 3: muted chart */}
+            {/* TAB 1: Competitors — FIX 2+3 */}
             {activeTab===1&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,cit=result.citation_share;
               const sent=result.sentiment,sov=result.share_of_voice,prom=result.prominence||0,avgRank=result.avg_rank;
-              // FIX 2: Build brandEntry with isYou:true explicitly, then merge+sort
               const brandEntry={Brand:result.brand_name,URL:result.domain,GEO:geo,Vis:vis,Cit:cit,Sen:sent,Sov:sov,Prom:prom,Rank:avgRank,isYou:true};
               const compEntries=(result.competitors||[]).slice(0,9).map((c:any)=>({...c,Prom:c.Prom||Math.round((c.Vis||0)*0.85),isYou:false}));
-              const top=[brandEntry,...compEntries].sort((a,b)=>b.GEO-a.GEO);
+              const top=[brandEntry,...compEntries].sort((a:any,b:any)=>b.GEO-a.GEO);
               const myRank=top.findIndex(c=>c.isYou)+1,leader=top[0],next=top[myRank]||null;
               const gapToTop=geo-leader.GEO,leadOver=next?geo-next.GEO:null;
               const resolvedRank=(c:any)=>{const pos=top.findIndex(t=>t.isYou===c.isYou&&t.Brand===c.Brand);if(pos<0||pos>=5)return '--';return `#${pos+1}`;};
               return(
                 <div>
-                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors</div>
-                  <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
+                  <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:16}}>{result.domain} vs Competitors</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <div style={{background:'#F5F3FF',borderRadius:14,border:'1px solid #DDD6FE',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#7C3AED',fontWeight:600,marginBottom:4}}>Your GEO Score</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#7C3AED'}}>{geo}</div><div style={{fontSize:'0.75rem',color:'#9CA3AF'}}>ranked #{myRank} of {top.length} brands</div></div>
-                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'--':`${gapToTop} pts`}</div><div style={{fontSize:'0.75rem',color:'#92400E'}}>{myRank===1?'You are the leader':Math.abs(gapToTop)<=5?'Close, strong opportunity':'Gap to close'}</div></div>
-                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1} (${next.Brand})`:'Top Ranked'}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'--'}</div><div style={{fontSize:'0.75rem',color:'#065F46'}}>{leadOver!=null?(leadOver<10?'Close, defend your position':'Comfortable but not safe'):'Leading the category'}</div></div>
+                    <div style={{background:'#FFFBEB',borderRadius:14,border:'1px solid #FCD34D',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#92400E',fontWeight:600,marginBottom:4}}>Gap to #1 ({leader.Brand})</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#92400E'}}>{gapToTop===0?'--':`${gapToTop} pts`}</div></div>
+                    <div style={{background:'#ECFDF5',borderRadius:14,border:'1px solid #6EE7B7',padding:'18px 22px'}}><div style={{fontSize:'0.75rem',color:'#065F46',fontWeight:600,marginBottom:4}}>{next?`Lead over #${myRank+1}`:''}</div><div style={{fontSize:'2.2rem',fontWeight:900,color:'#065F46'}}>{leadOver!=null?`+${leadOver} pts`:'--'}</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
-                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score & Signal Breakdown</div>
-                    <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Grouped bars show sub-metrics per brand. Black line traces GEO Score.</div>
+                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:10}}>GEO Score & Signal Breakdown</div>
                     <div style={{overflowX:'auto' as const}}><CompetitorBarChart top={top} hovBar={hovBar} setHovBar={setHovBar}/></div>
                   </div>
-                  {/* FIX 2: Only row where c.isYou===true gets purple left border and "You" badge */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <thead><tr style={{background:'#FAFAFA'}}>{['#','BRAND','GEO SCORE','GAP','VISIBILITY','CITATIONS','SENTIMENT','SOV','PROMINENCE','AVG. RANK'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left' as const,fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:'#FAFAFA'}}>{['#','BRAND','GEO','GAP','VIS','CIT','SENT','SOV','PROM','RANK'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left' as const,fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c:any,i:number)=>{
                         const gcol=c.GEO>=80?'#10B981':c.GEO>=60?'#7C3AED':'#374151',gap2=c.isYou?null:c.GEO-geo;
                         return<tr key={i} style={{background:c.isYou?'#F5F3FF':'white',borderTop:'1px solid #F3F4F6',borderLeft:c.isYou?'3px solid #7C3AED':'none'}}>
@@ -1732,10 +1468,9 @@ export default function GeoHub() {
                               <span style={{fontSize:'0.84rem',fontWeight:c.isYou?700:600,color:'#111827'}}>{c.Brand}</span>
                               {c.isYou&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:5,padding:'1px 7px',fontSize:'0.68rem',fontWeight:700}}>You</span>}
                             </div>
-                            <div style={{fontSize:'0.7rem',color:'#9CA3AF'}}>{c.URL}</div>
                           </td>
                           <td style={{padding:'11px 12px',fontSize:'0.95rem',fontWeight:800,color:gcol}}>{c.GEO}</td>
-                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:gap2===null?'#9CA3AF':gap2>0?'#EF4444':'#10B981'}}>{gap2===null?'--':`${gap2>0?'-':'+'}${Math.abs(gap2)} pts`}</td>
+                          <td style={{padding:'11px 12px',fontSize:'0.82rem',fontWeight:600,color:gap2===null?'#9CA3AF':gap2>0?'#EF4444':'#10B981'}}>{gap2===null?'--':`${gap2>0?'-':'+'}${Math.abs(gap2)}`}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Vis}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Cit}</td>
                           <td style={{padding:'11px 12px',fontSize:'0.82rem',color:'#374151'}}>{c.Sen}</td>
@@ -1750,29 +1485,26 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 2: Visibility — FIX 8: toggle between ScatterPlot and SCurveStandalone, never merged */}
+            {/* TAB 2: Visibility — FIX 8 separate toggle */}
             {activeTab===2&&(()=>{
               const geo=result.overall_geo_score,vis=result.visibility,comps=result.competitors||[];
               const allVis=[vis,...comps.map((c:any)=>c.Vis)];
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1;
               const topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
-              const gapToTop=vis-(topComp?topComp.Vis:vis),avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
+              const gapToTop=vis-(topComp?topComp.Vis:vis);
               const topCompBrand=result._topCompBrand||(comps.length>0?comps[0].Brand:'');
               return(
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands · avg {avgVis}</div></div>
-                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
+                    <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands</div></div>
+                    <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1{topComp?` (${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div></div>
                   </div>
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-                      <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>{showSCurve?'GEO Maturity S-Curve':'Sentiment vs. Visibility Market Positioning'}</div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                      <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>{showSCurve?'GEO Maturity S-Curve':'Sentiment vs. Visibility Positioning'}</div>
                       <button onClick={()=>setShowSCurve(s=>!s)} style={{background:showSCurve?'#7C3AED':'#F3F4F6',color:showSCurve?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer'}}>
                         {showSCurve?'Show Scatter Plot':'Show S-Curve'}
                       </button>
-                    </div>
-                    <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>
-                      {showSCurve?'GEO maturity curve showing your position, goal (70), and authority (80) thresholds.':'Each dot = one brand positioned by Visibility vs Sentiment. Median dashed lines split the market.'}
                     </div>
                     {showSCurve
                       ?<SCurveStandalone score={geo} brand={result.brand_name}/>
@@ -1783,15 +1515,13 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 3: Sentiment — FIX 6: NO strengths/concerns; FIX 7: radar from clusters */}
+            {/* TAB 3: Sentiment — FIX 6 (no strengths/concerns) + FIX 7 (cluster axes) */}
             {activeTab===3&&(()=>{
               const rawSent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility,cit=result.citation_share,sov=result.share_of_voice;
-              const smood=rawSent>=70?'AI speaks favorably about your brand':rawSent>=45?'AI tone is neutral, room to improve':'AI tone is negative or missing';
-              const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return(
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    {[{label:'sentiment score',val:rawSent,sub:smood},{label:'prominence score',val:prom,sub:pmood},{label:'average rank',val:avgRank,sub:'Average position within each AI response'}].map(({label,val,sub}:any)=>(
+                    {[{label:'sentiment score',val:rawSent,sub:rawSent>=70?'AI speaks favorably':rawSent>=45?'AI tone is neutral':'AI tone is negative'},{label:'prominence score',val:prom,sub:prom>=70?'Named first in AI responses':prom>=45?'Appears mid-list':'Rarely named early'},{label:'average rank',val:avgRank,sub:'Average position within each AI response'}].map(({label,val,sub}:any)=>(
                       <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
                         <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={METRIC_TIPS[label]||''}/></div>
                         <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
@@ -1799,18 +1529,17 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  {/* FIX 7: axes from clusters */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,alignItems:'stretch'}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Product Feature Positioning</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Axes = same categories as signal flow (query clusters). Hover each point for detail.</div>
+                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>Axes = query cluster categories (same as Sankey)</div>
                       <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
                         <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]} clusters={result.query_clusters||[]}/>
                       </div>
                     </div>
                     <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={result.competitors||[]} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]} clusters={result.query_clusters||[]}/>
                   </div>
-                  {/* FIX 6: Strengths/Concerns boxes are intentionally NOT rendered here */}
+                  {/* FIX 6: NO strengths/concerns boxes */}
                 </div>
               );
             })()}
@@ -1819,11 +1548,9 @@ export default function GeoHub() {
             {activeTab===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
               const brandKey3=(result.domain||'').replace('www.','').split('.')[0].toLowerCase();
-              const domainMatchesBrand=(domain:string)=>{const dk=domain.replace('www.','').split('.')[0].toLowerCase();return dk===brandKey3||dk.startsWith(brandKey3)||brandKey3.startsWith(dk.split('').filter((c:string)=>c>='a'&&c<='z').join(''));};
-              const OWNED_URLS:Record<string,string[]>={capitalone:['https://www.capitalone.com/credit-cards/','https://www.capitalone.com/credit-cards/venture/'],chase:['https://www.chase.com/personal/credit-cards','https://www.chase.com/personal/credit-cards/sapphire'],citi:['https://www.citi.com/credit-cards/home'],americanexpress:['https://www.americanexpress.com/us/credit-cards/']};
-              const DOMAIN_REAL_URLS:Record<string,string[]>={'nerdwallet.com':['https://www.nerdwallet.com/best/credit-cards'],'bankrate.com':['https://www.bankrate.com/credit-cards/best-credit-cards/'],'creditkarma.com':['https://www.creditkarma.com/credit-cards'],'thepointsguy.com':['https://thepointsguy.com/credit-cards/best/'],'forbes.com':['https://www.forbes.com/advisor/credit-cards/best/'],'reddit.com':['https://www.reddit.com/r/personalfinance/'],'wikipedia.org':['https://en.wikipedia.org/wiki/Credit_card']};
+              const domainMatchesBrand=(domain:string)=>{const dk=domain.replace('www.','').split('.')[0].toLowerCase();return dk===brandKey3||dk.startsWith(brandKey3);};
               const catMap:Record<string,number>={};
-              const allSrc=sources.length>0?sources:[{domain:'nerdwallet.com',citation_share:4.9},{domain:'bankrate.com',citation_share:3.8},{domain:'thepointsguy.com',citation_share:3.2},{domain:'forbes.com',citation_share:2.9},{domain:'creditkarma.com',citation_share:2.7},{domain:'reddit.com',citation_share:2.4},{domain:'wikipedia.org',citation_share:2.2},{domain:'cnbc.com',citation_share:1.9},{domain:'investopedia.com',citation_share:1.7},{domain:'wsj.com',citation_share:1.5}];
+              const allSrc=sources.length>0?sources:[{domain:'nerdwallet.com',citation_share:4.9},{domain:'bankrate.com',citation_share:3.8},{domain:'thepointsguy.com',citation_share:3.2},{domain:'forbes.com',citation_share:2.9},{domain:'creditkarma.com',citation_share:2.7},{domain:'reddit.com',citation_share:2.4},{domain:'wikipedia.org',citation_share:2.2},{domain:'cnbc.com',citation_share:1.9}];
               allSrc.forEach((s:any)=>{const d=(s.domain||'').toLowerCase();const isOwned=domainMatchesBrand(d);const cat=isOwned?'Owned Media':classifyDomain(d).label;catMap[cat]=(catMap[cat]||0)+(s.citation_share||0);});
               const catColors:Record<string,string>={'Earned Media':'#10B981','Owned Media':'#7C3AED','Other':'#6B7280','Social':'#F59E0B','Institution':'#3B82F6'};
               const catEntries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);
@@ -1831,35 +1558,28 @@ export default function GeoHub() {
               return(
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
-                    {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>)}
+                    {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>)}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
                       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
                       {catEntries.map(([cat,pct],i)=>{const isActive=activeCitCat===cat;return<div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent'}} onClick={()=>setActiveCitCat(isActive?null:cat)}>
                         <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}><span style={{fontSize:'0.84rem',color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span><span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span></div>
-                        <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}><div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.min(Math.round(pct),100)}%`,transition:'width 0.4s'}}/></div>
+                        <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}><div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.min(Math.round(pct),100)}%`}}/></div>
                       </div>;})}
                     </div>
                     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px'}}>
-                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sources AI is Pulling From</div>
-                      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>{activeCitCat?<span>Filtered: <strong style={{color:catColors[activeCitCat]||'#7C3AED'}}>{activeCitCat}</strong> — <button onClick={()=>setActiveCitCat(null)} style={{background:'none',border:'none',color:'#7C3AED',fontSize:'0.72rem',fontWeight:600,cursor:'pointer',padding:0}}>Clear</button></span>:'Top 10 domains influencing AI responses.'}</div>
+                      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:12}}>Sources AI Pulls From</div>
                       <table style={{width:'100%',borderCollapse:'collapse'}}>
-                        <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','SHARE %',''].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left' as const,fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
-                        <tbody>{displaySources.filter((s:any)=>{if(!activeCitCat)return true;const isOwned2=s.isOwned||domainMatchesBrand(s.domain||'');const cls3=isOwned2?'Owned Media':classifyDomain(s.domain||'').label;return cls3===activeCitCat;}).slice(0,10).map((s:any,i:number)=>{
-                          const isOwned2=s.isOwned||domainMatchesBrand(s.domain||''),cls2=isOwned2?{label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'}:classifyDomain(s.domain||'');
-                          const bw2=Math.min(s.citation_share,100),isExp2=expandedDomain===s.domain;
-                          const realUrls2=isOwned2?(OWNED_URLS[brandKey3]||[`https://www.${s.domain}/`]):(DOMAIN_REAL_URLS[s.domain]||[`https://www.${s.domain}`]);
-                          return<React.Fragment key={i}>
-                            <tr style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp2?'#F9F8FF':isOwned2?'#FAFBFF':'white',borderLeft:isOwned2?'3px solid #7C3AED':'none'}} onClick={()=>setExpandedDomain(isExp2?null:s.domain)}>
-                              <td style={{padding:'8px 10px',fontSize:'0.78rem',color:'#9CA3AF'}}>{s.rank||i+1}</td>
-                              <td style={{padding:'8px 10px'}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:'0.8rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</span>{isOwned2&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontSize:'0.6rem',fontWeight:700}}>You</span>}</div></td>
-                              <td style={{padding:'8px 10px'}}><span style={{background:cls2.bg,color:cls2.color,borderRadius:6,padding:'2px 7px',fontSize:'0.66rem',fontWeight:600}}>{cls2.label}</span></td>
-                              <td style={{padding:'8px 10px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:4,overflow:'hidden'}}><div style={{background:isOwned2?'#7C3AED':'#10B981',height:4,borderRadius:50,width:`${bw2}%`}}/></div><span style={{fontSize:'0.78rem',fontWeight:700,color:isOwned2?'#7C3AED':'#10B981',width:30}}>{s.citation_share}%</span></div></td>
-                              <td style={{padding:'8px 10px',fontSize:'0.7rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp2?'^':'v'}</td>
-                            </tr>
-                            {isExp2&&<tr style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'6px 10px 10px 24px'}}><div style={{fontSize:'0.7rem',fontWeight:600,color:'#7C3AED',marginBottom:6}}>Top pages from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:4}}>{realUrls2.map((urlItem:string,ui:number)=><div key={ui} style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:14,height:14,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.55rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={urlItem} target="_blank" rel="noreferrer" style={{fontSize:'0.72rem',color:'#4F46E5',textDecoration:'none'}}>{urlItem}</a></div>)}</div></td></tr>}
-                          </React.Fragment>;
+                        <thead><tr style={{background:'#FAFAFA'}}>{['#','DOMAIN','CATEGORY','SHARE %'].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left' as const,fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600}}>{h}</th>)}</tr></thead>
+                        <tbody>{displaySources.filter((s:any)=>{if(!activeCitCat)return true;const isOwned2=s.isOwned;const cls3=isOwned2?'Owned Media':classifyDomain(s.domain||'').label;return cls3===activeCitCat;}).slice(0,10).map((s:any,i:number)=>{
+                          const isOwned2=s.isOwned,cls2=isOwned2?{label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'}:classifyDomain(s.domain||'');
+                          return<tr key={i} style={{borderTop:'1px solid #F3F4F6',background:isOwned2?'#FAFBFF':'white',borderLeft:isOwned2?'3px solid #7C3AED':'none'}}>
+                            <td style={{padding:'8px 10px',fontSize:'0.78rem',color:'#9CA3AF'}}>{s.rank||i+1}</td>
+                            <td style={{padding:'8px 10px'}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:'0.8rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</span>{isOwned2&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontSize:'0.6rem',fontWeight:700}}>You</span>}</div></td>
+                            <td style={{padding:'8px 10px'}}><span style={{background:cls2.bg,color:cls2.color,borderRadius:6,padding:'2px 7px',fontSize:'0.66rem',fontWeight:600}}>{cls2.label}</span></td>
+                            <td style={{padding:'8px 10px',fontSize:'0.78rem',fontWeight:700,color:isOwned2?'#7C3AED':'#10B981'}}>{s.citation_share}%</td>
+                          </tr>;
                         })}</tbody>
                       </table>
                     </div>
@@ -1870,79 +1590,72 @@ export default function GeoHub() {
 
             {/* TAB 5: Prompts */}
             {activeTab===5&&(()=>{
-              const rd=result.responses_detail||[],clusters=result.query_clusters||[],trendingQs=result.trending_queries||[];
+              const rd=result.responses_detail||[],clusters=result.query_clusters||[];
               const totalQueries=result.total_responses??rd.length,totalMentions=result.responses_with_brand??rd.filter((r:any)=>r.mentioned).length;
               const displayRate=Math.round((totalMentions/Math.max(totalQueries,1))*100);
               const cats2:string[]=['All',...Array.from(new Set<string>(rd.map((r:any)=>r.category as string).filter((c:string)=>Boolean(c))))];
-              const maxMentioned=Math.max(...clusters.map((c:any)=>c.mentioned),1);
-              const grouped=[...clusters].sort((a:any,b:any)=>{const g=(c:any)=>c.winRate>=60?0:c.winRate>=30?1:c.winRate>0?2:3;return g(a)!==g(b)?g(a)-g(b):b.mentioned-a.mentioned;});
-              const nB=grouped.length,W=940,VPAD=52,COLS=Math.min(5,Math.ceil(Math.sqrt(nB*1.2))),ROWS=Math.ceil(nB/COLS),cellW=Math.min(160,W/COLS),cellH=105,totalGridW=COLS*cellW,gridOffsetX=(W-totalGridW)/2,H=ROWS*cellH+VPAD;
-              const bubbles=grouped.map((c:any,i:number)=>{const col=i%COLS,row=Math.floor(i/COLS),lastRowCount=nB%COLS||COLS,isLastRow=row===ROWS-1,offsetX=isLastRow?(COLS-lastRowCount)*cellW/2:0,x=gridOffsetX+offsetX+col*cellW+cellW/2,y=VPAD/2+row*cellH+cellH/2,r=Math.round(28+(c.mentioned/maxMentioned)*18);return{...c,x,y,r};});
               const ROWS_PER_PAGE=10;
               const allSorted=[...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
               const totalPages=Math.ceil(allSorted.length/ROWS_PER_PAGE),safePage=Math.min(queryPage,Math.max(1,totalPages));
               const pageRows=allSorted.slice((safePage-1)*ROWS_PER_PAGE,safePage*ROWS_PER_PAGE);
+              const maxMentioned=Math.max(...clusters.map((c:any)=>c.mentioned),1);
+              const nB=clusters.length,W=940,VPAD=52,COLS=Math.min(5,Math.ceil(Math.sqrt(nB*1.2))),ROWS2=Math.ceil(nB/COLS),cellW=Math.min(160,W/COLS),cellH=105,totalGridW=COLS*cellW,gridOffsetX=(W-totalGridW)/2,H=ROWS2*cellH+VPAD;
+              const bubbles=clusters.map((c:any,i:number)=>{const col=i%COLS,row=Math.floor(i/COLS),lastRowCount=nB%COLS||COLS,isLastRow=row===ROWS2-1,offsetX=isLastRow?(COLS-lastRowCount)*cellW/2:0,x=gridOffsetX+offsetX+col*cellW+cellW/2,y=VPAD/2+row*cellH+cellH/2,r=Math.round(28+(c.mentioned/maxMentioned)*18);return{...c,x,y,r};});
               return(
                 <div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
-                    <MetricCard label="queries run" val={totalQueries} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
-                    <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
-                    <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
+                    <MetricCard label="queries run" val={totalQueries} color="#7C3AED"/>
+                    <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} color="#7C3AED"/>
+                    <MetricCard label="appearance rate" val={`${displayRate}%`} color="#7C3AED"/>
                   </div>
                   {clusters.length>0&&(
                     <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
                       <div style={{background:'#0F172A',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                        <div><div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div><div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Node size = brand appearances · Color = win rate · Click to filter prompts</div></div>
-                        <div style={{display:'flex',alignItems:'center',gap:14}}>
-                          {[{color:'#10B981',label:'Winning (>=60%)'},{color:'#F59E0B',label:'Emerging (30-59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:7,height:7,borderRadius:'50%',background:l.color}}/><span style={{fontSize:'0.65rem',color:'#94A3B8'}}>{l.label}</span></div>))}
-                          {(filterCat!=='All'||highlightedBubble)&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,padding:'4px 10px',fontSize:'0.68rem',color:'#94A3B8',cursor:'pointer'}}>x Clear</button>}
-                        </div>
+                        <div><div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div><div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Click a node to filter the prompts table below</div></div>
+                        {(filterCat!=='All'||highlightedBubble)&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,padding:'4px 10px',fontSize:'0.68rem',color:'#94A3B8',cursor:'pointer'}}>Clear</button>}
                       </div>
                       <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
                         {bubbles.map((b:any)=>{
                           const nodeColor=b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
-                          const isHighlighted=highlightedBubble===b.category,isSelected=filterCat===b.category,isDimmed=highlightedBubble&&!isHighlighted;
+                          const isHighlighted=highlightedBubble===b.category,isDimmed=!!highlightedBubble&&!isHighlighted;
                           const words=b.category.split(' ');const maxChars=Math.round(b.r*0.52);let line1='',line2='';
                           words.forEach((w:string)=>{if(!line1){line1=w;}else if((line1+' '+w).length<=maxChars){line1+=' '+w;}else if(!line2){line2=w;}else if((line2+' '+w).length<=maxChars){line2+=' '+w;}});
                           const hasTwo=line2.length>0,fontSize=b.r>=38?9.5:b.r>=32?9:8,lineH=fontSize+2;
-                          const totalTextH=hasTwo?lineH*2+8+lineH:lineH+8+lineH,textStartY=b.y-totalTextH/2+fontSize;
-                          return(<g key={b.category} style={{cursor:'pointer'}} onClick={()=>{if(filterCat===b.category&&highlightedBubble===b.category){setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}else{setFilterCat(b.category);setQueryPage(1);setHighlightedBubble(b.category);}}}>
-                            <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isDimmed?0.25:isHighlighted?1:0.8} stroke={isHighlighted?'white':'none'} strokeWidth={isHighlighted?3:0}/>
-                            <text x={b.x} y={textStartY} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line1}</text>
-                            {hasTwo&&<text x={b.x} y={textStartY+lineH} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line2}</text>}
-                            <text x={b.x} y={textStartY+(hasTwo?lineH*2:lineH)+5} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:isDimmed?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.9)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
+                          const textY1=b.y-(hasTwo?lineH:lineH/2),textY2=textY1+lineH,winY=(hasTwo?textY2:textY1)+lineH+4;
+                          return(<g key={b.category} style={{cursor:'pointer'}} onClick={()=>{if(filterCat===b.category){setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}else{setFilterCat(b.category);setQueryPage(1);setHighlightedBubble(b.category);}}}>
+                            <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor} opacity={isDimmed?0.25:0.85} stroke={isHighlighted?'white':'none'} strokeWidth={isHighlighted?3:0}/>
+                            <text x={b.x} y={textY1} textAnchor="middle" style={{fontSize,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none',opacity:isDimmed?0.3:1}}>{line1}</text>
+                            {hasTwo&&<text x={b.x} y={textY2} textAnchor="middle" style={{fontSize,fontWeight:700,fill:'white',fontFamily:'Inter,sans-serif',pointerEvents:'none',opacity:isDimmed?0.3:1}}>{line2}</text>}
+                            <text x={b.x} y={winY} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:'rgba(255,255,255,0.85)',fontFamily:'Inter,sans-serif',pointerEvents:'none',opacity:isDimmed?0.2:1}}>{b.winRate}% win</text>
                           </g>);
                         })}
                       </svg>
                     </div>
                   )}
-                  <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
+                  <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px'}}>
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-                      <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>{filterCat==='All'?'All Queries':'Category: '+filterCat}<span style={{fontSize:'0.72rem',fontWeight:400,color:'#9CA3AF',marginLeft:8}}>({allSorted.length} queries · page {safePage} of {totalPages})</span></div>
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <span style={{fontSize:'0.68rem',color:'#9CA3AF'}}>Filter:</span>
-                        <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);setHighlightedBubble(null);}} style={{border:'1px solid #E5E7EB',borderRadius:6,padding:'4px 8px',fontSize:'0.75rem',color:'#374151',background:'white',outline:'none'}}>
-                          {cats2.map(c=><option key={c}>{c}</option>)}
-                        </select>
-                      </div>
+                      <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>{filterCat==='All'?'All Queries':filterCat}<span style={{fontSize:'0.72rem',fontWeight:400,color:'#9CA3AF',marginLeft:8}}>({allSorted.length} queries)</span></div>
+                      <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);}} style={{border:'1px solid #E5E7EB',borderRadius:6,padding:'4px 8px',fontSize:'0.75rem',color:'#374151',background:'white',outline:'none'}}>
+                        {cats2.map(c=><option key={c}>{c}</option>)}
+                      </select>
                     </div>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
-                      <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600}}>{h}</th>)}</tr></thead>
                       <tbody>{pageRows.map((item:any,i:number)=>{
-                        const globalIdx=(safePage-1)*ROWS_PER_PAGE+i+1,rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
+                        const globalIdx=(safePage-1)*ROWS_PER_PAGE+i+1,rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':item.mentioned?'#7C3AED':'#9CA3AF';
                         const beater=item.winner_brand&&item.winner_brand!==result.brand_name?item.winner_brand:null;
-                        return<tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                        return<tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':!item.mentioned?'#FFFBFB':'white'}}>
                           <td style={{padding:'9px 12px',fontSize:'0.75rem',color:'#9CA3AF',width:28}}>{globalIdx}</td>
-                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',gap:5,alignItems:'center',marginBottom:3}}><span style={{background:'#F3F4F6',color:'#6B7280',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem'}}>{item.category}</span>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.68rem',fontWeight:600}}>Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.68rem',fontWeight:600}}>Missed</span>}</div><div style={{fontSize:'0.82rem',color:'#374151',fontWeight:500}}>{item.query}</div></td>
+                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',gap:5,alignItems:'center',marginBottom:3}}><span style={{background:'#F3F4F6',color:'#6B7280',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem'}}>{item.category}</span>{item.mentioned?<span style={{color:'#10B981',fontSize:'0.68rem',fontWeight:600}}>Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.68rem',fontWeight:600}}>Missed</span>}</div><div style={{fontSize:'0.82rem',color:'#374151'}}>{item.query}</div></td>
                           <td style={{padding:'9px 12px',fontSize:'0.92rem',fontWeight:800,color:rankColor,width:70}}>{rankLabel}</td>
-                          <td style={{padding:'9px 12px',width:150}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#065F46'}}>You&apos;re #1</span>:<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>--</span>}</td>
+                          <td style={{padding:'9px 12px',width:150}}>{beater?<span style={{background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#065F46'}}>You&apos;re #1</span>:<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>--</span>}</td>
                         </tr>;
                       })}</tbody>
                     </table>
                     {totalPages>1&&(<div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14}}>
-                      <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===1?'#F9FAFB':'white',color:safePage===1?'#D1D5DB':'#374151',cursor:safePage===1?'default':'pointer',fontSize:'0.75rem'}}>Prev</button>
-                      {Array.from({length:Math.min(totalPages,10)},(_,i)=>{const pg=totalPages<=10?i+1:safePage<=5?i+1:safePage>=totalPages-4?totalPages-9+i:safePage-4+i;return<button key={pg} onClick={()=>setQueryPage(pg)} style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${pg===safePage?'#7C3AED':'#E5E7EB'}`,background:pg===safePage?'#7C3AED':'white',color:pg===safePage?'white':'#374151',cursor:'pointer',fontSize:'0.75rem',fontWeight:pg===safePage?700:400}}>{pg}</button>;})}
-                      <button onClick={()=>setQueryPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===totalPages?'#F9FAFB':'white',color:safePage===totalPages?'#D1D5DB':'#374151',cursor:safePage===totalPages?'default':'pointer',fontSize:'0.75rem'}}>Next</button>
+                      <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:'white',color:'#374151',cursor:'pointer',fontSize:'0.75rem'}}>Prev</button>
+                      {Array.from({length:Math.min(totalPages,8)},(_,i)=>i+1).map(pg=><button key={pg} onClick={()=>setQueryPage(pg)} style={{padding:'5px 10px',borderRadius:6,border:`1px solid ${pg===safePage?'#7C3AED':'#E5E7EB'}`,background:pg===safePage?'#7C3AED':'white',color:pg===safePage?'white':'#374151',cursor:'pointer',fontSize:'0.75rem'}}>{pg}</button>)}
+                      <button onClick={()=>setQueryPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:'white',color:'#374151',cursor:'pointer',fontSize:'0.75rem'}}>Next</button>
                     </div>)}
                   </div>
                 </div>
@@ -1952,14 +1665,11 @@ export default function GeoHub() {
             {/* TAB 6: Recommendations */}
             {activeTab===6&&(()=>{
               const rd=result.responses_detail||[],recClusters=result.query_clusters||[];
-              const topComp1=(result.competitors||[])[0]?.Brand||'Top Competitor';
-              const getClusterRate=(cats:string[]):number|null=>{for(const cat of cats){const cluster=recClusters.find((c:any)=>c.category===cat);if(cluster)return cluster.winRate;const fuzzy=recClusters.find((c:any)=>c.category.toLowerCase().includes(cat.toLowerCase()));if(fuzzy)return fuzzy.winRate;}let rows=rd.filter((r:any)=>cats.some(c=>(r.category||'')===c));if(!rows.length)return null;return Math.round((rows.filter((r:any)=>r.mentioned).length/rows.length)*100);};
-              const segments=recClusters.slice(0,9).map((c:any)=>{const rate=getClusterRate([c.category]);if(rate===null)return null;const isWinning=rate>=60,isEmerging=!isWinning&&rate>=30,status=isWinning?'Winning':isEmerging?'Emerging':'Gap',topComp=c.topCompetitor||topComp1;return{name:c.category,status,color:isWinning?'#10B981':isEmerging?'#F59E0B':'#EF4444',bg:isWinning?'#F0FDF4':isEmerging?'#FFFBEB':'#FFF1F2',border:isWinning?'#6EE7B7':isEmerging?'#FCD34D':'#FCA5A5',score:rate,dominated:topComp};}).filter((s:any):s is NonNullable<typeof s>=>s!==null);
+              const segments=recClusters.slice(0,9).map((c:any)=>{const rate=c.winRate;const isWinning=rate>=60,isEmerging=!isWinning&&rate>=30;return{name:c.category,status:isWinning?'Winning':isEmerging?'Emerging':'Gap',color:isWinning?'#10B981':isEmerging?'#F59E0B':'#EF4444',bg:isWinning?'#F0FDF4':isEmerging?'#FFFBEB':'#FFF1F2',border:isWinning?'#6EE7B7':isEmerging?'#FCD34D':'#FCA5A5',score:rate,dominated:c.topCompetitor||''};});
               return(
                 <div>
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
-                  <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:14}}>Which audience segments is your brand winning vs. losing in AI responses?</div>
-                  {segments.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>{segments.map((s:any,i:number)=><div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span><span style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span></div><div style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div><div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong> · Top: {s.dominated}</div></div>)}</div>}
+                  {segments.length>0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>{segments.map((s:any,i:number)=><div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span><span style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span></div><div style={{background:'#F3F4F6',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div><div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong>{s.dominated?` · Top: ${s.dominated}`:''}</div></div>)}</div>}
                   {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,marginBottom:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
                   <PriorityActionsTable result={result} cachedActions={cachedActions} setCachedActions={setCachedActions} actionsLoading={actionsLoading} setActionsLoading={setActionsLoading}/>
                 </div>
@@ -1968,21 +1678,20 @@ export default function GeoHub() {
 
             {/* TAB 7: Live Prompt */}
             {activeTab===7&&(()=>(
-              <div style={{display:'flex',flexDirection:'column' as const,minHeight:'calc(100vh - 200px)'}}>
-                <div style={{marginBottom:12}}><div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:3}}>Live Prompt Tester</div><div style={{fontSize:'0.8rem',color:'#9CA3AF'}}>Ask any question and see how AI responds about brands in your category.</div></div>
+              <div style={{display:'flex',flexDirection:'column' as const,minHeight:'60vh'}}>
+                <div style={{marginBottom:12}}><div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:3}}>Live Prompt Tester</div></div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:12}}>
-                  {examplePrompts.map((p,i)=>(<button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:20,padding:'6px 14px',fontSize:'0.78rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap' as const}}>{p}</button>))}
+                  {examplePrompts.map((p,i)=>(<button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:20,padding:'6px 14px',fontSize:'0.78rem',color:'#5B21B6',cursor:'pointer'}}>{p}</button>))}
                 </div>
                 <div style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',marginBottom:16}}>
-                  <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything, e.g. What is the best travel credit card?" style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
-                  <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:promptLoading?'#DDD6FE':'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:promptLoading?'not-allowed':'pointer',flexShrink:0}}>{promptLoading?'Asking...':'Ask AI'}</button>
+                  <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything..." style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
+                  <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:'pointer',flexShrink:0}}>{promptLoading?'Asking...':'Ask AI'}</button>
                   {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.75rem',color:'#9CA3AF',cursor:'pointer'}}>Clear</button>}
                 </div>
                 <div style={{display:'flex',flexDirection:'column' as const,gap:12,flex:1}}>
-                  {promptHistory.length===0&&!promptLoading?(<div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',textAlign:'center' as const,padding:'40px',color:'#9CA3AF',background:'white',borderRadius:14,border:'1px solid #E5E7EB'}}><div style={{width:56,height:56,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.6rem',marginBottom:12}}>🤖</div><div style={{fontSize:'0.95rem',fontWeight:700,color:'#374151',marginBottom:6}}>Ask the AI anything</div><div style={{fontSize:'0.82rem',lineHeight:1.7,maxWidth:400,color:'#9CA3AF'}}>Type a question above or click one of the suggestions. See exactly how AI responds about {result?.brand_name||'your brand'} in real time.</div></div>):(
-                    <>{promptHistory.map((h,i)=>(<div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}><div style={{background:'#F5F3FF',padding:'10px 18px',borderBottom:'1px solid #EDE9FE',display:'flex',alignItems:'center',gap:8}}><span style={{fontSize:'0.7rem',fontWeight:700,color:'#7C3AED',background:'#EDE9FE',borderRadius:50,padding:'2px 8px'}}>Q</span><span style={{fontSize:'0.84rem',fontWeight:600,color:'#5B21B6'}}>{h.q}</span></div><div style={{padding:'16px 18px'}}><MarkdownText text={h.a}/></div></div>))}
-                    {promptLoading&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF',fontSize:'0.88rem'}}><div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>Querying AI model...</div>}</>
-                  )}
+                  {promptHistory.length===0&&!promptLoading&&<div style={{textAlign:'center' as const,padding:'40px',color:'#9CA3AF',background:'white',borderRadius:14,border:'1px solid #E5E7EB'}}>Type a question or click a suggestion above</div>}
+                  {promptHistory.map((h,i)=>(<div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden'}}><div style={{background:'#F5F3FF',padding:'10px 18px',borderBottom:'1px solid #EDE9FE'}}><span style={{fontSize:'0.84rem',fontWeight:600,color:'#5B21B6'}}>{h.q}</span></div><div style={{padding:'16px 18px'}}><MarkdownText text={h.a}/></div></div>))}
+                  {promptLoading&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22,display:'flex',alignItems:'center',gap:12,color:'#9CA3AF'}}><div style={{width:18,height:18,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>Querying AI model...</div>}
                 </div>
               </div>
             ))()}
@@ -1990,9 +1699,9 @@ export default function GeoHub() {
             {/* TAB 8: FAQ */}
             {activeTab===8&&(()=>(
               <div>
-                <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>FAQ</div>
+                <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:16}}>FAQ</div>
                 <div style={{display:'flex',flexDirection:'column' as const,gap:14}}>
-                  {[{q:'What is a GEO Score?',a:'The GEO Score is a single 0-100 number that measures how often and how favorably your brand is cited in AI-generated responses across ChatGPT, Gemini, Perplexity, and other major AI engines.'},{q:'Why does 70 matter?',a:'70 is the efficiency threshold where AI models have accumulated enough signals to place you at the top of responses with statistical confidence. Below 70, AI treats your brand as optional. Above it, your brand becomes a default recommendation.'},{q:'How is the GEO Score calculated?',a:'The GEO Score is a weighted average of five signals: Visibility x 0.30 + Sentiment x 0.20 + Prominence x 0.20 + Citation Share x 0.15 + Share of Voice x 0.15.'},{q:'How often is the score updated?',a:'The GEO Score is calculated in real-time each time you run an analysis — so your score always reflects current AI responses, not cached data.'},{q:"What's the difference between Visibility and Prominence?",a:'Visibility measures whether your brand appears at all in an AI response. Prominence measures where — being named first scores much higher than being named fifth.'},{q:'How do I improve my GEO Score?',a:"The GEO Analysis Summary on the GEO Score tab identifies your highest-impact opportunities. Build authoritative content, earn placements on sources AI trusts, and expand coverage across segments where you're currently invisible."}].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
+                  {[{q:'What is a GEO Score?',a:'A single 0-100 number measuring how often and favorably your brand is cited in AI-generated responses.'},{q:'Why does 70 matter?',a:'70 is the efficiency threshold where AI models have enough signals to place you at the top of responses consistently.'},{q:'How is the GEO Score calculated?',a:'Visibility x 0.30 + Sentiment x 0.20 + Prominence x 0.20 + Citation Share x 0.15 + Share of Voice x 0.15.'},{q:'How often is the score updated?',a:'Calculated in real-time each time you run an analysis — always reflects current AI responses, not cached data.'},{q:"What's the difference between Visibility and Prominence?",a:'Visibility = whether your brand appears at all. Prominence = where — being named first scores much higher than fifth.'},].map((item,i)=><div key={i} style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 22px'}}><div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:8}}>{item.q}</div><div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.75}}>{item.a}</div></div>)}
                 </div>
               </div>
             ))()}
