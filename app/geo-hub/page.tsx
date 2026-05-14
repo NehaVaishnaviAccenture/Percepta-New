@@ -44,11 +44,14 @@ function getProductDefs(indKey:string, lob:string): ProductDef[] {
 
   if (k==='fin' || l.includes('credit card')) {
     return [
-      {label:'Cash Back Cards',   terms:['cash back','cashback','double cash','freedom','quicksilver','active cash','customized cash','blue cash'], color:TOPIC_COLORS[0]},
-      {label:'Travel Cards',      terms:['travel','sapphire','venture','strata','premier','platinum','autograph','miles','points card'], color:TOPIC_COLORS[1]},
-      {label:'Balance Transfer',  terms:['balance transfer','0% apr','0 apr','zero apr','simplicity','reflect','slate','diamond preferred'], color:TOPIC_COLORS[2]},
-      {label:'Secured Cards',     terms:['secured','credit builder','deposit','credit building','opensky','chime credit'], color:TOPIC_COLORS[3]},
-      {label:'Rewards Cards',     terms:['rewards','points','savor','gold card','preferred','signature','world elite'], color:TOPIC_COLORS[4]},
+      {label:'Cash Back Cards',   terms:['cash back','cashback','double cash','freedom','quicksilver','active cash','customized cash','blue cash','flat rate'], color:TOPIC_COLORS[0]},
+      {label:'Travel Cards',      terms:['travel','sapphire','venture','strata','premier','platinum','autograph','miles','points card','airline'], color:TOPIC_COLORS[1]},
+      {label:'Rewards Cards',     terms:['rewards','points','savor','gold card','preferred','signature','world elite','earn points','earn rewards'], color:TOPIC_COLORS[2]},
+      {label:'Balance Transfer',  terms:['balance transfer','0% apr','0 apr','zero apr','simplicity','reflect','slate','diamond preferred','intro period'], color:TOPIC_COLORS[3]},
+      {label:'Secured Cards',     terms:['secured','credit builder','deposit','credit building','opensky','chime credit','build credit'], color:TOPIC_COLORS[4]},
+      {label:'No Annual Fee',     terms:['no annual fee','no fee','fee-free','no yearly fee'], color:TOPIC_COLORS[0]},
+      {label:'Business Cards',    terms:['business card','small business','ink','spark','amex business','corporate card'], color:TOPIC_COLORS[1]},
+      {label:'Student Cards',     terms:['student','student card','college','no credit history','first card'], color:TOPIC_COLORS[2]},
     ];
   }
   if (k==='fin_cc_travel') { return [
@@ -289,11 +292,11 @@ function SankeyFlowChart({ result }: { result: any }) {
       }));
 
   const signals = [
-    {label:'Visibility', val:vis, weight:30, color:'#A100FF'},
-    {label:'Sentiment',  val:rawSent, weight:20, color:'#7500C0'},
-    {label:'Prominence', val:prom, weight:20, color:'#460073'},
-    {label:'Citations',  val:cit, weight:15, color:'#6B7280'},
-    {label:'Share of Voice', val:sov, weight:15, color:'#374151'},
+    {label:'Visibility',     val:vis,      weight:30, color:'#A100FF'},
+    {label:'Sentiment',      val:rawSent,  weight:20, color:'#7500C0'},
+    {label:'Prominence',     val:prom,     weight:20, color:'#460073'},
+    {label:'Citations',      val:cit,      weight:15, color:'#1E88E5'},
+    {label:'Share of Voice', val:sov,      weight:15, color:'#6366F1'},
   ];
 
   const geoScore = Math.round(signals.reduce((s,m) => s + m.val * m.weight / 100, 0)) || result.overall_geo_score || 0;
@@ -492,11 +495,12 @@ function RadarChart({ result }: { result: any }) {
   const lob = result.lob || '';
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
-  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions).slice(0, 6);
+  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions);
+  // Use ALL products from productDefs — no slice cap
   const dims = sorted.length >= 2
     ? sorted.map(p => ({ label: p.label, val: Math.max(5, Math.min(95, p.pct)), color: p.color }))
-    : productDefs.slice(0,6).map((p,i) => ({ label: p.label, val: 20 + i * 5, color: p.color }));
-  const cx=200,cy=200,R=120,n=dims.length;
+    : productDefs.map((p,i) => ({ label: p.label, val: Math.max(5, 20 + i * 3), color: p.color }));
+  const cx=200,cy=210,R=130,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
   const rings=[25,50,75,100];
@@ -505,12 +509,12 @@ function RadarChart({ result }: { result: any }) {
   const top2=sorted2.slice(0,2).map(d=>d.label),bot2=sorted2.slice(-2).map(d=>d.label);
   return (
     <div style={{position:'relative' as const}}>
-      <svg viewBox="0 0 400 300" style={{width:'100%'}}>
+      <svg viewBox="0 0 400 420" style={{width:'100%'}}>
         {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#A100FF" fillOpacity="0.18" stroke="#A100FF" strokeWidth="2"/>
         {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#A100FF" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;})}
-        {dims.map((d,i)=>{const lp=pt(i,R+26);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);return<text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#A100FF':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;})}
+        {dims.map((d,i)=>{const lp=pt(i,R+30);const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);return<text key={i} x={lp.x} y={lp.y} textAnchor="middle" dominantBaseline="middle" style={{fontSize:11,fill:isTop?'#A100FF':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>{d.label}</text>;})}
       </svg>
       {hov!==null&&tooltipPos&&<div style={{position:'absolute' as const,left:Math.max(0,tooltipPos.x-82),top:Math.max(0,tooltipPos.y-64),background:'#1F2937',borderRadius:8,padding:'10px 14px',width:165,pointerEvents:'none',zIndex:999}}><div style={{fontSize:11,fontWeight:700,color:'white',fontFamily:'Inter,sans-serif',marginBottom:3}}>{dims[hov].label}: {dims[hov].val}%</div><div style={{fontSize:9,color:'#D1D5DB',fontFamily:'Inter,sans-serif',lineHeight:1.5}}>{getRadarTip(dims[hov].label)}</div></div>}
       <div style={{background:'#F5F0FF',borderRadius:8,border:'1px solid #E9D5FF',padding:'8px 14px',fontSize:'0.78rem',color:'#7500C0',marginTop:4}}>💡 Strongest in <strong>{top2.join(' and ')}</strong>. Weakest in <strong>{bot2.join(' and ')}</strong>.</div>
@@ -532,10 +536,14 @@ function SentimentHeatmap({ result }: { result: any }) {
   const sov = result.share_of_voice || 0;
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
-  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions).slice(0, 6);
-  const labels = sorted.map(p => p.label);
+  // Show ALL products — no slice cap
+  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions);
+  const labels = sorted.length > 0 ? sorted.map(p => p.label) : productDefs.map(p => p.label);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
-  const myScores = sorted.map(p => Math.max(5, Math.min(95, p.pct)));
+  const myScores = labels.map(lbl => {
+    const p = sorted.find(s => s.label === lbl);
+    return p ? Math.max(5, Math.min(95, p.pct)) : 5;
+  });
   const rows=[
     {name:brand, isYou:true, scores:myScores},
     ...competitors.slice(0,8).map((c:any)=>{
