@@ -118,15 +118,20 @@ function getProductDefs(indKey:string, lob:string): ProductDef[] {
 }
 
 function computeProductMentions(productDefs: ProductDef[], rd: any[]): {label:string;terms:string[];color:string;mentions:number;pct:number;val:number}[] {
-  const total = rd.length || 1;
+  // Only scan responses where the brand was actually mentioned
+  const brandRd = rd.filter((r:any) =>
+    r.mentioned === true || (r.position !== undefined && r.position > 0) || r.mentioned === 1
+  );
+  const pool = brandRd.length > 0 ? brandRd : rd;
+  const total = pool.length || 1;
   return productDefs.map(p => {
-    const count = rd.filter((r:any) => {
+    const count = pool.filter((r:any) => {
       const txt = (r.response_preview || r.response || '').toLowerCase();
       return p.terms.some((t:string) => txt.includes(t));
     }).length;
     const pct = Math.round((count / total) * 100);
     return { ...p, mentions: count, pct, val: Math.max(5, count) };
-  }).filter(p => p.mentions > 0 || rd.length === 0);
+  }).filter(p => p.pct >= 3 || (total < 20 && p.mentions >= 1));
 }
 
 const RADAR_TIPS: Record<string,string> = {
@@ -248,36 +253,39 @@ function SankeyFlowChart({ result }: { result: any }) {
 
   const productDefs = getProductDefs(indKey, lob);
 
-  // FIXED PRODUCT LOGIC:
-  // 1. Only scan responses where this brand was actually mentioned (r.mentioned===true or r.position>0)
-  // 2. Denominator = totalRd (total prompts run) so pct = brand-mention-responses / total-prompts
-  // 3. This prevents: a) showing products the brand doesn't have (AI mentions competitor's balance transfer)
-  //    b) counts exceeding totalRd (was scanning all rd including non-mentions)
-  const brandMentionedRd = rd.filter((r:any) => r.mentioned === true || (r.position !== undefined && r.position > 0));
-  // If no brand mentions found in data, fall back to all rd (data may not have mentioned field)
+  // PRODUCT DETECTION — FIXED LOGIC:
+  // scanPool = only responses where this brand was actually mentioned
+  const brandMentionedRd = rd.filter((r:any) =>
+    r.mentioned === true || (r.position !== undefined && r.position > 0) || r.mentioned === 1
+  );
   const scanPool = brandMentionedRd.length > 0 ? brandMentionedRd : rd;
+  const scanTotal = scanPool.length; // denominator = brand-mentioned responses
+
+  const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#6B7280','#374151','#C4B5FD','#9CA3AF'];
 
   const productMentions = productDefs.map(p => {
     const count = scanPool.filter((r:any) => {
       const txt = (r.response_preview || r.response || '').toLowerCase();
+      // A product term must appear in the text — but exclude cases where it appears
+      // only in a clearly comparative/negative context ("unlike X" handled by brand presence)
       return p.terms.some((t:string) => txt.includes(t));
     }).length;
-    // Cap at totalRd to prevent impossible percentages
-    const cappedCount = Math.min(count, totalRd);
-    const pct = totalRd > 0 ? Math.round((cappedCount / totalRd) * 100) : 0;
-    return { ...p, mentions: cappedCount, pct, val: Math.max(5, cappedCount) };
-  }).filter(p => p.mentions > 0 || rd.length === 0);
+    // Use scanTotal (brand-mentioned responses) as denominator — honest: X of our appearances mentioned this product
+    const pct = scanTotal > 0 ? Math.round((count / scanTotal) * 100) : 0;
+    return { ...p, mentions: count, pct, val: Math.max(5, count) };
+  })
+  // Remove noise: must appear in at least 3% of brand-mention responses to be meaningful
+  .filter(p => p.pct >= 3 || (scanTotal < 20 && p.mentions >= 1));
 
   const sortedMentions = [...productMentions].sort((a:any,b:any) => b.mentions - a.mentions);
-  const PERF_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
   const prodItems: any[] = sortedMentions.length >= 1
-    ? sortedMentions.map((p, i) => ({ ...p, color: PERF_COLORS[Math.min(i, PERF_COLORS.length-1)] }))
+    ? sortedMentions.map((p, i) => ({ ...p, color: PROD_COLORS_POOL[i % PROD_COLORS_POOL.length] }))
     : productDefs.map((p, i) => ({
         ...p,
-        mentions: Math.round(totalRd / (productDefs.length || 5)),
+        mentions: Math.round(scanTotal / (productDefs.length || 5)),
         pct: Math.round(100 / (productDefs.length || 5)),
         val: 20 + i * 5,
-        color: PERF_COLORS[Math.min(i, PERF_COLORS.length-1)],
+        color: PROD_COLORS_POOL[i % PROD_COLORS_POOL.length],
       }));
 
   const signals = [
@@ -290,7 +298,7 @@ function SankeyFlowChart({ result }: { result: any }) {
 
   const geoScore = Math.round(signals.reduce((s,m) => s + m.val * m.weight / 100, 0)) || result.overall_geo_score || 0;
 
-  const W = 1040, H = 480, padT = 32, padB = 44;
+  const W = 1040, H = 520, padT = 32, padB = 44;
   const col1 = 130, col2 = 300, col3 = 510, col4 = 720, nW = 26;
   const plotH = H - padT - padB;
 
@@ -306,9 +314,9 @@ function SankeyFlowChart({ result }: { result: any }) {
     });
   };
 
-  const lNodes = layoutN(leftItems, col1, 24, 10);
-  const pNodes = layoutN(prodItems, col2, 26, 10);
-  const sNodes = layoutN(signals, col3, 28, 8);
+  const lNodes = layoutN(leftItems, col1, 28, 12);
+  const pNodes = layoutN(prodItems, col2, 30, 10);
+  const sNodes = layoutN(signals, col3, 32, 8);
   // GEO node: full plotH so it's same height as all other columns combined
   const geoN = { x: col4, y: padT, h: plotH, mid: padT + plotH / 2 };
 
@@ -410,7 +418,7 @@ function SankeyFlowChart({ result }: { result: any }) {
             return (<g key={`pn${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovMetric(hovMetric===n.label?null:n.label);}}>
               <rect x={n.x} y={n.y} width={nW} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
               <text x={n.x+nW+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>18?n.label.slice(0,17)+'…':n.label}</text>
-              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{totalRd} responses ({n.pct}%)</text>
+              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{scanTotal} appearances ({n.pct}%)</text>
             </g>);
           })}
           {sNodes.map((n,i)=>{
@@ -430,8 +438,8 @@ function SankeyFlowChart({ result }: { result: any }) {
       </div>
       <div style={{borderTop:'1px solid #F3F4F6',paddingTop:10,marginTop:10,display:'flex',flexWrap:'wrap' as const,gap:16}}>
         <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,alignItems:'center'}}>
-          <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>PRODUCTS DETECTED ({totalRd} total responses):</span>
-          {prodItems.map((p:any,i:number)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:7,height:7,borderRadius:1,background:p.color}}/><span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions} responses · {p.pct}%)</span></div>))}
+          <span style={{fontSize:'0.62rem',fontWeight:700,color:'#6B7280'}}>PRODUCTS IN BRAND RESPONSES ({scanTotal} brand mentions · responses can match multiple products):</span>
+          {prodItems.map((p:any,i:number)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:7,height:7,borderRadius:1,background:p.color}}/><span style={{fontSize:'0.62rem',color:'#6B7280'}}>{p.label} ({p.mentions} · {p.pct}%)</span></div>))}
         </div>
       </div>
     </div>
