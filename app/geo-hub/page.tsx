@@ -248,16 +248,24 @@ function SankeyFlowChart({ result }: { result: any }) {
 
   const productDefs = getProductDefs(indKey, lob);
 
-  // FIXED: Product mention count — count how many responses mention each product term.
-  // A single response can match multiple products (overlap expected), so pct shows per-product coverage.
-  // We show X/totalRd where X = responses that mention the product.
+  // FIXED PRODUCT LOGIC:
+  // 1. Only scan responses where this brand was actually mentioned (r.mentioned===true or r.position>0)
+  // 2. Denominator = totalRd (total prompts run) so pct = brand-mention-responses / total-prompts
+  // 3. This prevents: a) showing products the brand doesn't have (AI mentions competitor's balance transfer)
+  //    b) counts exceeding totalRd (was scanning all rd including non-mentions)
+  const brandMentionedRd = rd.filter((r:any) => r.mentioned === true || (r.position !== undefined && r.position > 0));
+  // If no brand mentions found in data, fall back to all rd (data may not have mentioned field)
+  const scanPool = brandMentionedRd.length > 0 ? brandMentionedRd : rd;
+
   const productMentions = productDefs.map(p => {
-    const count = rd.filter((r:any) => {
+    const count = scanPool.filter((r:any) => {
       const txt = (r.response_preview || r.response || '').toLowerCase();
       return p.terms.some((t:string) => txt.includes(t));
     }).length;
-    const pct = totalRd > 0 ? Math.round((count / totalRd) * 100) : 0;
-    return { ...p, mentions: count, pct, val: Math.max(5, count) };
+    // Cap at totalRd to prevent impossible percentages
+    const cappedCount = Math.min(count, totalRd);
+    const pct = totalRd > 0 ? Math.round((cappedCount / totalRd) * 100) : 0;
+    return { ...p, mentions: cappedCount, pct, val: Math.max(5, cappedCount) };
   }).filter(p => p.mentions > 0 || rd.length === 0);
 
   const sortedMentions = [...productMentions].sort((a:any,b:any) => b.mentions - a.mentions);
@@ -413,12 +421,11 @@ function SankeyFlowChart({ result }: { result: any }) {
               <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val} · {n.weight}%</text>
             </g>);
           })}
-          {/* GEO node: full plotH bar — label says "GEO Score" */}
+          {/* GEO node: full plotH bar — "GEO Score" on one line */}
           <rect x={geoN.x} y={geoN.y} width={nW} height={geoN.h} fill="#A100FF" rx={5}/>
-          <text x={geoN.x+nW+12} y={geoN.mid-28} style={{fontSize:10,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>GEO</text>
-          <text x={geoN.x+nW+12} y={geoN.mid-16} style={{fontSize:10,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>Score</text>
-          <text x={geoN.x+nW+12} y={geoN.mid+14} style={{fontSize:36,fontWeight:900,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
-          <text x={geoN.x+nW+12} y={geoN.mid+36} style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>out of 100</text>
+          <text x={geoN.x+nW+12} y={geoN.mid-24} style={{fontSize:13,fontWeight:800,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>GEO Score</text>
+          <text x={geoN.x+nW+12} y={geoN.mid+16} style={{fontSize:38,fontWeight:900,fill:'#A100FF',fontFamily:'Inter,sans-serif'}}>{geoScore}</text>
+          <text x={geoN.x+nW+12} y={geoN.mid+38} style={{fontSize:9,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>out of 100</text>
         </svg>
       </div>
       <div style={{borderTop:'1px solid #F3F4F6',paddingTop:10,marginTop:10,display:'flex',flexWrap:'wrap' as const,gap:16}}>
@@ -490,7 +497,7 @@ function RadarChart({ result }: { result: any }) {
   const top2=sorted2.slice(0,2).map(d=>d.label),bot2=sorted2.slice(-2).map(d=>d.label);
   return (
     <div style={{position:'relative' as const}}>
-      <svg viewBox="0 0 400 340" style={{width:'100%'}}>
+      <svg viewBox="0 0 400 300" style={{width:'100%'}}>
         {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#A100FF" fillOpacity="0.18" stroke="#A100FF" strokeWidth="2"/>
@@ -571,7 +578,7 @@ function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { bra
     const sameZone = raw.slice(0,i).filter(b=>!b.isYou&&!b.isTopComp&&Math.abs(b.x-a.x)<=4);
     return {...a, jx:a.x + sameZone.length*4, jy:a.y};
   });
-  const W=960,H=360,padL=56,padR=30,padT=24,padB=48;
+  const W=960,H=300,padL=56,padR=30,padT=20,padB=40;
   const sx=(v:number)=>padL+(v/100)*(W-padL-padR);
   const sy=(v:number)=>padT+((100-v)/100)*(H-padT-padB);
   const citVals=all.map(a=>a.cit);
@@ -719,7 +726,7 @@ function SCurveChart({ score, competitors, brand }: { score: number; competitors
 // S-Curve matching image 7: white bg, purple curve, shaded opportunity zone, 3 dots (You/Goal/Authority), stage labels below
 function SCurveImage7({ score, brand }: { score: number; brand: string }) {
   const [hov, setHov] = useState<string|null>(null);
-  const W = 860, H = 300, padL = 68, padR = 30, padT = 24, padB = 68;
+  const W = 860, H = 260, padL = 68, padR = 30, padT = 20, padB = 60;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const curve = (x: number) => 5 + 90 / (1 + Math.exp(-0.09 * (x - 45)));
   const pts = Array.from({ length: 201 }, (_, i) => ({ x: i / 2, y: curve(i / 2) }));
@@ -994,7 +1001,7 @@ export default function GeoHub() {
             </div>
           </div>
 
-          <div style={{padding:'28px 40px 60px'}}>
+          <div style={{padding:'16px 40px 40px'}}>
             {(()=>{
               if(result.ind_key==='fin'){
                 const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'}};
@@ -1253,11 +1260,11 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,alignItems:'stretch'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px',display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Positioning</div>
-                      <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:2}}>Same product categories as the Sankey diagram.</div>
-                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,alignItems:'stretch',maxHeight:'calc(100vh - 280px)',overflow:'hidden'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px',display:'flex',flexDirection:'column' as const,overflow:'hidden'}}>
+                      <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',marginBottom:1}}>Product Feature Positioning</div>
+                      <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:1}}>Same product categories as the Sankey diagram.</div>
+                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center',minHeight:0}}>
                         <RadarChart result={result}/>
                       </div>
                     </div>
