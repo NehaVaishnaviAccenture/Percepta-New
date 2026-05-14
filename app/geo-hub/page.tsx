@@ -261,7 +261,7 @@ function SankeyFlowChart({ result }: { result: any }) {
   const scanPool = brandMentionedRd.length > 0 ? brandMentionedRd : rd;
   const scanTotal = scanPool.length; // denominator = brand-mentioned responses
 
-  const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#6B7280','#374151','#C4B5FD','#9CA3AF'];
+  const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#1E88E5','#0EA5E9','#6366F1','#A78BFA'];
 
   const productMentions = productDefs.map(p => {
     const count = scanPool.filter((r:any) => {
@@ -270,8 +270,8 @@ function SankeyFlowChart({ result }: { result: any }) {
       // only in a clearly comparative/negative context ("unlike X" handled by brand presence)
       return p.terms.some((t:string) => txt.includes(t));
     }).length;
-    // Use scanTotal (brand-mentioned responses) as denominator — honest: X of our appearances mentioned this product
-    const pct = scanTotal > 0 ? Math.round((count / scanTotal) * 100) : 0;
+    // Use totalRd (total prompts run) as denominator — honest coverage rate
+    const pct = totalRd > 0 ? Math.round((count / totalRd) * 100) : 0;
     return { ...p, mentions: count, pct, val: Math.max(5, count) };
   })
   // Remove noise: must appear in at least 3% of brand-mention responses to be meaningful
@@ -418,7 +418,7 @@ function SankeyFlowChart({ result }: { result: any }) {
             return (<g key={`pn${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovMetric(hovMetric===n.label?null:n.label);}}>
               <rect x={n.x} y={n.y} width={nW} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
               <text x={n.x+nW+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>18?n.label.slice(0,17)+'…':n.label}</text>
-              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{scanTotal} appearances ({n.pct}%)</text>
+              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{totalRd} responses ({Math.round((n.mentions/totalRd)*100)}%)</text>
             </g>);
           })}
           {sNodes.map((n,i)=>{
@@ -555,10 +555,10 @@ function SentimentHeatmap({ result }: { result: any }) {
   const dimWins=labels.map((lbl,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:lbl,score:yourScore,beaten};});
   const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0],weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
   return (
-    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
+    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px'}}>
       <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Strength vs Competitors</div>
       <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Darker = stronger AI association. Hover to see score.</div>
-      <div style={{flex:1,display:'grid',gridTemplateColumns:`110px repeat(${labels.length},1fr)`,gridTemplateRows:`auto repeat(${rows.length},1fr)`,gap:4}}>
+      <div style={{display:'grid',gridTemplateColumns:`110px repeat(${labels.length},1fr)`,gap:4}}>
         <div/>{shortLabels.map((lbl,i)=><div key={i} style={{fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,paddingBottom:6,lineHeight:1.3}}>{lbl}</div>)}
         {rows.map((r,ri)=>[
           <div key={`l${ri}`} style={{fontSize:'0.73rem',color:r.isYou?'#A100FF':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,display:'flex',alignItems:'center',justifyContent:'flex-end',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{r.name}</div>,
@@ -802,14 +802,10 @@ function SCurveImage7({ score, brand }: { score: number; brand: string }) {
       {/* Shaded opportunity zone */}
       {shadeD && <path d={shadeD} fill="#EDE9FE" opacity="0.5" />}
 
-      {/* Goal dashed line — solid, no dotted axis line */}
-      <line x1={padL} y1={sy(70)} x2={padL + plotW} y2={sy(70)} stroke="#A100FF" strokeWidth="1.5" strokeDasharray="6,4" />
-      <text x={padL + plotW + 4} y={sy(70)} dominantBaseline="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#A100FF', fontFamily: 'Inter,sans-serif' }}>70</text>
-
-      {/* The curve */}
+      {/* The curve — no horizontal dashed axis line */}
       <path d={pathD} fill="none" stroke="#A100FF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
 
-      {/* Authority dot (green) */}
+      {/* Authority dot (green — matches Authority legend) */}
       <g onMouseEnter={() => setHov('auth')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
         <circle cx={authPX} cy={authPY} r={14} fill="#10B981" />
         {hov === 'auth' && <><rect x={authPX + 16} y={authPY - 22} width={130} height={40} rx={6} fill="#1F2937" /><text x={authPX + 81} y={authPY - 8} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: 'white', fontFamily: 'Inter,sans-serif' }}>Authority (80)</text><text x={authPX + 81} y={authPY + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO Score: 80</text></>}
@@ -817,12 +813,12 @@ function SCurveImage7({ score, brand }: { score: number; brand: string }) {
         <text x={authPX} y={authPY - 20} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#10B981', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>Authority (80)</text>
       </g>
 
-      {/* Goal dot (orange/amber) */}
+      {/* Goal dot — Leader blue (#1E88E5) to match Leader legend */}
       <g onMouseEnter={() => setHov('goal')} onMouseLeave={() => setHov(null)} style={{ cursor: 'pointer' }}>
-        <circle cx={goalPX} cy={goalPY} r={14} fill="#F59E0B" />
+        <circle cx={goalPX} cy={goalPY} r={14} fill="#1E88E5" />
         {hov === 'goal' && <><rect x={goalPX + 16} y={goalPY - 22} width={120} height={40} rx={6} fill="#1F2937" /><text x={goalPX + 76} y={goalPY - 8} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: 'white', fontFamily: 'Inter,sans-serif' }}>Goal (70)</text><text x={goalPX + 76} y={goalPY + 8} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>GEO Score: 70</text></>}
         <text x={goalPX} y={goalPY} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 8, fontWeight: 800, fill: 'white', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>70</text>
-        <text x={goalPX} y={goalPY - 20} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#D97706', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>Goal (70)</text>
+        <text x={goalPX} y={goalPY - 20} textAnchor="middle" style={{ fontSize: 10, fontWeight: 700, fill: '#1E88E5', fontFamily: 'Inter,sans-serif', pointerEvents: 'none' }}>Goal (70)</text>
       </g>
 
       {/* You dot (purple) */}
@@ -1268,13 +1264,11 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,alignItems:'stretch',maxHeight:'calc(100vh - 280px)',overflow:'hidden'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px',display:'flex',flexDirection:'column' as const,overflow:'hidden'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,alignItems:'start'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px'}}>
                       <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',marginBottom:1}}>Product Feature Positioning</div>
                       <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:1}}>Same product categories as the Sankey diagram.</div>
-                      <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center',minHeight:0}}>
-                        <RadarChart result={result}/>
-                      </div>
+                      <RadarChart result={result}/>
                     </div>
                     <SentimentHeatmap result={result}/>
                   </div>
