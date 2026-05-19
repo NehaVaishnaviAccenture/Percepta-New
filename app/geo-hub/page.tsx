@@ -1,3 +1,5 @@
+// v2.1.0: loading page, success and failure states, minor edits to initial search page
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -670,7 +672,7 @@ function MarkdownText({ text }: { text:string }) {
       if (p.startsWith('*') && p.endsWith('*') && p.length > 2)
         return <em key={j} style={{fontStyle:'italic',color:'#374151'}}>{p.slice(1,-1)}</em>;
       if (p.startsWith('`') && p.endsWith('`'))
-        return <code key={j} style={{background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.85em',fontFamily:'monospace',color:'#7C3AED'}}>{p.slice(1,-1)}</code>;
+        return <code key={j} style={{background:'#F3F4F6',borderRadius:4,padding:'1px 6px',fontSize:'0.85em',fontFamily:"'DM Mono','JetBrains Mono',monospace",color:'#7C3AED'}}>{p.slice(1,-1)}</code>;
       return p;
     });
   };
@@ -994,12 +996,15 @@ export default function GeoHub() {
   const [highlightedBubble,setHighlightedBubble]=useState<string|null>(null);
   const [d3ScopeSelected,setD3ScopeSelected]=useState('General');
   const [d3ShowCustomScope,setD3ShowCustomScope]=useState(false);
+  const [elapsedSec,setElapsedSec]=useState(0);
+  const [analysisError,setAnalysisError]=useState<{title:string;code:string;message:string;reduceDesc:string}|null>(null);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
+  useEffect(()=>{if(loading){setElapsedSec(0);const t=setInterval(()=>setElapsedSec(s=>s+1),1000);return()=>clearInterval(t);}}, [loading]);
 
   async function runAnalysis(){
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
-    setError('');setLoading(true);setLoadingStep(0);setLoadingProgress(0);
+    setError('');setAnalysisError(null);setLoading(true);setLoadingStep(0);setLoadingProgress(0);
     const steps = [
       {step:0, progress:5,  delay:200},
       {step:1, progress:12, delay:1500},
@@ -1021,11 +1026,27 @@ export default function GeoHub() {
       timers.forEach(t=>clearTimeout(t));
       setLoadingProgress(100);
       await new Promise(r=>setTimeout(r,400));
-      if(data.error)setError(data.error);
-      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      if(data.error){
+        const msg:string=data.error||'';
+        const status:number=res.status;
+        if(status===429||msg.includes('429')||msg.toLowerCase().includes('rate')){
+          setAnalysisError({title:'Rate limit reached',code:'429 Too Many Requests',message:'The API rate limit was hit. This usually resolves within 1–2 minutes. Retrying with fewer prompts will help.',reduceDesc:'Fewer prompts sends fewer API requests, which is less likely to trigger rate limiting.'});
+        } else if(status===408||msg.toLowerCase().includes('timeout')){
+          setAnalysisError({title:'Analysis timed out',code:'408 Request Timeout',message:'The OpenAI model exceeded the response time limit. This can happen during high load periods. Wait a minute and try again.',reduceDesc:'Fewer prompts means a shorter run time, which is less likely to hit the timeout threshold.'});
+        } else {
+          setAnalysisError({title:'Analysis couldn\'t complete',code:`${status||503} Service Unavailable`,message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
+        }
+      } else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
-      setError(e.message);
+      const msg:string=e.message||'';
+      if(msg.toLowerCase().includes('network')||msg.toLowerCase().includes('fetch')){
+        setAnalysisError({title:'Connection failed',code:'ERR_NETWORK_CHANGED',message:'The connection to the analysis engine was interrupted. Check your internet connection and try again.',reduceDesc:'A shorter run is less likely to be interrupted by a brief connection issue.'});
+      } else if(msg.toLowerCase().includes('timeout')){
+        setAnalysisError({title:'Analysis timed out',code:'408 Request Timeout',message:'The OpenAI model exceeded the response time limit. This can happen during high load periods. Wait a minute and try again.',reduceDesc:'Fewer prompts means a shorter run time, which is less likely to hit the timeout threshold.'});
+      } else {
+        setAnalysisError({title:'Analysis couldn\'t complete',code:'503 Service Unavailable',message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
+      }
     }
     setLoading(false);
   }
@@ -1050,10 +1071,10 @@ export default function GeoHub() {
   const examplePrompts=result?.ind_key==='fin'?['Compare invite-only credit cards for high net worth individuals','What is the best credit card for someone who travels internationally?','Which bank offers the best rewards for small business owners?','Best first credit card for someone with no credit history','Compare Chase Sapphire Reserve vs Capital One Venture X for travel']:result?.ind_key==='auto'?['Best electric vehicle for long road trips','Most reliable SUV for families','Compare Tesla Model 3 vs BMW i4','Best car for first-time buyers under $30,000','Which car brand has the best safety record?']:['What are the most trusted brands right now?','Best companies for customer service','Compare top brands for value and quality','Which companies are leading in innovation?','Best brands recommended by experts'];
 
   // ── D3 shell — initial search (pre-analysis) ──────────────────────────────
-  if (!result && !loading) {
-    const displayUrl = url.replace(/^https?:\/\/(www\.)?/,'');
+  if (!result && !loading && !analysisError) {
+    const displayUrl = url.replace(/^https?:\/\//, '');
     const scopeVisible = displayUrl.length > 2;
-    const cleaned = displayUrl.split('.')[0].toLowerCase();
+    const cleaned = displayUrl.replace(/^www\./, '').split('.')[0].toLowerCase();
     const knownDomains: Record<string,string> = {
       'bankofamerica':'Financial Services detected','bofa':'Financial Services detected',
       'chase':'Financial Services detected','wellsfargo':'Financial Services detected',
@@ -1084,7 +1105,7 @@ export default function GeoHub() {
 
     return (
       <>
-        <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+        <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}} #d3url::placeholder{font-style:italic;}`}</style>
         <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
 
           {/* ── Sidebar ── */}
@@ -1149,7 +1170,8 @@ export default function GeoHub() {
 
                 {/* Eyebrow */}
                 <div style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
-                  Percepta GEO · Powered by Accenture
+                  Percepta GEO 
+                  {/* · Powered by Accenture */}
                 </div>
 
                 {/* Headline */}
@@ -1165,12 +1187,13 @@ export default function GeoHub() {
                 {/* URL input + run button */}
                 <div style={{display:'flex',width:'100%'}}>
                   <input
+                    id="d3url"
                     type="text"
                     value={displayUrl}
-                    onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl(v?'https://www.'+v:'');}}
+                    onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl(v?'https://'+v:'');}}
                     onKeyDown={e=>e.key==='Enter'&&runAnalysis()}
                     placeholder="e.g. firstmeridian.com"
-                    style={{flex:1,background:'#FFFFFF',border:'1px solid #D0D0DC',borderRight:'none',color:'#0A0A0F',fontFamily:"'JetBrains Mono',monospace",fontSize:13,padding:'0 16px',height:48,outline:'none'}}
+                    style={{flex:1,background:'#FFFFFF',border:'1px solid #D0D0DC',borderRight:'none',color:'#0A0A0F',fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:13,padding:'0 16px',height:48,outline:'none'}}
                   />
                   <button
                     onClick={runAnalysis}
@@ -1185,7 +1208,7 @@ export default function GeoHub() {
                 <div style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
                     <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
-                    <div style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
+                    <div style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
                       <span style={{width:5,height:5,borderRadius:'50%',background:'#00C853',flexShrink:0,display:'inline-block'}}/>
                       {detectedIndustry}
                     </div>
@@ -1214,7 +1237,7 @@ export default function GeoHub() {
                 <div style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
                   <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
                     <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Analysis depth</div>
-                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
+                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
                       {promptCount.toLocaleString()} prompts selected
                     </div>
                   </div>
@@ -1224,13 +1247,13 @@ export default function GeoHub() {
                       return (
                         <div key={opt.count} onClick={()=>{setPromptCount(opt.count);setPromptCountSelected(true);setPromptCountErr('');}} style={{flex:1,background:sel?'rgba(161,0,255,0.06)':'#F7F7F9',border:`1px solid ${sel?'#A100FF':'#E4E4EC'}`,padding:'10px 12px',cursor:'pointer',textAlign:'left' as const,display:'flex',flexDirection:'column' as const}}>
                           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:3}}>
-                            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:500,color:sel?'#A100FF':'#3D3D50',lineHeight:1}}>
+                            <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:16,fontWeight:500,color:sel?'#A100FF':'#3D3D50',lineHeight:1}}>
                               {opt.count>=1000?'1k':opt.count}
                             </div>
                             <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase' as const,color:'#A100FF',opacity:sel&&opt.rec?1:0}}>Rec.</div>
                           </div>
                           <div style={{fontSize:10,color:'#7A7A90',marginBottom:8,fontFamily:'Inter,sans-serif'}}>{opt.name}</div>
-                          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:sel?'rgba(161,0,255,0.45)':'#B8B8CC',paddingTop:8,borderTop:`1px solid ${sel?'rgba(161,0,255,0.15)':'#E4E4EC'}`}}>{opt.time}</div>
+                          <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,color:sel?'rgba(161,0,255,0.45)':'#B8B8CC',paddingTop:8,borderTop:`1px solid ${sel?'rgba(161,0,255,0.15)':'#E4E4EC'}`}}>{opt.time}</div>
                         </div>
                       );
                     })}
@@ -1241,11 +1264,325 @@ export default function GeoHub() {
                 {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',width:'100%',fontFamily:'Inter,sans-serif'}}>{error}</div>}
 
                 {/* Hint */}
-                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
+                <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
                   Accepts any URL format<br/>
                   bofa.com · www.bankofamerica.com · https://www.bankofamerica.com/
                 </div>
 
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── D3 shell — failure state ──────────────────────────────────────────────
+  if (!result && !loading && analysisError) {
+    const cleanDomain = url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
+    const cleanedKey = cleanDomain.replace(/^www\./,'').split('.')[0].toLowerCase();
+    const brandNames: Record<string,string> = {
+      'bankofamerica':'Bank of America','bofa':'Bank of America','chase':'Chase','wellsfargo':'Wells Fargo',
+      'capitalone':'Capital One','americanexpress':'American Express','amex':'American Express',
+      'firstmeridian':'First Meridian','citi':'Citi','usbank':'U.S. Bank',
+      'google':'Google','microsoft':'Microsoft','apple':'Apple','amazon':'Amazon',
+      'marriott':'Marriott','hilton':'Hilton','target':'Target','walmart':'Walmart',
+    };
+    const brandLabel = brandNames[cleanedKey] || cleanDomain;
+    const sbIcon = (active=false): React.CSSProperties => ({
+      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
+      color:active?'#A100FF':'rgba(255,255,255,0.12)',background:active?'rgba(161,0,255,0.12)':'transparent',
+    });
+    return (
+      <>
+        <style>{`@keyframes d3fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
+        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+          {/* Sidebar */}
+          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:11,color:'#fff',marginBottom:20,fontFamily:"'Space Grotesk',sans-serif"}}>P</div>
+            <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
+            <div style={sbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
+            <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
+            <div style={{marginTop:'auto'}}><div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div></div>
+          </aside>
+          {/* Content column */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+            {/* Topbar */}
+            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:'rgba(255,255,255,0.35)',fontFamily:'Inter,sans-serif'}}>
+                <span>{brandLabel}</span>
+                <span style={{color:'rgba(255,255,255,0.15)'}}>/</span>
+                <span style={{color:'rgba(255,255,255,0.75)',fontWeight:500}}>Analysis Failed</span>
+              </div>
+              <div style={{marginLeft:'auto'}}>
+                <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,color:'#E03131',background:'rgba(224,49,49,0.10)',border:'1px solid rgba(224,49,49,0.20)',padding:'3px 10px'}}>✕ Analysis failed</span>
+              </div>
+            </div>
+            {/* Greyed report nav */}
+            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,pointerEvents:'none',opacity:0.3}}>
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
+                <div key={t} style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:'0 14px',display:'flex',alignItems:'center',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif'}}>{t}</div>
+              ))}
+            </div>
+            {/* White canvas */}
+            <div style={{flex:1,background:'#FFFFFF',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',padding:'40px 24px'}}>
+              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(#E4E4EC 1px,transparent 1px),linear-gradient(90deg,#E4E4EC 1px,transparent 1px)',backgroundSize:'40px 40px',opacity:0.5,pointerEvents:'none'}}/>
+              {/* Failure card */}
+              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both'}}>
+                {/* Dark header */}
+                <div style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
+                  <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(224,49,49,0.12)',border:'1px solid rgba(224,49,49,0.25)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#E03131" strokeWidth="2">
+                      <circle cx="9" cy="9" r="8"/>
+                      <line x1="9" y1="5.5" x2="9" y2="10"/>
+                      <circle cx="9" cy="12.5" r="0.8" fill="#E03131" stroke="none"/>
+                    </svg>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.01em',marginBottom:3}}>{analysisError.title}</div>
+                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.3)'}}>{cleanDomain} · {d3ScopeSelected} · {promptCount.toLocaleString()} prompts</div>
+                  </div>
+                </div>
+                {/* White body */}
+                <div style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
+                  {/* What happened */}
+                  <div>
+                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:10,fontFamily:'Inter,sans-serif'}}>What happened</div>
+                    <div style={{background:'#F7F7F9',border:'1px solid #E4E4EC',borderLeft:'2px solid #E03131',padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
+                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'#E03131'}}>{analysisError.code}</div>
+                      <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.55,marginTop:2,fontFamily:'Inter,sans-serif'}}>{analysisError.message}</div>
+                    </div>
+                  </div>
+                  {/* v1 transparency note */}
+                  <div style={{display:'flex',gap:10,padding:'10px 12px',background:'rgba(161,0,255,0.08)',border:'1px solid rgba(161,0,255,0.22)'}}>
+                    <div style={{flexShrink:0,marginTop:1}}>
+                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#A100FF" strokeWidth="1.5"><circle cx="8" cy="8" r="7"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r="0.6" fill="#A100FF" stroke="none"/></svg>
+                    </div>
+                    <div style={{fontSize:11,color:'#3D3D50',lineHeight:1.55,fontFamily:'Inter,sans-serif'}}>
+                      <strong style={{color:'#0A0A0F'}}>Percepta GEO v1</strong> uses OpenAI GPT-4o for all analysis. A single engine failure cancels the entire scan — partial results are not available in this version.
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:2,fontFamily:'Inter,sans-serif'}}>What you can do</div>
+                    {/* Try again */}
+                    <div onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
+                      <div style={{width:30,height:30,background:'rgba(161,0,255,0.12)',border:'1px solid rgba(161,0,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#A100FF" strokeWidth="1.5"><path d="M12 7A5 5 0 1 1 7 2"/><polyline points="12,2 12,7 7,7"/></svg>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Try again</div>
+                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Most failures are temporary. Retrying usually resolves within a minute.</div>
+                      </div>
+                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                    </div>
+                    {/* Retry with fewer prompts */}
+                    {promptCount > 50 && <div onClick={()=>{setPromptCount(Math.max(50,Math.floor(promptCount/2)));runAnalysis();}} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
+                      <div style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><polyline points="2,8 6,4 10,8"/><line x1="6" y1="4" x2="6" y2="12"/></svg>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Retry with fewer prompts</div>
+                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>{analysisError.reduceDesc}</div>
+                      </div>
+                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                    </div>}
+                    {/* Go to dashboard */}
+                    <div onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
+                      <div style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><path d="M2 6l5-4 5 4v6H2V6z"/></svg>
+                      </div>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Go to dashboard</div>
+                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Return home and try again later. Nothing was saved from this run.</div>
+                      </div>
+                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                    </div>
+                  </div>
+                  {/* Support note */}
+                  <div style={{fontSize:11,color:'#B8B8CC',textAlign:'center',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
+                    Seeing this repeatedly? <span style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>Contact support</span> or check <span style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>system status</span>.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // ── D3 shell — loading state ───────────────────────────────────────────────
+  if (!result && loading) {
+    const cleanDomain = url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
+    const cleanedKey = cleanDomain.replace(/^www\./, '').split('.')[0].toLowerCase();
+    const brandNames: Record<string,string> = {
+      'bankofamerica':'Bank of America','bofa':'Bank of America',
+      'chase':'Chase','wellsfargo':'Wells Fargo',
+      'capitalone':'Capital One','americanexpress':'American Express',
+      'amex':'American Express','firstmeridian':'First Meridian',
+      'citi':'Citi','usbank':'U.S. Bank',
+      'google':'Google','microsoft':'Microsoft',
+      'apple':'Apple','amazon':'Amazon',
+      'marriott':'Marriott','hilton':'Hilton',
+      'target':'Target','walmart':'Walmart',
+    };
+    const brandLabel = brandNames[cleanedKey] || cleanDomain;
+    const progressLabel = loadingProgress < 15 ? 'Initializing…' : loadingProgress < 45 ? 'Firing queries…' : loadingProgress < 80 ? 'Analysing responses…' : loadingProgress < 100 ? 'Calculating scores…' : 'Complete';
+    const elapsed = `${Math.floor(elapsedSec/60)}:${String(elapsedSec%60).padStart(2,'0')}`;
+
+    const sbIcon = (active=false): React.CSSProperties => ({
+      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
+      color:active?'#A100FF':'rgba(255,255,255,0.12)',
+      background:active?'rgba(161,0,255,0.12)':'transparent',
+    });
+
+    return (
+      <>
+        <style>{`
+          @keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}}
+          @keyframes d3spin{to{transform:rotate(360deg)}}
+          @keyframes d3shimmer{0%{transform:translateX(-80px);opacity:0}40%{opacity:1}100%{transform:translateX(80px);opacity:0}}
+          @keyframes d3indeterminate{0%{background-position:100% 0}100%{background-position:-100% 0}}
+        `}</style>
+        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+
+          {/* Sidebar */}
+          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:20}}>P</div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
+            </div>
+            <div style={sbIcon(true)}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
+            </div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg>
+            </div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg>
+            </div>
+            <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+              <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
+              <div style={sbIcon()}>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg>
+              </div>
+              <div style={sbIcon()}>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg>
+              </div>
+            </div>
+          </aside>
+
+          {/* Content column */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+
+            {/* Dark topbar */}
+            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
+                <span>Percepta GEO</span>
+                <span style={{color:'rgba(255,255,255,0.12)'}}>/</span>
+                <span style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
+              </div>
+              <div style={{marginLeft:'auto'}}>
+                <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',padding:'3px 10px'}}>{cleanDomain}</span>
+              </div>
+            </div>
+
+            {/* Report nav — greyed */}
+            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
+                <div key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
+              ))}
+            </div>
+
+            {/* White canvas */}
+            <div style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
+              {/* Grid */}
+              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.5) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
+
+              {/* Loading card */}
+              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
+
+                {/* Dark card header */}
+                <div style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
+                  <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,letterSpacing:'0.14em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.28)',marginBottom:5}}>Running analysis</div>
+                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
+                      <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:5,fontFamily:'Inter,sans-serif'}}>{d3ScopeSelected} · {promptCount.toLocaleString()} prompts · GPT-4o</div>
+                    </div>
+                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,padding:'4px 10px',whiteSpace:'nowrap' as const,flexShrink:0,display:'flex',alignItems:'center',gap:6,color:'#00D1C7',background:'rgba(0,209,199,0.10)',border:'1px solid rgba(0,209,199,0.20)'}}>
+                      <span style={{width:5,height:5,borderRadius:'50%',background:'currentColor',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
+                      Querying
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column' as const,gap:5}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <span style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
+                      <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#00D1C7'}}>{loadingProgress}%</span>
+                    </div>
+                    <div style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
+                      <div style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
+                        <div style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* White card body */}
+                <div style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
+
+                  {/* AI engine row */}
+                  <div>
+                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',fontFamily:'Inter,sans-serif',marginBottom:10}}>AI Engine</div>
+                    <div style={{display:'grid',gridTemplateColumns:'20px 110px 1fr 72px',alignItems:'center',gap:12,padding:'8px 0'}}>
+                      <div style={{width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        {loadingProgress>=100
+                          ?<div style={{width:16,height:16,borderRadius:'50%',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.5"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+                          :<div style={{width:14,height:14,border:'1.5px solid #D0D0DC',borderTopColor:'#A100FF',borderRadius:'50%',animation:'d3spin 0.8s linear infinite'}}/>
+                        }
+                      </div>
+                      <div style={{fontSize:12,fontWeight:500,color:'#3D3D50',fontFamily:'Inter,sans-serif'}}>GPT-4o</div>
+                      <div style={{flex:1}}>
+                        <div style={{height:3,background:'#F0F0F4',overflow:'hidden'}}>
+                          {loadingProgress>=100
+                            ?<div style={{height:'100%',background:'#00C853',width:'100%'}}/>
+                            :<div style={{height:'100%',width:'100%',background:'linear-gradient(90deg,#E8E8EE,#A100FF,#E8E8EE)',backgroundSize:'200% 100%',animation:'d3indeterminate 1.4s ease-in-out infinite'}}/>
+                          }
+                        </div>
+                      </div>
+                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,textAlign:'right' as const,whiteSpace:'nowrap' as const,color:loadingProgress>=100?'#00C853':'#A100FF'}}>
+                        {loadingProgress>=100?'Done':'Querying…'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Percepta GEO V1 info block */}
+                  <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(161,0,255,0.05)',border:'1px solid rgba(161,0,255,0.18)'}}>
+                    <div style={{width:18,height:18,borderRadius:'50%',background:'rgba(161,0,255,0.15)',border:'1px solid rgba(161,0,255,0.30)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
+                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><line x1="5" y1="2" x2="5" y2="5.5" stroke="#A100FF" strokeWidth="2"/><circle cx="5" cy="7.5" r="0.7" fill="#A100FF"/></svg>
+                    </div>
+                    <div>
+                      <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#A100FF',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
+                      <div style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
+                        This analysis runs on <strong style={{color:'#0A0A0F'}}>OpenAI GPT-4o</strong> and models AI visibility patterns across major search engines. <strong style={{color:'#0A0A0F'}}>Multi-engine analysis</strong> — querying ChatGPT, Gemini, Perplexity, and Claude directly — is planned for v2.
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Elapsed */}
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <span style={{fontSize:11,color:'#B8B8CC',fontFamily:'Inter,sans-serif'}}>Elapsed</span>
+                    <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#7A7A90'}}>{elapsed}</span>
+                  </div>
+
+                  {/* Nav warning */}
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#F5A623" strokeWidth="1.5" style={{flexShrink:0}}><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.7" fill="#F5A623" stroke="none"/></svg>
+                    Leaving this page will cancel the analysis. Results are not saved until complete.
+                  </div>
+
+                </div>
               </div>
             </div>
           </div>
@@ -1355,8 +1692,7 @@ export default function GeoHub() {
             <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
             <div style={{display:'flex',gap:12,alignItems:'center'}}>
               <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #E5E7EB',borderRadius:12,background:'white',overflow:'hidden',height:52}}>
-                <span style={{padding:'0 0 0 20px',fontSize:'0.95rem',color:'#9CA3AF',flexShrink:0,fontWeight:500}}>https://www.</span>
-                <input type="text" value={url.replace(/^https?:\/\/(www\.)?/,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl('https://www.'+v);}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 12px 14px 4px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
+                <input type="text" value={url.replace(/^https?:\/\//,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl(v?'https://'+v:'');}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 20px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
               </div>
               <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>🔍 {loading?'Analysing...':'Run Live AI Analysis'}</button>
             </div>
