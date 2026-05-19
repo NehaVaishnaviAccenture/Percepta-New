@@ -992,6 +992,8 @@ export default function GeoHub() {
   const [promptCountSelected,setPromptCountSelected]=useState(true);
   // CHANGE: highlighted bubble connections
   const [highlightedBubble,setHighlightedBubble]=useState<string|null>(null);
+  const [d3ScopeSelected,setD3ScopeSelected]=useState('General');
+  const [d3ShowCustomScope,setD3ShowCustomScope]=useState(false);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
 
@@ -1046,6 +1048,211 @@ export default function GeoHub() {
   }
 
   const examplePrompts=result?.ind_key==='fin'?['Compare invite-only credit cards for high net worth individuals','What is the best credit card for someone who travels internationally?','Which bank offers the best rewards for small business owners?','Best first credit card for someone with no credit history','Compare Chase Sapphire Reserve vs Capital One Venture X for travel']:result?.ind_key==='auto'?['Best electric vehicle for long road trips','Most reliable SUV for families','Compare Tesla Model 3 vs BMW i4','Best car for first-time buyers under $30,000','Which car brand has the best safety record?']:['What are the most trusted brands right now?','Best companies for customer service','Compare top brands for value and quality','Which companies are leading in innovation?','Best brands recommended by experts'];
+
+  // ── D3 shell — initial search (pre-analysis) ──────────────────────────────
+  if (!result && !loading) {
+    const displayUrl = url.replace(/^https?:\/\/(www\.)?/,'');
+    const scopeVisible = displayUrl.length > 2;
+    const cleaned = displayUrl.split('.')[0].toLowerCase();
+    const knownDomains: Record<string,string> = {
+      'bankofamerica':'Financial Services detected','bofa':'Financial Services detected',
+      'chase':'Financial Services detected','wellsfargo':'Financial Services detected',
+      'capitalone':'Financial Services detected','americanexpress':'Financial Services detected',
+      'amex':'Financial Services detected','firstmeridian':'Financial Services detected',
+      'citi':'Financial Services detected','usbank':'Financial Services detected',
+      'google':'Technology detected','microsoft':'Technology detected',
+      'apple':'Technology detected','amazon':'E-Commerce / Cloud detected',
+      'marriott':'Hospitality detected','hilton':'Hospitality detected',
+      'target':'Retail detected','walmart':'Retail detected',
+    };
+    const detectedIndustry = knownDomains[cleaned] || 'Detecting industry…';
+
+    const SCOPE_PILLS = ['General','Credit Cards','Mortgages','Retail Banking','Wealth Management','Auto Loans','Small Business'];
+    const PROMPT_OPTS = [
+      {count:50,  name:'Quick',    time:'~30 sec', rec:false},
+      {count:100, name:'Standard', time:'~1 min',  rec:true},
+      {count:300, name:'Deep',     time:'~3 min',  rec:false},
+      {count:500, name:'Thorough', time:'~5 min',  rec:false},
+      {count:1000,name:'Extended', time:'~10 min', rec:false},
+    ];
+
+    const sbIcon = (active=false): React.CSSProperties => ({
+      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
+      color:active?'#A100FF':'rgba(255,255,255,0.12)',
+      background:active?'rgba(161,0,255,0.12)':'transparent',
+    });
+
+    return (
+      <>
+        <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
+        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+
+          {/* ── Sidebar ── */}
+          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:20}}>P</div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
+            </div>
+            <div style={sbIcon(true)}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
+            </div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg>
+            </div>
+            <div style={sbIcon()}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg>
+            </div>
+            <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+              <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
+              <div style={sbIcon()}>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg>
+              </div>
+              <div style={sbIcon()}>
+                <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg>
+              </div>
+            </div>
+          </aside>
+
+          {/* ── Content column ── */}
+          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+
+            {/* Dark topbar */}
+            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
+                <span>Percepta GEO</span>
+                <span style={{color:'rgba(255,255,255,0.12)'}}>/</span>
+                <span style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
+              </div>
+              <div style={{marginLeft:'auto'}}>
+                <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase' as const,color:'#00D1C7',background:'rgba(0,209,199,0.08)',border:'1px solid rgba(0,209,199,0.18)',padding:'3px 8px',fontFamily:'Inter,sans-serif'}}>
+                  <span style={{width:5,height:5,borderRadius:'50%',background:'#00D1C7',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
+                  Live
+                </span>
+              </div>
+            </div>
+
+            {/* Report nav — greyed/locked */}
+            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
+                <div key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
+              ))}
+            </div>
+
+            {/* ── White canvas ── */}
+            <div style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px',position:'relative'}}>
+
+              {/* Grid texture */}
+              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.55) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.55) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
+
+              {/* Scan content */}
+              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:540,display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
+
+                {/* Eyebrow */}
+                <div style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
+                  Percepta GEO · Powered by Accenture
+                </div>
+
+                {/* Headline */}
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:30,fontWeight:500,color:'#0A0A0F',letterSpacing:'-0.03em',textAlign:'center',lineHeight:1.1}}>
+                  How does AI <span style={{color:'#A100FF'}}>see</span> your brand<span style={{color:'#A100FF'}}>?</span>
+                </div>
+
+                {/* Sub */}
+                <div style={{fontSize:13,color:'#7A7A90',textAlign:'center',maxWidth:400,lineHeight:1.65,fontFamily:'Inter,sans-serif'}}>
+                  Enter any brand URL to get a full GEO analysis across visibility, prominence, sentiment, citations, and share of voice.
+                </div>
+
+                {/* URL input + run button */}
+                <div style={{display:'flex',width:'100%'}}>
+                  <input
+                    type="text"
+                    value={displayUrl}
+                    onChange={e=>{const v=e.target.value.replace(/^https?:\/\/(www\.)?/,'').replace(/^www\./,'');setUrl(v?'https://www.'+v:'');}}
+                    onKeyDown={e=>e.key==='Enter'&&runAnalysis()}
+                    placeholder="e.g. firstmeridian.com"
+                    style={{flex:1,background:'#FFFFFF',border:'1px solid #D0D0DC',borderRight:'none',color:'#0A0A0F',fontFamily:"'JetBrains Mono',monospace",fontSize:13,padding:'0 16px',height:48,outline:'none'}}
+                  />
+                  <button
+                    onClick={runAnalysis}
+                    disabled={loading}
+                    style={{background:'#A100FF',color:'white',border:'none',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,padding:'0 24px',height:48,cursor:'pointer',whiteSpace:'nowrap' as const,flexShrink:0}}
+                  >
+                    Run Analysis →
+                  </button>
+                </div>
+
+                {/* Scope — contextual reveal after URL typed */}
+                <div style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
+                    <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
+                    <div style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
+                      <span style={{width:5,height:5,borderRadius:'50%',background:'#00C853',flexShrink:0,display:'inline-block'}}/>
+                      {detectedIndustry}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
+                    {SCOPE_PILLS.map(pill=>{
+                      const sel=d3ScopeSelected===pill;
+                      return (
+                        <div key={pill} onClick={()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}} style={{background:sel?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px solid ${sel?'#A100FF':'#D0D0DC'}`,color:sel?'#A100FF':'#3D3D50',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const}}>
+                          {pill}
+                        </div>
+                      );
+                    })}
+                    <div onClick={()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}} style={{background:d3ScopeSelected==='+ Custom'?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px ${d3ScopeSelected==='+ Custom'?'solid':'dashed'} ${d3ScopeSelected==='+ Custom'?'#A100FF':'#D0D0DC'}`,color:d3ScopeSelected==='+ Custom'?'#A100FF':'#B8B8CC',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const}}>
+                      + Custom
+                    </div>
+                  </div>
+                  {d3ShowCustomScope&&(
+                    <div style={{marginTop:8}}>
+                      <input type="text" placeholder="Describe the product or service you want to analyze…" style={{width:'100%',background:'#FFFFFF',border:'1px dashed #D0D0DC',color:'#0A0A0F',fontFamily:'Inter,sans-serif',fontSize:12,padding:'0 12px',height:36,outline:'none'}}/>
+                    </div>
+                  )}
+                </div>
+
+                {/* Prompt count / analysis depth cards */}
+                <div style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
+                  <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
+                    <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Analysis depth</div>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
+                      {promptCount.toLocaleString()} prompts selected
+                    </div>
+                  </div>
+                  <div style={{display:'flex',gap:8}}>
+                    {PROMPT_OPTS.map(opt=>{
+                      const sel=promptCount===opt.count;
+                      return (
+                        <div key={opt.count} onClick={()=>{setPromptCount(opt.count);setPromptCountSelected(true);setPromptCountErr('');}} style={{flex:1,background:sel?'rgba(161,0,255,0.06)':'#F7F7F9',border:`1px solid ${sel?'#A100FF':'#E4E4EC'}`,padding:'10px 12px',cursor:'pointer',textAlign:'left' as const,display:'flex',flexDirection:'column' as const}}>
+                          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:3}}>
+                            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:16,fontWeight:500,color:sel?'#A100FF':'#3D3D50',lineHeight:1}}>
+                              {opt.count>=1000?'1k':opt.count}
+                            </div>
+                            <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase' as const,color:'#A100FF',opacity:sel&&opt.rec?1:0}}>Rec.</div>
+                          </div>
+                          <div style={{fontSize:10,color:'#7A7A90',marginBottom:8,fontFamily:'Inter,sans-serif'}}>{opt.name}</div>
+                          <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:sel?'rgba(161,0,255,0.45)':'#B8B8CC',paddingTop:8,borderTop:`1px solid ${sel?'rgba(161,0,255,0.15)':'#E4E4EC'}`}}>{opt.time}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Error */}
+                {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',width:'100%',fontFamily:'Inter,sans-serif'}}>{error}</div>}
+
+                {/* Hint */}
+                <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
+                  Accepts any URL format<br/>
+                  bofa.com · www.bankofamerica.com · https://www.bankofamerica.com/
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
