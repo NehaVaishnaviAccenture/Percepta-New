@@ -1,5 +1,5 @@
-import { ClerkProvider } from '@clerk/nextjs'
-import { currentUser } from '@clerk/nextjs/server'
+// import { ClerkProvider } from '@clerk/nextjs'
+// import { currentUser } from '@clerk/nextjs/server'
 import './globals.css';
 import Link from 'next/link';
 
@@ -10,10 +10,10 @@ const navItems = [
 ];
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const user = await currentUser();
+  // const user = await currentUser();
 
   return (
-    <ClerkProvider>
+    // <ClerkProvider>
       <html lang="en">
         <body>
           <nav style={{
@@ -57,28 +57,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </Link>
               ))}
             </div>
-          {user && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>
-                  {user.emailAddresses[0]?.emailAddress}
-                </span>
-                <a href="/sign-out" style={{
-                  fontSize: '0.82rem',
-                  color: '#7C3AED',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  background: '#EDE9FE',
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                }}>
-                  Sign Out
-                </a>
-              </div>
-            )}
           </nav>
           {children}
         </body>
       </html>
-    </ClerkProvider>
+    // </ClerkProvider>
   );
 }
