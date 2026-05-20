@@ -1,8 +1,8 @@
-// v2.1.0: loading page, success and failure states, minor edits to initial search page
+// v2.2.0: overview page, geo score overall page, initial tab formatting
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 const bands = [
   { bg: '#E8F5E9', border: '#43A047', color: '#43A047', range: '80-100', label: 'Excellent', desc: 'Well optimized for AI citation' },
@@ -52,7 +52,14 @@ function getRadarTip(label: string): string {
   return `How often your brand appears in AI responses for ${label.toLowerCase()} queries.`;
 }
 
-const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt','FAQ'];
+const TOP_TABS = [
+  {label:'Overview',subs:[]},
+  {label:'GEO Score',subs:['Overall','Visibility','Sentiment','Prominence','Citation','Share of Voice']},
+  {label:'Competitors',subs:['Overall','By Topic']},
+  {label:'Prompts',subs:['Tested Prompts','Live Prompt']},
+  {label:'Trends',subs:[]},
+  {label:'Action Plan',subs:[]},
+];
 
 // CHANGE: Good band is now yellow #FDD835 everywhere
 function scoreBadge(s: number) {
@@ -60,6 +67,13 @@ function scoreBadge(s: number) {
   if (s >= 70) return { label: 'Good', color: '#F9A825', bg: '#FFFDE7' };
   if (s >= 45) return { label: 'Needs Work', color: '#FF7043', bg: '#FBE9E7' };
   return { label: 'Poor', color: '#F44336', bg: '#FFEBEE' };
+}
+function geoTier(s:number){
+  if(s>=80) return {label:'Authority',  tier:5, text:'#14532D', fill:'#86EFAC'};
+  if(s>=65) return {label:'Leader',     tier:4, text:'#1E40AF', fill:'#93C5FD'};
+  if(s>=45) return {label:'Competitive',tier:3, text:'#92400E', fill:'#FCD34D'};
+  if(s>=26) return {label:'Emerging',   tier:2, text:'#9A3412', fill:'#FDBA74'};
+  return           {label:'Fragmented', tier:1, text:'#991B1B', fill:'#FCA5A5'};
 }
 
 function classifyDomain(d: string) {
@@ -971,7 +985,10 @@ export default function GeoHub() {
   const [loadingProgress,setLoadingProgress]=useState(0);
   const [result,setResult]=useState<any>(null);
   const [error,setError]=useState('');
-  const [activeTab,setActiveTab]=useState(0);
+  const [activeParent,setActiveParent]=useState(0);
+  const [activeSub,setActiveSub]=useState(0);
+  const [hoverParent,setHoverParent]=useState<number|null>(null);
+  const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [promptInput,setPromptInput]=useState('');
   const [promptHistory,setPromptHistory]=useState<{q:string;a:string}[]>([]);
   const [promptLoading,setPromptLoading]=useState(false);
@@ -1036,7 +1053,7 @@ export default function GeoHub() {
         } else {
           setAnalysisError({title:'Analysis couldn\'t complete',code:`${status||503} Service Unavailable`,message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
         }
-      } else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      } else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveParent(0);setActiveSub(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
       const msg:string=e.message||'';
@@ -1106,36 +1123,40 @@ export default function GeoHub() {
     return (
       <>
         <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}} #d3url::placeholder{font-style:italic;}`}</style>
-        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-scan-form" style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
 
           {/* ── Sidebar ── */}
-          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:20}}>P</div>
-            <div style={sbIcon()}>
+          <aside id="scan-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div id="sb-logo" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8}}>P</div>
+            <div id="sb-new-analysis" title="New Analysis" onClick={()=>{setAnalysisError(null);setLoading(false);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+            </div>
+            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
+            <div id="sb-home" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
             </div>
-            <div style={sbIcon(true)}>
+            <div id="sb-reports" style={sbIcon(true)}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
             </div>
-            <div style={sbIcon()}>
+            <div id="sb-trends" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg>
             </div>
-            <div style={sbIcon()}>
+            <div id="sb-account" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg>
             </div>
             <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
               <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
-              <div style={sbIcon()}>
+              <div id="sb-user" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg>
               </div>
-              <div style={sbIcon()}>
+              <div id="sb-logout" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg>
               </div>
             </div>
           </aside>
 
           {/* ── Content column ── */}
-          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="scan-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
 
             {/* Dark topbar */}
             <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
@@ -1166,7 +1187,7 @@ export default function GeoHub() {
               <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.55) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.55) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
 
               {/* Scan content */}
-              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:540,display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
+              <div id="scan-card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:540,display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
 
                 {/* Eyebrow */}
                 <div style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
@@ -1196,6 +1217,7 @@ export default function GeoHub() {
                     style={{flex:1,background:'#FFFFFF',border:'1px solid #D0D0DC',borderRight:'none',color:'#0A0A0F',fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:13,padding:'0 16px',height:48,outline:'none'}}
                   />
                   <button
+                    id="scan-submit-btn"
                     onClick={runAnalysis}
                     disabled={loading}
                     style={{background:'#A100FF',color:'white',border:'none',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,padding:'0 24px',height:48,cursor:'pointer',whiteSpace:'nowrap' as const,flexShrink:0}}
@@ -1205,7 +1227,7 @@ export default function GeoHub() {
                 </div>
 
                 {/* Scope — contextual reveal after URL typed */}
-                <div style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
+                <div id="scan-scope-section" style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
                     <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
                     <div style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
@@ -1234,7 +1256,7 @@ export default function GeoHub() {
                 </div>
 
                 {/* Prompt count / analysis depth cards */}
-                <div style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
+                <div id="scan-prompt-count-section" style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
                   <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
                     <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Analysis depth</div>
                     <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
@@ -1296,17 +1318,21 @@ export default function GeoHub() {
     return (
       <>
         <style>{`@keyframes d3fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
-        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-error" style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
           {/* Sidebar */}
-          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:11,color:'#fff',marginBottom:20,fontFamily:"'Space Grotesk',sans-serif"}}>P</div>
+          <aside id="error-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:11,color:'#fff',marginBottom:8,fontFamily:"'Space Grotesk',sans-serif"}}>P</div>
+            <div title="New Analysis" onClick={()=>setAnalysisError(null)} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+            </div>
+            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
             <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
             <div style={sbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
             <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
             <div style={{marginTop:'auto'}}><div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div></div>
           </aside>
           {/* Content column */}
-          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="error-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
             {/* Topbar */}
             <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
               <div style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:'rgba(255,255,255,0.35)',fontFamily:'Inter,sans-serif'}}>
@@ -1328,9 +1354,9 @@ export default function GeoHub() {
             <div style={{flex:1,background:'#FFFFFF',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',padding:'40px 24px'}}>
               <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(#E4E4EC 1px,transparent 1px),linear-gradient(90deg,#E4E4EC 1px,transparent 1px)',backgroundSize:'40px 40px',opacity:0.5,pointerEvents:'none'}}/>
               {/* Failure card */}
-              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both'}}>
+              <div id="error-card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both'}}>
                 {/* Dark header */}
-                <div style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
+                <div id="error-card-header" style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
                   <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(224,49,49,0.12)',border:'1px solid rgba(224,49,49,0.25)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#E03131" strokeWidth="2">
                       <circle cx="9" cy="9" r="8"/>
@@ -1344,9 +1370,9 @@ export default function GeoHub() {
                   </div>
                 </div>
                 {/* White body */}
-                <div style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
+                <div id="error-card-body" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
                   {/* What happened */}
-                  <div>
+                  <div id="error-what-happened">
                     <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:10,fontFamily:'Inter,sans-serif'}}>What happened</div>
                     <div style={{background:'#F7F7F9',border:'1px solid #E4E4EC',borderLeft:'2px solid #E03131',padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
                       <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'#E03131'}}>{analysisError.code}</div>
@@ -1363,10 +1389,10 @@ export default function GeoHub() {
                     </div>
                   </div>
                   {/* Actions */}
-                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  <div id="error-what-you-can-do" style={{display:'flex',flexDirection:'column',gap:8}}>
                     <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:2,fontFamily:'Inter,sans-serif'}}>What you can do</div>
                     {/* Try again */}
-                    <div onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
+                    <div id="error-action-retry" onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
                       <div style={{width:30,height:30,background:'rgba(161,0,255,0.12)',border:'1px solid rgba(161,0,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#A100FF" strokeWidth="1.5"><path d="M12 7A5 5 0 1 1 7 2"/><polyline points="12,2 12,7 7,7"/></svg>
                       </div>
@@ -1388,7 +1414,7 @@ export default function GeoHub() {
                       <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
                     </div>}
                     {/* Go to dashboard */}
-                    <div onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
+                    <div id="error-action-go-back" onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
                       <div style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><path d="M2 6l5-4 5 4v6H2V6z"/></svg>
                       </div>
@@ -1445,11 +1471,15 @@ export default function GeoHub() {
           @keyframes d3shimmer{0%{transform:translateX(-80px);opacity:0}40%{opacity:1}100%{transform:translateX(80px);opacity:0}}
           @keyframes d3indeterminate{0%{background-position:100% 0}100%{background-position:-100% 0}}
         `}</style>
-        <div style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-loading" style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
 
           {/* Sidebar */}
-          <aside style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:20}}>P</div>
+          <aside id="loading-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8}}>P</div>
+            <div title="New Analysis" onClick={()=>{setLoading(false);setAnalysisError(null);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
+            </div>
+            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
             <div style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
             </div>
@@ -1474,7 +1504,7 @@ export default function GeoHub() {
           </aside>
 
           {/* Content column */}
-          <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="loading-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
 
             {/* Dark topbar */}
             <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
@@ -1501,14 +1531,14 @@ export default function GeoHub() {
               <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.5) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
 
               {/* Loading card */}
-              <div style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
+              <div id="loading-panel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
 
                 {/* Dark card header */}
                 <div style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
                   <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
                     <div style={{flex:1}}>
                       <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,letterSpacing:'0.14em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.28)',marginBottom:5}}>Running analysis</div>
-                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
+                      <div id="loading-brand-name" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
                       <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:5,fontFamily:'Inter,sans-serif'}}>{d3ScopeSelected} · {promptCount.toLocaleString()} prompts · GPT-4o</div>
                     </div>
                     <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,padding:'4px 10px',whiteSpace:'nowrap' as const,flexShrink:0,display:'flex',alignItems:'center',gap:6,color:'#00D1C7',background:'rgba(0,209,199,0.10)',border:'1px solid rgba(0,209,199,0.20)'}}>
@@ -1521,8 +1551,8 @@ export default function GeoHub() {
                       <span style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
                       <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#00D1C7'}}>{loadingProgress}%</span>
                     </div>
-                    <div style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
-                      <div style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
+                    <div id="loading-progress-track" style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
+                      <div id="loading-progress-fill" style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
                         <div style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
                       </div>
                     </div>
@@ -1530,7 +1560,7 @@ export default function GeoHub() {
                 </div>
 
                 {/* White card body */}
-                <div style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
+                <div id="loading-steps-list" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
 
                   {/* AI engine row */}
                   <div>
@@ -1591,179 +1621,103 @@ export default function GeoHub() {
     );
   }
 
+  const rSbIcon = (active=false): React.CSSProperties => ({
+    width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
+    color:active?'#A100FF':'rgba(255,255,255,0.25)',background:active?'rgba(161,0,255,0.12)':'transparent',cursor:'pointer',
+  });
+  const geo = result?.overall_geo_score ?? 0;
+  const gBadge = scoreBadge(geo);
+
   return (
-    <main style={{minHeight:'100vh',background:'#F3F4F6'}}>
-      <div style={{background:'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)',padding:(loading||result)?'16px 40px':'64px 40px 72px',textAlign:'center',transition:'padding 0.3s ease'}}>
-        {!(loading||result)&&<>
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.4)',borderRadius:50,padding:'8px 24px',fontSize:'0.82rem',fontWeight:600,color:'white',marginBottom:32,background:'rgba(255,255,255,0.15)'}}>* &nbsp;Real Time GEO Scoring</div>
-          <h1 style={{fontSize:'3.6rem',fontWeight:900,color:'white',margin:'0 0 16px',letterSpacing:'-1.5px',lineHeight:1.1}}>GEO Scorecard</h1>
-          <p style={{fontSize:'1.1rem',color:'rgba(255,255,255,0.9)',margin:'0 0 20px'}}>Enter any brand URL  .  Discover your brand&apos;s AI presence</p>
-          <div style={{display:'inline-flex',alignItems:'center',gap:8,border:'1.5px solid rgba(255,255,255,0.3)',borderRadius:50,padding:'8px 22px',fontSize:'0.82rem',color:'rgba(255,255,255,0.8)',background:'rgba(255,255,255,0.12)'}}>Live data  .  Updated in real-time  .  Not cached like competitors</div>
-        </>}
-        {(loading||result)&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:'1.3rem',fontWeight:900,color:'white',letterSpacing:'-0.5px'}}>GEO Scorecard</span>
-            <span style={{fontSize:'0.72rem',color:'rgba(255,255,255,0.7)',background:'rgba(255,255,255,0.15)',borderRadius:50,padding:'3px 10px'}}>Real Time GEO Scoring</span>
-          </div>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:'0.75rem',color:'rgba(255,255,255,0.7)'}}>Live data</span>
-          </div>
-        </div>}
-      </div>
+    <div id="percepta-shell" style={{display:'flex',height:'calc(100vh - 58px)',overflow:'hidden',background:'#0F0F11'}}>
 
-      {!result?(
-        <div style={{padding: loading ? '16px 40px' : '48px 40px 60px'}}>
-          {!loading && <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:24,marginBottom:24}}>
-            {/* CHANGE: Good band uses yellow */}
-            {bands.map((b,i)=><div key={i} style={{background:b.bg,borderRadius:20,padding:'36px 28px',textAlign:'center',border:`1.5px solid ${b.border}`}}><div style={{fontSize:'0.85rem',fontWeight:700,color:b.color,marginBottom:8}}>{b.range}</div><div style={{fontSize:'1.8rem',fontWeight:900,color:b.color,marginBottom:8}}>{b.label}</div><div style={{fontSize:'0.85rem',color:b.color,lineHeight:1.5}}>{b.desc}</div></div>)}
-          </div>}
-          <div style={{background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'28px 32px'}}>
-            {/* CHANGE: Prompt count selector - clearer UI, mandatory feel, default 100 */}
-            <div style={{marginBottom:18}}>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}>
-                <div style={{width:8,height:8,borderRadius:'50%',background:'#EF4444'}}/>
-                <span style={{fontSize:'0.8rem',fontWeight:700,color:'#111827'}}>Select number of AI prompts to run</span>
-                <span style={{fontSize:'0.72rem',color:'#EF4444',fontWeight:600,background:'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>Required</span>
-              </div>
-              <div style={{display:'flex',gap:6,alignItems:'flex-end',flexWrap:'wrap' as const}}>
-                {[50,100,300,500,1000].map(n=>(
-                  <button
-                    key={n}
-                    onClick={()=>{setPromptCount(n);setPromptCountSelected(true);setPromptCountErr('');}}
-                    style={{
-                      background:promptCount===n?'#7C3AED':'white',
-                      color:promptCount===n?'white':'#374151',
-                      border:promptCount===n?'2px solid #7C3AED':'2px solid #D1D5DB',
-                      borderRadius:7,
-                      padding:'5px 12px',
-                      fontSize:'0.75rem',
-                      fontWeight:700,
-                      cursor:'pointer',
-                      transition:'all 0.15s',
-                      display:'flex',
-                      flexDirection:'column' as const,
-                      alignItems:'center',
-                      gap:1,
-                      minWidth:52,
-                    }}
-                  >
-                    <span style={{fontSize:'0.82rem',fontWeight:900}}>{n}</span>
-                    <span style={{fontSize:'0.56rem',fontWeight:500,opacity:0.72}}>
-                      {n===50?'Quick':n===100?'Standard':n===300?'Deep':n===500?'Thorough':'Extended'}
-                    </span>
-                  </button>
-                ))}
-                {/* Custom number input */}
-                <div style={{display:'flex',flexDirection:'column' as const,gap:2,minWidth:100}}>
-                  <label style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',textTransform:'uppercase' as const,letterSpacing:'0.06em'}}>Custom (max 10,000)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 200"
-                    value={promptCount && ![50,100,300,500,1000].includes(promptCount) ? promptCount : ''}
-                    onChange={e=>{
-                      const raw=e.target.value;
-                      const v=parseInt(raw);
-                      if(raw===''){setPromptCountErr('');return;}
-                      if(isNaN(v)){return;}
-                      if(v>10000){setPromptCountErr('Max is 10,000');setPromptCount(Math.min(v,10000));}
-                      else{setPromptCount(v);setPromptCountSelected(true);setPromptCountErr('');}
-                    }}
-                    style={{
-                      border:`1.5px solid ${promptCountErr?'#EF4444':'#D1D5DB'}`,
-                      borderRadius:7,
-                      padding:'5px 10px',
-                      fontSize:'0.78rem',
-                      fontWeight:700,
-                      color:'#374151',
-                      outline:'none',
-                      background:'white',
-                      width:'100%',
-                    }}
-                  />
-                  {promptCountErr
-                    ? <div style={{fontSize:'0.58rem',color:'#EF4444',fontWeight:600}}>{promptCountErr}</div>
-                    : <div style={{fontSize:'0.58rem',color:'#9CA3AF'}}>More prompts = longer run time</div>
-                  }
-                </div>
-              </div>
-
-            </div>
-
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}><div style={{width:7,height:7,borderRadius:'50%',background:'#7C3AED'}}/><span style={{fontSize:'0.72rem',fontWeight:700,letterSpacing:'.14em',color:'#9CA3AF',textTransform:'uppercase' as const}}>Brand URL</span></div>
-            <div style={{display:'flex',gap:12,alignItems:'center'}}>
-              <div style={{flex:1,display:'flex',alignItems:'center',border:'1.5px solid #E5E7EB',borderRadius:12,background:'white',overflow:'hidden',height:52}}>
-                <input type="text" value={url.replace(/^https?:\/\//,'')} onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl(v?'https://'+v:'');}} onKeyDown={e=>e.key==='Enter'&&runAnalysis()} placeholder="capitalone.com" style={{flex:1,border:'none',padding:'14px 20px',fontSize:'0.95rem',background:'transparent',outline:'none',color:'#374151'}}/>
-              </div>
-              <button onClick={runAnalysis} disabled={loading} style={{background:'#7C3AED',color:'white',border:'none',borderRadius:50,fontWeight:700,fontSize:'0.95rem',height:52,padding:'0 28px',cursor:'pointer',boxShadow:'0 4px 16px rgba(124,58,237,0.4)',whiteSpace:'nowrap' as const,display:'flex',alignItems:'center',gap:8,flexShrink:0}}>🔍 {loading?'Analysing...':'Run Live AI Analysis'}</button>
-            </div>
-            {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',marginTop:10}}>{error}</div>}
-          </div>
-
-          {loading&&(()=>{
-            const brandName = url.replace('https://www.','').replace('http://www.','').replace('https://','').replace('http://','').split('/')[0].split('.')[0];
-            const displayName = brandName.charAt(0).toUpperCase()+brandName.slice(1);
-            const steps = [
-              {icon:'🌐', label:'Fetching brand page', detail:'Reading website content and metadata'},
-              {icon:'🤖', label:'Launching AI queries', detail:'Firing all query batches simultaneously across product categories'},
-              {icon:'💳', label:'Running consumer queries', detail:'Broad brand awareness and discovery questions'},
-              {icon:'💰', label:'Running category-specific queries', detail:'Product-specific purchase intent questions'},
-              {icon:'🔍', label:'Detecting brand mentions', detail:`Scanning all AI responses for ${displayName} references`},
-              {icon:'📊', label:'Scoring sentiment & prominence', detail:'Analysing tone and position in each response'},
-              {icon:'🏆', label:'Benchmarking competitors', detail:'Scoring top competitors across all signals'},
-              {icon:'🔗', label:'Building citation network', detail:'Mapping sources and share of voice'},
-              {icon:'#', label:'Calculating GEO Score', detail:'Applying weighted formula across all signals'},
-            ];
-            const currentStep = steps[Math.min(loadingStep, steps.length-1)];
-            const completedSteps = steps.slice(0, loadingStep);
-            return (
-              <div style={{marginTop:32,background:'white',borderRadius:20,border:'1px solid #E5E7EB',boxShadow:'0 2px 12px rgba(0,0,0,0.06)',padding:'36px 40px',overflow:'hidden'}}>
-                <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}} @keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
-                <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:28}}>
-                  <div style={{width:48,height:48,borderRadius:'50%',background:'linear-gradient(135deg,#7C3AED,#9333EA)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0}}>🔍</div>
-                  <div>
-                    <div style={{fontSize:'1.2rem',fontWeight:800,color:'#111827'}}>Analysing {displayName}</div>
-                    <div style={{fontSize:'0.82rem',color:'#9CA3AF',marginTop:2}}>{url}</div>
-                  </div>
-                  <div style={{marginLeft:'auto',textAlign:'right' as const}}>
-                    <div style={{fontSize:'2rem',fontWeight:900,color:'#7C3AED',lineHeight:1}}>{loadingProgress}%</div>
-                    <div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>complete</div>
-                  </div>
-                </div>
-                <div style={{background:'#F3F4F6',borderRadius:50,height:8,marginBottom:28,overflow:'hidden'}}>
-                  <div style={{background:'linear-gradient(90deg,#7C3AED,#9333EA)',height:8,borderRadius:50,width:`${loadingProgress}%`,transition:'width 0.8s ease',position:'relative' as const}}>
-                    <div style={{position:'absolute' as const,right:0,top:0,width:20,height:8,background:'rgba(255,255,255,0.4)',borderRadius:50,animation:'pulse 1s infinite'}}/>
-                  </div>
-                </div>
-                <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'center',gap:12,animation:'slideIn 0.3s ease'}}>
-                  <div style={{width:32,height:32,borderRadius:'50%',background:'white',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1rem',flexShrink:0,boxShadow:'0 2px 8px rgba(124,58,237,0.15)'}}>{currentStep.icon}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:'0.9rem',fontWeight:700,color:'#7C3AED'}}>{currentStep.label}</div>
-                    <div style={{fontSize:'0.76rem',color:'#9CA3AF',marginTop:2}}>{currentStep.detail}</div>
-                  </div>
-                  <div style={{width:20,height:20,border:'2px solid #DDD6FE',borderTopColor:'#7C3AED',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
-                </div>
-                <div style={{display:'flex',flexDirection:'column' as const,gap:8,marginBottom:24}}>
-                  {completedSteps.map((s,i)=>(
-                    <div key={i} style={{display:'flex',alignItems:'center',gap:10,opacity:0.7}}>
-                      <div style={{width:22,height:22,borderRadius:'50%',background:'#D1FAE5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'0.7rem',flexShrink:0}}>ok</div>
-                      <span style={{fontSize:'0.82rem',color:'#6B7280'}}>{s.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+      {/* ── Sidebar ── */}
+      <aside id="percepta-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+        <div id="sb-logo" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8}}>P</div>
+        <div id="sb-new-analysis" title="New Analysis" onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
         </div>
-      ):(
-        <div>
-          <div style={{borderBottom:'1px solid #E5E7EB',background:'white',display:'flex',padding:'0 40px',gap:4,overflowX:'auto' as const}}>
-            {TABS.map((t,i)=><button key={i} onClick={()=>setActiveTab(i)} style={{background:'none',border:'none',borderBottom:activeTab===i?'2px solid #7C3AED':'2px solid transparent',color:activeTab===i?'#7C3AED':'#6B7280',fontWeight:activeTab===i?700:500,fontSize:'0.85rem',padding:'12px 20px',cursor:'pointer',transition:'all 0.15s',whiteSpace:'nowrap' as const}}>{t}</button>)}
-            <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
-              <button onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} style={{background:'#7C3AED',border:'none',borderRadius:8,color:'white',fontSize:'0.78rem',fontWeight:600,padding:'6px 16px',cursor:'pointer',boxShadow:'0 2px 8px rgba(124,58,237,0.3)'}}>New Analysis</button>
+        <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
+        <div id="sb-home" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
+        <div id="sb-reports" style={rSbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
+        <div id="sb-trends" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
+        <div id="sb-account" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg></div>
+        <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+          <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
+          <div id="sb-user" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div>
+          <div id="sb-logout" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg></div>
+        </div>
+      </aside>
+
+      {/* ── Content column ── */}
+      <div id="percepta-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+
+        {/* Topbar: breadcrumb + GEO pill */}
+        <div id="percepta-topbar" style={{height:48,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',justifyContent:'space-between',flexShrink:0}}>
+          <div style={{fontSize:13,color:'rgba(255,255,255,0.32)',fontFamily:'Inter,sans-serif'}}>
+            Reports&nbsp;<span style={{color:'rgba(255,255,255,0.2)'}}>/</span>&nbsp;<span style={{color:'rgba(255,255,255,0.85)',fontWeight:500}}>{result?.brand_name||''}</span>
+          </div>
+          {result&&<span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:600,padding:'3px 10px',background:gBadge.bg,color:gBadge.color,border:`1px solid ${gBadge.color}22`}}>GEO {geo}</span>}
+        </div>
+
+        {/* Org strip */}
+        <div id="percepta-org-strip" style={{background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',padding:'12px 20px',display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
+          <div style={{width:36,height:36,background:'#A100FF',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,letterSpacing:'-0.01em',flexShrink:0}}>
+            {(result?.brand_name||'?').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()}
+          </div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:15,fontWeight:500,color:'rgba(255,255,255,0.88)',letterSpacing:'-0.01em',lineHeight:1.2,fontFamily:"'Space Grotesk',sans-serif"}}>{result?.brand_name}</div>
+            <div style={{fontSize:11,color:'rgba(255,255,255,0.28)',marginTop:3}}>
+              <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",color:'#C084FC'}}>{(result?.domain||'').replace(/^https?:\/\//,'').replace(/^www\./,'')}</span>
+              {result?.ind_label&&<>&nbsp;&nbsp;·&nbsp;&nbsp;{result.ind_label}</>}
             </div>
           </div>
+          {result?.ind_label&&<div style={{fontSize:10,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.3)',padding:'3px 10px',border:'1px solid rgba(255,255,255,0.12)',flexShrink:0,whiteSpace:'nowrap' as const}}>
+            {(result.ind_label||'').split(' ').slice(0,2).join(' ')}
+          </div>}
+        </div>
 
+        {/* Top-level tab bar */}
+        <div id="percepta-tab-bar" style={{background:'#0A0A0A',padding:'0 12px',display:'flex',alignItems:'stretch',borderBottom:'1px solid rgba(255,255,255,0.06)',position:'relative' as const,flexShrink:0}}
+          onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);setHoverParent(null);}}>
+          {TOP_TABS.map((tab,i)=>(
+            <button key={i}
+              onClick={()=>{setActiveParent(i);setActiveSub(0);setHoverParent(null);}}
+              onMouseEnter={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);hoverTimer.current=setTimeout(()=>setHoverParent(i),120);}}
+              style={{background:hoverParent===i&&activeParent!==i?'rgba(255,255,255,0.03)':'none',border:'none',borderBottom:activeParent===i?'2px solid #A100FF':'2px solid transparent',color:activeParent===i?'rgba(255,255,255,0.9)':hoverParent===i?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.28)',fontWeight:activeParent===i?600:400,fontSize:13,padding:'13px 16px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'color 0.12s,background 0.12s'}}>
+              {tab.label}
+            </button>
+          ))}
+          {hoverParent!==null&&TOP_TABS[hoverParent].subs.length>0&&activeParent!==hoverParent&&(
+            <div style={{position:'absolute' as const,top:'100%',left:0,right:0,background:'#1C1C1E',padding:'7px 16px',display:'flex',gap:4,borderBottom:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 8px 24px rgba(0,0,0,0.55)',zIndex:20}}>
+              {TOP_TABS[hoverParent].subs.map((sub,j)=>(
+                <button key={j}
+                  onClick={()=>{const hp=hoverParent;setActiveParent(hp);setActiveSub(j);setHoverParent(null);}}
+                  style={{background:j===0?'rgba(161,0,255,0.10)':'none',border:j===0?'1px dashed rgba(161,0,255,0.4)':'1px solid transparent',color:j===0?'#C084FC':'rgba(255,255,255,0.38)',fontSize:12,padding:'5px 11px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'all 0.1s',borderRadius:2}}>
+                  {sub}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Persistent sub-tab strip */}
+        {TOP_TABS[activeParent].subs.length>0&&(
+          <div id="percepta-subtab-bar" style={{background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',padding:'6px 16px',display:'flex',gap:4,flexShrink:0,position:'relative' as const,zIndex:1}}>
+            {TOP_TABS[activeParent].subs.map((sub,j)=>(
+              <button key={j}
+                onClick={()=>setActiveSub(j)}
+                style={{background:activeSub===j?'rgba(161,0,255,0.12)':'none',border:activeSub===j?'1px solid rgba(161,0,255,0.3)':'1px solid transparent',color:activeSub===j?'#C084FC':'rgba(255,255,255,0.32)',fontSize:12,padding:'5px 11px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'all 0.12s',borderRadius:2}}>
+                {sub}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* White scrollable canvas */}
+        <div id="percepta-canvas" style={{flex:1,background:'#F3F4F6',overflow:'auto'}}>
           <div style={{padding:'28px 40px 60px'}}>
+
 
             {(()=>{
               if(result.ind_key==='fin'){
@@ -1788,61 +1742,264 @@ export default function GeoHub() {
               return null;
             })()}
 
-            {activeTab===0&&(()=>{
-              const geo = result.overall_geo_score;
-              const vis = result.visibility;
-              const cit = result.citation_share;
-              const rawSent = result.sentiment;
-              const prom = result.prominence;
-              const sov = result.share_of_voice;
-              const _allBrands = [{GEO:geo, isYou:true}, ...(result.competitors||[]).slice(0,9)].sort((a:any,b:any)=>b.GEO-a.GEO);
-              const _myPos = _allBrands.findIndex((b:any)=>b.isYou);
-              const _computedRank = _myPos >= 0 ? _myPos + 1 : null;
-              const avgRank = _computedRank ?? result.avg_rank;
-              const badge = scoreBadge(geo);
-              const summaryText = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by Prominence (${prom}), mentioned mid-list; Share of Voice (${sov}), competitors dominating AI conversation; Citation (${cit}), rarely top pick; Sentiment (${rawSent}).`;
-              // CHANGE: derive industry label for display
-              const industryLabel = result.ind_label || result.industry || 'Financial Services';
+            {activeParent===0&&(()=>{
+              const geo=result.overall_geo_score;
+              const tier=geoTier(geo);
+              const comps=(result.competitors||[]).slice(0,9);
+              const allBrands=[{GEO:geo,Brand:result.brand_name,isYou:true},...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
+              const myRank=allBrands.findIndex((b:any)=>b.isYou)+1;
+              const topComp=allBrands.find((b:any)=>!b.isYou);
+              const topCompGap=topComp?Math.max(0,(topComp.GEO||0)-geo):0;
+              const nextThreshold=geo<26?26:geo<45?45:geo<65?65:geo<80?80:100;
+              const nextTierLabel=geo<26?'Emerging':geo<45?'Competitive':geo<65?'Leader':geo<80?'Authority':'Max';
+              const missedPrompts=(result.responses_detail||[]).filter((r:any)=>!r.mentioned&&!r.brand_mentioned).length;
+              const recs=(result.recommendations||[]).slice(0,3);
+              const ind=result.ind_label||'your industry';
+              const interpText=tier.tier===1
+                ?`AI assistants rarely surface ${result.brand_name} for ${ind} queries — ${topComp?.Brand||'competitors'}${topCompGap>0?` leads by ${topCompGap} pts and`:''}  is recommended instead. Reaching ${nextThreshold} (${nextTierLabel}) puts ${result.brand_name} in the consideration set for significantly more queries.`
+                :tier.tier===2
+                ?`At ${geo}, ${result.brand_name} is occasionally mentioned but rarely in a leading position. Competitors above 45 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier.`
+                :tier.tier===3
+                ?`At ${geo}, ${result.brand_name} appears in AI responses but isn't yet a first-choice recommendation. Competitors above 65 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier.`
+                :tier.tier===4
+                ?`At ${geo}, AI assistants frequently surface ${result.brand_name} near the top of responses. You're above the efficiency threshold — focus is on closing the remaining gap to achieve consistent first-position recommendations.`
+                :`AI assistants consistently lead with ${result.brand_name} as the top recommendation. You're in the Authority tier — the focus is on maintaining dominance and monitoring for competitor movements.`;
+              const FT=(s:string,style:React.CSSProperties)=><span style={style}>{s}</span>;
               return (
-                <div>
-                  {/* CHANGE: GeoGauge no longer shows brand name - brand+industry shown on right card only */}
-                  <div style={{display:'grid',gridTemplateColumns:'360px 1fr',gap:20,marginBottom:16}}>
-                    <GeoGauge score={geo}/>
-                    <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:5}}>
-                        <div style={{fontSize:'1.4rem',fontWeight:800,color:'#111827'}}>{result.brand_name}</div>
-                        {/* CHANGE: Show both LOB and industry */}
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap' as const}}>
-                          {result.lob&&<span style={{fontSize:'0.72rem',fontWeight:600,color:'#7C3AED',background:'#EDE9FE',borderRadius:50,padding:'2px 10px'}}>{result.lob}</span>}
-                          <span style={{fontSize:'0.72rem',fontWeight:600,color:'#374151',background:'#F3F4F6',borderRadius:50,padding:'2px 10px'}}>{industryLabel}</span>
+                <div id="geo-overall-wrapper" style={{display:'grid',gap:14}}>
+                  {/* Hero row */}
+                  <div id="geo-overall-hero-row" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,alignItems:'stretch'}}>
+                    {/* Score block — spans 2 cols */}
+                    <div id="geo-overall-score-block" style={{gridColumn:'span 2',background:'white',border:'1px solid #E5E5E5',padding:'28px 32px',display:'grid',gap:14}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16}}>
+                        <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>GEO Score</div>
+                        <div style={{display:'flex',gap:18,flexShrink:0}}>
+                          <button onClick={()=>{setActiveParent(1);setActiveSub(0);}} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8'}}>See composition ›</button>
+                          <button onClick={()=>{setActiveParent(2);setActiveSub(0);}} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8'}}>See competitors ›</button>
                         </div>
                       </div>
-                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{color:'#7C3AED',fontSize:'0.84rem'}}>{result.page_url?.slice(0,60)}{result.page_url?.length>60?'...':''}</a>
-                      <div style={{margin:'12px 0 5px',fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'.1em',textTransform:'uppercase' as const}}>Status</div>
-                      <span style={{background:badge.bg,color:badge.color,padding:'4px 14px',borderRadius:50,fontSize:'0.8rem',fontWeight:700}}>{badge.label}</span>
-                      <div style={{fontSize:'0.84rem',color:'#6B7280',lineHeight:1.8,borderTop:'1px solid #F3F4F6',paddingTop:12,marginTop:12}}>{summaryText}</div>
+                      <div style={{display:'flex',alignItems:'baseline',gap:18,flexWrap:'wrap' as const}}>
+                        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:500,fontSize:88,lineHeight:0.95,letterSpacing:'-0.04em',color:'#0A0A0A'}}>
+                          {geo}<span style={{color:tier.fill,fontWeight:600}}>.</span>
+                        </div>
+                        <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
+                          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:28,letterSpacing:'-0.01em',lineHeight:1.1,color:tier.text}}>{tier.label}</div>
+                          <div style={{fontFamily:"'JetBrains Mono','DM Mono',monospace",fontSize:12,color:'#4A4A4A'}}>
+                            Ranked <strong style={{color:'#0A0A0A',fontWeight:600}}>#{myRank} of {allBrands.length}</strong>{result.ind_label?` in ${result.ind_label}`:''}
+                            {topComp&&topCompGap>0&&<> · {topCompGap} pts behind {topComp.Brand}</>}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{fontFamily:'Inter,sans-serif',fontSize:14,color:'#2B2B2B',lineHeight:1.55,maxWidth:'64ch'}}>{interpText}</div>
+                    </div>
+                    {/* Change block */}
+                    <div id="geo-overall-change-block" style={{background:'white',border:'1px solid #E5E5E5',padding:'28px 32px',display:'grid',gridTemplateRows:'auto 1fr'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,marginBottom:12}}>
+                        <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>Change since last run</div>
+                        <button onClick={()=>setActiveParent(4)} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8',whiteSpace:'nowrap' as const}}>Open Trends ›</button>
+                      </div>
+                      <div style={{display:'grid',alignContent:'center' as const,gap:12,paddingBottom:8}}>
+                        <div style={{fontFamily:'Inter,sans-serif',fontSize:13,color:'#6B6B6B',fontStyle:'italic' as const,lineHeight:1.6}}>
+                          No previous run to compare.<br/>Run the analysis again to start tracking change over time.
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:16}}>
-                    <MetricCard label="visibility score" val={vis}/>
-                    <MetricCard label="sentiment score" val={rawSent}/>
-                    <MetricCard label="citation score" val={cit}/>
-                    <MetricCard label="prominence score" val={prom}/>
-                    <MetricCard label="share of voice" val={sov}/>
-                    <MetricCard label="avg rank" val={`#${String(avgRank).replace('#','')}`}/>
+                  {/* Actions block */}
+                  <div id="geo-overall-actions-block" style={{background:'white',border:'1px solid #E5E5E5',padding:'18px 22px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,marginBottom:12}}>
+                      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:14,letterSpacing:'-0.01em',color:'#0A0A0A'}}>Top 3 priority actions</div>
+                      <button onClick={()=>setActiveParent(5)} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8',whiteSpace:'nowrap' as const}}>Open Action Plan ›</button>
+                    </div>
+                    {(recs.length>0?recs:[
+                      {title:'Build authoritative content in your lowest-scoring query segments'},
+                      {title:'Expand FAQ coverage for the highest-volume prompt clusters'},
+                      {title:'Increase citation presence in the top AI-referenced sources'},
+                    ]).map((rec:any,i:number)=>(
+                      <div key={i} style={{display:'grid',gridTemplateColumns:'auto 1fr'+(rec.gain?' auto':''),gap:14,alignItems:'center',padding:'10px 0',borderTop:i===0?'none':'1px solid #E5E5E5',paddingTop:i===0?4:10}}>
+                        <span style={{fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase' as const,padding:'4px 8px',color:'white',background:i===0?'#A100FF':i===1?'#0A0A0A':'#6B6B6B',flexShrink:0}}>P{i+1}</span>
+                        <div style={{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:600,color:'#0A0A0A',lineHeight:1.35}}>{rec.action||rec.title||rec.recommendation||JSON.stringify(rec)}</div>
+                        {rec.gain&&<div style={{fontFamily:"'JetBrains Mono','DM Mono',monospace",fontSize:12,color:'#6B00A8',fontWeight:600,whiteSpace:'nowrap' as const,textAlign:'right' as const}}>
+                          <span style={{display:'block',fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8E8E8E',marginBottom:1}}>Est gain</span>
+                          {rec.gain}
+                        </div>}
+                      </div>
+                    ))}
                   </div>
-                  <WhatScoreMeans score={geo} brand={result.brand_name}/>
-                  <div style={{marginTop:16}}>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-                      <SankeyChart result={result}/>
-                      <BusinessImpact result={result} onGo={()=>setActiveTab(1)}/>
+                  {/* Teasers */}
+                  <div id="geo-overall-teasers" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+                    {([
+                      {from:'From Competitors',headline:topComp?<>Chase leads by <strong style={{color:'#6B00A8'}}>{topCompGap} pts</strong>{result.ind_label?` in ${result.ind_label}`:''}</>:'Run competitor analysis to see where you stand',go:()=>{setActiveParent(2);setActiveSub(0);}},
+                      {from:'From Prompts',headline:missedPrompts>0?<><strong style={{color:'#6B00A8'}}>{missedPrompts} prompts</strong> where {result.brand_name} does not appear</>:'Run to see which prompts you are missing',go:()=>{setActiveParent(3);setActiveSub(0);}},
+                      {from:'From Trends',headline:'Run again to start tracking your score over time',go:()=>setActiveParent(4)},
+                    ] as {from:string;headline:React.ReactNode;go:()=>void}[]).map((t,i)=>(
+                      <div key={i} id={`geo-teaser-${i}`} onClick={t.go} style={{background:'white',border:'1px solid #E5E5E5',borderLeft:'3px solid #A100FF',padding:'14px 18px',cursor:'pointer',position:'relative' as const,display:'grid',gap:4}}>
+                        <div style={{fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:700,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B'}}>{t.from}</div>
+                        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:500,fontSize:15,letterSpacing:'-0.01em',lineHeight:1.25,color:'#0A0A0A',paddingRight:20}}>{t.headline}</div>
+                        <span style={{position:'absolute' as const,top:14,right:14,color:'#A100FF',fontSize:18,fontWeight:600,lineHeight:1}}>›</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {activeParent===1&&activeSub===0&&(()=>{
+              const geo=result.overall_geo_score??0;
+              const vis=result.visibility??0,sent=result.sentiment??0,prom=result.prominence??0,cit=result.citation_share??0,sov=result.share_of_voice??0;
+              const comps=result.competitors||[];
+              const tierOf=(s:number)=>s>=80?{label:'Authority',color:'#00A656'}:s>=70?{label:'Leader',color:'#2563EB'}:s>=56?{label:'Competitive',color:'#E8A33D'}:s>=45?{label:'Emerging',color:'#E8703D'}:{label:'Fragmented',color:'#D62F2F'};
+              const sigBg=(s:number)=>s>=80?'#00A656':s>=70?'#2563EB':s>=56?'#E8A33D':s>=45?'#E8703D':'#D62F2F';
+              const sigFg=(s:number)=>(s>=56&&s<70)?'#2A1500':'white';
+              const allBrands=[{GEO:geo,Brand:result.brand_name,isYou:true},...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
+              const myRank=allBrands.findIndex((b:any)=>b.isYou)+1;
+              const topComp=allBrands.find((b:any)=>!b.isYou);
+              const topGap=topComp?Math.max(0,(topComp.GEO||0)-geo):0;
+              const nextThreshold=geo>=80?100:geo>=70?80:geo>=56?70:geo>=45?56:45;
+              const nextTierLabel=geo>=80?'Max':geo>=70?'Authority':geo>=56?'Leader':geo>=45?'Competitive':'Emerging';
+              const ptsToNext=nextThreshold-geo;
+              const signals=[{key:'Vis',label:'Visibility',score:vis,weight:30,sub:1},{key:'Sent',label:'Sentiment',score:sent,weight:20,sub:2},{key:'Prom',label:'Prominence',score:prom,weight:20,sub:3},{key:'Cit',label:'Citation',score:cit,weight:15,sub:4},{key:'SoV',label:'SoV',score:sov,weight:15,sub:5}];
+              const weakest=[...signals].sort((a,b)=>a.score-b.score)[0];
+              const weakColor=sigBg(weakest.score);
+              const topGeo=Math.max(geo,...comps.map((c:any)=>c.GEO||0));
+              const topVis=Math.max(vis,...comps.map((c:any)=>c.Vis||c.visibility||0));
+              const topSent=Math.max(sent,...comps.map((c:any)=>c.Sen||c.sentiment||0));
+              const topProm=Math.max(prom,...comps.map((c:any)=>c.Prom||c.prominence||0));
+              const topCit=Math.max(cit,...comps.map((c:any)=>c.Cit||c.citation_share||0));
+              const topSov=Math.max(sov,...comps.map((c:any)=>c.Sov||c.share_of_voice||0));
+              const vcmpCols=[
+                {label:'GEO Score',sub:'composite',score:geo,ref:topGeo,headline:true},
+                {label:'Visibility',sub:'30% weight',score:vis,ref:topVis},
+                {label:'Sentiment',sub:'20% weight',score:sent,ref:topSent},
+                {label:'Prominence',sub:'20% weight',score:prom,ref:topProm},
+                {label:'Citation',sub:'15% weight',score:cit,ref:topCit},
+                {label:'Share of Voice',sub:'15% weight',score:sov,ref:topSov},
+              ];
+              const tierSegs=[
+                {label:'Fragmented',range:'0–44',isCurrent:geo<45,color:'#D62F2F'},
+                {label:'Emerging',range:'45–55',isCurrent:geo>=45&&geo<56,color:'#E8703D'},
+                {label:'Competitive',range:'56–69',isCurrent:geo>=56&&geo<70,color:'#E8A33D'},
+                {label:'Leader',range:'70–79',isCurrent:geo>=70&&geo<80,color:'#2563EB'},
+                {label:'Authority',range:'80–100',isCurrent:geo>=80,color:'#00A656'},
+              ];
+              const barFrs=[44,11,14,10,21];
+              const markerPct=`${Math.min(geo,100)}%`;
+              const bracketFrom=`${Math.min(geo,100)}%`;
+              const bracketTo=`${Math.min(nextThreshold,100)}%`;
+              const bracketMid=`${(Math.min(geo,100)+Math.min(nextThreshold,100))/2}%`;
+              return (
+                <div id="geo-score-overall-wrapper" style={{display:'grid',gap:14}}>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+                    {/* Hero score — span 2 */}
+                    <div id="geo-score-overall-hero" style={{gridColumn:'span 2',background:'white',border:'1px solid #E5E5E5',padding:'24px 28px',display:'flex',flexDirection:'column' as const,gap:14}}>
+                      <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#A100FF',fontFamily:'Inter,sans-serif'}}>GEO Score · Run 1</div>
+                      <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:36,alignItems:'start'}}>
+                        {/* Score pillar */}
+                        <div style={{display:'flex',flexDirection:'column' as const,gap:8}}>
+                          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:500,fontSize:88,lineHeight:0.95,letterSpacing:'-0.04em',color:'#0A0A0A'}}>{geo}</div>
+                          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:22,letterSpacing:'-0.01em',color:tierOf(geo).color}}>{tierOf(geo).label}</div>
+                        </div>
+                        {/* Rank + tier ladder */}
+                        <div style={{display:'flex',flexDirection:'column' as const,gap:18}}>
+                          <div style={{fontFamily:'Inter,sans-serif',fontSize:15,lineHeight:1.4,color:'#6B6B6B'}}>
+                            <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'#0A0A0A'}}>#{myRank}</span> of <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'#0A0A0A'}}>{allBrands.length}</span> brands{topComp&&topGap>0&&<> and <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'#0A0A0A'}}>{topGap}</span> points behind <span style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:600,color:'#0A0A0A'}}>#1</span></>} in {result.ind_label||'your industry'}.
+                          </div>
+                          {/* Tier ladder with bracket */}
+                          <div style={{display:'flex',flexDirection:'column' as const,gap:6,position:'relative' as const,paddingTop:ptsToNext<100?36:0}}>
+                            {ptsToNext<100&&<>
+                              {/* bracket line: sits 6px above the bar */}
+                              <div style={{position:'absolute' as const,top:24,left:bracketFrom,width:`calc(${bracketTo} - ${bracketFrom})`,height:6,pointerEvents:'none' as const}}>
+                                <div style={{position:'absolute' as const,top:0,left:0,right:0,height:1,background:'#2B2B2B'}}/>
+                                <div style={{position:'absolute' as const,top:0,left:0,width:1,height:6,background:'#2B2B2B',transform:'translateX(-50%)'}}/>
+                                <div style={{position:'absolute' as const,top:0,right:0,width:1,height:6,background:'#2B2B2B',transform:'translateX(50%)'}}/>
+                              </div>
+                              {/* label: sits above the bracket */}
+                              <div style={{position:'absolute' as const,top:2,left:bracketMid,transform:'translateX(-50%)',background:'white',padding:'2px 6px',fontFamily:"'JetBrains Mono',monospace",fontSize:10,fontWeight:600,color:'#0A0A0A',whiteSpace:'nowrap' as const,zIndex:4}}>+{ptsToNext} to {nextTierLabel}</div>
+                            </>}
+                            <div style={{display:'grid',gridTemplateColumns:`${barFrs.join('fr ')}fr`,gap:2,height:14,position:'relative' as const}}>
+                              {tierSegs.map(seg=><div key={seg.label} style={{background:seg.color,opacity:seg.isCurrent?1:0.25}}/>)}
+                              <div style={{position:'absolute' as const,top:-6,left:markerPct,width:2,height:22,background:'#0A0A0A',transform:'translateX(-50%)',zIndex:2}}/>
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:`${barFrs.join('fr ')}fr`,gap:2,marginTop:16}}>
+                              {tierSegs.map(seg=>(
+                                <div key={seg.label} style={{textAlign:'center' as const,fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:seg.isCurrent?seg.color:'#8E8E8E',fontWeight:seg.isCurrent?600:400,lineHeight:1.2}}>
+                                  {seg.label}<span style={{display:'block',fontSize:8,marginTop:1}}>{seg.range}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Hero comp — span 1 */}
+                    <div id="geo-score-overall-comp" style={{background:'white',border:'1px solid #E5E5E5',padding:'24px 28px',display:'flex',flexDirection:'column' as const,gap:14}}>
+                      <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>Your {geo} · broken down</div>
+                      <div style={{display:'flex',width:'100%',height:56,overflow:'hidden'}}>
+                        {signals.map(sig=>(
+                          <div key={sig.key} style={{flex:sig.weight,position:'relative' as const,display:'flex',flexDirection:'column' as const,justifyContent:'flex-end',alignItems:'flex-start',padding:'8px 10px',background:sigBg(sig.score),borderRight:'1px solid rgba(255,255,255,0.6)',color:sigFg(sig.score)}}>
+                            <span style={{position:'absolute' as const,top:8,right:10,fontFamily:"'JetBrains Mono',monospace",fontSize:10,fontWeight:500,opacity:0.85}}>{sig.weight}%</span>
+                            <span style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:11,letterSpacing:'-0.01em'}}>{sig.key}</span>
+                            <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:14,fontWeight:600,lineHeight:1}}>{sig.score}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{borderLeft:`2px solid ${weakColor}`,paddingLeft:12,paddingTop:4,paddingBottom:4,marginTop:4}}>
+                        <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:weakColor,marginBottom:4,fontFamily:'Inter,sans-serif'}}>Holding you back</div>
+                        <p style={{margin:0,fontSize:12,lineHeight:1.5,color:'#2B2B2B',fontFamily:'Inter,sans-serif'}}>
+                          {weakest.label} ({weakest.score}) is your weakest signal.{' '}
+                          <span style={{color:'#6B00A8',fontWeight:500,cursor:'pointer'}} onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  {/* vcmp chart */}
+                  <div id="geo-score-overall-vcmp" style={{background:'white',border:'1px solid #E5E5E5',padding:'24px 28px',display:'flex',flexDirection:'column' as const,gap:12}}>
+                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16}}>
+                      <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>How you rank in {result.ind_label||'your industry'}</div>
+                      <button onClick={()=>{setActiveParent(2);setActiveSub(0);}} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8',whiteSpace:'nowrap' as const}}>See competitors →</button>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:18,paddingBottom:12,borderBottom:'1px solid #E5E5E5',fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#4A4A4A'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{display:'inline-block',width:14,height:10,background:'#0A0A0A'}}/><span>Your score</span></div>
+                      <div style={{display:'flex',alignItems:'center',gap:6}}><span style={{display:'inline-block',width:14,height:10,background:'#00D1C7'}}/><span>Gap to top scorer per signal</span></div>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'36px 1fr',gap:8,height:240}}>
+                      <div style={{display:'flex',flexDirection:'column' as const,fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:'#6B6B6B',textAlign:'right' as const}}>
+                        <div style={{height:24,flexShrink:0}}/>
+                        <div style={{flex:1,position:'relative' as const}}>
+                          <span style={{position:'absolute' as const,top:0,right:0,lineHeight:1}}>100</span>
+                          <span style={{position:'absolute' as const,top:'50%',right:0,transform:'translateY(-50%)',lineHeight:1}}>50</span>
+                          <span style={{position:'absolute' as const,bottom:0,right:0,lineHeight:1}}>0</span>
+                        </div>
+                        <div style={{height:38,flexShrink:0}}/>
+                      </div>
+                      <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:18}}>
+                        {vcmpCols.map((col,i)=>(
+                          <div key={col.label} style={{display:'flex',flexDirection:'column' as const,paddingRight:col.headline?8:0,borderRight:col.headline?'1px solid #B8B8B8':'none',marginRight:col.headline?-2:0}}>
+                            <div style={{height:24,flexShrink:0,textAlign:'center' as const,display:'flex',alignItems:'center',justifyContent:'center',gap:2,fontFamily:"'JetBrains Mono',monospace"}}>
+                              <span style={{fontSize:13,fontWeight:600,color:'#0A0A0A'}}>{col.score}</span>
+                              {col.ref>col.score&&<span style={{fontSize:12,fontWeight:500,color:'#00A89F'}}>({col.ref})</span>}
+                            </div>
+                            <div style={{flex:1,position:'relative' as const,background:'#F2F2F2'}}>
+                              <div style={{position:'absolute' as const,top:0,left:0,right:0,height:0,borderTop:'1px dashed #D6D6D6'}}/>
+                              <div style={{position:'absolute' as const,top:'50%',left:0,right:0,height:0,borderTop:'1px dashed #D6D6D6'}}/>
+                              <div style={{position:'absolute' as const,bottom:0,left:0,right:0,height:1,background:'#8E8E8E'}}/>
+                              <div style={{position:'absolute' as const,bottom:0,left:0,right:0,height:`${col.score}%`,background:'#0A0A0A'}}/>
+                              {col.ref>col.score&&<div style={{position:'absolute' as const,bottom:`${col.score}%`,left:0,right:0,height:`${col.ref-col.score}%`,background:'#00D1C7',zIndex:1}}/>}
+                            </div>
+                            <div style={{height:38,flexShrink:0,paddingTop:12,textAlign:'center' as const,fontFamily:"'Space Grotesk',sans-serif",fontSize:12,fontWeight:col.headline?600:500,color:col.headline?'#0A0A0A':'#4A4A4A',whiteSpace:'nowrap' as const}}>
+                              {col.label}
+                              <span style={{display:'block',fontFamily:"'JetBrains Mono',monospace",fontSize:9,fontWeight:500,color:'#8E8E8E',marginTop:1}}>{col.sub}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
               );
             })()}
 
-            {activeTab===1&&(()=>{
+            {activeParent===2&&activeSub===0&&(()=>{
               const CLIENT_FIN_TIERS:Record<string,any> = {
                 'Chase':{'geo':80,'vis':82,'cit':78,'sent':86,'sov':72,'prom':74,'rank':'#1'},
                 'American Express':{'geo':73,'vis':73,'cit':70,'sent':84,'sov':62,'prom':66,'rank':'#2'},
@@ -1896,7 +2053,7 @@ export default function GeoHub() {
               ];
 
               return (
-                <div>
+                <div id="tab-competitors">
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:2}}>{result.domain} vs Competitors {result.ind_label}</div>
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>Real-time GEO scores across AI visibility signals</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
@@ -1906,7 +2063,7 @@ export default function GeoHub() {
                   </div>
 
                   {/* CHANGE: Combined bar chart (sub-metrics) + GEO line chart overlay */}
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
+                  <div id="competitors-chart-section" style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                     <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:2}}>GEO Score & Signal Breakdown</div>
                     <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:10}}>Grouped bars show sub-metrics per brand. Purple line traces GEO Score across brands.</div>
                     <div style={{overflowX:'auto' as const}}>
@@ -1982,7 +2139,7 @@ export default function GeoHub() {
                   </div>
 
                   {/* CHANGE: Full metrics table with all columns */}
-                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
+                  <div id="competitors-table-section" style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px'}}>
                     <table style={{width:'100%',borderCollapse:'collapse'}}>
                       <thead><tr style={{background:'#FAFAFA'}}>{['#','BRAND / URL','GEO SCORE','GAP','VISIBILITY','CITATIONS','SENTIMENT','SOV','PROMINENCE','AVG. RANK'].map(h=><th key={h} style={{padding:'10px 12px',textAlign:'left',fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c:any,i:number)=>{
@@ -2006,14 +2163,14 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===2&&(()=>{
+            {activeParent===1&&activeSub===1&&(()=>{
               const geo=result.overall_geo_score;
               const vis=result.visibility,comps=result.competitors||[],allVis=[vis,...comps.map((c:any)=>c.Vis)];
               const myVisRank=[...allVis].sort((a,b)=>b-a).indexOf(vis)+1,topComp=comps.length>0?comps.reduce((a:any,b:any)=>b.Vis>a.Vis?b:a,comps[0]):null;
               const gapToTop=vis-(topComp?topComp.Vis:vis),avgVis=Math.round(allVis.reduce((a:number,b:number)=>a+b,0)/allVis.length);
               const topCompBrand = result._topCompBrand || (comps.length > 0 ? comps[0].Brand : '');
               return (
-                <div>
+                <div id="tab-visibility">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
                     <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands  .  avg {avgVis}</div></div>
                     <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
@@ -2146,7 +2303,7 @@ export default function GeoHub() {
                       );
                     }
                     return (
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
+                    <div id="geo-visibility-scatter-card" style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
                       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                         <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility Market Positioning</div>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
@@ -2172,13 +2329,13 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===3&&(()=>{
+            {activeParent===1&&activeSub===2&&(()=>{
               const rawSent=result.sentiment,prom=result.prominence,avgRank=result.avg_rank,vis=result.visibility;
               const cit=result.citation_share,sov=result.share_of_voice;
               const smood=rawSent>=70?'AI speaks favorably about your brand':rawSent>=45?'AI tone is neutral, room to improve':'AI tone is negative or missing';
               const pmood=prom>=70?'Named first or near top of AI responses':prom>=45?'Appears mid-list in AI responses':'Rarely named early in AI responses';
               return (
-                <div>
+                <div id="tab-sentiment">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     {[
                       {label:'sentiment score',val:rawSent,sub:smood,tip:'How positively AI describes your brand.'},
@@ -2416,7 +2573,7 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===4&&(()=>{
+            {activeParent===1&&activeSub===4&&(()=>{
               const cit=result.citation_share,sov=result.share_of_voice,sources=result.citation_sources||[];
               const brandKey3 = (result.domain||'').replace('www.','').split('.')[0].toLowerCase();
               const domainMatchesBrand = (domain: string) => {
@@ -2495,7 +2652,7 @@ export default function GeoHub() {
               };
               const displaySources = buildDisplaySources();
               return (
-                <div>
+                <div id="tab-citation">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
                     {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>)}
                   </div>
@@ -2562,7 +2719,7 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===5&&(()=>{
+            {activeParent===3&&activeSub===0&&(()=>{
               const rd=result.responses_detail||[];
               const clusters=result.query_clusters||[];
               const trendingQs=result.trending_queries||[];
@@ -2573,7 +2730,7 @@ export default function GeoHub() {
               const cats2: string[] = ['All',...Array.from(new Set<string>(rd.map((r:any)=>r.category as string).filter((c:string)=>Boolean(c))))];
 
               return (
-                <div>
+                <div id="tab-prompts">
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
                     <MetricCard label="queries run" val={totalQueries} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
                     <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
@@ -2632,7 +2789,7 @@ export default function GeoHub() {
                     const connectedToHighlight = highlightedBubble ? getConnectedCategories(highlightedBubble) : new Set<string>();
 
                     return (
-                      <div style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
+                      <div id="prompts-filter-row" style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
                         <div style={{background:'#0F172A',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                           <div>
                             <div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
@@ -2730,7 +2887,7 @@ export default function GeoHub() {
                     const safePage = Math.min(queryPage, Math.max(1, totalPages));
                     const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
                     return (
-                      <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
+                      <div id="prompts-list-section" style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                           <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>
                             {filterCat==='All'?'All Queries':'Category: '+filterCat}
@@ -2764,7 +2921,7 @@ export default function GeoHub() {
                           })}</tbody>
                         </table>
                         {totalPages > 1 && (
-                          <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14}}>
+                          <div id="prompts-pagination" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14}}>
                             <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===1?'#F9FAFB':'white',color:safePage===1?'#D1D5DB':'#374151',cursor:safePage===1?'default':'pointer',fontSize:'0.75rem'}}>Prev</button>
                             {Array.from({length:Math.min(totalPages,10)},(_,i)=>{
                               const pg = totalPages<=10 ? i+1 : safePage<=5 ? i+1 : safePage>=totalPages-4 ? totalPages-9+i : safePage-4+i;
@@ -2868,7 +3025,7 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===6&&(()=>{
+            {activeParent===5&&(()=>{
               const geo=result.overall_geo_score,fin=result.ind_key==='fin';
               const brandNameLower = (result.brand_name||'').toLowerCase();
               const filterDominated = (d:string) => d.split(',').map((s:string)=>s.trim()).filter((s:string)=>!s.toLowerCase().includes(brandNameLower)&&!brandNameLower.includes(s.toLowerCase())).join(', ')||'Top Competitors';
@@ -2930,15 +3087,15 @@ export default function GeoHub() {
                 };
               }).filter((s: any): s is NonNullable<typeof s> => s !== null);
               return (
-                <div>
+                <div id="tab-action-plan">
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>Segment Coverage Analysis</div>
                   <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:14}}>Which audience segments is your brand winning vs. losing in AI responses?</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:14,marginBottom:24}}>{segments.map((s:any,i:number)=><div key={i} style={{background:s.bg,borderRadius:14,border:`1px solid ${s.border}`,padding:'16px 18px'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}><span style={{fontSize:'0.88rem',fontWeight:700,color:s.color}}>{s.name}</span><span style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',color:s.color,borderRadius:50,padding:'2px 10px',fontSize:'0.7rem',fontWeight:700}}>{s.status}</span></div><div style={{background:s.status==='Winning'?'#D1FAE5':s.status==='Emerging'?'#FEF3C7':'#FEE2E2',borderRadius:50,height:4,marginBottom:7,overflow:'hidden'}}><div style={{background:s.color,height:4,borderRadius:50,width:`${Math.min(s.score,100)}%`}}/></div><div style={{fontSize:'0.75rem',color:'#6B7280'}}>Score: <strong style={{color:s.color}}>{s.score}</strong> &nbsp; . &nbsp; Dominated by: {s.dominated}</div></div>)}</div>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}><span>!</span><span style={{fontSize:'1.05rem',fontWeight:700,color:'#111827'}}>GEO Health Summary</span></div>
                   <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:14}}>Based on how your brand performed across AI queries.</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:18,marginBottom:24}}>
-                    <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>What is Working Well</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
-                    <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>What Needs Improvement</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>-</span><span>{w}</span></li>)}</ul></div>
+                    <div id="action-plan-strengths-card" style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>What is Working Well</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
+                    <div id="action-plan-improvements-card" style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>What Needs Improvement</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>-</span><span>{w}</span></li>)}</ul></div>
                   </div>
                   {result.recommendations&&<div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,marginBottom:24}}><div style={{fontSize:'1rem',fontWeight:700,color:'#111827',marginBottom:14}}>Recommendations</div><MarkdownText text={result.recommendations}/></div>}
                   <PriorityActionsTable result={result} cachedActions={cachedActions} setCachedActions={setCachedActions} actionsLoading={actionsLoading} setActionsLoading={setActionsLoading}/>
@@ -2946,15 +3103,15 @@ export default function GeoHub() {
               );
             })()}
 
-            {activeTab===7&&(()=>(
-              <div style={{display:'flex',flexDirection:'column' as const,minHeight:'calc(100vh - 200px)'}}>
+            {activeParent===3&&activeSub===1&&(()=>(
+              <div id="tab-live-prompt" style={{display:'flex',flexDirection:'column' as const,minHeight:'calc(100vh - 200px)'}}>
                 {/* Header */}
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:3}}>Live Prompt Tester</div>
                   <div style={{fontSize:'0.8rem',color:'#9CA3AF'}}>Ask any question and see how AI responds about brands in your category.</div>
                 </div>
                 {/* Suggestion chips */}
-                <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:12}}>
+                <div id="live-prompt-suggestion-chips" style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:12}}>
                   {examplePrompts.map((p,i)=>(
                     <button key={i} onClick={()=>runPrompt(p)} style={{background:'#F5F3FF',border:'1px solid #DDD6FE',borderRadius:20,padding:'6px 14px',fontSize:'0.78rem',color:'#5B21B6',fontWeight:500,cursor:'pointer',whiteSpace:'nowrap' as const,transition:'all 0.15s'}}
                       onMouseEnter={e=>(e.currentTarget.style.background='#EDE9FE')}
@@ -2963,13 +3120,13 @@ export default function GeoHub() {
                   ))}
                 </div>
                 {/* Search bar — immediately below chips */}
-                <div style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.05)',marginBottom:16}}>
+                <div id="live-prompt-input-area" style={{background:'white',borderRadius:14,border:'1.5px solid #E5E7EB',padding:'12px 16px',display:'flex',gap:10,alignItems:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.05)',marginBottom:16}}>
                   <input type="text" value={promptInput} onChange={e=>setPromptInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&runPrompt()} placeholder="Ask anything, e.g. What is the best travel credit card?" style={{flex:1,border:'none',padding:'6px 0',fontSize:'0.9rem',outline:'none',color:'#374151',background:'transparent'}}/>
                   <button onClick={()=>runPrompt()} disabled={promptLoading} style={{background:promptLoading?'#DDD6FE':'#7C3AED',color:'white',border:'none',borderRadius:10,padding:'8px 22px',fontWeight:700,fontSize:'0.88rem',cursor:promptLoading?'not-allowed':'pointer',flexShrink:0,transition:'background 0.15s'}}>{promptLoading?'Asking...':'Ask AI'}</button>
                   {promptHistory.length>0&&<button onClick={()=>setPromptHistory([])} style={{background:'none',border:'1px solid #E5E7EB',borderRadius:8,padding:'7px 12px',fontSize:'0.75rem',color:'#9CA3AF',cursor:'pointer'}}>Clear</button>}
                 </div>
                 {/* Response area */}
-                <div style={{display:'flex',flexDirection:'column' as const,gap:12,flex:1}}>
+                <div id="live-prompt-response-area" style={{display:'flex',flexDirection:'column' as const,gap:12,flex:1}}>
                   {promptHistory.length===0&&!promptLoading?(
                     <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',textAlign:'center' as const,padding:'40px 40px',color:'#9CA3AF',background:'white',borderRadius:14,border:'1px solid #E5E7EB'}}>
                       <div style={{width:56,height:56,borderRadius:'50%',background:'#EDE9FE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.6rem',marginBottom:12}}>🤖</div>
@@ -3000,7 +3157,7 @@ export default function GeoHub() {
               </div>
             ))()}
 
-            {activeTab===8&&(()=>(
+            {false&&(()=>(
               <div>
                 <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>What does this score mean for your business?</div>
                 <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:24}}>Everything you need to understand your score and how to act on it.</div>
@@ -3018,9 +3175,22 @@ export default function GeoHub() {
               </div>
             ))()}
 
+            {activeParent===1&&activeSub===3&&(
+              <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Prominence analysis coming soon.</div>
+            )}
+            {activeParent===1&&activeSub===5&&(
+              <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Share of Voice analysis coming soon.</div>
+            )}
+            {activeParent===2&&activeSub===1&&(
+              <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Competitor topic breakdown coming soon.</div>
+            )}
+            {activeParent===4&&(
+              <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Trends analysis available after your second run.</div>
+            )}
+
           </div>
         </div>
-      )}
-    </main>
+      </div>
+    </div>
   );
 }

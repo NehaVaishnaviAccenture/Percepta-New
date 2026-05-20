@@ -4,7 +4,7 @@ import './globals.css';
 import Link from 'next/link';
 
 const navItems = [
-  { label: 'Overview', href: '/' },
+  { label: 'About', href: '/' },
   { label: 'GEO Hub', href: '/geo-hub' },
   { label: 'Get Support', href: '/get-support' },
 ];
