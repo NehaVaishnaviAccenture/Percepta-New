@@ -14,6 +14,8 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
   const [cmpRef, setCmpRef] = useState(true);
   const [cmpSort, setCmpSort] = useState<{col:string;dir:number}>({col:'rank',dir:1});
 
+  const tierColor=(s:number)=>s>=80?'#00A656':s>=70?'#2563EB':s>=56?'#E8A33D':s>=45?'#E8703D':'#D62F2F';
+
   const geo=result.overall_geo_score??0;
   const vis=result.visibility??0,sent=result.sentiment??0,prom=result.prominence??0,cit=result.citation_share??0,sov=result.share_of_voice??0;
   const comps=resultComps;
@@ -76,21 +78,25 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
             <button onClick={()=>setActiveParent(5)} className="cmpCardLinkBtn">Open Action Plan ›</button>
           </div>
           <div className="cmpLadderList">
+            {/* TODO: consider removing the border-left on badges entirely — the tier color
+                is already communicated by the badge background/text color, and the ladder
+                is short enough that the visual hierarchy reads cleanly without it.
+                Removing it is likely the stronger, less cluttered answer. */}
             {brandAbove&&(
               <div className="cmpLadderRow">
-                <div className="cmpLadderBadge">#{myRank-1}</div>
+                <div className="cmpLadderBadge" style={{borderLeft:`3px solid ${tierColor(brandAbove.GEO)}`}}>#{myRank-1}</div>
                 <div className="cmpLadderBrandName">{brandAbove.Brand}</div>
                 <div className="cmpLadderDelta">+{brandAbove.GEO-geo}</div>
               </div>
             )}
             <div className="cmpLadderRowYou">
-              <div className="cmpLadderBadgeYou">#{myRank}</div>
+              <div className="cmpLadderBadgeYou" style={{borderLeft:`5px solid ${tierColor(geo)}`}}>#{myRank}</div>
               <div className="cmpLadderBrandNameYou">{result.brand_name}</div>
               <div className="cmpLadderScore">{geo}</div>
             </div>
             {brandBelow&&(
               <div className="cmpLadderRow">
-                <div className="cmpLadderBadge">#{myRank+1}</div>
+                <div className="cmpLadderBadge" style={{borderLeft:`3px solid ${tierColor(brandBelow.GEO)}`}}>#{myRank+1}</div>
                 <div className="cmpLadderBrandName">{brandBelow.Brand}</div>
                 <div className="cmpLadderDelta">−{geo-brandBelow.GEO}</div>
               </div>

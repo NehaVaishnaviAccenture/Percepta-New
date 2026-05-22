@@ -2865,6 +2865,149 @@
   padding: 7px 10px;
 }
 
+/* ── PromptsTestedTab (new r5 design) ── */
+.ptRoot { display:flex; flex-direction:column; gap:16px; }
+
+/* Hero */
+.ptHeroBlock { background:#fff; border:1px solid #E5E5E5; padding:28px 32px; }
+.ptHeroEyebrow { margin-bottom:22px; }
+.ptHeroGrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0; align-items:stretch; }
+.ptHeroStat { padding:0 28px; border-left:1px solid #E5E5E5; display:flex; flex-direction:column; justify-content:center; }
+.ptHeroStat:first-child { padding-left:0; border-left:none; }
+.ptHeroStatValue { font-family:var(--font-display); font-weight:500; font-size:56px; line-height:1.05; letter-spacing:-0.02em; color:#0A0A0A; margin-bottom:4px; white-space:nowrap; }
+.ptHeroStatQual { font-size:22px; color:#8E8E8E; margin-left:8px; font-weight:400; letter-spacing:-0.01em; }
+.ptHeroStatLabel { font-family:var(--font-sans); font-size:12px; color:#6B6B6B; line-height:1.4; margin-top:8px; max-width:240px; }
+
+/* Chart block */
+.ptChartBlock { background:#fff; border:1px solid #E5E5E5; padding:24px 28px; }
+.ptVexpHeadline { font-family:var(--font-display); font-size:18px; font-weight:500; color:#0A0A0A; line-height:1.3; letter-spacing:-0.01em; margin-bottom:14px; }
+.ptVexpCtaLine { font-family:var(--font-sans); font-size:12px; color:#4A4A4A; font-style:italic; margin-bottom:14px; }
+
+.ptBubbleCanvas { position:relative; display:grid; grid-template-columns:60px 1fr; width:100%; }
+.ptYAxisTitle { grid-column:1; writing-mode:vertical-rl; transform:rotate(180deg); display:flex; align-items:center; justify-content:center; font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:#6B6B6B; padding:8px 0; }
+.ptPlot { grid-column:2; position:relative; width:100%; height:clamp(320px,46vw,440px); background:#FAFAFA; border-left:1px solid #B8B8B8; border-bottom:1px solid #B8B8B8; }
+.ptXAxisTitle { margin-left:60px; text-align:center; font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:#6B6B6B; margin-top:24px; margin-bottom:8px; }
+
+.ptMidlineV { position:absolute; left:50%; top:0; bottom:0; border-left:1px dashed #D6D6D6; pointer-events:none; }
+.ptMidlineH { position:absolute; top:50%; left:0; right:0; border-top:1px dashed #D6D6D6; pointer-events:none; }
+.ptQLabel { position:absolute; font-family:var(--font-sans); font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; line-height:1; white-space:nowrap; pointer-events:none; z-index:3; }
+.ptBubble { position:absolute; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; text-align:center; line-height:1.1; padding:4px; transform:translate(-50%,-50%); transition:transform 160ms, box-shadow 160ms; }
+.ptBubble:hover { transform:translate(-50%,-50%) scale(1.06); box-shadow:0 4px 14px rgba(0,0,0,0.18); z-index:4 !important; }
+.ptBubble--selected { outline:2px solid #0A0A0A; outline-offset:3px; z-index:5 !important; }
+.ptBubbleName { font-size:11px; pointer-events:none; }
+
+.ptCombinedLegend { padding:12px 16px; background:#FAFAFA; border-left:2px solid #D6D6D6; margin-top:14px; display:flex; flex-wrap:wrap; gap:12px 22px; align-items:center; font-family:var(--font-sans); font-size:12px; color:#2B2B2B; line-height:1.4; }
+.ptLegendEncoding { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.ptLegendGlyph { font-family:var(--font-mono); font-weight:600; font-size:14px; color:#0A0A0A; width:14px; display:inline-flex; justify-content:center; }
+.ptLegendGlyphDot { width:10px; height:10px; border-radius:50%; background:#2B2B2B; display:inline-block; }
+.ptLegendTier { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.ptLegendTierSwatch { width:12px; height:12px; flex-shrink:0; }
+.ptLegendTierName { color:#0A0A0A; font-weight:600; }
+.ptLegendTierRange { font-family:var(--font-mono); font-size:10px; color:#6B6B6B; }
+
+.ptSummarySentence { background:#F2F2F2; padding:14px 18px; font-family:var(--font-sans); font-size:14px; color:#1A1A1A; line-height:1.5; margin-top:12px; }
+.ptSummarySentence--empty { color:#6B6B6B; font-style:italic; }
+
+/* Prompt list block */
+.ptListBlock { background:#fff; border:1px solid #E5E5E5; padding:24px 28px; }
+.ptFilterChipRow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.ptFilterChip { font-family:var(--font-sans); font-size:12px; color:#2B2B2B; background:#fff; border:1px solid #D6D6D6; padding:5px 12px; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+.ptFilterChip--active { background:#F5E6FF; border-color:#E6C2FF; color:#6B00A8; }
+.ptFilterChipX { font-family:var(--font-mono); font-size:10px; color:#6B00A8; cursor:pointer; padding-left:2px; }
+.ptFilterClear { font-family:var(--font-sans); font-size:11px; color:#6B6B6B; cursor:pointer; text-decoration:underline; text-decoration-color:#D6D6D6; margin-left:4px; }
+
+.ptPromptsTable { width:100%; border-collapse:collapse; font-family:var(--font-sans); font-size:13px; }
+.ptPromptsTable thead th { text-align:left; font-family:var(--font-sans); font-size:10px; font-weight:600; color:#6B6B6B; letter-spacing:0.12em; text-transform:uppercase; padding:0 12px 10px; border-bottom:1px solid #D6D6D6; }
+.ptPromptsTable tbody td { padding:14px 12px; border-bottom:1px solid #E5E5E5; vertical-align:middle; color:#1A1A1A; }
+.ptPromptsTable tbody tr:last-child td { border-bottom:none; }
+.ptPromptsTable tbody tr { cursor:pointer; transition:background 80ms; }
+.ptPromptsTable tbody tr:hover td { background:#FAFAFA; }
+.ptColPrompt { width:50%; }
+.ptColRank { width:15%; }
+.ptColBeater { width:30%; }
+.ptColArrow { width:40px; text-align:right; padding-right:0 !important; }
+
+.ptPromptTopicTag { display:inline-block; font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.12em; text-transform:uppercase; color:#6B6B6B; margin-bottom:6px; }
+.ptPromptText { color:#0A0A0A; font-weight:500; line-height:1.4; }
+.ptPromptQuote { color:#2B2B2B; font-weight:400; font-style:italic; }
+
+.ptRankBadge { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:12px; font-weight:600; padding:3px 8px; white-space:nowrap; flex-shrink:0; }
+.ptRankBadge--missed { background:#E5E5E5; color:#4A4A4A; border:1px dashed #B8B8B8; }
+.ptRankOut { font-family:var(--font-mono); font-size:10px; font-weight:500; opacity:0.7; }
+.ptBeaterText { font-family:var(--font-sans); font-size:12px; color:#2B2B2B; line-height:1.45; }
+.ptBeaterWho { color:#0A0A0A; font-weight:500; }
+.ptBeaterNone { color:#8E8E8E; font-style:italic; }
+.ptRowArrow { font-family:var(--font-display); font-size:18px; font-weight:600; color:#A100FF; line-height:1; transition:color 80ms, transform 80ms; display:inline-block; }
+.ptPromptsTable tbody tr:hover .ptRowArrow { color:#6B00A8; transform:translateX(3px); }
+
+.ptListFooter { display:flex; flex-direction:column; margin-top:16px; padding-top:14px; border-top:1px solid #E5E5E5; font-family:var(--font-sans); font-size:12px; color:#6B6B6B; gap:12px; }
+.ptListFooterRow { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.ptPagerNew { display:flex; align-items:center; gap:8px; }
+.ptPagerBtnNew { font-family:var(--font-mono); font-size:11px; color:#2B2B2B; padding:4px 10px; border:1px solid #D6D6D6; background:#fff; cursor:pointer; }
+.ptPagerBtnNew:hover { border-color:#8E8E8E; }
+.ptPagerBtnNew:disabled { color:#B8B8B8; border-color:#E5E5E5; cursor:default; }
+
+/* Teaser strip */
+.ptTeaserStrip { background:#fff; border:1px solid #E5E5E5; border-left:3px solid #A100FF; padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.ptTeaserContent { flex:1; min-width:200px; }
+.ptTeaserEyebrow { font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:#A100FF; margin-bottom:6px; }
+.ptTeaserHeadline { font-family:var(--font-sans); font-size:14px; font-weight:500; color:#0A0A0A; line-height:1.4; }
+.ptTeaserCount { font-family:var(--font-display); color:#6B00A8; font-weight:600; }
+.ptTeaserSub { font-family:var(--font-sans); font-size:12px; color:#6B6B6B; margin-top:4px; }
+.ptTeaserCta { font-family:var(--font-sans); font-size:13px; font-weight:500; color:#fff; background:#0A0A0A; padding:9px 16px; white-space:nowrap; flex-shrink:0; cursor:pointer; border:none; transition:background 160ms; }
+.ptTeaserCta:hover { background:#A100FF; }
+
+/* List + detail screens — both need flex+gap so their block children inherit the spacing */
+.ptListScreen  { display:flex; flex-direction:column; gap:16px; }
+.ptDetailScreen { display:flex; flex-direction:column; gap:16px; }
+.ptBackBar { padding:4px 0 0; display:flex; align-items:center; gap:6px; font-family:var(--font-sans); font-size:13px; margin-bottom:4px; }
+.ptBackLink { color:#6B00A8; text-decoration:none; border-bottom:1px solid #E6C2FF; padding-bottom:1px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; }
+.ptBackLink:hover { color:#A100FF; border-bottom-color:#A100FF; }
+.ptBackArrow { font-family:var(--font-display); font-weight:600; font-size:16px; line-height:1; }
+.ptBackSep { color:#B8B8B8; margin:0 2px; }
+.ptBackCurrent { color:#6B6B6B; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:540px; }
+
+.ptRecapBlock { background:#fff; border:1px solid #E5E5E5; padding:24px 28px; }
+.ptRecapEyebrow { margin-bottom:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-sans); font-size:11px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; line-height:1; }
+.ptRecapTopic { color:#A100FF; }
+.ptRecapSep { color:#B8B8B8; font-weight:400; }
+.ptRecapMeta { color:#6B6B6B; font-weight:500; }
+.ptRecapPrompt { font-family:var(--font-display); font-weight:500; font-size:22px; color:#0A0A0A; line-height:1.35; letter-spacing:-0.015em; margin-bottom:16px; }
+.ptRecapQuote { color:#2B2B2B; font-style:italic; font-weight:400; }
+.ptRecapSummary { font-family:var(--font-sans); font-size:14px; color:#2B2B2B; line-height:1.55; max-width:720px; margin-bottom:16px; }
+.ptRecapMetaRow { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.ptRecapRankBadge { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:14px; font-weight:600; padding:4px 10px; white-space:nowrap; }
+.ptRecapRankBadge--missed { background:#E5E5E5; color:#4A4A4A; border:1px dashed #B8B8B8; padding:3px 9px; }
+.ptRecapDelta { font-family:var(--font-sans); font-size:12px; color:#6B6B6B; line-height:1.4; }
+
+.ptResponseBlock { background:#fff; border:1px solid #E5E5E5; padding:24px 28px; }
+.ptTranscriptMeta { display:flex; align-items:center; gap:14px; font-family:var(--font-sans); font-size:11px; color:#6B6B6B; margin-bottom:14px; flex-wrap:wrap; }
+.ptTranscriptAssistant { font-family:var(--font-mono); font-weight:600; color:#2B2B2B; }
+.ptTranscriptWindow { position:relative; max-height:380px; overflow-y:auto; background:#FAFAFA; border:1px solid #E5E5E5; padding:18px 22px; font-family:var(--font-sans); font-size:14px; color:#1A1A1A; line-height:1.65; }
+.ptTranscriptWindow p { margin:0 0 12px; }
+.ptTranscriptWindow p:last-child { margin-bottom:0; }
+.ptMentionBrand { background:#F5E6FF; color:#350052; padding:1px 4px; font-weight:600; }
+.ptMentionCompetitor { background:#E0F2FE; color:#0C4A6E; padding:1px 4px; font-weight:600; }
+.ptTranscriptCounts { font-family:var(--font-sans); font-size:12px; color:#6B6B6B; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+.ptCountItem { display:inline-flex; align-items:center; gap:6px; }
+.ptCountSwatch { width:10px; height:10px; display:inline-block; }
+
+.ptCompBlock { background:#fff; border:1px solid #E5E5E5; padding:24px 28px; }
+.ptCompGrid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+.ptCompCard { background:#fff; border:1px solid #E5E5E5; padding:16px 18px; }
+.ptCompCardHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.ptCompName { font-family:var(--font-display); font-weight:600; font-size:15px; color:#0A0A0A; letter-spacing:-0.01em; }
+.ptCompRankBadge { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:12px; font-weight:600; padding:3px 8px; white-space:nowrap; flex-shrink:0; }
+.ptCompExcerpt { font-family:var(--font-sans); font-size:13px; color:#2B2B2B; line-height:1.5; margin-bottom:12px; font-style:italic; }
+.ptCompLink { font-family:var(--font-sans); font-size:12px; font-weight:500; color:#6B00A8; text-decoration:none; border-bottom:1px solid #E6C2FF; padding-bottom:1px; cursor:pointer; }
+
+.ptFooterActions { background:#fff; border:1px solid #E5E5E5; padding:18px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.ptFooterActionsText { font-family:var(--font-sans); font-size:13px; color:#4A4A4A; }
+.ptFooterActionsButtons { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+.ptBtnSecondary { font-family:var(--font-sans); font-size:13px; font-weight:500; color:#0A0A0A; background:#fff; border:1px solid #0A0A0A; padding:8px 16px; cursor:pointer; text-decoration:none; transition:background 80ms, color 80ms; }
+.ptBtnSecondary:hover { background:#0A0A0A; color:#fff; }
+.ptBtnTertiary { font-family:var(--font-sans); font-size:12px; font-weight:500; color:#6B00A8; background:none; border:none; padding:8px 4px; cursor:pointer; text-decoration:none; border-bottom:1px solid #E6C2FF; }
+
 /* ── PromptsLiveTab ── */
 
 /* ── Shell ──────────────────────────────────────────────────── */
