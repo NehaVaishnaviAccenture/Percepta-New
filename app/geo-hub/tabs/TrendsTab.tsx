@@ -11,6 +11,6 @@ interface TabProps {
 
 export default function TrendsTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
   return (
-    <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Trends analysis available after your second run.</div>
+    <div className="trPlaceholder">Trends analysis available after your second run.</div>
   );
 }

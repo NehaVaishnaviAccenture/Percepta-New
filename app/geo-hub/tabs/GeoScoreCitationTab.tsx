@@ -96,35 +96,49 @@ export default function GeoScoreCitationTab({ result, resultComps, setActivePare
 
   return (
     <div id="tab-citation">
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:24}}>
-        {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=><div key={label} style={{background:'white',borderRadius:12,padding:'20px 22px',border:'1px solid #E5E7EB'}}><div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.08em',textTransform:'uppercase' as const,marginBottom:10}}>{label}<Tooltip text={tip}/></div><div style={{fontSize:'2.4rem',fontWeight:900,color:'#7C3AED',lineHeight:1,marginBottom:6}}>{val}</div><div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>{sub}</div></div>)}
+      <div className="citMetricsGrid">
+        {[{label:'Citation Score',val:cit,sub:'How authoritatively your brand was cited',tip:'How often and prominently AI models cite your brand.'},{label:'Share of Voice',val:sov,sub:'Your brand mentions as % of all mentions',tip:'Your share of all brand mentions in AI responses.'}].map(({label,val,sub,tip})=>(
+          <div key={label} className="citMetricCard">
+            <div className="citMetricLabel">{label}<Tooltip text={tip}/></div>
+            <div className="citMetricValue">{val}</div>
+            <div className="citMetricSub">{sub}</div>
+          </div>
+        ))}
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:22}}>
-          <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:14}}>Citation by Category</div>
+      <div className="citMainGrid">
+        <div className="citCategoryCard">
+          <div className="citPanelTitle">Citation by Category</div>
           {catEntries.length>0?catEntries.map(([cat,pct],i)=>{
             const isActive = activeCitCat===cat;
-            return <div key={i} style={{marginBottom:10,cursor:'pointer',borderRadius:8,padding:'8px 10px',background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent',transition:'all 0.15s'}} onClick={()=>setActiveCitCat(isActive?null:cat)}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
-                <span style={{fontSize:'0.84rem',color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span>
-                <span style={{fontSize:'0.84rem',fontWeight:700,color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span>
+            return (
+              <div key={i} className="citCatRow" style={{background:isActive?catColors[cat]+'22':'transparent',border:isActive?`1.5px solid ${catColors[cat]}`:'1.5px solid transparent'}} onClick={()=>setActiveCitCat(isActive?null:cat)}>
+                <div className="citCatRowHeader">
+                  <span className="citCatName" style={{color:isActive?catColors[cat]:'#374151',fontWeight:isActive?700:500}}>{cat}</span>
+                  <span className="citCatPct" style={{color:catColors[cat]||'#7C3AED'}}>{Math.round(pct)}%</span>
+                </div>
+                <div className="citCatBarTrack">
+                  <div className="citCatBarFill" style={{background:catColors[cat]||'#7C3AED',width:`${Math.min(Math.round(pct),100)}%`}}/>
+                </div>
+                {isActive&&<div className="citCatFilterHint" style={{color:catColors[cat]}}>Filtering right panel</div>}
               </div>
-              <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden'}}>
-                <div style={{background:catColors[cat]||'#7C3AED',height:7,borderRadius:50,width:`${Math.min(Math.round(pct),100)}%`,transition:'width 0.4s'}}/>
-              </div>
-              {isActive&&<div style={{fontSize:'0.65rem',color:catColors[cat],marginTop:4,fontWeight:600}}>Filtering right panel</div>}
-            </div>;
-          }):<div style={{fontSize:'0.82rem',color:'#9CA3AF'}}>No category data available.</div>}
+            );
+          }):<div className="citCatEmpty">No category data available.</div>}
         </div>
-        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'18px 20px'}}>
-          <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Sources AI is Pulling From {result.brand_name}</div>
-          <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:12}}>
+        <div className="citSourcesCard">
+          <div className="citSourcesTitle">Sources AI is Pulling From {result.brand_name}</div>
+          <div className="citSourcesSubtitle">
             {activeCitCat
-              ? <span>Filtered: <strong style={{color:catColors[activeCitCat]||'#7C3AED'}}>{activeCitCat}</strong> sources — <button onClick={()=>setActiveCitCat(null)} style={{background:'none',border:'none',color:'#7C3AED',fontSize:'0.72rem',fontWeight:600,cursor:'pointer',padding:0}}>Clear filter</button></span>
+              ? <span>Filtered: <strong style={{color:catColors[activeCitCat]||'#7C3AED'}}>{activeCitCat}</strong> sources — <button onClick={()=>setActiveCitCat(null)} className="citFilterClearBtn">Clear filter</button></span>
               : 'Top 10 domains influencing AI responses. Click a category on the left to filter.'}
           </div>
-          <table style={{width:'100%',borderCollapse:'collapse'}}>
-            <thead><tr style={{background:'#FAFAFA'}}>{['RANK','DOMAIN','CATEGORY','SHARE %',''].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left' as const,fontSize:'0.62rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+          <table className="citSourceTable">
+            <thead>
+              <tr className="citTableHeaderRow">
+                {['RANK','DOMAIN','CATEGORY','SHARE %',''].map(h=>(
+                  <th key={h} className="citTableHeaderCell">{h}</th>
+                ))}
+              </tr>
+            </thead>
             <tbody>{(()=>{
               const filtered = displaySources.filter((s:any)=>{
                 if(!activeCitCat) return true;
@@ -135,24 +149,54 @@ export default function GeoScoreCitationTab({ result, resultComps, setActivePare
               // When no category selected: show top 10. When filtered: show all matching (could be few)
               const toShow = activeCitCat ? filtered : filtered.slice(0, 10);
               if(toShow.length === 0) {
-                return <tr><td colSpan={5} style={{padding:'16px 10px',textAlign:'center' as const,fontSize:'0.8rem',color:'#9CA3AF'}}>No sources found for {activeCitCat}. This category has very low citation share.</td></tr>;
+                return <tr><td colSpan={5} className="citSourceEmptyCell">No sources found for {activeCitCat}. This category has very low citation share.</td></tr>;
               }
               return toShow.map((s:any,i:number)=>{
-              const isOwned2 = s.isOwned || domainMatchesBrand(s.domain||'');
-              const cls2 = isOwned2 ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
-              const bw2=Math.min(s.citation_share,100);
-              const isExp2=expandedDomain===s.domain;
-              const realUrls2 = isOwned2 ? (OWNED_URLS[brandKey3]||[`https://www.${s.domain}/credit-cards`]) : (DOMAIN_REAL_URLS[s.domain]||[`https://www.${s.domain}`]);
-              return<React.Fragment key={i}>
-                <tr style={{borderTop:'1px solid #F3F4F6',cursor:'pointer',background:isExp2?'#F9F8FF':isOwned2?'#FAFBFF':'white',borderLeft:isOwned2?'3px solid #7C3AED':'none'}} onClick={()=>setExpandedDomain(isExp2?null:s.domain)}>
-                  <td style={{padding:'8px 10px',fontSize:'0.78rem',color:'#9CA3AF'}}>{s.rank||i+1}</td>
-                  <td style={{padding:'8px 10px'}}><div style={{display:'flex',alignItems:'center',gap:5}}><span style={{fontSize:'0.8rem',fontWeight:600,color:'#7C3AED'}}>{s.domain}</span>{isOwned2&&<span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:4,padding:'1px 5px',fontSize:'0.6rem',fontWeight:700}}>You</span>}</div></td>
-                  <td style={{padding:'8px 10px'}}><span style={{background:cls2.bg,color:cls2.color,borderRadius:6,padding:'2px 7px',fontSize:'0.66rem',fontWeight:600}}>{cls2.label}</span></td>
-                  <td style={{padding:'8px 10px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><div style={{flex:1,background:'#F3F4F6',borderRadius:50,height:4,overflow:'hidden'}}><div style={{background:isOwned2?'#7C3AED':'#10B981',height:4,borderRadius:50,width:`${bw2}%`}}/></div><span style={{fontSize:'0.78rem',fontWeight:700,color:isOwned2?'#7C3AED':'#10B981',width:30}}>{s.citation_share}%</span></div></td>
-                  <td style={{padding:'8px 10px',fontSize:'0.7rem',color:'#9CA3AF',textAlign:'right' as const}}>{isExp2?'^':'v'}</td>
-                </tr>
-                {isExp2&&<tr style={{background:'#F9F8FF'}}><td colSpan={5} style={{padding:'6px 10px 10px 24px'}}><div style={{fontSize:'0.7rem',fontWeight:600,color:'#7C3AED',marginBottom:6}}>Top pages from {s.domain}</div><div style={{display:'flex',flexDirection:'column' as const,gap:4}}>{realUrls2.map((url:string,ui:number)=><div key={ui} style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:14,height:14,borderRadius:'50%',background:'#EDE9FE',color:'#7C3AED',fontSize:'0.55rem',fontWeight:700,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{ui+1}</span><a href={url} target="_blank" rel="noreferrer" style={{fontSize:'0.72rem',color:'#4F46E5',textDecoration:'none'}}>{url}</a></div>)}</div></td></tr>}
-              </React.Fragment>;
+                const isOwned2 = s.isOwned || domainMatchesBrand(s.domain||'');
+                const cls2 = isOwned2 ? {label:'Owned Media',color:'#7C3AED',bg:'#EDE9FE'} : classifyDomain(s.domain||'');
+                const bw2=Math.min(s.citation_share,100);
+                const isExp2=expandedDomain===s.domain;
+                const realUrls2 = isOwned2 ? (OWNED_URLS[brandKey3]||[`https://www.${s.domain}/credit-cards`]) : (DOMAIN_REAL_URLS[s.domain]||[`https://www.${s.domain}`]);
+                return (
+                  <React.Fragment key={i}>
+                    <tr className="citSourceRow" style={{borderTop:'1px solid #F3F4F6',background:isExp2?'#F9F8FF':isOwned2?'#FAFBFF':'white',borderLeft:isOwned2?'3px solid #7C3AED':'none'}} onClick={()=>setExpandedDomain(isExp2?null:s.domain)}>
+                      <td className="citSourceRankCell">{s.rank||i+1}</td>
+                      <td className="citSourceDomainCell">
+                        <div className="citSourceDomainInner">
+                          <span className="citSourceDomainName">{s.domain}</span>
+                          {isOwned2&&<span className="citOwnedBadge">You</span>}
+                        </div>
+                      </td>
+                      <td className="citSourceCatCell">
+                        <span className="citCatChip" style={{background:cls2.bg,color:cls2.color}}>{cls2.label}</span>
+                      </td>
+                      <td className="citSourceShareCell">
+                        <div className="citShareInner">
+                          <div className="citShareBarTrack">
+                            <div className="citShareBarFill" style={{background:isOwned2?'#7C3AED':'#10B981',width:`${bw2}%`}}/>
+                          </div>
+                          <span className="citShareValue" style={{color:isOwned2?'#7C3AED':'#10B981'}}>{s.citation_share}%</span>
+                        </div>
+                      </td>
+                      <td className="citSourceExpandCell">{isExp2?'^':'v'}</td>
+                    </tr>
+                    {isExp2&&(
+                      <tr className="citExpandedRow">
+                        <td colSpan={5} className="citExpandedCell">
+                          <div className="citExpandedLabel">Top pages from {s.domain}</div>
+                          <div className="citUrlList">
+                            {realUrls2.map((url:string,ui:number)=>(
+                              <div key={ui} className="citUrlItem">
+                                <span className="citUrlBullet">{ui+1}</span>
+                                <a href={url} target="_blank" rel="noreferrer" className="citUrlLink">{url}</a>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
               });
             })()}</tbody>
           </table>

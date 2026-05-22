@@ -11,6 +11,6 @@ interface TabProps {
 
 export default function GeoScoreProminenceTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
   return (
-    <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Prominence analysis coming soon.</div>
+    <div className="promPlaceholder">Prominence analysis coming soon.</div>
   );
 }

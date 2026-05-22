@@ -11,6 +11,6 @@ interface TabProps {
 
 export default function GeoScoreSovTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
   return (
-    <div style={{padding:'40px 0',textAlign:'center' as const,color:'#9CA3AF',fontSize:'0.85rem'}}>Share of Voice analysis coming soon.</div>
+    <div className="sovPlaceholder">Share of Voice analysis coming soon.</div>
   );
 }

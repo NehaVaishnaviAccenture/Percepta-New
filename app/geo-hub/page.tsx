@@ -1,4 +1,4 @@
-// v2.3.0: separated files for modularity, competitors subtabs, live prompts subtab
+// v2.4.0: variables and global css files, adjusting tab colors
 
 'use client';
 
@@ -643,10 +643,6 @@ export default function GeoHub() {
     );
   }
 
-  const rSbIcon = (active=false): React.CSSProperties => ({
-    width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
-    color:active?'#A100FF':'rgba(255,255,255,0.25)',background:active?'rgba(161,0,255,0.12)':'transparent',cursor:'pointer',
-  });
   const geo = result?.overall_geo_score ?? 0;
   const gBadge = scoreBadge(geo);
   // Single cap — all tabs show the same 10-competitor field.
@@ -654,72 +650,73 @@ export default function GeoHub() {
   const resultComps = (result?.competitors || []).slice(0, 10);
 
   return (
-    <div id="percepta-shell" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
+    <div id="percepta-shell" className="shell">
 
       {/* ── Sidebar ── */}
-      <aside id="percepta-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-        <Link id="sb-logo" href="/" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8,textDecoration:'none'}}>P</Link>
-        <div id="sb-new-analysis" title="New Analysis" onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+      <aside id="percepta-sidebar" className="sidebar">
+        <Link id="sb-logo" href="/" className="sidebarLogo">P</Link>
+        <div id="sb-new-analysis" title="New Analysis" onClick={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}} className="sidebarNewBtn">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
         </div>
-        <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
-        <div id="sb-home" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
-        <div id="sb-reports" style={rSbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
-        <div id="sb-trends" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
-        <div id="sb-account" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg></div>
-        <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-          <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
-          <Link id="sb-support" href="/get-support" title="Get Support" style={{...rSbIcon(),textDecoration:'none'}}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6"/><path d="M6.5 6.5a1.5 1.5 0 0 1 3 .5c0 1-1.5 1.5-1.5 2.5"/><circle cx="8" cy="12" r=".6" fill="currentColor" stroke="none"/></svg></Link>
-          <div id="sb-user" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div>
-          <div id="sb-logout" style={rSbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg></div>
+        <div className="sidebarDivider"/>
+        <div id="sb-home"    className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
+        <div id="sb-reports" className="sidebarIcon sidebarIcon--active"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
+        <div id="sb-trends"  className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
+        <div id="sb-account" className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg></div>
+        <div className="sidebarBottom">
+          <div className="sidebarDivider" style={{margin:'6px 0'}}/>
+          <Link id="sb-support" href="/get-support" title="Get Support" className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="8" r="6"/><path d="M6.5 6.5a1.5 1.5 0 0 1 3 .5c0 1-1.5 1.5-1.5 2.5"/><circle cx="8" cy="12" r=".6" fill="currentColor" stroke="none"/></svg></Link>
+          <div id="sb-user"   className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div>
+          <div id="sb-logout" className="sidebarIcon"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg></div>
         </div>
       </aside>
 
       {/* ── Content column ── */}
-      <div id="percepta-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+      <div id="percepta-content-col" className="contentCol">
 
         {/* Topbar: breadcrumb + GEO pill */}
-        <div id="percepta-topbar" style={{height:48,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',justifyContent:'space-between',flexShrink:0}}>
-          <div style={{fontSize:13,color:'rgba(255,255,255,0.32)',fontFamily:'Inter,sans-serif'}}>
-            Reports&nbsp;<span style={{color:'rgba(255,255,255,0.2)'}}>/</span>&nbsp;<span style={{color:'rgba(255,255,255,0.85)',fontWeight:500}}>{result?.brand_name||''}</span>
+        <div id="percepta-topbar" className="topbar">
+          <div className="topbarBreadcrumb">
+            Reports&nbsp;<span className="topbarSep">/</span>&nbsp;<span className="topbarBreadcrumbActive">{result?.brand_name||''}</span>
           </div>
           {result&&<span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:600,padding:'3px 10px',background:gBadge.bg,color:gBadge.color,border:`1px solid ${gBadge.color}22`}}>GEO {geo}</span>}
         </div>
 
         {/* Org strip */}
-        <div id="percepta-org-strip" style={{background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',padding:'12px 20px',display:'flex',alignItems:'center',gap:14,flexShrink:0}}>
-          <div style={{width:36,height:36,background:'#A100FF',color:'white',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:13,letterSpacing:'-0.01em',flexShrink:0}}>
+        <div id="percepta-org-strip" className="orgStrip">
+          <div className="orgAvatar">
             {(result?.brand_name||'?').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()}
           </div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:15,fontWeight:500,color:'rgba(255,255,255,0.88)',letterSpacing:'-0.01em',lineHeight:1.2,fontFamily:"'Space Grotesk',sans-serif"}}>{result?.brand_name}</div>
-            <div style={{fontSize:11,color:'rgba(255,255,255,0.28)',marginTop:3}}>
-              <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",color:'#C084FC'}}>{(result?.domain||'').replace(/^https?:\/\//,'').replace(/^www\./,'')}</span>
+            <div className="orgName">{result?.brand_name}</div>
+            <div className="orgMeta">
+              <span className="orgDomain">{(result?.domain||'').replace(/^https?:\/\//,'').replace(/^www\./,'')}</span>
               {result?.ind_label&&<>&nbsp;&nbsp;·&nbsp;&nbsp;{result.ind_label}</>}
             </div>
           </div>
-          {result?.ind_label&&<div style={{fontSize:10,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.3)',padding:'3px 10px',border:'1px solid rgba(255,255,255,0.12)',flexShrink:0,whiteSpace:'nowrap' as const}}>
+          {result?.ind_label&&<div className="orgChip">
             {(result.ind_label||'').split(' ').slice(0,2).join(' ')}
           </div>}
         </div>
 
         {/* Top-level tab bar */}
-        <div id="percepta-tab-bar" style={{background:'#0A0A0A',padding:'0 12px',display:'flex',alignItems:'stretch',borderBottom:'1px solid rgba(255,255,255,0.06)',position:'relative' as const,flexShrink:0}}
+        <div id="percepta-tab-bar" className="tabBar"
           onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);setHoverParent(null);}}>
           {TOP_TABS.map((tab,i)=>(
             <button key={i}
+              className={`tabBtn${activeParent===i?' tabBtn--active':''}`}
               onClick={()=>{setActiveParent(i);setActiveSub(0);setHoverParent(null);}}
-              onMouseEnter={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);hoverTimer.current=setTimeout(()=>setHoverParent(i),120);}}
-              style={{background:hoverParent===i&&activeParent!==i?'rgba(255,255,255,0.03)':'none',border:'none',borderBottom:activeParent===i?'2px solid #A100FF':'2px solid transparent',color:activeParent===i?'rgba(255,255,255,0.9)':hoverParent===i?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.28)',fontWeight:activeParent===i?600:400,fontSize:13,padding:'13px 16px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'color 0.12s,background 0.12s'}}>
+              onMouseEnter={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);hoverTimer.current=setTimeout(()=>setHoverParent(i),120);}}>
               {tab.label}
             </button>
           ))}
           {hoverParent!==null&&TOP_TABS[hoverParent].subs.length>0&&activeParent!==hoverParent&&(
-            <div style={{position:'absolute' as const,top:'100%',left:0,right:0,background:'#1C1C1E',padding:'7px 16px',display:'flex',gap:4,borderBottom:'1px solid rgba(255,255,255,0.08)',boxShadow:'0 8px 24px rgba(0,0,0,0.55)',zIndex:20}}>
+            <div className="tabDropdown">
               {TOP_TABS[hoverParent].subs.map((sub,j)=>(
                 <button key={j}
-                  onClick={()=>{const hp=hoverParent;setActiveParent(hp);setActiveSub(j);setHoverParent(null);}}
-                  style={{background:j===0?'rgba(161,0,255,0.10)':'none',border:j===0?'1px dashed rgba(161,0,255,0.4)':'1px solid transparent',color:j===0?'#C084FC':'rgba(255,255,255,0.38)',fontSize:12,padding:'5px 11px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'all 0.1s',borderRadius:2}}>
+                  id={`tab-dropdown-item-${hoverParent}-${j}`}
+                  className="tabDropdownItem"
+                  onClick={()=>{const hp=hoverParent;setActiveParent(hp);setActiveSub(j);setHoverParent(null);}}>
                   {sub}
                 </button>
               ))}
@@ -729,20 +726,21 @@ export default function GeoHub() {
 
         {/* Persistent sub-tab strip */}
         {TOP_TABS[activeParent].subs.length>0&&(
-          <div id="percepta-subtab-bar" style={{background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',padding:'6px 16px',display:'flex',gap:4,flexShrink:0,position:'relative' as const,zIndex:1}}>
+          <div id="percepta-subtab-bar" className="subtabBar">
             {TOP_TABS[activeParent].subs.map((sub,j)=>(
               <button key={j}
-                onClick={()=>setActiveSub(j)}
-                style={{background:activeSub===j?'rgba(161,0,255,0.12)':'none',border:activeSub===j?'1px solid rgba(161,0,255,0.3)':'1px solid transparent',color:activeSub===j?'#C084FC':'rgba(255,255,255,0.32)',fontSize:12,padding:'5px 11px',cursor:'pointer',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif',transition:'all 0.12s',borderRadius:2}}>
+                id={`subtab-btn-${activeParent}-${j}`}
+                className={`subtabBtn${activeSub===j?' subtabBtn--active':''}`}
+                onClick={()=>setActiveSub(j)}>
                 {sub}
               </button>
             ))}
           </div>
         )}
 
-        {/* White scrollable canvas */}
-        <div id="percepta-canvas" style={{flex:1,background:'#F3F4F6',overflow:'auto'}}>
-          <div style={{padding:'28px 40px 60px'}}>
+        {/* Scrollable content canvas */}
+        <div id="percepta-canvas" className="canvas">
+          <div className="canvasInner">
 
 
 

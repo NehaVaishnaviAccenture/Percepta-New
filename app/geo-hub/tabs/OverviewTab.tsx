@@ -34,76 +34,78 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
     :`AI assistants consistently lead with ${result.brand_name} as the top recommendation. You're in the Authority tier — the focus is on maintaining dominance and monitoring for competitor movements.`;
 
   return (
-    <div id="geo-overall-wrapper" style={{display:'grid',gap:14}}>
+    <div id="geo-overall-wrapper" className="ovWrapper">
       {/* Hero row */}
-      <div id="geo-overall-hero-row" style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,alignItems:'stretch'}}>
+      <div id="geo-overall-hero-row" className="ovHeroRow">
         {/* Score block — spans 2 cols */}
-        <div id="geo-overall-score-block" style={{gridColumn:'span 2',background:'white',border:'1px solid #E5E5E5',padding:'28px 32px',display:'grid',gap:14}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16}}>
-            <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>GEO Score</div>
-            <div style={{display:'flex',gap:18,flexShrink:0}}>
-              <button onClick={()=>{setActiveParent(1);setActiveSub(0);}} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8'}}>See composition ›</button>
-              <button onClick={()=>{setActiveParent(2);setActiveSub(0);}} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8'}}>See competitors ›</button>
+        <div id="geo-overall-score-block" className="ovScoreBlock">
+          <div id="geo-overall-score-header" className="ovScoreHeader">
+            <div id="geo-overall-score-eyebrow" className="ovScoreEyebrow">GEO Score</div>
+            <div id="geo-overall-score-ctas" className="ovScoreCtas">
+              <button id="geo-overall-score-cta-composition" onClick={()=>{setActiveParent(1);setActiveSub(0);}} className="ovLinkBtn">See composition ›</button>
+              <button id="geo-overall-score-cta-competitors" onClick={()=>{setActiveParent(2);setActiveSub(0);}} className="ovLinkBtn">See competitors ›</button>
             </div>
           </div>
-          <div style={{display:'flex',alignItems:'baseline',gap:18,flexWrap:'wrap' as const}}>
-            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:500,fontSize:88,lineHeight:0.95,letterSpacing:'-0.04em',color:'#0A0A0A'}}>
-              {geo}<span style={{color:tier.fill,fontWeight:600}}>.</span>
+          <div id="geo-overall-score-display" className="ovScoreDisplay">
+            <div id="geo-overall-score-number" className="ovScoreNumber">
+              {geo}<span id="geo-overall-score-dot" style={{color:tier.fill,fontWeight:600}}>.</span>
             </div>
-            <div style={{display:'flex',flexDirection:'column' as const,gap:4}}>
-              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:28,letterSpacing:'-0.01em',lineHeight:1.1,color:tier.text}}>{tier.label}</div>
-              <div style={{fontFamily:"'JetBrains Mono','DM Mono',monospace",fontSize:12,color:'#4A4A4A'}}>
-                Ranked <strong style={{color:'#0A0A0A',fontWeight:600}}>#{myRank} of {allBrands.length}</strong>{result.ind_label?` in ${result.ind_label}`:''}
-                {topComp&&topCompGap>0&&<> · {topCompGap} pts behind {topComp.Brand}</>}
+            <div id="geo-overall-score-meta" className="ovScoreMeta">
+              <div id="geo-overall-score-tier" className="ovScoreTier" style={{color:tier.text}}>{tier.label}</div>
+              <div id="geo-overall-score-rank" className="ovScoreRank">
+                Ranked <strong className="geo-overall-rank-num ovScoreRankNum">#{myRank} of {allBrands.length}</strong>{result.ind_label?` in ${result.ind_label}`:''}
+                {topComp&&topCompGap>0&&<> · <span className="geo-overall-rank-gap">{topCompGap} pts behind {topComp.Brand}</span></>}
               </div>
             </div>
           </div>
-          <div style={{fontFamily:'Inter,sans-serif',fontSize:14,color:'#2B2B2B',lineHeight:1.55,maxWidth:'64ch'}}>{interpText}</div>
+          <div id="geo-overall-score-interp" className="ovScoreInterp">{interpText}</div>
         </div>
         {/* Change block */}
-        <div id="geo-overall-change-block" style={{background:'white',border:'1px solid #E5E5E5',padding:'28px 32px',display:'grid',gridTemplateRows:'auto 1fr'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,marginBottom:12}}>
-            <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B',fontFamily:'Inter,sans-serif'}}>Change since last run</div>
-            <button onClick={()=>setActiveParent(4)} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8',whiteSpace:'nowrap' as const}}>Open Trends ›</button>
+        <div id="geo-overall-change-block" className="ovChangeBlock">
+          <div id="geo-overall-change-header" className="ovChangeHeader">
+            <div id="geo-overall-change-eyebrow" className="ovChangeEyebrow">Change since last run</div>
+            <button id="geo-overall-change-cta" onClick={()=>setActiveParent(4)} className="ovLinkBtn" style={{whiteSpace:'nowrap'}}>Open Trends ›</button>
           </div>
-          <div style={{display:'grid',alignContent:'center' as const,gap:12,paddingBottom:8}}>
-            <div style={{fontFamily:'Inter,sans-serif',fontSize:13,color:'#6B6B6B',fontStyle:'italic' as const,lineHeight:1.6}}>
+          <div id="geo-overall-change-content" className="ovChangeContent">
+            <div id="geo-overall-change-empty" className="ovChangeEmpty">
               No previous run to compare.<br/>Run the analysis again to start tracking change over time.
             </div>
           </div>
         </div>
       </div>
       {/* Actions block */}
-      <div id="geo-overall-actions-block" style={{background:'white',border:'1px solid #E5E5E5',padding:'18px 22px'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:16,marginBottom:12}}>
-          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,fontSize:14,letterSpacing:'-0.01em',color:'#0A0A0A'}}>Top 3 priority actions</div>
-          <button onClick={()=>setActiveParent(5)} style={{background:'none',border:'none',borderBottom:'1px solid #D199FF',padding:'0 0 1px',cursor:'pointer',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:500,color:'#6B00A8',whiteSpace:'nowrap' as const}}>Open Action Plan ›</button>
+      <div id="geo-overall-actions-block" className="ovActionsBlock">
+        <div id="geo-overall-actions-header" className="ovActionsHeader">
+          <div id="geo-overall-actions-title" className="ovActionsTitle">Top 3 priority actions</div>
+          <button id="geo-overall-actions-cta" onClick={()=>setActiveParent(5)} className="ovLinkBtn" style={{whiteSpace:'nowrap'}}>Open Action Plan ›</button>
         </div>
         {(recs.length>0?recs:[
           {title:'Build authoritative content in your lowest-scoring query segments'},
           {title:'Expand FAQ coverage for the highest-volume prompt clusters'},
           {title:'Increase citation presence in the top AI-referenced sources'},
         ]).map((rec:any,i:number)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'auto 1fr'+(rec.gain?' auto':''),gap:14,alignItems:'center',padding:'10px 0',borderTop:i===0?'none':'1px solid #E5E5E5',paddingTop:i===0?4:10}}>
-            <span style={{fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:700,letterSpacing:'0.12em',textTransform:'uppercase' as const,padding:'4px 8px',color:'white',background:i===0?'#A100FF':i===1?'#0A0A0A':'#6B6B6B',flexShrink:0}}>P{i+1}</span>
-            <div style={{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:600,color:'#0A0A0A',lineHeight:1.35}}>{rec.action||rec.title||rec.recommendation||JSON.stringify(rec)}</div>
-            {rec.gain&&<div style={{fontFamily:"'JetBrains Mono','DM Mono',monospace",fontSize:12,color:'#6B00A8',fontWeight:600,whiteSpace:'nowrap' as const,textAlign:'right' as const}}>
-              <span style={{display:'block',fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#8E8E8E',marginBottom:1}}>Est gain</span>
+          <div key={i} id={`geo-overall-action-${i+1}`} className={['ovActionRow', i>0&&'ovActionRowBorder'].filter(Boolean).join(' ')}
+            style={{gridTemplateColumns:'auto 1fr'+(rec.gain?' auto':''),paddingTop:i===0?4:10}}>
+            <span className={`geo-overall-action-badge geo-overall-action-badge--p${i+1} ovActionBadge`}
+              style={{background:i===0?'#A100FF':i===1?'#0A0A0A':'#6B6B6B'}}>P{i+1}</span>
+            <div className="geo-overall-action-text ovActionText">{rec.action||rec.title||rec.recommendation||JSON.stringify(rec)}</div>
+            {rec.gain&&<div className="geo-overall-action-gain ovActionGain">
+              <span className="geo-overall-action-gain-label ovActionGainLabel">Est gain</span>
               {rec.gain}
             </div>}
           </div>
         ))}
       </div>
       {/* Teasers */}
-      <div id="geo-overall-teasers" style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:14}}>
+      <div id="geo-overall-teasers" className="ovTeasers">
         {([
-          {from:'From Competitors',headline:topComp?<>Chase leads by <strong style={{color:'#6B00A8'}}>{topCompGap} pts</strong>{result.ind_label?` in ${result.ind_label}`:''}</>:'Run competitor analysis to see where you stand',go:()=>{setActiveParent(2);setActiveSub(0);}},
-          {from:'From Prompts',headline:missedPrompts>0?<><strong style={{color:'#6B00A8'}}>{missedPrompts} prompts</strong> where {result.brand_name} does not appear</>:'Run to see which prompts you are missing',go:()=>{setActiveParent(3);setActiveSub(0);}},
+          {from:'From Competitors',headline:topComp?<>Chase leads by <strong>{topCompGap} pts</strong>{result.ind_label?` in ${result.ind_label}`:''}</>:'Run competitor analysis to see where you stand',go:()=>{setActiveParent(2);setActiveSub(0);}},
+          {from:'From Prompts',headline:missedPrompts>0?<><strong>{missedPrompts} prompts</strong> where {result.brand_name} does not appear</>:'Run to see which prompts you are missing',go:()=>{setActiveParent(3);setActiveSub(0);}},
         ] as {from:string;headline:React.ReactNode;go:()=>void}[]).map((t,i)=>(
-          <div key={i} id={`geo-teaser-${i}`} onClick={t.go} style={{background:'white',border:'1px solid #E5E5E5',borderLeft:'3px solid #A100FF',padding:'14px 18px',cursor:'pointer',position:'relative' as const,display:'grid',gap:4}}>
-            <div style={{fontFamily:'Inter,sans-serif',fontSize:9,fontWeight:700,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'#6B6B6B'}}>{t.from}</div>
-            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:500,fontSize:15,letterSpacing:'-0.01em',lineHeight:1.25,color:'#0A0A0A',paddingRight:20}}>{t.headline}</div>
-            <span style={{position:'absolute' as const,top:14,right:14,color:'#A100FF',fontSize:18,fontWeight:600,lineHeight:1}}>›</span>
+          <div key={i} id={`geo-teaser-${i}`} className="geo-teaser-card ovTeaserCard" onClick={t.go}>
+            <div className="geo-teaser-from ovTeaserFrom">{t.from}</div>
+            <div className="geo-teaser-headline ovTeaserHeadline">{t.headline}</div>
+            <span className="geo-teaser-arrow ovTeaserArrow">›</span>
           </div>
         ))}
       </div>
