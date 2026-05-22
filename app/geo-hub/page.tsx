@@ -1,4 +1,4 @@
-// v2.4.0: variables and global css files, adjusting tab colors
+// v2.5.0: tested prompts complete redo
 
 'use client';
 

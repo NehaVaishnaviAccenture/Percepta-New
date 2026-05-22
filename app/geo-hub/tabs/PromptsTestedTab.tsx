@@ -1,7 +1,5 @@
 'use client';
-
-import React, { useState } from 'react';
-import { MetricCard } from '../lib/tiers';
+import React, { useState, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 
 interface TabProps {
   result: any;
@@ -10,313 +8,707 @@ interface TabProps {
   setActiveSub: (n: number) => void;
 }
 
-export default function PromptsTestedTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
-  const [filterCat, setFilterCat] = useState('All');
-  const [selectedCluster, setSelectedCluster] = useState<string|null>(null);
-  const [queryPage, setQueryPage] = useState(1);
-  const [highlightedBubble, setHighlightedBubble] = useState<string|null>(null);
+// ── Deterministic name-hash (for demo-mode rank spread) ───────────────────────
+function nameHash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) & 0xffff;
+  return h;
+}
 
-  const rd=result.responses_detail||[];
-  const clusters=result.query_clusters||[];
-  const trendingQs=result.trending_queries||[];
+// ── Tier helpers ──────────────────────────────────────────────────────────────
+const TIER_FILL: Record<string, string> = {
+  fragmented: '#E0003B',
+  emerging:   '#F48500',
+  competitive:'#F3B10C',
+  leader:     '#2F6DFF',
+  authority:  '#00AB7B',
+};
+const TIER_TEXT: Record<string, string> = {
+  fragmented: '#fff',
+  emerging:   '#412402',
+  competitive:'#412402',
+  leader:     '#fff',
+  authority:  '#fff',
+};
+const TIER_LABEL: Record<string, string> = {
+  fragmented: 'Fragmented',
+  emerging:   'Emerging',
+  competitive:'Competitive',
+  leader:     'Leader',
+  authority:  'Authority',
+};
+const TIER_RANGE: Record<string, string> = {
+  fragmented: '<45%',
+  emerging:   '45–55%',
+  competitive:'56–69%',
+  leader:     '70–79%',
+  authority:  '≥80%',
+};
+const RANK_TO_TIER: Record<number, string> = { 1:'authority', 2:'leader', 3:'competitive', 4:'emerging', 5:'fragmented' };
+
+function winRateToTier(wr: number): string {
+  if (wr >= 80) return 'authority';
+  if (wr >= 70) return 'leader';
+  if (wr >= 56) return 'competitive';
+  if (wr >= 45) return 'emerging';
+  return 'fragmented';
+}
+
+// ── Rank badge ────────────────────────────────────────────────────────────────
+function RankBadge({ rank, size = 'sm' }: { rank: number; size?: 'sm' | 'lg' }) {
+  if (!rank || rank <= 0) {
+    const cls = size === 'lg' ? 'ptRecapRankBadge ptRecapRankBadge--missed' : 'ptRankBadge ptRankBadge--missed';
+    return <span className={cls}>— missed</span>;
+  }
+  const tier = RANK_TO_TIER[rank] ?? 'fragmented';
+  const fill = TIER_FILL[tier];
+  const text = TIER_TEXT[tier];
+  if (size === 'lg') {
+    return (
+      <span className="ptRecapRankBadge" style={{ background: fill, color: text }}>
+        #{rank}<span className="ptRankOut"> / 5</span>
+      </span>
+    );
+  }
+  return (
+    <span className="ptRankBadge" style={{ background: fill, color: text }}>
+      #{rank}<span className="ptRankOut"> / 5</span>
+    </span>
+  );
+}
+
+// ── Eyebrow ───────────────────────────────────────────────────────────────────
+function Eyebrow({ children, className = '', style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-sans)',
+      fontSize: 10,
+      fontWeight: 600,
+      letterSpacing: '0.16em',
+      textTransform: 'uppercase',
+      color: '#6B6B6B',
+      lineHeight: 1,
+      ...style,
+    }} className={className}>
+      {children}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+export default function PromptsTestedTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
+  // ── Derived data ──────────────────────────────────────────────
+  const rd: any[] = result.responses_detail || [];
+  const clusters: any[] = result.query_clusters || [];
+  const trendingQs: any[] = result.trending_queries || [];
+  const brandName: string = result.brand_name || '';
+  const indLabel: string = result.ind_label || result.industry || '';
+
   const totalQueries = result.total_responses ?? rd.length;
-  const totalMentions = result.responses_with_brand ?? rd.filter((r:any)=>r.mentioned).length;
+  const totalMentions = result.responses_with_brand ?? rd.filter((r: any) => r.mentioned || r.brand_mentioned).length;
   const displayRate = Math.round((totalMentions / Math.max(totalQueries, 1)) * 100);
 
-  const cats2: string[] = ['All',...Array.from(new Set<string>(rd.map((r:any)=>r.category as string).filter((c:string)=>Boolean(c))))];
+  const mentionedWithRank = rd.filter((r: any) => r.mentioned && r.position > 0);
+  const avgRank = mentionedWithRank.length
+    ? Math.round((mentionedWithRank.reduce((s: number, r: any) => s + r.position, 0) / mentionedWithRank.length) * 10) / 10
+    : null;
 
-  return (
-    <div id="tab-prompts">
-      <div className="ptMetricGrid">
-        <MetricCard label="queries run" val={totalQueries} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
-        <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
-        <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
-      </div>
+  // Bubble data from clusters — memoized against result so reference stays stable across renders
+  const bubbleData = useMemo(() => {
+    const _clusters: any[] = result.query_clusters || [];
+    const _rd: any[] = result.responses_detail || [];
+    return _clusters.map((c: any) => {
+      const catRows = _rd.filter((r: any) => r.category === c.category);
+      const mRows = catRows.filter((r: any) => r.mentioned && r.position > 0);
+      const avgRankCluster = mRows.length
+        ? mRows.reduce((s: number, r: any) => s + r.position, 0) / mRows.length
+        // Fallback: use winRate if available, otherwise use a deterministic name-hash spread
+        // so clusters fan across the chart in demo mode rather than all stacking at rank 5.
+        : (c.winRate ?? 0) > 0
+          ? Math.max(1, Math.min(5, 5 - (c.winRate) / 25))
+          : 1.5 + (nameHash(c.category) % 300) / 100; // 1.5–4.5, deterministic per name
+      const tier = winRateToTier(c.winRate ?? 0);
+      return {
+        id: c.category,
+        name: c.category,
+        tier,
+        rank: avgRankCluster,
+        vol: c.total ?? catRows.length,
+        appearances: c.mentioned ?? mRows.length,
+        winRate: c.winRate ?? 0,
+        topCompetitor: c.topCompetitor ?? '',
+      };
+    }).sort((a: any, b: any) => {
+      // Urgent first: high vol AND bad rank (high number = worse)
+      const urgencyScore = (d: any) => (d.vol ?? 0) * (d.rank ?? 3.5);
+      return urgencyScore(b) - urgencyScore(a);
+    });
+  }, [result]);
 
-      {/* CHANGE: Tighter bubble network, centered layout, click highlights connections */}
-      {clusters.length > 0 && (()=>{
-        const maxMentioned = Math.max(...clusters.map((c:any)=>c.mentioned), 1);
-        const grouped = [...clusters].sort((a:any, b:any) => {
-          const g = (c:any) => c.winRate>=60?0:c.winRate>=30?1:c.winRate>0?2:3;
-          return g(a)!==g(b) ? g(a)-g(b) : b.mentioned-a.mentioned;
-        });
+  // ── State ──────────────────────────────────────────────────────
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [hoveredTopicId, setHoveredTopicId]   = useState<string | null>(null);
+  const [view, setView]                         = useState<'list' | 'detail'>('list');
+  const [currentPrompt, setCurrentPrompt]       = useState<any | null>(null);
+  const [page, setPage]                         = useState(1);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-        const nB = grouped.length;
-        // CHANGE: Tighter grid - fewer columns, more centered
-        const W = 940, VPAD = 52;
-        const COLS = Math.min(5, Math.ceil(Math.sqrt(nB * 1.2)));
-        const ROWS = Math.ceil(nB / COLS);
-        // CHANGE: Tighter cell size
-        const cellW = Math.min(160, W / COLS);
-        const cellH = 105;
-        const totalGridW = COLS * cellW;
-        const gridOffsetX = (W - totalGridW) / 2;
-        const H = ROWS * cellH + VPAD;
+  // Bubble positions
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [bubblePositions, setBubblePositions] = useState<Record<string, { x: number; y: number; size: number }>>({});
 
-        const bubbles = grouped.map((c:any, i:number) => {
-          const col = i % COLS;
-          const row = Math.floor(i / COLS);
-          const lastRowCount = nB % COLS || COLS;
-          const isLastRow = row === ROWS - 1;
-          const offsetX = isLastRow ? (COLS - lastRowCount) * cellW / 2 : 0;
-          const x = gridOffsetX + offsetX + col * cellW + cellW / 2;
-          const y = VPAD / 2 + row * cellH + cellH / 2;
-          const r = Math.round(28 + (c.mentioned / maxMentioned) * 18);
-          return {...c, x, y, r};
-        });
+  const ROWS_PER_PAGE = 10;
+  const PLOT_INSET = 60;
+  const MIN_BUBBLE = 42;
+  const MAX_BUBBLE = 100;
+  const MAX_JITTER = 30;
+  const SEP_PAD = 4;
+  const JITTER_ITERS = 12;
 
-        // CHANGE: determine which bubbles are "connected" to highlighted one
-        const getConnectedCategories = (cat: string): Set<string> => {
-          const connected = new Set<string>();
-          const bubble = bubbles.find((b:any) => b.category === cat);
-          if (!bubble) return connected;
-          (bubble.related||[]).forEach((rel:any) => {
-            if (rel.similarity >= 20) connected.add(rel.category);
-          });
-          // Also add any bubble that lists this bubble as related
-          bubbles.forEach((b:any) => {
-            if ((b.related||[]).some((rel:any) => rel.category === cat && rel.similarity >= 20)) {
-              connected.add(b.category);
-            }
-          });
-          return connected;
-        };
+  // Compute bubble positions
+  const computePositions = useCallback(() => {
+    if (!plotRef.current || bubbleData.length === 0) return;
+    const plotW = plotRef.current.offsetWidth;
+    const plotH = plotRef.current.offsetHeight;
+    if (!plotW || !plotH) return;
 
-        const connectedToHighlight = highlightedBubble ? getConnectedCategories(highlightedBubble) : new Set<string>();
+    const maxApp = Math.max(...bubbleData.map((b) => b.appearances), 1);
+    const yMax   = Math.max(...bubbleData.map((b) => b.vol), 1);
 
-        return (
-          <div id="prompts-filter-row" className="ptNetworkWrap">
-            <div className="ptNetworkHeader">
-              <div>
-                <div className="ptNetworkTitle">Query Intelligence Network</div>
-                <div className="ptNetworkSubtitle">Node size = brand appearances  .  Color = win rate  .  Click to filter prompts & highlight connections</div>
-              </div>
-              <div className="ptNetworkLegendRow">
-                {[{color:'#10B981',label:'Winning (>=60%)'},{color:'#F59E0B',label:'Emerging (30-59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
-                  <div key={i} className="ptNetworkLegendItem">
-                    <div className="ptNetworkLegendDot" style={{background:l.color}}/>
-                    <span className="ptNetworkLegendLabel">{l.label}</span>
-                  </div>
-                ))}
-                {(filterCat!=='All'||highlightedBubble)&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}} className="ptNetworkClearBtn">x Clear</button>}
-              </div>
-            </div>
-            <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
-              {Array.from({length:19},(_,i)=>Array.from({length:Math.ceil(H/30)},(_,j)=>(
-                <circle key={`${i}-${j}`} cx={i*(W/18)} cy={j*30} r="1" fill="#1E293B"/>
-              )))}
+    // Initial positions
+    const positions: Array<{ id: string; x: number; y: number; size: number; jx: number; jy: number }> =
+      bubbleData.map((b) => {
+        const size = MIN_BUBBLE + ((b.appearances / maxApp) * (MAX_BUBBLE - MIN_BUBBLE));
+        const xNorm = (5 - b.rank) / 4; // rank 5 → left, rank 1 → right
+        const yNorm = (yMax - b.vol) / yMax; // high vol → top
+        const x = PLOT_INSET + xNorm * (plotW - 2 * PLOT_INSET);
+        const y = PLOT_INSET + yNorm * (plotH - 2 * PLOT_INSET);
+        return { id: b.id, x, y, size, jx: 0, jy: 0 };
+      });
 
-              {/* CHANGE: Lines always visible, but highlighted connections glow when a bubble is selected */}
-              {bubbles.map((b:any)=>(b.related||[]).map((rel:any)=>{
-                const target=bubbles.find((bb:any)=>bb.category===rel.category);
-                if(!target||rel.similarity<20) return null;
-                const isHighlightedConn = highlightedBubble &&
-                  (b.category === highlightedBubble || rel.category === highlightedBubble);
-                const isDimmed = highlightedBubble && !isHighlightedConn;
-                return <line key={`${b.category}-${rel.category}`}
-                  x1={b.x} y1={b.y} x2={target.x} y2={target.y}
-                  stroke={isHighlightedConn ? '#A78BFA' : '#334155'}
-                  strokeWidth={isHighlightedConn ? 2.5 : rel.similarity>60?2:1}
-                  strokeDasharray={rel.similarity>60?undefined:"3,4"}
-                  opacity={isDimmed ? 0.1 : isHighlightedConn ? 0.9 : 0.4}/>;
-              }))}
+    // Collision resolution
+    for (let iter = 0; iter < JITTER_ITERS; iter++) {
+      for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+          const pi = positions[i], pj = positions[j];
+          const dx = (pi.x + pi.jx) - (pj.x + pj.jx);
+          const dy = (pi.y + pi.jy) - (pj.y + pj.jy);
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = (pi.size + pj.size) / 2 + SEP_PAD;
+          if (dist < minDist && dist > 0) {
+            const push = (minDist - dist) / 2;
+            const nx = dx / dist, ny = dy / dist;
+            pi.jx = Math.max(-MAX_JITTER, Math.min(MAX_JITTER, pi.jx + nx * push));
+            pi.jy = Math.max(-MAX_JITTER, Math.min(MAX_JITTER, pi.jy + ny * push));
+            pj.jx = Math.max(-MAX_JITTER, Math.min(MAX_JITTER, pj.jx - nx * push));
+            pj.jy = Math.max(-MAX_JITTER, Math.min(MAX_JITTER, pj.jy - ny * push));
+          }
+        }
+      }
+    }
 
-              {bubbles.map((b:any)=>{
-                const isSelected = filterCat===b.category;
-                const isHighlighted = highlightedBubble === b.category;
-                const isConnected = connectedToHighlight.has(b.category);
-                const isDimmed = highlightedBubble && !isHighlighted && !isConnected;
-                const isUntapped = b.winRate===0 && b.total>0;
-                const nodeColor = b.winRate>=60?'#10B981':b.winRate>=30?'#F59E0B':'#EF4444';
+    const result: Record<string, { x: number; y: number; size: number }> = {};
+    positions.forEach((p) => {
+      result[p.id] = { x: p.x + p.jx, y: p.y + p.jy, size: p.size };
+    });
+    setBubblePositions(result);
+  }, [bubbleData]);
 
-                const words = b.category.split(' ');
-                const maxChars = Math.round(b.r * 0.52);
-                let line1 = '', line2 = '';
-                words.forEach((w:string) => {
-                  if(!line1) { line1 = w; }
-                  else if((line1 + ' ' + w).length <= maxChars) { line1 += ' ' + w; }
-                  else if(!line2) { line2 = w; }
-                  else if((line2 + ' ' + w).length <= maxChars) { line2 += ' ' + w; }
-                });
-                if(line2.length > maxChars) line2 = line2.slice(0, maxChars-1) + '...';
-                const hasTwo = line2.length > 0;
-                const fontSize = b.r >= 38 ? 9.5 : b.r >= 32 ? 9 : 8;
-                const lineH = fontSize + 2;
-                const totalTextH = hasTwo ? lineH * 2 + 8 + lineH : lineH + 8 + lineH;
-                const textStartY = b.y - totalTextH / 2 + fontSize;
-                const textY1 = textStartY;
-                const textY2 = textY1 + lineH;
-                const winY = (hasTwo ? textY2 : textY1) + lineH + 4;
-                const appY = winY + lineH;
-                return (
-                  <g key={b.category} style={{cursor:'pointer'}} onClick={()=>{
-                    // CHANGE: clicking toggles filter AND highlights connections
-                    if(filterCat===b.category && highlightedBubble===b.category){
-                      setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);
-                    } else {
-                      setFilterCat(b.category);setQueryPage(1);setHighlightedBubble(b.category);
-                    }
-                  }}>
-                    <circle cx={b.x} cy={b.y} r={b.r+8} fill={nodeColor} opacity={isDimmed?0.02:isHighlighted?0.2:0.07}/>
-                    <circle cx={b.x} cy={b.y} r={b.r} fill={nodeColor}
-                      opacity={isDimmed?0.25:isConnected?0.95:isHighlighted?1:0.8}
-                      stroke={isHighlighted?'white':isConnected?'#A78BFA':nodeColor}
-                      strokeWidth={isHighlighted?3:isConnected?2:isSelected?2.5:1}/>
-                    {isUntapped&&<circle cx={b.x} cy={b.y} r={b.r+3} fill="none" stroke="#EF4444" strokeWidth="1.5" strokeDasharray="3,3" opacity={isDimmed?0.1:0.7}/>}
-                    <text x={b.x} y={textY1} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line1}</text>
-                    {hasTwo&&<text x={b.x} y={textY2} textAnchor="middle" style={{fontSize,fontWeight:700,fill:isDimmed?'rgba(255,255,255,0.3)':'white',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{line2}</text>}
-                    <text x={b.x} y={winY} textAnchor="middle" style={{fontSize:Math.max(6,fontSize-1),fill:isDimmed?'rgba(255,255,255,0.2)':'rgba(255,255,255,0.9)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.winRate}% win</text>
-                    {b.r>26&&<text x={b.x} y={appY} textAnchor="middle" style={{fontSize:6,fill:isDimmed?'rgba(255,255,255,0.1)':'rgba(255,255,255,0.55)',fontFamily:'Inter,sans-serif',pointerEvents:'none'}}>{b.mentioned} appearances</text>}
-                  </g>
-                );
-              })}
-            </svg>
+  useLayoutEffect(() => {
+    computePositions();
+  }, [computePositions]);
+
+  // ── Derived for active topic ──────────────────────────────────
+  const activeSummaryId = hoveredTopicId ?? selectedTopicId;
+  const activeTopic = activeSummaryId
+    ? bubbleData.find((b) => b.id === activeSummaryId)
+    : null;
+
+  // Filtered prompt list
+  const filteredRows = selectedTopicId
+    ? rd.filter((r: any) => r.category === selectedTopicId)
+    : rd;
+  const totalFiltered = filteredRows.length;
+  const totalPages = Math.ceil(totalFiltered / ROWS_PER_PAGE) || 1;
+  const safePage = Math.min(page, totalPages);
+  const pageRows = filteredRows.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
+  // ── Handlers ──────────────────────────────────────────────────
+  function handleBubbleClick(id: string) {
+    setSelectedTopicId((prev) => (prev === id ? null : id));
+    setPage(1);
+  }
+
+  function handleBubbleEnter(id: string) {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHoveredTopicId(id), 100);
+  }
+
+  function handleBubbleLeave() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoveredTopicId(null);
+  }
+
+  function handleRowClick(item: any) {
+    setCurrentPrompt(item);
+    setView('detail');
+  }
+
+  function handleBack() {
+    setView('list');
+    setCurrentPrompt(null);
+  }
+
+  // ── Summary sentence ──────────────────────────────────────────
+  function buildSummary(topic: (typeof bubbleData)[0] | null): string {
+    if (!topic) return '';
+    const tier = TIER_LABEL[topic.tier] ?? topic.tier;
+    const rankLabel = topic.rank ? `avg rank ${topic.rank.toFixed(1)}` : 'no rank data';
+    return `"${topic.name}" is ${tier.toLowerCase()} territory — ${topic.appearances} appearances across ${topic.vol} prompts (${topic.winRate}% win rate, ${rankLabel}).${topic.topCompetitor ? ` Top rival: ${topic.topCompetitor}.` : ''}`;
+  }
+
+  // ── Highlight text ────────────────────────────────────────────
+  function highlightText(text: string, brand: string, competitor: string): string {
+    if (!text) return '';
+    let escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    if (brand) {
+      escaped = escaped.replace(
+        new RegExp(brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+        (m) => `<span class="ptMentionBrand">${m}</span>`,
+      );
+    }
+    if (competitor && competitor !== brand) {
+      escaped = escaped.replace(
+        new RegExp(competitor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+        (m) => `<span class="ptMentionCompetitor">${m}</span>`,
+      );
+    }
+    return escaped;
+  }
+
+  // ── Recap summary sentence ────────────────────────────────────
+  function buildRecapSummary(item: any): string {
+    if (!item) return '';
+    const missed = !item.mentioned && !item.brand_mentioned;
+    if (missed) return `${brandName} was not mentioned in this AI response. ${item.winner_brand && item.winner_brand !== brandName ? `${item.winner_brand} appeared instead.` : 'No specific brand was highlighted.'}`;
+    if (item.position === 1) return `${brandName} ranked #1 in this response — you're the top recommendation for this query.`;
+    const rank = item.position > 0 ? `#${item.position}` : 'a lower position';
+    return `${brandName} appeared at ${rank} in this response.${item.winner_brand && item.winner_brand !== brandName ? ` ${item.winner_brand} ranked ahead.` : ''}`;
+  }
+
+  // ── Teaser count ──────────────────────────────────────────────
+  const teaserCount = trendingQs.length;
+
+  // ─────────────────────────────────────────────────────────────
+  // DETAIL SCREEN
+  // ─────────────────────────────────────────────────────────────
+  if (view === 'detail' && currentPrompt) {
+    const item = currentPrompt;
+    const missed = !item.mentioned && !item.brand_mentioned;
+    const beater = item.winner_brand && item.winner_brand !== brandName ? item.winner_brand : null;
+    const recapTier = item.position > 0 ? (RANK_TO_TIER[item.position] ?? 'fragmented') : null;
+    const promptTruncated = item.query ? (item.query.length > 60 ? item.query.slice(0, 57) + '…' : item.query) : '';
+    const responseText = item.response_preview || '';
+    const hasResponse = Boolean(responseText);
+    const brandCount = hasResponse
+      ? (responseText.match(new RegExp(brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length
+      : 0;
+    const compCount = hasResponse && beater
+      ? (responseText.match(new RegExp(beater.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length
+      : 0;
+
+    return (
+      <div id="tab-prompts-tested" className="ptRoot">
+        <div id="pt-detail-screen" className="ptDetailScreen">
+          {/* Back bar */}
+          <div className="ptBackBar">
+            <span className="ptBackLink" onClick={handleBack}>
+              <span className="ptBackArrow">‹</span> Tested Prompts
+            </span>
+            <span className="ptBackSep">/</span>
+            <span className="ptBackCurrent">"{promptTruncated}"</span>
           </div>
-        );
-      })()}
 
-      {/* Paginated query table */}
-      {(()=>{
-        const ROWS_PER_PAGE = 10;
-        const allSorted = [...rd].filter((r:any)=>filterCat==='All'||r.category===filterCat).sort((a:any,b:any)=>{const ap=a.position>0?a.position:999,bp=b.position>0?b.position:999;return ap-bp;});
-        const totalPages = Math.ceil(allSorted.length / ROWS_PER_PAGE);
-        const safePage = Math.min(queryPage, Math.max(1, totalPages));
-        const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
-        return (
-          <div id="prompts-list-section" className="ptQueryListSection">
-            <div className="ptQueryListHeader">
-              <div className="ptQueryListTitle">
-                {filterCat==='All'?'All Queries':'Category: '+filterCat}
-                <span className="ptQueryListMeta">({allSorted.length} queries  .  page {safePage} of {totalPages})</span>
-              </div>
-              <div className="ptQueryListFilterRow">
-                <span className="ptQueryListFilterLabel">Filter:</span>
-                <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);setHighlightedBubble(null);}} className="ptQueryListSelect">
-                  {cats2.map(c=><option key={c}>{c}</option>)}
-                </select>
-              </div>
+          {/* Recap block */}
+          <div className="ptRecapBlock" id="pt-recap-block">
+            <div className="ptRecapEyebrow">
+              {item.category && <span className="ptRecapTopic">{item.category.toUpperCase()}</span>}
+              {item.category && <span className="ptRecapSep">·</span>}
+              <span className="ptRecapMeta">RUN 1</span>
             </div>
-            <table className="ptTable">
-              <thead><tr className="ptTableHead">{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} className="ptTableHeadCell">{h}</th>)}</tr></thead>
-              <tbody>{pageRows.map((item:any,i:number)=>{
-                const globalIdx = (safePage-1)*ROWS_PER_PAGE + i + 1;
-                const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
-                const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
-                return <tr key={i} className="ptTableRow" style={{background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
-                  <td className="ptTableCellNum">{globalIdx}</td>
-                  <td className="ptTableCell">
-                    <div className="ptQueryTagRow">
-                      <span className="ptQueryCatTag">{item.category}</span>
-                      {item.mentioned?<span className="ptQueryAppeared">Appeared</span>:<span className="ptQueryMissed">Missed</span>}
-                    </div>
-                    <div className="ptQueryText">{item.query}</div>
-                  </td>
-                  <td className="ptTableCellRank" style={{color:rankColor}}>{rankLabel}</td>
-                  <td className="ptTableCellBeater">{beater?<span className="ptBeaterBadge">👑 {beater}</span>:rp===1?<span className="ptFirstBadge">You&apos;re #1</span>:<span className="ptNoBeatLabel">--</span>}</td>
-                </tr>;
-              })}</tbody>
-            </table>
-            {totalPages > 1 && (
-              <div id="prompts-pagination" className="ptPagination">
-                <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===1?'#F9FAFB':'white',color:safePage===1?'#D1D5DB':'#374151',cursor:safePage===1?'default':'pointer',fontSize:'0.75rem'}}>Prev</button>
-                {Array.from({length:Math.min(totalPages,10)},(_,i)=>{
-                  const pg = totalPages<=10 ? i+1 : safePage<=5 ? i+1 : safePage>=totalPages-4 ? totalPages-9+i : safePage-4+i;
-                  return <button key={pg} onClick={()=>setQueryPage(pg)} style={{padding:'5px 10px',borderRadius:6,border:'1px solid '+(pg===safePage?'#7C3AED':'#E5E7EB'),background:pg===safePage?'#7C3AED':'white',color:pg===safePage?'white':'#374151',cursor:'pointer',fontSize:'0.75rem',fontWeight:pg===safePage?700:400}}>{pg}</button>;
-                })}
-                <button onClick={()=>setQueryPage(p=>Math.min(totalPages,p+1))} disabled={safePage===totalPages} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===totalPages?'#F9FAFB':'white',color:safePage===totalPages?'#D1D5DB':'#374151',cursor:safePage===totalPages?'default':'pointer',fontSize:'0.75rem'}}>Next</button>
+            <div className="ptRecapPrompt">
+              <span className="ptRecapQuote">"{item.query}"</span>
+            </div>
+            <div className="ptRecapSummary">{buildRecapSummary(item)}</div>
+            <div className="ptRecapMetaRow">
+              <RankBadge rank={item.position} size="lg" />
+              <span className="ptRecapDelta">↓1 from previous run (#{ item.position > 1 ? item.position - 1 : item.position }) — placeholder</span>
+            </div>
+          </div>
+
+          {/* Response block */}
+          <div className="ptResponseBlock" id="pt-response-block">
+            <Eyebrow style={{ marginBottom: 14 }}>AI RESPONSE · FULL TRANSCRIPT</Eyebrow>
+            <div className="ptTranscriptMeta">
+              <span><span className="ptTranscriptAssistant">Assistant:</span> GPT-4o</span>
+              <span>·</span>
+              <span>Captured [run timestamp]</span>
+              {hasResponse && (
+                <>
+                  <span style={{ marginLeft: 'auto' }} />
+                  <span className="ptTranscriptCounts">
+                    {brandName && (
+                      <span className="ptCountItem">
+                        <span className="ptCountSwatch" style={{ background: '#F5E6FF', border: '1px solid #E6C2FF' }} />
+                        {brandName} ×{brandCount}
+                      </span>
+                    )}
+                    {beater && (
+                      <span className="ptCountItem">
+                        <span className="ptCountSwatch" style={{ background: '#E0F2FE', border: '1px solid #BAE6FD' }} />
+                        {beater} ×{compCount}
+                      </span>
+                    )}
+                  </span>
+                </>
+              )}
+            </div>
+            <div className="ptTranscriptWindow">
+              {hasResponse ? (
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: highlightText(responseText, brandName, beater ?? ''),
+                  }}
+                />
+              ) : (
+                <p style={{ color: '#6B6B6B', fontStyle: 'italic' }}>
+                  Full AI response not captured for this prompt. Run the prompt live to see the complete transcript.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Competitor breakdown */}
+          <div className="ptCompBlock" id="pt-comp-block">
+            <Eyebrow style={{ marginBottom: 14 }}>COMPETITOR BREAKDOWN</Eyebrow>
+            {!beater || item.position === 1 ? (
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: TIER_FILL.authority, padding: '12px 0' }}>
+                YOU RANKED #1 — NO COMPETITORS ABOVE
+              </div>
+            ) : (
+              <div className="ptCompGrid">
+                <div className="ptCompCard">
+                  <div className="ptCompCardHeader">
+                    <span className="ptCompName">{beater}</span>
+                    <span className="ptCompRankBadge" style={{ background: TIER_FILL[RANK_TO_TIER[1] ?? 'authority'], color: TIER_TEXT[RANK_TO_TIER[1] ?? 'authority'] }}>
+                      #1 <span className="ptRankOut">/ 5</span>
+                    </span>
+                  </div>
+                  <div className="ptCompExcerpt">
+                    "{beater} appeared as the top recommendation for this query type."
+                  </div>
+                  <span className="ptCompLink">See {beater}&apos;s GEO profile →</span>
+                </div>
               </div>
             )}
           </div>
-        );
-      })()}
 
-      {/* CHANGE: "What Market is Asking" - removed year references, removed all volume data */}
-      {trendingQs.length > 0 && (()=>{
-        const oppOrder = (o:string) => o==='High'?0:o==='Medium'?1:2;
-        const highOpp = [...trendingQs]
-          // CHANGE: strip any year references (2024, 2025, 2026, etc.) from queries
-          .map((tq:any) => ({
-            ...tq,
-            query: (tq.query||'').replace(/\bin\s+20\d{2}\b/gi,'').replace(/\s+/g,' ').trim()
-          }))
-          .sort((a:any,b:any)=>oppOrder(a.opportunity)-oppOrder(b.opportunity))
-          .slice(0,10);
-
-        const getCluster = (tqCat:string) => {
-          const tl = tqCat.toLowerCase();
-          return clusters.find((c:any)=>{
-            const cl = (c.category||'').toLowerCase();
-            if(cl.includes(tl)||tl.includes(cl)) return true;
-            const tWords = tl.split('&').join(' ').split(',').join(' ').split(' ').filter((w:string)=>w.length>0);
-            const cWords = cl.split('&').join(' ').split(',').join(' ').split(' ').filter((w:string)=>w.length>0);
-            return tWords.some((w:string)=>w.length>3&&cWords.some((cw:string)=>cw.includes(w)||w.includes(cw)));
-          }) || null;
-        };
-        if(highOpp.length===0) return null;
-        return (
-          <div className="ptTrendingSection">
-            <div className="ptTrendingHeader">
-              <span style={{fontSize:'1rem'}}>🔥</span>
-              <div className="ptTrendingTitle">What the Market is Asking Right Now</div>
-            </div>
-            <div className="ptTrendingSubtitle">
-              Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry} beyond what we tested.
-            </div>
-            <div className="ptTrendingGrid">
-              {highOpp.map((tq:any,i:number)=>{
-                const trendColor=tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
-                const trendBg=tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
-                const cluster=getCluster(tq.category);
-                const brandWinRate=cluster?.winRate??null;
-                const brandWinning=brandWinRate!==null&&brandWinRate>=40;
-                const topComp=cluster?.topCompetitor||null;
-                const isOpen=selectedCluster===`trend-${i}`;
-                return (
-                  <div key={i} className="ptTrendingCard" style={{border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`}}>
-                    <div className="ptTrendingCardTop" onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
-                      <div className="ptTrendingTagRow">
-                        <span className="ptTrendingTag" style={{background:trendBg,color:trendColor}}>{tq.trend==='Rising'?'^ Rising':tq.trend==='Peak'?'o Peak':'Stable'}</span>
-                        <span className="ptTrendingCatTag">{tq.category}</span>
-                        {/* CHANGE: volume data (daily estimates) removed entirely */}
-                      </div>
-                      <div className="ptTrendingQuery">{tq.query}</div>
-                      <div className="ptTrendingMetaRow">
-                        {topComp&&<span className="ptTrendingLeaderTag">👑 {topComp} leading</span>}
-                        {brandWinRate!==null
-                          ?<span style={{fontSize:'0.65rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win</span>
-                          :<span className="ptTrendingNotTestedLabel">New category, not yet tested</span>
-                        }
-                        <span className="ptTrendingToggle">{isOpen?'^':'v'}</span>
-                      </div>
-                    </div>
-                    {isOpen&&(
-                      <div className="ptTrendingExpanded">
-                        {/* CHANGE: removed AI Queries/Day row from expanded dropdown */}
-                        <div className="ptTrendingStatsGrid">
-                          {[
-                            {label:'Currently Leading',val:topComp||'No clear leader',color:'#F59E0B'},
-                            {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'Not tested',color:brandWinning?'#10B981':'#EF4444'},
-                            {label:'Trend Signal',val:tq.trend,color:trendColor},
-                            {label:'Opportunity',val:tq.opportunity||'--',color:'#7C3AED'},
-                          ].map((s,j)=>(
-                            <div key={j} className="ptTrendingStatCard">
-                              <div className="ptTrendingStatLabel">{s.label.toUpperCase()}</div>
-                              <div className="ptTrendingStatVal" style={{color:s.color}}>{s.val}</div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="ptTrendingInsight">
-                          💡 {topComp?`${topComp.split(' ')[0]} currently leads this query type.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is showing strength here -- invest to consolidate.`:` ${result.brand_name} has room to own this with targeted content.`):'Consider testing this category in your next analysis.'}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+          {/* Footer actions */}
+          <div className="ptFooterActions" id="pt-footer-actions">
+            <span className="ptFooterActionsText">Prompt ID: run-1 · {item.category}</span>
+            <div className="ptFooterActionsButtons">
+              <button className="ptBtnTertiary">Export this prompt&apos;s data ↓</button>
+              <button className="ptBtnSecondary">Run this prompt live →</button>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // LIST SCREEN
+  // ─────────────────────────────────────────────────────────────
+  return (
+    <div id="tab-prompts-tested" className="ptRoot">
+      <div id="pt-list-screen" className="ptListScreen">
+
+        {/* ── Block 1: Hero stats ─────────────────────────────── */}
+        <div className="ptHeroBlock" id="pt-hero-block">
+          <div className="ptHeroEyebrow">
+            <Eyebrow>PROMPTS · RUN 1 ·{' '}
+              <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              </span>
+            </Eyebrow>
+          </div>
+          <div className="ptHeroGrid">
+            <div className="ptHeroStat">
+              <div className="ptHeroStatValue">{totalQueries.toLocaleString()}</div>
+              <div className="ptHeroStatLabel">Total prompts run this period</div>
+            </div>
+            <div className="ptHeroStat">
+              <div className="ptHeroStatValue">
+                {totalMentions.toLocaleString()}
+                <span className="ptHeroStatQual">{displayRate}%</span>
+              </div>
+              <div className="ptHeroStatLabel">Appearances — prompts where {brandName || 'your brand'} was mentioned</div>
+            </div>
+            <div className="ptHeroStat">
+              <div className="ptHeroStatValue">
+                {avgRank !== null ? avgRank.toFixed(1) : '—'}
+                <span className="ptHeroStatQual">/ 5</span>
+              </div>
+              <div className="ptHeroStatLabel">Avg rank when {brandName || 'your brand'} appeared</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 20, borderTop: '1px solid #E5E5E5', paddingTop: 14 }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#6B00A8', cursor: 'pointer', borderBottom: '1px solid #E6C2FF' }}>
+              Download prompt set ↓
+            </span>
+          </div>
+        </div>
+
+        {/* ── Block 2: Bubble chart ───────────────────────────── */}
+        {bubbleData.length > 0 && (() => {
+          const maxApp = Math.max(...bubbleData.map((b) => b.appearances), 1);
+          const maxVol = Math.max(...bubbleData.map((b) => b.vol), 1);
+          const midVol = maxVol / 2;
+
+          const tiers: Array<keyof typeof TIER_FILL> = ['fragmented', 'emerging', 'competitive', 'leader', 'authority'];
+
+          return (
+            <div className="ptChartBlock" id="pt-chart-block">
+              <Eyebrow style={{ marginBottom: 10 }}>TOPIC PERFORMANCE · {bubbleData.length} TOPICS</Eyebrow>
+              <div className="ptVexpHeadline">Where are your strongest topics, and where are the gaps?</div>
+              <div className="ptVexpCtaLine">Click any bubble to filter the list below.</div>
+
+              {/* Chart canvas */}
+              <div className="ptBubbleCanvas">
+                {/* Y-axis title */}
+                <div className="ptYAxisTitle">Volume (prompts)</div>
+
+                {/* Plot area */}
+                <div
+                  className="ptPlot"
+                  id="pt-plot"
+                  ref={plotRef}
+                  style={{ position: 'relative' }}
+                >
+                  {/* Quadrant midlines */}
+                  <div className="ptMidlineV" />
+                  <div className="ptMidlineH" />
+
+                  {/* Quadrant labels */}
+                  <div className="ptQLabel" style={{ top: 8, left: 8, color: TIER_FILL.fragmented }}>Urgent gaps</div>
+                  <div className="ptQLabel" style={{ top: 8, right: 8, color: TIER_FILL.authority }}>Strongholds</div>
+                  <div className="ptQLabel" style={{ bottom: 8, left: 8, color: '#8E8E8E' }}>Low priority</div>
+                  <div className="ptQLabel" style={{ bottom: 8, right: 8, color: '#6B6B6B' }}>Niche wins</div>
+
+                  {/* Bubbles */}
+                  {bubbleData.map((b) => {
+                    const pos = bubblePositions[b.id];
+                    if (!pos) return null;
+                    const fill = TIER_FILL[b.tier] ?? '#8E8E8E';
+                    const textColor = TIER_TEXT[b.tier] ?? '#fff';
+                    const isSelected = selectedTopicId === b.id;
+                    const fontSize = pos.size > 70 ? 12 : pos.size > 55 ? 11 : 10;
+                    return (
+                      <div
+                        key={b.id}
+                        className={`ptBubble${isSelected ? ' ptBubble--selected' : ''}`}
+                        style={{
+                          left: pos.x,
+                          top: pos.y,
+                          width: pos.size,
+                          height: pos.size,
+                          background: fill,
+                          color: textColor,
+                          fontSize,
+                          zIndex: isSelected ? 5 : 2,
+                        }}
+                        onClick={() => handleBubbleClick(b.id)}
+                        onMouseEnter={() => handleBubbleEnter(b.id)}
+                        onMouseLeave={handleBubbleLeave}
+                      >
+                        <span className="ptBubbleName">{b.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* X-axis title */}
+              <div className="ptXAxisTitle">← Rank 5 (lower) &nbsp;&nbsp; Avg rank &nbsp;&nbsp; Rank 1 (higher) →</div>
+
+              {/* Legend */}
+              <div className="ptCombinedLegend">
+                <div className="ptLegendEncoding">
+                  <span className="ptLegendGlyph">↔</span>
+                  Rank
+                </div>
+                <div className="ptLegendEncoding">
+                  <span className="ptLegendGlyph">↕</span>
+                  Volume
+                </div>
+                <div className="ptLegendEncoding">
+                  <span className="ptLegendGlyphDot" />
+                  Size = appearances
+                </div>
+                {tiers.map((tier) => (
+                  <div key={tier} className="ptLegendTier">
+                    <span
+                      className="ptLegendTierSwatch"
+                      style={{ background: TIER_FILL[tier] }}
+                    />
+                    <span className="ptLegendTierName">{TIER_LABEL[tier]}</span>
+                    <span className="ptLegendTierRange">{TIER_RANGE[tier]}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Summary sentence */}
+              <div
+                id="pt-summary-sentence"
+                className={`ptSummarySentence${activeTopic ? '' : ' ptSummarySentence--empty'}`}
+              >
+                {activeTopic
+                  ? buildSummary(activeTopic)
+                  : 'Hover or click a bubble to see topic details.'}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Block 3: Prompt list ────────────────────────────── */}
+        <div className="ptListBlock" id="pt-list-block">
+          <Eyebrow style={{ marginBottom: 14 }}>
+            PROMPT LIST · {totalFiltered} OF {totalQueries}
+          </Eyebrow>
+
+          {/* Filter chip */}
+          {selectedTopicId && (
+            <div className="ptFilterChipRow" id="pt-filter-chip-row">
+              <span
+                className="ptFilterChip ptFilterChip--active"
+                onClick={() => { setSelectedTopicId(null); setPage(1); }}
+              >
+                {selectedTopicId}
+                <span className="ptFilterChipX">×</span>
+              </span>
+              <span
+                className="ptFilterClear"
+                onClick={() => { setSelectedTopicId(null); setPage(1); }}
+              >
+                Clear filters
+              </span>
+            </div>
+          )}
+
+          {/* Table */}
+          <table className="ptPromptsTable">
+            <thead>
+              <tr>
+                <th className="ptColPrompt">Prompt</th>
+                <th className="ptColRank">Your rank</th>
+                <th className="ptColBeater">Who beat you</th>
+                <th className="ptColArrow" />
+              </tr>
+            </thead>
+            <tbody id="pt-prompt-table-body">
+              {pageRows.map((item: any, i: number) => {
+                const beater = item.winner_brand && item.winner_brand !== brandName ? item.winner_brand : null;
+                return (
+                  <tr key={i} onClick={() => handleRowClick(item)}>
+                    <td className="ptColPrompt">
+                      {!selectedTopicId && item.category && (
+                        <div className="ptPromptTopicTag">{item.category}</div>
+                      )}
+                      <div className="ptPromptText">{item.query}</div>
+                    </td>
+                    <td className="ptColRank">
+                      <RankBadge rank={item.position} />
+                    </td>
+                    <td className="ptColBeater">
+                      {beater ? (
+                        <span className="ptBeaterText">
+                          <span className="ptBeaterWho">{beater}</span> ranked above you
+                        </span>
+                      ) : item.position === 1 ? (
+                        <span className="ptBeaterNone">— You&apos;re #1</span>
+                      ) : (
+                        <span className="ptBeaterNone">—</span>
+                      )}
+                    </td>
+                    <td className="ptColArrow">
+                      <span className="ptRowArrow">›</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {pageRows.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ padding: '24px 12px', color: '#8E8E8E', fontStyle: 'italic', textAlign: 'center' }}>
+                    No prompts found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* Footer */}
+          <div className="ptListFooter">
+            <div className="ptListFooterRow">
+              <span id="pt-list-footer-text">
+                Showing {Math.min((safePage - 1) * ROWS_PER_PAGE + 1, totalFiltered)}–{Math.min(safePage * ROWS_PER_PAGE, totalFiltered)} of {totalFiltered} prompts
+              </span>
+              <div className="ptPagerNew">
+                <button
+                  className="ptPagerBtnNew"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                >
+                  ← Prev
+                </button>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#4A4A4A' }}>
+                  {safePage} / {totalPages}
+                </span>
+                <button
+                  className="ptPagerBtnNew"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage >= totalPages}
+                >
+                  Next →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Block 4: Teaser strip ───────────────────────────── */}
+        {teaserCount > 0 && (
+          <div className="ptTeaserStrip" id="pt-teaser-strip">
+            <div className="ptTeaserContent">
+              <div className="ptTeaserEyebrow">EXPAND YOUR PROMPT SET</div>
+              <div className="ptTeaserHeadline">
+                <span className="ptTeaserCount">{teaserCount}</span> trending prompts in{' '}
+                {indLabel || 'your industry'} you&apos;re not testing yet.
+              </div>
+              <div className="ptTeaserSub">Close coverage gaps before competitors do.</div>
+            </div>
+            <button
+              className="ptTeaserCta"
+              onClick={() => setActiveParent(5)}
+            >
+              See in Action Plan →
+            </button>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
