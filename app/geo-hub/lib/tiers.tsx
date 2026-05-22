@@ -86,11 +86,11 @@ export function scoreBadge(s: number) {
 export function geoTier(s:number){
   // text = solid mid-range tier color (used for tier name label on white bg, consistent with tOf system)
   // fill = light pastel shade (used for the decorative dot accent next to the score)
-  if(s>=80) return {label:'Authority',  tier:5, text:'#00AB7B', fill:'#86EFAC'};
-  if(s>=65) return {label:'Leader',     tier:4, text:'#2F6DFF', fill:'#93C5FD'};
-  if(s>=45) return {label:'Competitive',tier:3, text:'#D97706', fill:'#FCD34D'};
-  if(s>=26) return {label:'Emerging',   tier:2, text:'#EA580C', fill:'#FDBA74'};
-  return           {label:'Fragmented', tier:1, text:'#DC2626', fill:'#FCA5A5'};
+  if(s>=80) return {label:'Authority',  tier:5, text:'#007653', fill:'#00AB7B'};
+  if(s>=65) return {label:'Leader',     tier:4, text:'#043BCC', fill:'#2F6DFF'};
+  if(s>=45) return {label:'Competitive',tier:3, text:'#996E00', fill:'#F3B10C'};
+  if(s>=26) return {label:'Emerging',   tier:2, text:'#B15F00', fill:'#F48500'};
+  return           {label:'Fragmented', tier:1, text:'#B7002F', fill:'#E0003B'};
 }
 
 export function bandOf(s: number) {

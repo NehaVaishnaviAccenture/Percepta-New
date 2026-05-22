@@ -145,42 +145,47 @@ export default function GeoScoreSentimentTab({ result, resultComps, setActivePar
 
   return (
     <div id="tab-sentiment">
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+      <div className="sentStatsGrid">
         {[
           {label:'sentiment score',val:rawSent,sub:smood,tip:'How positively AI describes your brand.'},
           {label:'prominence score',val:prom,sub:pmood,tip:'How early in AI responses your brand is mentioned.'},
           {label:'average rank',val:avgRank,sub:'Average position within each AI response',tip:'Average position when mentioned in AI responses.'}
         ].map(({label,val,sub,tip}:any)=>(
-          <div key={label} style={{background:'white',borderRadius:12,padding:'18px 16px',border:'1px solid #E5E7EB'}}>
-            <div style={{display:'flex',alignItems:'center',fontSize:'0.65rem',fontWeight:600,color:'#9CA3AF',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:8}}>{label}<Tooltip text={tip}/></div>
-            <div style={{fontSize:'1.8rem',fontWeight:800,color:'#7C3AED',lineHeight:1}}>{val}</div>
-            <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:3}}>{sub}</div>
+          <div key={label} className="sentStatCard">
+            <div className="sentStatLabel">{label}<Tooltip text={tip}/></div>
+            <div className="sentStatValue">{val}</div>
+            <div className="sentStatSub">{sub}</div>
           </div>
         ))}
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20,alignItems:'stretch'}}>
-        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:24,display:'flex',flexDirection:'column' as const}}>
-          <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:4}}>Product Feature Positioning</div>
-          <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:4}}>How your brand scores on key product decision drivers. Hover each point for detail.</div>
-          <div style={{flex:1,display:'flex',flexDirection:'column' as const,justifyContent:'center'}}>
+      <div className="sentChartsGrid">
+        <div className="sentChartCard">
+          <div className="sentChartTitle">Product Feature Positioning</div>
+          <div className="sentChartDesc">How your brand scores on key product decision drivers. Hover each point for detail.</div>
+          <div className="sentChartBody">
             <RadarChart sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
           </div>
         </div>
         <SentimentHeatmap brandName={result.brand_name} sent={rawSent} prom={prom} vis={vis} cit={cit} sov={sov} competitors={resultComps} indKey={result.ind_key||'gen'} rd={result.responses_detail||[]}/>
       </div>
       {/* Sankey: Products → GEO Signals → GEO Score → AI Opportunity */}
-      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'20px 24px',marginTop:20}}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:14}}>
+      <div className="sentSankeyCard">
+        <div className="sentSankeyHeader">
           <div>
-            <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Brand Signal Flow GEO Score Composition</div>
-            <div style={{fontSize:'0.73rem',color:'#9CA3AF',marginTop:2}}>How your products flow through GEO signals to your score and AI opportunity. Click any node or stream to highlight its path.</div>
+            <div className="sentSankeyTitle">Brand Signal Flow GEO Score Composition</div>
+            <div className="sentSankeyDesc">How your products flow through GEO signals to your score and AI opportunity. Click any node or stream to highlight its path.</div>
           </div>
-          <div style={{background:'#F8FAFC',borderRadius:8,border:'1px solid #E5E7EB',padding:'8px 12px',fontSize:'0.66rem',color:'#6B7280',lineHeight:1.6,maxWidth:210,flexShrink:0}}>
-            <div style={{fontWeight:700,color:'#374151',marginBottom:4}}>AI Opportunity (right column)</div>
-            {opportunities.map((o,i)=><div key={i} style={{display:'flex',gap:4,marginBottom:2}}><div style={{width:6,height:6,borderRadius:1,background:o.color,flexShrink:0,marginTop:3}}/><span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span></div>)}
+          <div className="sentSankeyLegendBox">
+            <div className="sentSankeyLegendTitle">AI Opportunity (right column)</div>
+            {opportunities.map((o,i)=>(
+              <div key={i} className="sentSankeyLegendItem">
+                <div className="sentSankeyLegendDot" style={{background:o.color}}/>
+                <span><strong style={{color:o.color}}>{o.label}:</strong> {o.desc}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{overflowX:'auto' as const}}>
+        <div className="sentSankeyScrollArea">
         <svg viewBox={`0 0 ${W4} ${H4}`} style={{width:'100%',minWidth:700,display:'block'}}
           onClick={()=>setHovPath(null)}>
           {/* Headers */}
@@ -240,13 +245,38 @@ export default function GeoScoreSentimentTab({ result, resultComps, setActivePar
           {hovPath&&<text x={W4-30} y={padT4} textAnchor="end" style={{fontSize:8,fill:'#9CA3AF',fontFamily:'Inter,sans-serif',fontStyle:'italic'}}>Click anywhere to clear · Highlighted: {hovPath}</text>}
         </svg>
         </div>
-        <div style={{display:'flex',gap:12,marginTop:10,flexWrap:'wrap' as const,borderTop:'1px solid #F3F4F6',paddingTop:10}}>
-          {signals3.map((m,i)=><div key={i} style={{display:'flex',alignItems:'center',gap:4}}><div style={{width:8,height:8,borderRadius:2,background:m.color}}/><span style={{fontSize:'0.65rem',color:'#6B7280'}}>{m.label} ({m.weight}% weight · score: {m.val})</span></div>)}
+        <div className="sentSignalLegend">
+          {signals3.map((m,i)=>(
+            <div key={i} className="sentSignalLegendItem">
+              <div className="sentSignalDot" style={{background:m.color}}/>
+              <span className="sentSignalLegendText">{m.label} ({m.weight}% weight · score: {m.val})</span>
+            </div>
+          ))}
         </div>
       </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
-        <div style={{background:'#F0FDF4',borderRadius:14,border:'1px solid #6EE7B7',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#065F46',marginBottom:12}}>Sentiment Strengths</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#10B981',fontWeight:700,flexShrink:0}}>+</span><span>{s}</span></li>)}</ul></div>
-        <div style={{background:'#FFF1F2',borderRadius:14,border:'1px solid #FCA5A5',padding:22}}><div style={{fontSize:'1rem',fontWeight:700,color:'#991B1B',marginBottom:12}}>(x) Areas of Concern</div><ul style={{listStyle:'none',padding:0,margin:0}}>{(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=><li key={i} style={{display:'flex',gap:10,marginBottom:10,fontSize:'0.84rem',color:'#374151'}}><span style={{color:'#EF4444',fontWeight:700,flexShrink:0}}>-</span><span>{w}</span></li>)}</ul></div>
+      <div className="sentInsightsGrid">
+        <div className="sentStrengthsCard">
+          <div className="sentStrengthsTitle">Sentiment Strengths</div>
+          <ul className="sentInsightList">
+            {(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(
+              <li key={i} className="sentInsightItem">
+                <span className="sentInsightPlus">+</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="sentConcernsCard">
+          <div className="sentConcernsTitle">(x) Areas of Concern</div>
+          <ul className="sentInsightList">
+            {(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(
+              <li key={i} className="sentInsightItem">
+                <span className="sentInsightMinus">-</span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );

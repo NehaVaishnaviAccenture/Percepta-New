@@ -151,27 +151,35 @@ export default function GeoScoreVisibilityTab({ result, resultComps, setActivePa
 
   return (
     <div id="tab-visibility">
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:24}}>
-        <div style={{background:'#F5F3FF',borderRadius:12,border:'1px solid #DDD6FE',padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:'#7C3AED',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>Your Visibility</div><div style={{fontSize:'2rem',fontWeight:800,color:'#7C3AED'}}>{vis}</div><div style={{fontSize:'0.72rem',color:'#9CA3AF'}}>ranked #{myVisRank} of {allVis.length} brands  .  avg {avgVis}</div></div>
-        <div style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',borderRadius:12,border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`,padding:'18px'}}><div style={{fontSize:'0.65rem',fontWeight:600,color:gapToTop>=0?'#065F46':'#991B1B',letterSpacing:'.06em',textTransform:'uppercase' as const,marginBottom:6}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div><div style={{fontSize:'2rem',fontWeight:800,color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div><div style={{fontSize:'0.72rem',color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div></div>
+      <div className="visStatsGrid">
+        <div className="visVisCard">
+          <div className="visCardLabel">Your Visibility</div>
+          <div className="visCardValue">{vis}</div>
+          <div className="visCardSub">ranked #{myVisRank} of {allVis.length} brands  .  avg {avgVis}</div>
+        </div>
+        <div className="visGapCard" style={{background:gapToTop>=0?'#ECFDF5':'#FFF1F2',border:`1px solid ${gapToTop>=0?'#6EE7B7':'#FCA5A5'}`}}>
+          <div className="visCardLabel" style={{color:gapToTop>=0?'#065F46':'#991B1B'}}>vs. #1 {topComp?`(${topComp.Brand})`:''}</div>
+          <div className="visCardValue" style={{color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'+':''}{gapToTop} pts</div>
+          <div className="visCardSub" style={{color:gapToTop>=0?'#065F46':'#991B1B'}}>{gapToTop>=0?'You lead on visibility':'Behind the top competitor'}</div>
+        </div>
       </div>
 
-      <div id="geo-visibility-scatter-card" style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 26px'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
-          <div style={{fontSize:'1rem',fontWeight:700,color:'#111827'}}>Sentiment Score vs. Visibility Market Positioning</div>
-          <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {showSc&&<div style={{display:'flex',alignItems:'center',gap:12,fontSize:'0.7rem',color:'#6B7280'}}>
-              <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="#7C3AED" strokeWidth="3"/></svg><span style={{color:'#7C3AED',fontWeight:700}}>GEO Score</span></span>
-              <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="12" height="12"><circle cx="6" cy="6" r="5.5" fill="#1E88E5"/></svg><span>Goal — GEO 70</span></span>
-              <span style={{display:'inline-flex',alignItems:'center',gap:4}}><svg width="14" height="14"><circle cx="7" cy="7" r="6.5" fill="#43A047"/></svg><span>Authority — GEO 80</span></span>
-              <span style={{fontSize:'0.64rem',color:'#9CA3AF',fontStyle:'italic'}}>Hover dots for detail</span>
+      <div id="geo-visibility-scatter-card" className="visScatterCard">
+        <div className="visScatterHeader">
+          <div className="visScatterTitle">Sentiment Score vs. Visibility Market Positioning</div>
+          <div className="visScatterControls">
+            {showSc&&<div className="visScurveLegend">
+              <span className="visLegendItem"><svg width="20" height="4"><line x1="0" y1="2" x2="20" y2="2" stroke="#7C3AED" strokeWidth="3"/></svg><span className="visLegendGeoLabel">GEO Score</span></span>
+              <span className="visLegendItem"><svg width="12" height="12"><circle cx="6" cy="6" r="5.5" fill="#1E88E5"/></svg><span>Goal — GEO 70</span></span>
+              <span className="visLegendItem"><svg width="14" height="14"><circle cx="7" cy="7" r="6.5" fill="#43A047"/></svg><span>Authority — GEO 80</span></span>
+              <span className="visLegendHint">Hover dots for detail</span>
             </div>}
             <button onClick={()=>setSelectedCluster(showSc?null:'_scurve_toggle')} style={{background:showSc?'#7C3AED':'#F3F4F6',color:showSc?'white':'#6B7280',border:'none',borderRadius:8,padding:'6px 14px',fontSize:'0.75rem',fontWeight:600,cursor:'pointer',transition:'all 0.15s'}}>
               {showSc?'Hide S-Curve':'Show S-Curve'}
             </button>
           </div>
         </div>
-        <div style={{fontSize:'0.78rem',color:'#9CA3AF',marginBottom:16}}>
+        <div className="visScatterDesc">
           {showSc?'S-curve overlay shows GEO maturity threshold. Bubbles = brands positioned by Visibility vs Sentiment. Median lines split top/bottom halves.':'Each dot = one brand positioned by Visibility vs Sentiment. Median dashed lines split the market in half.'}
         </div>
         <MergedScatterSCurve brand={result.brand_name} vis={vis} sent={result.sentiment} cit={result.citation_share} competitors={resultComps} topCompBrand={topCompBrand} score={geo} showOverlay={showSc}/>

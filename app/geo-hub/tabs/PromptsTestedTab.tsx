@@ -27,7 +27,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
 
   return (
     <div id="tab-prompts">
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+      <div className="ptMetricGrid">
         <MetricCard label="queries run" val={totalQueries} sub="Generic consumer questions, no brand name" color="#7C3AED"/>
         <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared" color="#7C3AED"/>
         <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of all AI queries triggered brand mention" color="#7C3AED"/>
@@ -85,20 +85,20 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
         const connectedToHighlight = highlightedBubble ? getConnectedCategories(highlightedBubble) : new Set<string>();
 
         return (
-          <div id="prompts-filter-row" style={{borderRadius:16,overflow:'hidden',marginBottom:20,border:'1px solid #1E293B'}}>
-            <div style={{background:'#0F172A',padding:'14px 20px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div id="prompts-filter-row" className="ptNetworkWrap">
+            <div className="ptNetworkHeader">
               <div>
-                <div style={{fontSize:'0.9rem',fontWeight:800,color:'white'}}>Query Intelligence Network</div>
-                <div style={{fontSize:'0.68rem',color:'#64748B',marginTop:1}}>Node size = brand appearances  .  Color = win rate  .  Click to filter prompts & highlight connections</div>
+                <div className="ptNetworkTitle">Query Intelligence Network</div>
+                <div className="ptNetworkSubtitle">Node size = brand appearances  .  Color = win rate  .  Click to filter prompts & highlight connections</div>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:14}}>
+              <div className="ptNetworkLegendRow">
                 {[{color:'#10B981',label:'Winning (>=60%)'},{color:'#F59E0B',label:'Emerging (30-59%)'},{color:'#EF4444',label:'Gap (<30%)'}].map((l,i)=>(
-                  <div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
-                    <div style={{width:7,height:7,borderRadius:'50%',background:l.color}}/>
-                    <span style={{fontSize:'0.65rem',color:'#94A3B8'}}>{l.label}</span>
+                  <div key={i} className="ptNetworkLegendItem">
+                    <div className="ptNetworkLegendDot" style={{background:l.color}}/>
+                    <span className="ptNetworkLegendLabel">{l.label}</span>
                   </div>
                 ))}
-                {(filterCat!=='All'||highlightedBubble)&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}} style={{background:'#1E293B',border:'1px solid #334155',borderRadius:6,padding:'4px 10px',fontSize:'0.68rem',color:'#94A3B8',cursor:'pointer'}}>x Clear</button>}
+                {(filterCat!=='All'||highlightedBubble)&&<button onClick={()=>{setFilterCat('All');setQueryPage(1);setHighlightedBubble(null);}} className="ptNetworkClearBtn">x Clear</button>}
               </div>
             </div>
             <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',display:'block',background:'#0F172A'}}>
@@ -183,41 +183,41 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
         const safePage = Math.min(queryPage, Math.max(1, totalPages));
         const pageRows = allSorted.slice((safePage-1)*ROWS_PER_PAGE, safePage*ROWS_PER_PAGE);
         return (
-          <div id="prompts-list-section" style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 20px',marginBottom:20}}>
-            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-              <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>
+          <div id="prompts-list-section" className="ptQueryListSection">
+            <div className="ptQueryListHeader">
+              <div className="ptQueryListTitle">
                 {filterCat==='All'?'All Queries':'Category: '+filterCat}
-                <span style={{fontSize:'0.72rem',fontWeight:400,color:'#9CA3AF',marginLeft:8}}>({allSorted.length} queries  .  page {safePage} of {totalPages})</span>
+                <span className="ptQueryListMeta">({allSorted.length} queries  .  page {safePage} of {totalPages})</span>
               </div>
-              <div style={{display:'flex',alignItems:'center',gap:8}}>
-                <span style={{fontSize:'0.68rem',color:'#9CA3AF'}}>Filter:</span>
-                <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);setHighlightedBubble(null);}} style={{border:'1px solid #E5E7EB',borderRadius:6,padding:'4px 8px',fontSize:'0.75rem',color:'#374151',background:'white',outline:'none'}}>
+              <div className="ptQueryListFilterRow">
+                <span className="ptQueryListFilterLabel">Filter:</span>
+                <select value={filterCat} onChange={e=>{setFilterCat(e.target.value);setQueryPage(1);setHighlightedBubble(null);}} className="ptQueryListSelect">
                   {cats2.map(c=><option key={c}>{c}</option>)}
                 </select>
               </div>
             </div>
-            <table style={{width:'100%',borderCollapse:'collapse'}}>
-              <thead><tr style={{background:'#F8FAFC'}}>{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} style={{padding:'8px 12px',textAlign:'left' as const,fontSize:'0.63rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em'}}>{h}</th>)}</tr></thead>
+            <table className="ptTable">
+              <thead><tr className="ptTableHead">{['#','QUERY','YOUR RANK','WHO BEAT YOU'].map(h=><th key={h} className="ptTableHeadCell">{h}</th>)}</tr></thead>
               <tbody>{pageRows.map((item:any,i:number)=>{
                 const globalIdx = (safePage-1)*ROWS_PER_PAGE + i + 1;
                 const rp=item.position,rankLabel=rp===1?'#1':rp>0?`#${rp}`:'N/A',rankColor=rp===1?'#10B981':rp<=3?'#7C3AED':item.mentioned?'#7C3AED':'#9CA3AF',isMissed=!item.mentioned;
                 const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
-                return <tr key={i} style={{borderTop:'1px solid #F3F4F6',background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
-                  <td style={{padding:'9px 12px',fontSize:'0.75rem',color:'#9CA3AF',width:28}}>{globalIdx}</td>
-                  <td style={{padding:'9px 12px'}}>
-                    <div style={{display:'flex',gap:5,alignItems:'center',marginBottom:3,flexWrap:'wrap' as const}}>
-                      <span style={{background:'#F3F4F6',color:'#6B7280',borderRadius:4,padding:'1px 6px',fontSize:'0.65rem'}}>{item.category}</span>
-                      {item.mentioned?<span style={{color:'#10B981',fontSize:'0.68rem',fontWeight:600}}>Appeared</span>:<span style={{color:'#EF4444',fontSize:'0.68rem',fontWeight:600}}>Missed</span>}
+                return <tr key={i} className="ptTableRow" style={{background:rp===1?'#F0FDF4':isMissed?'#FFFBFB':'white'}}>
+                  <td className="ptTableCellNum">{globalIdx}</td>
+                  <td className="ptTableCell">
+                    <div className="ptQueryTagRow">
+                      <span className="ptQueryCatTag">{item.category}</span>
+                      {item.mentioned?<span className="ptQueryAppeared">Appeared</span>:<span className="ptQueryMissed">Missed</span>}
                     </div>
-                    <div style={{fontSize:'0.82rem',color:'#374151',fontWeight:500}}>{item.query}</div>
+                    <div className="ptQueryText">{item.query}</div>
                   </td>
-                  <td style={{padding:'9px 12px',fontSize:'0.92rem',fontWeight:800,color:rankColor,width:70}}>{rankLabel}</td>
-                  <td style={{padding:'9px 12px',width:150}}>{beater?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#FEF3C7',border:'1px solid #FCD34D',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#92400E'}}>👑 {beater}</span>:rp===1?<span style={{display:'inline-flex',alignItems:'center',gap:4,background:'#D1FAE5',border:'1px solid #6EE7B7',borderRadius:6,padding:'2px 8px',fontSize:'0.7rem',fontWeight:700,color:'#065F46'}}>You&apos;re #1</span>:<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>--</span>}</td>
+                  <td className="ptTableCellRank" style={{color:rankColor}}>{rankLabel}</td>
+                  <td className="ptTableCellBeater">{beater?<span className="ptBeaterBadge">👑 {beater}</span>:rp===1?<span className="ptFirstBadge">You&apos;re #1</span>:<span className="ptNoBeatLabel">--</span>}</td>
                 </tr>;
               })}</tbody>
             </table>
             {totalPages > 1 && (
-              <div id="prompts-pagination" style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6,marginTop:14}}>
+              <div id="prompts-pagination" className="ptPagination">
                 <button onClick={()=>setQueryPage(p=>Math.max(1,p-1))} disabled={safePage===1} style={{padding:'5px 10px',borderRadius:6,border:'1px solid #E5E7EB',background:safePage===1?'#F9FAFB':'white',color:safePage===1?'#D1D5DB':'#374151',cursor:safePage===1?'default':'pointer',fontSize:'0.75rem'}}>Prev</button>
                 {Array.from({length:Math.min(totalPages,10)},(_,i)=>{
                   const pg = totalPages<=10 ? i+1 : safePage<=5 ? i+1 : safePage>=totalPages-4 ? totalPages-9+i : safePage-4+i;
@@ -254,15 +254,15 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
         };
         if(highOpp.length===0) return null;
         return (
-          <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'20px 24px',marginBottom:20}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+          <div className="ptTrendingSection">
+            <div className="ptTrendingHeader">
               <span style={{fontSize:'1rem'}}>🔥</span>
-              <div style={{fontSize:'0.95rem',fontWeight:800,color:'#111827'}}>What the Market is Asking Right Now</div>
+              <div className="ptTrendingTitle">What the Market is Asking Right Now</div>
             </div>
-            <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginBottom:16}}>
+            <div className="ptTrendingSubtitle">
               Top {highOpp.length} high-intent queries trending in {result.ind_label||result.industry} beyond what we tested.
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+            <div className="ptTrendingGrid">
               {highOpp.map((tq:any,i:number)=>{
                 const trendColor=tq.trend==='Rising'?'#EF4444':tq.trend==='Peak'?'#F59E0B':'#6B7280';
                 const trendBg=tq.trend==='Rising'?'#FEE2E2':tq.trend==='Peak'?'#FEF3C7':'#F3F4F6';
@@ -272,40 +272,40 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                 const topComp=cluster?.topCompetitor||null;
                 const isOpen=selectedCluster===`trend-${i}`;
                 return (
-                  <div key={i} style={{background:'#FAFAFA',borderRadius:10,border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`,overflow:'hidden'}}>
-                    <div style={{padding:'11px 13px',cursor:'pointer'}} onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
-                      <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:5,flexWrap:'wrap' as const}}>
-                        <span style={{background:trendBg,color:trendColor,borderRadius:50,padding:'2px 7px',fontSize:'0.62rem',fontWeight:700}}>{tq.trend==='Rising'?'^ Rising':tq.trend==='Peak'?'o Peak':'Stable'}</span>
-                        <span style={{background:'#EDE9FE',color:'#7C3AED',borderRadius:50,padding:'2px 7px',fontSize:'0.62rem',fontWeight:600}}>{tq.category}</span>
+                  <div key={i} className="ptTrendingCard" style={{border:`1px solid ${isOpen?'#7C3AED':'#E5E7EB'}`}}>
+                    <div className="ptTrendingCardTop" onClick={()=>setSelectedCluster(isOpen?null:`trend-${i}`)}>
+                      <div className="ptTrendingTagRow">
+                        <span className="ptTrendingTag" style={{background:trendBg,color:trendColor}}>{tq.trend==='Rising'?'^ Rising':tq.trend==='Peak'?'o Peak':'Stable'}</span>
+                        <span className="ptTrendingCatTag">{tq.category}</span>
                         {/* CHANGE: volume data (daily estimates) removed entirely */}
                       </div>
-                      <div style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.5,fontWeight:500,marginBottom:6}}>{tq.query}</div>
-                      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap' as const}}>
-                        {topComp&&<span style={{fontSize:'0.65rem',color:'#92400E',background:'#FEF3C7',borderRadius:4,padding:'1px 7px',fontWeight:600}}>👑 {topComp} leading</span>}
+                      <div className="ptTrendingQuery">{tq.query}</div>
+                      <div className="ptTrendingMetaRow">
+                        {topComp&&<span className="ptTrendingLeaderTag">👑 {topComp} leading</span>}
                         {brandWinRate!==null
                           ?<span style={{fontSize:'0.65rem',fontWeight:700,color:brandWinning?'#10B981':'#EF4444',background:brandWinning?'#D1FAE5':'#FEE2E2',borderRadius:4,padding:'1px 7px'}}>{result.brand_name}: {brandWinRate}% win</span>
-                          :<span style={{fontSize:'0.65rem',color:'#9CA3AF',fontStyle:'italic'}}>New category, not yet tested</span>
+                          :<span className="ptTrendingNotTestedLabel">New category, not yet tested</span>
                         }
-                        <span style={{marginLeft:'auto',fontSize:'0.62rem',color:'#6B7280'}}>{isOpen?'^':'v'}</span>
+                        <span className="ptTrendingToggle">{isOpen?'^':'v'}</span>
                       </div>
                     </div>
                     {isOpen&&(
-                      <div style={{borderTop:'1px solid #E5E7EB',padding:'11px 13px',background:'white'}}>
+                      <div className="ptTrendingExpanded">
                         {/* CHANGE: removed AI Queries/Day row from expanded dropdown */}
-                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7,marginBottom:9}}>
+                        <div className="ptTrendingStatsGrid">
                           {[
                             {label:'Currently Leading',val:topComp||'No clear leader',color:'#F59E0B'},
                             {label:`${result.brand_name} Win Rate`,val:brandWinRate!==null?`${brandWinRate}%`:'Not tested',color:brandWinning?'#10B981':'#EF4444'},
                             {label:'Trend Signal',val:tq.trend,color:trendColor},
                             {label:'Opportunity',val:tq.opportunity||'--',color:'#7C3AED'},
                           ].map((s,j)=>(
-                            <div key={j} style={{background:'#F9FAFB',borderRadius:6,padding:'7px 9px'}}>
-                              <div style={{fontSize:'0.58rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'.06em',marginBottom:2}}>{s.label.toUpperCase()}</div>
-                              <div style={{fontSize:'0.85rem',fontWeight:800,color:s.color}}>{s.val}</div>
+                            <div key={j} className="ptTrendingStatCard">
+                              <div className="ptTrendingStatLabel">{s.label.toUpperCase()}</div>
+                              <div className="ptTrendingStatVal" style={{color:s.color}}>{s.val}</div>
                             </div>
                           ))}
                         </div>
-                        <div style={{fontSize:'0.72rem',color:'#6B7280',lineHeight:1.6,background:'#F5F3FF',borderRadius:6,padding:'7px 10px'}}>
+                        <div className="ptTrendingInsight">
                           💡 {topComp?`${topComp.split(' ')[0]} currently leads this query type.`:'No brand clearly owns this topic yet.'} {brandWinRate!==null?(brandWinning?` ${result.brand_name} is showing strength here -- invest to consolidate.`:` ${result.brand_name} has room to own this with targeted content.`):'Consider testing this category in your next analysis.'}
                         </div>
                       </div>
