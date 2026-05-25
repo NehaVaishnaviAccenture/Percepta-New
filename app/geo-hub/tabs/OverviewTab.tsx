@@ -18,17 +18,17 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
   const myRank = allBrands.findIndex((b:any)=>b.isYou)+1;
   const topComp = allBrands.find((b:any)=>!b.isYou);
   const topCompGap = topComp?Math.max(0,(topComp.GEO||0)-geo):0;
-  const nextThreshold = geo<26?26:geo<45?45:geo<65?65:geo<80?80:100;
-  const nextTierLabel = geo<26?'Emerging':geo<45?'Competitive':geo<65?'Leader':geo<80?'Authority':'Max';
+  const nextThreshold = geo<45?45:geo<56?56:geo<70?70:geo<80?80:100;
+  const nextTierLabel = geo<45?'Emerging':geo<56?'Competitive':geo<70?'Leader':geo<80?'Authority':'Max';
   const missedPrompts = (result.responses_detail||[]).filter((r:any)=>!r.mentioned&&!r.brand_mentioned).length;
   const recs = (result.recommendations||[]).slice(0,3);
   const ind = result.ind_label||'your industry';
   const interpText = tier.tier===1
     ?`AI assistants rarely surface ${result.brand_name} for ${ind} queries — ${topComp?.Brand||'competitors'}${topCompGap>0?` leads by ${topCompGap} pts and`:''}  is recommended instead. Reaching ${nextThreshold} (${nextTierLabel}) puts ${result.brand_name} in the consideration set for significantly more queries.`
     :tier.tier===2
-    ?`At ${geo}, ${result.brand_name} is occasionally mentioned but rarely in a leading position. Competitors above 45 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier.`
+    ?`At ${geo}, ${result.brand_name} is occasionally mentioned but rarely in a leading position. Competitors above 56 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier.`
     :tier.tier===3
-    ?`At ${geo}, ${result.brand_name} appears in AI responses but isn't yet a first-choice recommendation. Competitors above 65 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier.`
+    ?`At ${geo}, ${result.brand_name} appears in AI responses but isn't yet a first-choice recommendation. Competitors above 70 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier.`
     :tier.tier===4
     ?`At ${geo}, AI assistants frequently surface ${result.brand_name} near the top of responses. You're above the efficiency threshold — focus is on closing the remaining gap to achieve consistent first-position recommendations.`
     :`AI assistants consistently lead with ${result.brand_name} as the top recommendation. You're in the Authority tier — the focus is on maintaining dominance and monitoring for competitor movements.`;

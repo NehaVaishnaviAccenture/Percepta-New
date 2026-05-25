@@ -35,7 +35,7 @@ function SignalKey({ full, short }: { full: string; short: string }) {
   }, [full]);
   return (
     <span ref={ref} id={`gso-signal-key-${full.toLowerCase().replace(/\s+/g,'-')}`} className="gsoSignalKeySpan">
-      {showShort ? `${short}.` : full}
+      {showShort ? (short === 'SoV' ? short : `${short}.`) : full}
     </span>
   );
 }
@@ -51,7 +51,7 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
   const geo = result.overall_geo_score??0;
   const vis = result.visibility??0,sent = result.sentiment??0,prom = result.prominence??0,cit = result.citation_share??0,sov = result.share_of_voice??0;
   const comps = resultComps;
-  const tierOf=(s:number)=>s>=80?{label:'Authority',color:'#007653'}:s>=70?{label:'Leader',color:'#043BCC'}:s>=56?{label:'Competitive',color:'#996E00'}:s>=45?{label:'Emerging',color:'#F48500'}:{label:'Fragmented',color:'#B7002F'};
+  const tierOf=(s:number)=>s>=80?{label:'Authority',color:'#007653',textColor:'#007653'}:s>=70?{label:'Leader',color:'#043BCC',textColor:'#043BCC'}:s>=56?{label:'Competitive',color:'#F3B10C',textColor:'#996E00'}:s>=45?{label:'Emerging',color:'#F48500',textColor:'#B15F00'}:{label:'Fragmented',color:'#B7002F',textColor:'#B7002F'};
   const sigBg=(s:number)=>s>=80?'#00AB7B':s>=70?'#2F6DFF':s>=56?'#F3B10C':s>=45?'#F48500':'#E0003B';
   const sigFg=(s:number)=>(s>=56&&s<70)?'#2A1500':'white';
   const allBrands=[{GEO:geo,Brand:result.brand_name,isYou:true},...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
@@ -61,7 +61,7 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
   const nextThreshold=geo>=80?100:geo>=70?80:geo>=56?70:geo>=45?56:45;
   const nextTierLabel=geo>=80?'Max':geo>=70?'Authority':geo>=56?'Leader':geo>=45?'Competitive':'Emerging';
   const ptsToNext=nextThreshold-geo;
-  const signals=[{key:'Vis',label:'Visibility',score:vis,weight:30,sub:1},{key:'Sent',label:'Sentiment',score:sent,weight:20,sub:2},{key:'Prom',label:'Prominence',score:prom,weight:20,sub:3},{key:'Cit',label:'Citation',score:cit,weight:15,sub:4},{key:'SoV',label:'SoV',score:sov,weight:15,sub:5}];
+  const signals=[{key:'Vis',label:'Visibility',score:vis,weight:30,sub:1},{key:'Sent',label:'Sentiment',score:sent,weight:20,sub:2},{key:'Prom',label:'Prominence',score:prom,weight:20,sub:3},{key:'Cit',label:'Citation',score:cit,weight:15,sub:4},{key:'SoV',label:'Share of Voice',score:sov,weight:15,sub:5}];
   const weakest=[...signals].sort((a,b)=>a.score-b.score)[0];
   const weakColor=sigBg(weakest.score);
   const topGeo=Math.max(geo,...comps.map((c:any)=>c.GEO||0));
@@ -105,7 +105,7 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
             {/* Score pillar: big number + tier name */}
             <div id="gso-score-pillar" className="gsoScorePillar">
               <div id="gso-score-number" className="gsoScoreNumber">{geo}</div>
-              <div id="gso-score-tier-label" className="gsoScoreTierLabel" style={{color:tierOf(geo).color}}>{tierOf(geo).label}</div>
+              <div id="gso-score-tier-label" className="gsoScoreTierLabel" style={{color:tierOf(geo).textColor}}>{tierOf(geo).label}</div>
             </div>
 
             {/* Rank text + tier ladder */}

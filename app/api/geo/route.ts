@@ -2153,7 +2153,7 @@ function scoreCompetitor(name: string, responses: any[], awarenessMap: Record<st
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, promptCount } = await req.json();
+    const { url, promptCount, scope } = await req.json();
     const MAX_QUERIES = promptCount ? Math.min(Math.max(promptCount, 10), 1000) : 120;
     const pageData = await fetchPageContent(url);
     if (!pageData.ok) return NextResponse.json({ error: (pageData as any).error }, { status: 400 });
@@ -2374,7 +2374,101 @@ Rules:
     }
 
     const ind = INDUSTRY_DATA[indKey] || INDUSTRY_DATA['gen'];
-    const queries: string[][] = ind.queries.slice(0, MAX_QUERIES);
+    let queries: string[][] = ind.queries.slice(0, MAX_QUERIES);
+
+    // When a specific scope is selected, all hardcoded tier/floor/rank/competitor
+    // overrides are bypassed — actual AI responses drive every metric instead.
+    const scopeOverride = !!(scope && scope !== 'General');
+
+    // ── Scope-specific query override ────────────────────────────────────────
+    // When the user picks a specific scope (e.g. "Credit Cards"), replace the
+    // generic industry queries with questions that are actually about that scope.
+    if (scope && scope !== 'General') {
+      // Step 1: ask AI for 10 sub-categories within this scope
+      const catPrompt = `List exactly 10 specific sub-categories or decision dimensions that consumers think about when researching "${scope}". These will be used as question categories for a GEO analysis.
+
+Return ONLY a valid JSON array of 10 short strings (2–5 words each), e.g.:
+["Rewards & Cash Back","Balance Transfer Cards","No Annual Fee","Travel Cards","Business Cards","Secured Cards","Sign-up Bonuses","APR & Interest Rates","Credit Limit","Approval Requirements"]
+
+No markdown, no explanation, just the JSON array.`;
+
+      let scopeCats: string[] = [];
+      try {
+        const catRaw = await callAI([{ role: 'user', content: catPrompt }], 0.3, 300);
+        const parsed = JSON.parse(catRaw.replace(/```json|```/g, '').trim());
+        if (Array.isArray(parsed)) scopeCats = parsed.map((s: any) => String(s)).slice(0, 10);
+      } catch {}
+
+      // Fallback: derive category names from scope if AI call fails
+      if (scopeCats.length < 5) {
+        scopeCats = [
+          scope,
+          `Best ${scope}`,
+          `${scope} Comparison`,
+          `${scope} Reviews`,
+          `${scope} for Beginners`,
+          `${scope} Costs`,
+          `${scope} Benefits`,
+          `${scope} Alternatives`,
+          `${scope} Tips`,
+          `${scope} Recommendations`,
+        ];
+      }
+
+      const cats10 = (scopeCats.length >= 10 ? scopeCats : [...scopeCats, ...Array(10 - scopeCats.length).fill(scope)]).slice(0, 10);
+
+      // Step 2: use question templates to build scope-specific queries
+      const SCOPE_TEMPLATES: ((c: string, s: string) => string)[] = [
+        (c) => `What is the best ${c.toLowerCase()} available right now?`,
+        (c) => `How do I choose between different ${c.toLowerCase()} options?`,
+        (c) => `Which ${c.toLowerCase()} offers the best value?`,
+        (c) => `What should I know before committing to ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is most recommended by experts?`,
+        (c) => `What are the top-rated ${c.toLowerCase()} options in 2025?`,
+        (c) => `How do I compare ${c.toLowerCase()} from different providers?`,
+        (c) => `Which ${c.toLowerCase()} is best for someone just starting out?`,
+        (c) => `What fees or costs are associated with ${c.toLowerCase()}?`,
+        (c) => `What do customers say about ${c.toLowerCase()} after long-term use?`,
+        (c) => `What are the pros and cons of the leading ${c.toLowerCase()} options?`,
+        (c) => `Which ${c.toLowerCase()} is easiest to qualify for?`,
+        (c) => `What is the typical cost of ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is best for someone with excellent credit?`,
+        (c) => `What do financial experts recommend for ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is best for maximizing rewards?`,
+        (c) => `How do I get approved for ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is most popular right now?`,
+        (c) => `What makes one ${c.toLowerCase()} better than another?`,
+        (c) => `Which ${c.toLowerCase()} has no hidden fees?`,
+        (c) => `What is the best ${c.toLowerCase()} for someone building credit?`,
+        (c) => `Which ${c.toLowerCase()} offers the best sign-up bonus or welcome offer?`,
+        (c) => `How do I get the most value from ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is best for everyday spending?`,
+        (c) => `What should I watch out for with ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} is best for large purchases?`,
+        (c) => `What are common mistakes people make with ${c.toLowerCase()}?`,
+        (c) => `Which ${c.toLowerCase()} has the lowest interest rate?`,
+        (c) => `How does ${c.toLowerCase()} compare across the major banks?`,
+        (c) => `Which ${c.toLowerCase()} is the safest and most trusted option?`,
+      ];
+
+      // Interleave queries across all 10 categories so that every category
+      // gets coverage even when MAX_QUERIES < 300.
+      // Pattern: for query index i → category = cats10[i % 10], template = SCOPE_TEMPLATES[Math.floor(i / 10)]
+      // This gives 10 queries per category for a 100-prompt run, vs only 3-4 categories
+      // getting any queries at all with a sequential flatMap + slice approach.
+      const scopeQueries: string[][] = [];
+      for (let i = 0; i < SCOPE_TEMPLATES.length * cats10.length; i++) {
+        const catIdx = i % cats10.length;
+        const tplIdx = Math.floor(i / cats10.length);
+        if (tplIdx < SCOPE_TEMPLATES.length) {
+          scopeQueries.push([cats10[catIdx], SCOPE_TEMPLATES[tplIdx](cats10[catIdx], scope)]);
+        }
+      } // 300 total, interleaved: cats10[0], cats10[1], ..., cats10[9], cats10[0], ...
+
+      queries = scopeQueries.slice(0, MAX_QUERIES);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const allQA: any[] = new Array(queries.length);
 
     const BATCH_SIZE = 25;
@@ -2387,7 +2481,8 @@ Rules:
       const ql = batch.map((q, j) => `Q${j + 1}: ${q[1]}`).join('\n\n');
       const answerLabels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
       const brandCtx = isDynamic ? ` The brand being analyzed is ${brand} but do not favour it -- mention it only if genuinely relevant.` : '';
-      const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.${brandCtx}\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
+      const scopeCtx = scope && scope !== 'General' ? ` Focus specifically on the "${scope}" product/service line when relevant to the question.` : '';
+      const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any brand.${brandCtx}${scopeCtx}\n\n${ql}\n\nRespond with EXACTLY this format, one answer per line:\n${answerLabels}`;
       let bt = '';
       try { bt = await callAI([{ role: 'user', content: prompt }], 0.5, 2048); } catch {}
       batch.forEach((q, j) => {
@@ -2549,7 +2644,7 @@ Return ONLY valid JSON, no markdown:
     let visOverride = visibility;
 
     // ── FIN_SMALL_BUSINESS_CC TIERS ──
-    if (indKey === 'fin_small_business_cc') {
+    if (!scopeOverride && indKey === 'fin_small_business_cc') {
       const SB_CC_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'capital one': { vis:62, sent:72, prom:64, cit:60, sov:52, geo:63 },
         'chase':       { vis:74, sent:80, prom:72, cit:70, sov:64, geo:73 },
@@ -2566,7 +2661,7 @@ Return ONLY valid JSON, no markdown:
     }
 
     // ── FIN AUTO LOAN TIERS ──
-    if ((indKey as string) === 'fin_auto_loan') {
+    if (!scopeOverride && (indKey as string) === 'fin_auto_loan') {
       const AUTO_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'capital one': { vis:60, sent:74, prom:62, cit:58, sov:50, geo:62 },
         'chase':       { vis:68, sent:76, prom:68, cit:64, sov:56, geo:67 },
@@ -2583,7 +2678,7 @@ Return ONLY valid JSON, no markdown:
     }
 
     // ── FIN MORTGAGE TIERS ──
-    if ((indKey as string) === 'fin_mortgage') {
+    if (!scopeOverride && (indKey as string) === 'fin_mortgage') {
       const MORT_MAIN_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'chase':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:72 },
         'capital one': { vis:50, sent:68, prom:52, cit:48, sov:40, geo:53 },
@@ -2599,7 +2694,7 @@ Return ONLY valid JSON, no markdown:
     }
 
     // ── FIN CREDIT CARD & RETAIL BANK TIERS ──
-    if ((indKey as string) === 'fin_retirement') {
+    if (!scopeOverride && (indKey as string) === 'fin_retirement') {
       const RETIREMENT_TIERS: Record<string,{vis:number;sent:number;prom:number;cit:number;sov:number;geo:number}> = {
         'fidelity':       { vis:72, sent:78, prom:70, cit:68, sov:62, geo:71 },
         'vanguard':       { vis:70, sent:80, prom:68, cit:66, sov:60, geo:69 },
@@ -2636,7 +2731,7 @@ Return ONLY valid JSON, no markdown:
       }
     }
 
-    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
+    if (!scopeOverride && (indKey === 'fin' || (indKey as string) === 'fin_retail_bank')) {
       const RETAIL_BANK_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
         // Scores derived from actual AI query analysis across 100 prompts
         // Ally and Marcus lead on savings-focused queries; Chase leads on checking/overall
@@ -2694,7 +2789,7 @@ Return ONLY valid JSON, no markdown:
     }
 
     // ── FIN_WEALTH TIERS ──
-    if ((indKey as string) === 'fin_wealth') {
+    if (!scopeOverride && (indKey as string) === 'fin_wealth') {
       const WEALTH_TIERS: Record<string, {vis:number; sent:number; prom:number; cit:number; sov:number; geo:number}> = {
         // Tier 1 -- Dominant AI presence (investment-focused brands)
         'fidelity':          { vis:78, sent:84, prom:76, cit:74, sov:68, geo:76 },
@@ -2735,7 +2830,7 @@ Return ONLY valid JSON, no markdown:
 
     // ── AVG RANK ──
     const FIN_TOP4 = ['chase','american express','amex','capital one','citi'];
-    const finalAvgRank =
+    const finalAvgRank = scopeOverride ? computedAvgRank :
       indKey === 'fin' && bl === 'chase'                               ? '#1' :
       indKey === 'fin' && (bl === 'american express' || bl === 'amex') ? '#2' :
       indKey === 'fin' && bl === 'capital one'                         ? '#3' :
@@ -2808,8 +2903,8 @@ Return ONLY valid JSON, no markdown:
 
     let geo = Math.round(visOverride * 0.30 + sent * 0.20 + prom * 0.20 + citOverride * 0.15 + sov * 0.15);
 
-    // Hard floors
-    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
+    // Hard floors — skipped when a scope is active (actual AI data drives the score)
+    if (!scopeOverride && (indKey === 'fin' || (indKey as string) === 'fin_retail_bank')) {
       const RETIREMENT_FLOORS: Record<string,number> = { 'fidelity':71,'vanguard':69,'schwab':62,'t. rowe price':54,'tiaa':53,'principal':43,'prudential':44,'empower':49,'mass mutual':39,'massmutual':39,'transamerica':35 };
       const GEO_FLOORS: Record<string,number> = (indKey as string) === 'fin_retail_bank' ? {
         'chase': 72, 'ally': 77, 'marcus': 70, 'capital one': 66,
@@ -2819,7 +2914,7 @@ Return ONLY valid JSON, no markdown:
       const floor = GEO_FLOORS[bl];
       if (floor) geo = Math.max(geo, floor);
     }
-    if ((indKey as string) === 'fin_wealth') {
+    if (!scopeOverride && (indKey as string) === 'fin_wealth') {
       const WEALTH_FLOORS: Record<string,number> = {
         'fidelity':76,'vanguard':75,'charles schwab':73,'morgan stanley':67,'merrill lynch':65,
         'edward jones':62,'raymond james':57,'t. rowe price':59,'tiaa':55,'empower':51,
@@ -2828,15 +2923,15 @@ Return ONLY valid JSON, no markdown:
       };
       const f = WEALTH_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
-    if ((indKey as string) === 'fin_auto_loan') {
+    if (!scopeOverride && (indKey as string) === 'fin_auto_loan') {
       const AUTO_FLOORS: Record<string,number> = { 'ally':70,'chase':67,'capital one':62,'bank of america':59,'wells fargo':53 };
       const f = AUTO_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
-    if ((indKey as string) === 'fin_mortgage') {
+    if (!scopeOverride && (indKey as string) === 'fin_mortgage') {
       const MORT_FLOORS: Record<string,number> = { 'chase':72,'bank of america':66,'wells fargo':60,'citi':54,'capital one':53 };
       const f = MORT_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
-    if ((indKey as string) === 'fin_small_business_cc') {
+    if (!scopeOverride && (indKey as string) === 'fin_small_business_cc') {
       const SB_CC_FLOORS: Record<string,number> = { 'chase':73,'american express':70,'capital one':63,'citi':46 };
       const f = SB_CC_FLOORS[bl]; if (f) geo = Math.max(geo, f);
     }
@@ -2922,7 +3017,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
     let competitors = compSource
       .filter((c: string) => c.toLowerCase() !== bl)
       .map((c: string) => {
-        if (isDynamic) {
+        if (isDynamic || scopeOverride) {
           // Score from real allQA responses — count mentions, position, sentiment
           const cLower = c.toLowerCase();
           const cWords = cLower.split(' ').filter((w:string) => w.length > 2);
@@ -2967,8 +3062,8 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
         return { ...s, URL: ind.compUrls?.[c] || `${c.toLowerCase().replace(/ /g, '')}.com` };
       });
 
-    // ── COMPETITOR TIERS ──
-    if ((indKey as string) === 'fin_small_business_cc') {
+    // ── COMPETITOR TIERS — skipped when scope is active (dynamic scoring used instead) ──
+    if (!scopeOverride && (indKey as string) === 'fin_small_business_cc') {
       const SB_CC_COMP_TIERS: Record<string,any> = {
         'Chase Ink':              { GEO:73, Vis:74, Cit:70, Sen:80, Sov:64, Prom:72, Rank:'#1' },
         'American Express Business': { GEO:70, Vis:70, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#2' },
@@ -2988,7 +3083,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
-    if ((indKey as string) === 'fin_retirement') {
+    if (!scopeOverride && (indKey as string) === 'fin_retirement') {
       const RETIREMENT_COMP_TIERS_POST: Record<string,any> = {
         'Fidelity':       { GEO:71, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#1' },
         'Vanguard':       { GEO:69, Vis:70, Cit:66, Sen:80, Sov:60, Prom:68, Rank:'#2' },
@@ -3008,7 +3103,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
-    if ((indKey as string) === 'fin_wealth') {
+    if (!scopeOverride && (indKey as string) === 'fin_wealth') {
       const WEALTH_COMP_TIERS: Record<string,any> = {
         'Fidelity':           { GEO:76, Vis:78, Cit:74, Sen:84, Sov:68, Prom:76, Rank:'#1' },
         'Vanguard':           { GEO:75, Vis:76, Cit:72, Sen:86, Sov:66, Prom:74, Rank:'#2' },
@@ -3038,7 +3133,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
-    if ((indKey as string) === 'fin_auto_loan') {
+    if (!scopeOverride && (indKey as string) === 'fin_auto_loan') {
       const AUTO_COMP_TIERS: Record<string,any> = {
         'Ally Financial':       { GEO:70, Vis:72, Cit:66, Sen:78, Sov:60, Prom:70, Rank:'#1' },
         'Chase Auto':           { GEO:67, Vis:68, Cit:64, Sen:76, Sov:56, Prom:68, Rank:'#2' },
@@ -3058,7 +3153,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
-    if ((indKey as string) === 'fin_mortgage') {
+    if (!scopeOverride && (indKey as string) === 'fin_mortgage') {
       const MORT_COMP_TIERS: Record<string,any> = {
         'Rocket Mortgage':        { GEO:78, Vis:80, Cit:74, Sen:82, Sov:70, Prom:76, Rank:'#1' },
         'Chase Mortgage':         { GEO:72, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#2' },
@@ -3078,7 +3173,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       competitors.sort((a: any, b: any) => b.GEO - a.GEO);
     }
 
-    if (indKey === 'fin' || (indKey as string) === 'fin_retail_bank') {
+    if (!scopeOverride && (indKey === 'fin' || (indKey as string) === 'fin_retail_bank')) {
       const RETAIL_COMP_TIERS: Record<string, {GEO:number; Vis:number; Cit:number; Sen:number; Sov:number; Prom:number; Rank:string}> = {
         'Chase':           { GEO:72, Vis:72, Cit:68, Sen:78, Sov:62, Prom:70, Rank:'#2' },
         'Ally':            { GEO:77, Vis:76, Cit:74, Sen:88, Sov:66, Prom:76, Rank:'#1' },
@@ -3128,6 +3223,8 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
 
     // ── LOB LABEL ──
     const lobLabel = ((): string | null => {
+      // Scope selection always wins — it IS the line of business the user cares about
+      if (scope && scope !== 'General') return scope;
       const k = indKey as string;
       if (k === '_dynamic') return (INDUSTRY_DATA as any)['_dynamic']?.lob || null;
       if (k === 'fin_cc_travel')           return 'Travel Credit Cards';
@@ -3271,10 +3368,15 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
             }
             return 0;
           })();
-          const finalSim = Math.min(1, cosine + semanticBonus * 0.5);
+          // For scope-specific queries, add a structural bonus between adjacent categories
+          // so the Response Map always has edges even when brand visibility is low
+          const catAIdx = scopeOverride ? catNames.indexOf(cat) : -1;
+          const catBIdx = scopeOverride ? catNames.indexOf(c) : -1;
+          const adjacencyBonus = (catAIdx >= 0 && catBIdx >= 0 && Math.abs(catAIdx - catBIdx) === 1) ? 0.25 : 0;
+          const finalSim = Math.min(1, cosine + semanticBonus * 0.5 + adjacencyBonus);
           return { category: c, similarity: Math.round(finalSim * 100) };
         })
-        .filter(r => r.similarity > 10)
+        .filter(r => r.similarity > 5)
         .sort((a, b) => b.similarity - a.similarity)
         .slice(0, 4);
       return { category: cat, total, mentioned, winRate, topCompetitor, dailySearches, related };
@@ -3285,7 +3387,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       industry: ind.name,
       ind_key: indKey,
       lob: lobLabel,
-      ind_label: ind.label,
+      ind_label: lobLabel || ind.label,
       visibility: visOverride,
       sentiment: sent,
       prominence: prom,

@@ -1,8 +1,16 @@
-// v2.5.0: tested prompts complete redo
+// v2.7.0: dynamic scope detection, button gating thing adjusted, response map page, etc
 
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+
+function isValidUrl(u: string): boolean {
+  if (!u) return false;
+  try {
+    const parsed = new URL(u);
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname.includes('.');
+  } catch { return false; }
+}
 import Link from 'next/link';
 import OverviewTab from './tabs/OverviewTab';
 import GeoScoreTab from './tabs/GeoScoreTab';
@@ -15,6 +23,7 @@ import CompetitorsTab from './tabs/CompetitorsTab';
 import CompetitorsByTopicTab from './tabs/CompetitorsByTopicTab';
 import PromptsTestedTab from './tabs/PromptsTestedTab';
 import PromptsLiveTab from './tabs/PromptsLiveTab';
+import ResponseMapTab from './tabs/ResponseMapTab';
 import TrendsTab from './tabs/TrendsTab';
 import ActionPlanTab from './tabs/ActionPlanTab';
 
@@ -24,7 +33,7 @@ const TOP_TABS = [
   {label:'Overview',subs:[]},
   {label:'GEO Score',subs:['Overall','Visibility','Sentiment','Prominence','Citation','Share of Voice']},
   {label:'Competitors',subs:['Overall','By Topic']},
-  {label:'Prompts',subs:['Tested Prompts','Live Prompt']},
+  {label:'Prompts',subs:['Tested Prompts','Live Prompt','Response Map']},
   {label:'Trends',subs:[]},
   {label:'Action Plan',subs:[]},
 ];
@@ -52,16 +61,50 @@ export default function GeoHub() {
   const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   // CHANGE: default prompt count is 100, not 120
   const [promptCount,setPromptCount]=useState(100);
-  const [d3ScopeSelected,setD3ScopeSelected]=useState('General');
+  const [d3ScopeSelected,setD3ScopeSelected]=useState('');
   const [d3ShowCustomScope,setD3ShowCustomScope]=useState(false);
+  const [d3CustomScope,setD3CustomScope]=useState('');
+  const [detectedScopes,setDetectedScopes]=useState<string[]>([]);
+  const [scopeDetecting,setScopeDetecting]=useState(false);
+  const scopeDebounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [elapsedSec,setElapsedSec]=useState(0);
   const [analysisError,setAnalysisError]=useState<{title:string;code:string;message:string;reduceDesc:string}|null>(null);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
   useEffect(()=>{if(loading){setElapsedSec(0);const t=setInterval(()=>setElapsedSec(s=>s+1),1000);return()=>clearInterval(t);}}, [loading]);
 
+  // Scope detection: fires when url becomes valid; debounced 700ms
+  useEffect(()=>{
+    if(!isValidUrl(url)){
+      setDetectedScopes([]);
+      setD3ScopeSelected('');
+      setD3ShowCustomScope(false);
+      setD3CustomScope('');
+      setScopeDetecting(false);
+      if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
+      return;
+    }
+    setScopeDetecting(true);
+    setDetectedScopes([]);
+    setD3ScopeSelected('');
+    setD3ShowCustomScope(false);
+    setD3CustomScope('');
+    if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
+    scopeDebounceRef.current=setTimeout(async()=>{
+      try{
+        const res=await fetch('/api/detect-scope',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
+        const data=await res.json();
+        if(data.scopes&&Array.isArray(data.scopes)) setDetectedScopes(data.scopes);
+      }catch{}
+      setScopeDetecting(false);
+    },700);
+    return()=>{if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);};
+  },[url]);
+
   async function runAnalysis(){
-    if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
+    const effectiveScope=d3ScopeSelected==='+ Custom'?d3CustomScope.trim():d3ScopeSelected;
+    if(!isValidUrl(url)){setError('Please enter a valid URL (e.g. citi.com)');return;}
+    if(!effectiveScope){setError('Please select a scope before running the analysis.');return;}
     setError('');setAnalysisError(null);setLoading(true);setLoadingStep(0);setLoadingProgress(0);
     const steps = [
       {step:0, progress:5,  delay:200},
@@ -79,7 +122,7 @@ export default function GeoHub() {
       timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));
     });
     try{
-      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url, promptCount})});
+      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url, promptCount, scope: effectiveScope})});
       const data=await res.json();
       timers.forEach(t=>clearTimeout(t));
       setLoadingProgress(100);
@@ -112,22 +155,12 @@ export default function GeoHub() {
   // ── D3 shell — initial search (pre-analysis) ──────────────────────────────
   if (!result && !loading && !analysisError) {
     const displayUrl = url.replace(/^https?:\/\//, '');
-    const scopeVisible = displayUrl.length > 2;
-    const cleaned = displayUrl.replace(/^www\./, '').split('.')[0].toLowerCase();
-    const knownDomains: Record<string,string> = {
-      'bankofamerica':'Financial Services detected','bofa':'Financial Services detected',
-      'chase':'Financial Services detected','wellsfargo':'Financial Services detected',
-      'capitalone':'Financial Services detected','americanexpress':'Financial Services detected',
-      'amex':'Financial Services detected','firstmeridian':'Financial Services detected',
-      'citi':'Financial Services detected','usbank':'Financial Services detected',
-      'google':'Technology detected','microsoft':'Technology detected',
-      'apple':'Technology detected','amazon':'E-Commerce / Cloud detected',
-      'marriott':'Hospitality detected','hilton':'Hospitality detected',
-      'target':'Retail detected','walmart':'Retail detected',
-    };
-    const detectedIndustry = knownDomains[cleaned] || 'Detecting industry…';
+    const urlValid = isValidUrl(url);
+    const scopeVisible = urlValid;
+    const effectiveScope = d3ScopeSelected === '+ Custom' ? d3CustomScope.trim() : d3ScopeSelected;
+    const canRun = urlValid && effectiveScope !== '' && !loading;
 
-    const SCOPE_PILLS = ['General','Credit Cards','Mortgages','Retail Banking','Wealth Management','Auto Loans','Small Business'];
+    const SCOPE_PILLS = ['General', ...detectedScopes];
     const PROMPT_OPTS = [
       {count:50,  name:'Quick',    time:'~30 sec', rec:false},
       {count:100, name:'Standard', time:'~1 min',  rec:true},
@@ -145,92 +178,84 @@ export default function GeoHub() {
     return (
       <>
         <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}} #d3url::placeholder{font-style:italic;}`}</style>
-        <div id="percepta-scan-form" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-scan-form" className="perceptaScanForm" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
 
           {/* ── Sidebar ── */}
-          <aside id="scan-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <Link id="sb-logo" href="/" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8,textDecoration:'none'}}>P</Link>
-            <div id="sb-new-analysis" title="New Analysis" onClick={()=>{setAnalysisError(null);setLoading(false);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+          <aside id="scan-sidebar" className="scanSidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <Link id="sb-logo" href="/" className="scanSidebarLogo" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8,textDecoration:'none'}}>P</Link>
+            <div id="sb-new-analysis" className="scanSidebarNewBtn" title="New Analysis" onClick={()=>{setAnalysisError(null);setLoading(false);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
             </div>
-            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
-            <div id="sb-home" style={sbIcon()}>
+            <div id="scan-sidebar-divider" className="scanSidebarDivider" style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
+            <div id="sb-home" className="scanSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
             </div>
-            <div id="sb-reports" style={sbIcon(true)}>
+            <div id="sb-reports" className="scanSidebarIcon scanSidebarIconActive" style={sbIcon(true)}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
             </div>
-            <div id="sb-trends" style={sbIcon()}>
+            <div id="sb-trends" className="scanSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg>
             </div>
-            <div id="sb-account" style={sbIcon()}>
+            <div id="sb-account" className="scanSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg>
             </div>
-            <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-              <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
-              <div id="sb-user" style={sbIcon()}>
+            <div id="scan-sidebar-bottom" className="scanSidebarBottom" style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+              <div id="scan-sidebar-bottom-divider" className="scanSidebarBottomDivider" style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
+              <div id="sb-user" className="scanSidebarIcon" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg>
               </div>
-              <div id="sb-logout" style={sbIcon()}>
+              <div id="sb-logout" className="scanSidebarIcon" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg>
               </div>
             </div>
           </aside>
 
           {/* ── Content column ── */}
-          <div id="scan-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="scan-content-col" className="scanContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
 
             {/* Dark topbar */}
-            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
-                <span>Percepta GEO</span>
-                <span style={{color:'rgba(255,255,255,0.12)'}}>/</span>
-                <span style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
+            <div id="scan-topbar" className="scanTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div id="scan-breadcrumb" className="scanBreadcrumb" style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
+                <span id="scan-breadcrumb-root" className="scanBreadcrumbRoot">Percepta GEO</span>
+                <span id="scan-breadcrumb-sep" className="scanBreadcrumbSep" style={{color:'rgba(255,255,255,0.12)'}}>/</span>
+                <span id="scan-breadcrumb-active" className="scanBreadcrumbActive" style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
               </div>
-              <div style={{marginLeft:'auto'}}>
-                <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase' as const,color:'#00D1C7',background:'rgba(0,209,199,0.08)',border:'1px solid rgba(0,209,199,0.18)',padding:'3px 8px',fontFamily:'Inter,sans-serif'}}>
-                  <span style={{width:5,height:5,borderRadius:'50%',background:'#00D1C7',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
+              <div id="scan-topbar-right" className="scanTopbarRight" style={{marginLeft:'auto'}}>
+                <span id="scan-live-badge" className="scanLiveBadge" style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase' as const,color:'#00D1C7',background:'rgba(0,209,199,0.08)',border:'1px solid rgba(0,209,199,0.18)',padding:'3px 8px',fontFamily:'Inter,sans-serif'}}>
+                  <span id="scan-live-dot" className="scanLiveDot" style={{width:5,height:5,borderRadius:'50%',background:'#00D1C7',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
                   Live
                 </span>
               </div>
             </div>
 
-            {/* Report nav — greyed/locked */}
-            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
-                <div key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
-              ))}
-            </div>
 
             {/* ── White canvas ── */}
-            <div style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px',position:'relative'}}>
-
-              {/* Grid texture */}
-              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.55) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.55) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
+            <div id="scan-canvas" className="scanCanvas" style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px',position:'relative'}}>
 
               {/* Scan content */}
-              <div id="scan-card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:540,display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
+              <div id="scan-card" className="scanCard" style={{position:'relative',zIndex:1,width:'100%',maxWidth:'75%',display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
 
                 {/* Eyebrow */}
-                <div style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
-                  Percepta GEO 
+                <div id="scan-eyebrow" className="scanEyebrow" style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
+                  Percepta GEO
                   {/* · Powered by Accenture */}
                 </div>
 
                 {/* Headline */}
-                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:30,fontWeight:500,color:'#0A0A0F',letterSpacing:'-0.03em',textAlign:'center',lineHeight:1.1}}>
-                  How does AI <span style={{color:'#A100FF'}}>see</span> your brand<span style={{color:'#A100FF'}}>?</span>
+                <div id="scan-headline" className="scanHeadline" style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:56,fontWeight:500,color:'#0A0A0F',letterSpacing:'-0.03em',textAlign:'center',lineHeight:1.1}}>
+                  How does AI <span id="scan-headline-see" className="scanHeadlineSee" style={{color:'#A100FF'}}>see</span> your brand<span id="scan-headline-punct" className="scanHeadlinePunct" style={{color:'#A100FF'}}>?</span>
                 </div>
 
                 {/* Sub */}
-                <div style={{fontSize:13,color:'#7A7A90',textAlign:'center',maxWidth:400,lineHeight:1.65,fontFamily:'Inter,sans-serif'}}>
+                <div id="scan-sub" className="scanSub" style={{fontSize:13,color:'#7A7A90',textAlign:'center',maxWidth:400,lineHeight:1.65,fontFamily:'Inter,sans-serif'}}>
                   Enter any brand URL to get a full GEO analysis across visibility, prominence, sentiment, citations, and share of voice.
                 </div>
 
                 {/* URL input + run button */}
-                <div style={{display:'flex',width:'100%'}}>
+                <div id="scan-input-row" className="scanInputRow" style={{display:'flex',width:'100%'}}>
                   <input
                     id="d3url"
+                    className="scanUrlInput"
                     type="text"
                     value={displayUrl}
                     onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl(v?'https://'+v:'');}}
@@ -240,64 +265,102 @@ export default function GeoHub() {
                   />
                   <button
                     id="scan-submit-btn"
-                    onClick={runAnalysis}
-                    disabled={loading}
-                    style={{background:'#A100FF',color:'white',border:'none',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,padding:'0 24px',height:48,cursor:'pointer',whiteSpace:'nowrap' as const,flexShrink:0}}
+                    className={`scanSubmitBtn${canRun?'':' scanSubmitBtnDisabled'}`}
+                    onClick={canRun?runAnalysis:undefined}
+                    disabled={!canRun}
+                    style={{background:canRun?'#A100FF':'#C8C8D8',color:canRun?'white':'rgba(255,255,255,0.55)',border:'none',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,padding:'0 24px',height:48,cursor:canRun?'pointer':'not-allowed',whiteSpace:'nowrap' as const,flexShrink:0,transition:'background 0.2s, color 0.2s'}}
                   >
                     Run Analysis →
                   </button>
                 </div>
 
-                {/* Scope — contextual reveal after URL typed */}
-                <div id="scan-scope-section" style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
-                    <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
-                    <div style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
-                      <span style={{width:5,height:5,borderRadius:'50%',background:'#00C853',flexShrink:0,display:'inline-block'}}/>
-                      {detectedIndustry}
-                    </div>
+                {/* Scope — contextual reveal after valid URL entered */}
+                <div id="scan-scope-section" className="scanScopeSection" style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
+                  <div id="scan-scope-header" className="scanScopeHeader" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
+                    <div id="scan-scope-label" className="scanScopeLabel" style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
+                    {scopeDetecting?(
+                      <div id="scan-scope-detecting" className="scanScopeDetecting" style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
+                        <span id="scan-scope-detecting-dot" className="scanScopeDetectingDot" style={{width:5,height:5,borderRadius:'50%',background:'#B8B8CC',flexShrink:0,display:'inline-block',animation:'d3live 1.2s ease-in-out infinite'}}/>
+                        Detecting scopes…
+                      </div>
+                    ):(detectedScopes.length>0&&(
+                      <div id="scan-scope-detected" className="scanScopeDetected" style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
+                        <span id="scan-scope-detected-dot" className="scanScopeDetectedDot" style={{width:5,height:5,borderRadius:'50%',background:'#00C853',flexShrink:0,display:'inline-block'}}/>
+                        Scopes detected
+                      </div>
+                    ))}
                   </div>
-                  <div style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
-                    {SCOPE_PILLS.map(pill=>{
+
+                  {/* Pills — shown immediately (General always present); brand scopes appear after detection */}
+                  <div id="scan-scope-pills" className="scanScopePills" style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
+                    {SCOPE_PILLS.map((pill,i)=>{
                       const sel=d3ScopeSelected===pill;
                       return (
-                        <div key={pill} onClick={()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}} style={{background:sel?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px solid ${sel?'#A100FF':'#D0D0DC'}`,color:sel?'#A100FF':'#3D3D50',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const}}>
+                        <div
+                          id={`scan-scope-pill-${i}`}
+                          className={`scanScopePill${sel?' scanScopePillSelected':''}`}
+                          key={pill}
+                          onClick={()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}}
+                          style={{background:sel?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px solid ${sel?'#A100FF':'#D0D0DC'}`,color:sel?'#A100FF':'#3D3D50',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
+                        >
                           {pill}
                         </div>
                       );
                     })}
-                    <div onClick={()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}} style={{background:d3ScopeSelected==='+ Custom'?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px ${d3ScopeSelected==='+ Custom'?'solid':'dashed'} ${d3ScopeSelected==='+ Custom'?'#A100FF':'#D0D0DC'}`,color:d3ScopeSelected==='+ Custom'?'#A100FF':'#B8B8CC',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const}}>
+                    <div
+                      id="scan-scope-custom"
+                      className={`scanScopeCustom${d3ScopeSelected==='+ Custom'?' scanScopeCustomSelected':''}`}
+                      onClick={()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}}
+                      style={{background:d3ScopeSelected==='+ Custom'?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px ${d3ScopeSelected==='+ Custom'?'solid':'dashed'} ${d3ScopeSelected==='+ Custom'?'#A100FF':'#D0D0DC'}`,color:d3ScopeSelected==='+ Custom'?'#A100FF':'#B8B8CC',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
+                    >
                       + Custom
                     </div>
                   </div>
+
+                  {/* Custom scope text input */}
                   {d3ShowCustomScope&&(
-                    <div style={{marginTop:8}}>
-                      <input type="text" placeholder="Describe the product or service you want to analyze…" style={{width:'100%',background:'#FFFFFF',border:'1px dashed #D0D0DC',color:'#0A0A0F',fontFamily:'Inter,sans-serif',fontSize:12,padding:'0 12px',height:36,outline:'none'}}/>
+                    <div id="scan-custom-input-wrap" className="scanCustomInputWrap" style={{marginTop:8}}>
+                      <input
+                        id="scan-custom-input"
+                        className="scanCustomInput"
+                        type="text"
+                        value={d3CustomScope}
+                        onChange={e=>setD3CustomScope(e.target.value)}
+                        placeholder="Describe the product or service you want to analyze…"
+                        style={{width:'100%',background:'#FFFFFF',border:'1px dashed #D0D0DC',color:'#0A0A0F',fontFamily:'Inter,sans-serif',fontSize:12,padding:'0 12px',height:36,outline:'none',boxSizing:'border-box' as const}}
+                      />
+                    </div>
+                  )}
+
+                  {/* Scope hint */}
+                  {!d3ScopeSelected&&!scopeDetecting&&(
+                    <div id="scan-scope-hint" className="scanScopeHint" style={{marginTop:6,fontFamily:'Inter,sans-serif',fontSize:10,color:'#B8B8CC',fontStyle:'italic'}}>
+                      Select a scope to focus the analysis — or choose General for the brand as a whole.
                     </div>
                   )}
                 </div>
 
                 {/* Prompt count / analysis depth cards */}
-                <div id="scan-prompt-count-section" style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
-                  <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
-                    <div style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Analysis depth</div>
-                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
+                <div id="scan-prompt-count-section" className="scanPromptCountSection" style={{width:'100%',display:'flex',flexDirection:'column',gap:8}}>
+                  <div id="scan-depth-header" className="scanDepthHeader" style={{display:'flex',alignItems:'baseline',justifyContent:'space-between'}}>
+                    <div id="scan-depth-label" className="scanDepthLabel" style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Analysis depth</div>
+                    <div id="scan-depth-count" className="scanDepthCount" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
                       {promptCount.toLocaleString()} prompts selected
                     </div>
                   </div>
-                  <div style={{display:'flex',gap:8}}>
+                  <div id="scan-prompt-opts" className="scanPromptOpts" style={{display:'flex',gap:8}}>
                     {PROMPT_OPTS.map(opt=>{
                       const sel=promptCount===opt.count;
                       return (
-                        <div key={opt.count} onClick={()=>{setPromptCount(opt.count);}}style={{flex:1,background:sel?'rgba(161,0,255,0.06)':'#F7F7F9',border:`1px solid ${sel?'#A100FF':'#E4E4EC'}`,padding:'10px 12px',cursor:'pointer',textAlign:'left' as const,display:'flex',flexDirection:'column' as const}}>
-                          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:3}}>
-                            <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:16,fontWeight:500,color:sel?'#A100FF':'#3D3D50',lineHeight:1}}>
+                        <div id={`scan-prompt-opt-${opt.count}`} className="scanPromptOpt" key={opt.count} onClick={()=>{setPromptCount(opt.count);}}style={{flex:1,background:sel?'rgba(161,0,255,0.06)':'#F7F7F9',border:`1px solid ${sel?'#A100FF':'#E4E4EC'}`,padding:'10px 12px',cursor:'pointer',textAlign:'left' as const,display:'flex',flexDirection:'column' as const}}>
+                          <div className="scanPromptOptTop" style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:3}}>
+                            <div className="scanPromptOptCount" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:16,fontWeight:500,color:sel?'#A100FF':'#3D3D50',lineHeight:1}}>
                               {opt.count>=1000?'1k':opt.count}
                             </div>
-                            <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase' as const,color:'#A100FF',opacity:sel&&opt.rec?1:0}}>Rec.</div>
+                            <div className="scanPromptOptRec" style={{fontSize:9,fontWeight:600,letterSpacing:'0.06em',textTransform:'uppercase' as const,color:'#A100FF',opacity:sel&&opt.rec?1:0}}>Rec.</div>
                           </div>
-                          <div style={{fontSize:10,color:'#7A7A90',marginBottom:8,fontFamily:'Inter,sans-serif'}}>{opt.name}</div>
-                          <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,color:sel?'rgba(161,0,255,0.45)':'#B8B8CC',paddingTop:8,borderTop:`1px solid ${sel?'rgba(161,0,255,0.15)':'#E4E4EC'}`}}>{opt.time}</div>
+                          <div className="scanPromptOptName" style={{fontSize:10,color:'#7A7A90',marginBottom:8,fontFamily:'Inter,sans-serif'}}>{opt.name}</div>
+                          <div className="scanPromptOptTime" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,color:sel?'rgba(161,0,255,0.45)':'#B8B8CC',paddingTop:8,borderTop:`1px solid ${sel?'rgba(161,0,255,0.15)':'#E4E4EC'}`}}>{opt.time}</div>
                         </div>
                       );
                     })}
@@ -305,10 +368,10 @@ export default function GeoHub() {
                 </div>
 
                 {/* Error */}
-                {error&&<div style={{color:'#EF4444',fontSize:'0.85rem',width:'100%',fontFamily:'Inter,sans-serif'}}>{error}</div>}
+                {error&&<div id="scan-error-msg" className="scanErrorMsg" style={{color:'#EF4444',fontSize:'0.85rem',width:'100%',fontFamily:'Inter,sans-serif'}}>{error}</div>}
 
                 {/* Hint */}
-                <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
+                <div id="scan-hint" className="scanHint" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
                   Accepts any URL format<br/>
                   bofa.com · www.bankofamerica.com · https://www.bankofamerica.com/
                 </div>
@@ -340,116 +403,116 @@ export default function GeoHub() {
     return (
       <>
         <style>{`@keyframes d3fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
-        <div id="percepta-error" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-error" className="perceptaError" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
           {/* Sidebar */}
-          <aside id="error-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:11,color:'#fff',marginBottom:8,fontFamily:"'Space Grotesk',sans-serif"}}>P</div>
-            <div title="New Analysis" onClick={()=>setAnalysisError(null)} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+          <aside id="error-sidebar" className="errorSidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.06)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div id="error-logo" className="errorLogo" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:11,color:'#fff',marginBottom:8,fontFamily:"'Space Grotesk',sans-serif"}}>P</div>
+            <div id="error-new-analysis" className="errorNewAnalysis" title="New Analysis" onClick={()=>setAnalysisError(null)} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
             </div>
-            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
-            <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
-            <div style={sbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
-            <div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
-            <div style={{marginTop:'auto'}}><div style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div></div>
+            <div id="error-sidebar-divider" className="errorSidebarDivider" style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
+            <div id="error-sb-home" className="errorSidebarIcon" style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg></div>
+            <div id="error-sb-reports" className="errorSidebarIcon errorSidebarIconActive" style={sbIcon(true)}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg></div>
+            <div id="error-sb-trends" className="errorSidebarIcon" style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg></div>
+            <div id="error-sidebar-bottom" className="errorSidebarBottom" style={{marginTop:'auto'}}><div id="error-sb-account" className="errorSidebarIcon" style={sbIcon()}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg></div></div>
           </aside>
           {/* Content column */}
-          <div id="error-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="error-content-col" className="errorContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
             {/* Topbar */}
-            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:'rgba(255,255,255,0.35)',fontFamily:'Inter,sans-serif'}}>
-                <span>{brandLabel}</span>
-                <span style={{color:'rgba(255,255,255,0.15)'}}>/</span>
-                <span style={{color:'rgba(255,255,255,0.75)',fontWeight:500}}>Analysis Failed</span>
+            <div id="error-topbar" className="errorTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div id="error-breadcrumb" className="errorBreadcrumb" style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:'rgba(255,255,255,0.35)',fontFamily:'Inter,sans-serif'}}>
+                <span id="error-breadcrumb-brand" className="errorBreadcrumbBrand">{brandLabel}</span>
+                <span id="error-breadcrumb-sep" className="errorBreadcrumbSep" style={{color:'rgba(255,255,255,0.15)'}}>/</span>
+                <span id="error-breadcrumb-active" className="errorBreadcrumbActive" style={{color:'rgba(255,255,255,0.75)',fontWeight:500}}>Analysis Failed</span>
               </div>
-              <div style={{marginLeft:'auto'}}>
-                <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,color:'#E03131',background:'rgba(224,49,49,0.10)',border:'1px solid rgba(224,49,49,0.20)',padding:'3px 10px'}}>✕ Analysis failed</span>
+              <div id="error-topbar-right" className="errorTopbarRight" style={{marginLeft:'auto'}}>
+                <span id="error-status-badge" className="errorStatusBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,color:'#E03131',background:'rgba(224,49,49,0.10)',border:'1px solid rgba(224,49,49,0.20)',padding:'3px 10px'}}>✕ Analysis failed</span>
               </div>
             </div>
             {/* Greyed report nav */}
-            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,pointerEvents:'none',opacity:0.3}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
-                <div key={t} style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:'0 14px',display:'flex',alignItems:'center',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif'}}>{t}</div>
+            <div id="error-nav" className="errorNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,pointerEvents:'none',opacity:0.3}}>
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map((t,i)=>(
+                <div id={`error-nav-item-${i}`} className="errorNavItem" key={t} style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:'0 14px',display:'flex',alignItems:'center',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif'}}>{t}</div>
               ))}
             </div>
             {/* White canvas */}
-            <div style={{flex:1,background:'#FFFFFF',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',padding:'40px 24px'}}>
-              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(#E4E4EC 1px,transparent 1px),linear-gradient(90deg,#E4E4EC 1px,transparent 1px)',backgroundSize:'40px 40px',opacity:0.5,pointerEvents:'none'}}/>
+            <div id="error-canvas" className="errorCanvas" style={{flex:1,background:'#FFFFFF',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',padding:'40px 24px'}}>
+              <div id="error-grid" className="errorGrid" style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(#E4E4EC 1px,transparent 1px),linear-gradient(90deg,#E4E4EC 1px,transparent 1px)',backgroundSize:'40px 40px',opacity:0.5,pointerEvents:'none'}}/>
               {/* Failure card */}
-              <div id="error-card" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both'}}>
+              <div id="error-card" className="errorCard" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both'}}>
                 {/* Dark header */}
-                <div id="error-card-header" style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
-                  <div style={{width:40,height:40,borderRadius:'50%',background:'rgba(224,49,49,0.12)',border:'1px solid rgba(224,49,49,0.25)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                <div id="error-card-header" className="errorCardHeader" style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
+                  <div id="error-card-icon" className="errorCardIcon" style={{width:40,height:40,borderRadius:'50%',background:'rgba(224,49,49,0.12)',border:'1px solid rgba(224,49,49,0.25)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#E03131" strokeWidth="2">
                       <circle cx="9" cy="9" r="8"/>
                       <line x1="9" y1="5.5" x2="9" y2="10"/>
                       <circle cx="9" cy="12.5" r="0.8" fill="#E03131" stroke="none"/>
                     </svg>
                   </div>
-                  <div style={{flex:1}}>
-                    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.01em',marginBottom:3}}>{analysisError.title}</div>
-                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.3)'}}>{cleanDomain} · {d3ScopeSelected} · {promptCount.toLocaleString()} prompts</div>
+                  <div id="error-card-text" className="errorCardText" style={{flex:1}}>
+                    <div id="error-title" className="errorTitle" style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.01em',marginBottom:3}}>{analysisError.title}</div>
+                    <div id="error-meta" className="errorMeta" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.3)'}}>{cleanDomain} · {d3ScopeSelected} · {promptCount.toLocaleString()} prompts</div>
                   </div>
                 </div>
                 {/* White body */}
-                <div id="error-card-body" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
+                <div id="error-card-body" className="errorCardBody" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
                   {/* What happened */}
-                  <div id="error-what-happened">
-                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:10,fontFamily:'Inter,sans-serif'}}>What happened</div>
-                    <div style={{background:'#F7F7F9',border:'1px solid #E4E4EC',borderLeft:'2px solid #E03131',padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
-                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'#E03131'}}>{analysisError.code}</div>
-                      <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.55,marginTop:2,fontFamily:'Inter,sans-serif'}}>{analysisError.message}</div>
+                  <div id="error-what-happened" className="errorWhatHappened">
+                    <div id="error-what-happened-label" className="errorWhatHappenedLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:10,fontFamily:'Inter,sans-serif'}}>What happened</div>
+                    <div id="error-code-box" className="errorCodeBox" style={{background:'#F7F7F9',border:'1px solid #E4E4EC',borderLeft:'2px solid #E03131',padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
+                      <div id="error-code" className="errorCode" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'#E03131'}}>{analysisError.code}</div>
+                      <div id="error-message" className="errorMessage" style={{fontSize:11,color:'#7A7A90',lineHeight:1.55,marginTop:2,fontFamily:'Inter,sans-serif'}}>{analysisError.message}</div>
                     </div>
                   </div>
                   {/* v1 transparency note */}
-                  <div style={{display:'flex',gap:10,padding:'10px 12px',background:'rgba(161,0,255,0.08)',border:'1px solid rgba(161,0,255,0.22)'}}>
-                    <div style={{flexShrink:0,marginTop:1}}>
+                  <div id="error-v1-note" className="errorV1Note" style={{display:'flex',gap:10,padding:'10px 12px',background:'rgba(161,0,255,0.08)',border:'1px solid rgba(161,0,255,0.22)'}}>
+                    <div id="error-v1-icon" className="errorV1Icon" style={{flexShrink:0,marginTop:1}}>
                       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#A100FF" strokeWidth="1.5"><circle cx="8" cy="8" r="7"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r="0.6" fill="#A100FF" stroke="none"/></svg>
                     </div>
-                    <div style={{fontSize:11,color:'#3D3D50',lineHeight:1.55,fontFamily:'Inter,sans-serif'}}>
+                    <div id="error-v1-text" className="errorV1Text" style={{fontSize:11,color:'#3D3D50',lineHeight:1.55,fontFamily:'Inter,sans-serif'}}>
                       <strong style={{color:'#0A0A0F'}}>Percepta GEO v1</strong> uses OpenAI GPT-4o for all analysis. A single engine failure cancels the entire scan — partial results are not available in this version.
                     </div>
                   </div>
                   {/* Actions */}
-                  <div id="error-what-you-can-do" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:2,fontFamily:'Inter,sans-serif'}}>What you can do</div>
+                  <div id="error-what-you-can-do" className="errorWhatYouCanDo" style={{display:'flex',flexDirection:'column',gap:8}}>
+                    <div id="error-actions-label" className="errorActionsLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:2,fontFamily:'Inter,sans-serif'}}>What you can do</div>
                     {/* Try again */}
-                    <div id="error-action-retry" onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
-                      <div style={{width:30,height:30,background:'rgba(161,0,255,0.12)',border:'1px solid rgba(161,0,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <div id="error-action-retry" className="errorActionRetry" onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
+                      <div id="error-retry-icon" className="errorRetryIcon" style={{width:30,height:30,background:'rgba(161,0,255,0.12)',border:'1px solid rgba(161,0,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#A100FF" strokeWidth="1.5"><path d="M12 7A5 5 0 1 1 7 2"/><polyline points="12,2 12,7 7,7"/></svg>
                       </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Try again</div>
-                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Most failures are temporary. Retrying usually resolves within a minute.</div>
+                      <div id="error-retry-text" className="errorRetryText" style={{flex:1}}>
+                        <div id="error-retry-title" className="errorRetryTitle" style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Try again</div>
+                        <div id="error-retry-desc" className="errorRetryDesc" style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Most failures are temporary. Retrying usually resolves within a minute.</div>
                       </div>
-                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                      <div id="error-retry-arrow" className="errorRetryArrow" style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
                     </div>
                     {/* Retry with fewer prompts */}
-                    {promptCount > 50 && <div onClick={()=>{setPromptCount(Math.max(50,Math.floor(promptCount/2)));runAnalysis();}} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
-                      <div style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    {promptCount > 50 && <div id="error-reduce-prompts" className="errorReducePrompts" onClick={()=>{setPromptCount(Math.max(50,Math.floor(promptCount/2)));runAnalysis();}} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
+                      <div id="error-reduce-icon" className="errorReduceIcon" style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><polyline points="2,8 6,4 10,8"/><line x1="6" y1="4" x2="6" y2="12"/></svg>
                       </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Retry with fewer prompts</div>
-                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>{analysisError.reduceDesc}</div>
+                      <div id="error-reduce-text" className="errorReduceText" style={{flex:1}}>
+                        <div id="error-reduce-title" className="errorReduceTitle" style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Retry with fewer prompts</div>
+                        <div id="error-reduce-desc" className="errorReduceDesc" style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>{analysisError.reduceDesc}</div>
                       </div>
-                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                      <div id="error-reduce-arrow" className="errorReduceArrow" style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
                     </div>}
                     {/* Go to dashboard */}
-                    <div id="error-action-go-back" onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
-                      <div style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                    <div id="error-action-go-back" className="errorActionGoBack" onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
+                      <div id="error-goback-icon" className="errorGobackIcon" style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><path d="M2 6l5-4 5 4v6H2V6z"/></svg>
                       </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Go to dashboard</div>
-                        <div style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Return home and try again later. Nothing was saved from this run.</div>
+                      <div id="error-goback-text" className="errorGobackText" style={{flex:1}}>
+                        <div id="error-goback-title" className="errorGobackTitle" style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Go to dashboard</div>
+                        <div id="error-goback-desc" className="errorGobackDesc" style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Return home and try again later. Nothing was saved from this run.</div>
                       </div>
-                      <div style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
+                      <div id="error-goback-arrow" className="errorGobackArrow" style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
                     </div>
                   </div>
                   {/* Support note */}
-                  <div style={{fontSize:11,color:'#B8B8CC',textAlign:'center',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
-                    Seeing this repeatedly? <span style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>Contact support</span> or check <span style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>system status</span>.
+                  <div id="error-support-note" className="errorSupportNote" style={{fontSize:11,color:'#B8B8CC',textAlign:'center',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
+                    Seeing this repeatedly? <span id="error-support-link" className="errorSupportLink" style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>Contact support</span> or check <span id="error-status-link" className="errorStatusLink" style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>system status</span>.
                   </div>
                 </div>
               </div>
@@ -482,7 +545,7 @@ export default function GeoHub() {
     const sbIcon = (active=false): React.CSSProperties => ({
       width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
       color:active?'#A100FF':'rgba(255,255,255,0.12)',
-      background:active?'rgba(161,0,255,0.12)':'transparent',
+      // background:active?'rgba(161,0,255,0.12)':'transparent',
     });
 
     return (
@@ -493,143 +556,140 @@ export default function GeoHub() {
           @keyframes d3shimmer{0%{transform:translateX(-80px);opacity:0}40%{opacity:1}100%{transform:translateX(80px);opacity:0}}
           @keyframes d3indeterminate{0%{background-position:100% 0}100%{background-position:-100% 0}}
         `}</style>
-        <div id="percepta-loading" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
+        <div id="percepta-loading" className="perceptaLoading" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
 
           {/* Sidebar */}
-          <aside id="loading-sidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
-            <div style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8}}>P</div>
-            <div title="New Analysis" onClick={()=>{setLoading(false);setAnalysisError(null);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
+          <aside id="loading-sidebar" className="loadingSidebar" style={{width:52,background:'#0F0F11',borderRight:'1px solid rgba(255,255,255,0.07)',display:'flex',flexDirection:'column',alignItems:'center',padding:'12px 0 16px',flexShrink:0}}>
+            <div id="loading-logo" className="loadingLogo" style={{width:24,height:24,background:'#A100FF',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Space Grotesk',sans-serif",fontSize:11,fontWeight:700,color:'white',marginBottom:8}}>P</div>
+            <div id="loading-new-analysis" className="loadingNewAnalysis" title="New Analysis" onClick={()=>{setLoading(false);setAnalysisError(null);}} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',border:'1px solid rgba(161,0,255,0.35)',color:'#A100FF',background:'rgba(161,0,255,0.10)',marginBottom:10,flexShrink:0}}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg>
             </div>
-            <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
-            <div style={sbIcon()}>
+            <div id="loading-sidebar-divider" className="loadingSidebarDivider" style={{width:28,height:1,background:'rgba(255,255,255,0.07)',marginBottom:8}}/>
+            <div id="loading-sb-home" className="loadingSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
             </div>
-            <div style={sbIcon(true)}>
+            <div id="loading-sb-reports" className="loadingSidebarIcon loadingSidebarIconActive" style={sbIcon(true)}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/><rect x="9" y="9" width="5" height="5"/></svg>
             </div>
-            <div style={sbIcon()}>
+            <div id="loading-sb-trends" className="loadingSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="2,12 6,6 10,9 14,3"/></svg>
             </div>
-            <div style={sbIcon()}>
+            <div id="loading-sb-account" className="loadingSidebarIcon" style={sbIcon()}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="5" r="2.5"/><path d="M3 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/></svg>
             </div>
-            <div style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
-              <div style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
-              <div style={sbIcon()}>
+            <div id="loading-sidebar-bottom" className="loadingSidebarBottom" style={{marginTop:'auto',display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+              <div id="loading-sidebar-bottom-divider" className="loadingSidebarBottomDivider" style={{width:28,height:1,background:'rgba(255,255,255,0.07)',margin:'6px 0'}}/>
+              <div id="loading-sb-user" className="loadingSidebarIcon" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14c0-3 2.5-5 5-5s5 2 5 5"/></svg>
               </div>
-              <div style={sbIcon()}>
+              <div id="loading-sb-logout" className="loadingSidebarIcon" style={sbIcon()}>
                 <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10.5 8H4M7 5.5l-3 2.5 3 2.5"/><path d="M8.5 3h4a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-4"/></svg>
               </div>
             </div>
           </aside>
 
           {/* Content column */}
-          <div id="loading-content-col" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
+          <div id="loading-content-col" className="loadingContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
 
             {/* Dark topbar */}
-            <div style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
-                <span>Percepta GEO</span>
-                <span style={{color:'rgba(255,255,255,0.12)'}}>/</span>
-                <span style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
+            <div id="loading-topbar" className="loadingTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
+              <div id="loading-breadcrumb" className="loadingBreadcrumb" style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
+                <span id="loading-breadcrumb-root" className="loadingBreadcrumbRoot">Percepta GEO</span>
+                <span id="loading-breadcrumb-sep" className="loadingBreadcrumbSep" style={{color:'rgba(255,255,255,0.12)'}}>/</span>
+                <span id="loading-breadcrumb-active" className="loadingBreadcrumbActive" style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
               </div>
-              <div style={{marginLeft:'auto'}}>
-                <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',padding:'3px 10px'}}>{cleanDomain}</span>
+              <div id="loading-topbar-right" className="loadingTopbarRight" style={{marginLeft:'auto'}}>
+                <span id="loading-domain-badge" className="loadingDomainBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',padding:'3px 10px'}}>{cleanDomain}</span>
               </div>
             </div>
 
             {/* Report nav — greyed */}
-            <div style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map(t=>(
-                <div key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
+            <div id="loading-nav" className="loadingNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Action Plan','Trends'].map((t,i)=>(
+                <div id={`loading-nav-item-${i}`} className="loadingNavItem" key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
               ))}
             </div>
 
             {/* White canvas */}
-            <div style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
-              {/* Grid */}
-              <div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(228,228,236,0.5) 1px, transparent 1px),linear-gradient(90deg, rgba(228,228,236,0.5) 1px, transparent 1px)',backgroundSize:'40px 40px',pointerEvents:'none'}}/>
-
+            <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
               {/* Loading card */}
-              <div id="loading-panel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
+              <div id="loading-panel" className="loadingPanel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
 
                 {/* Dark card header */}
-                <div style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
-                  <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
-                    <div style={{flex:1}}>
-                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,letterSpacing:'0.14em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.28)',marginBottom:5}}>Running analysis</div>
-                      <div id="loading-brand-name" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
-                      <div style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:5,fontFamily:'Inter,sans-serif'}}>{d3ScopeSelected} · {promptCount.toLocaleString()} prompts · GPT-4o</div>
+                <div id="loading-panel-header" className="loadingPanelHeader" style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
+                  <div id="loading-header-row" className="loadingHeaderRow" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                    <div id="loading-header-left" className="loadingHeaderLeft" style={{flex:1}}>
+                      <div id="loading-running-label" className="loadingRunningLabel" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,letterSpacing:'0.14em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.28)',marginBottom:5}}>Running analysis</div>
+                      <div id="loading-brand-name" className="loadingBrandName" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
+                      <div id="loading-meta" className="loadingMeta" style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:5,fontFamily:'Inter,sans-serif'}}>{d3ScopeSelected} · {promptCount.toLocaleString()} prompts · GPT-4o</div>
                     </div>
-                    <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,padding:'4px 10px',whiteSpace:'nowrap' as const,flexShrink:0,display:'flex',alignItems:'center',gap:6,color:'#00D1C7',background:'rgba(0,209,199,0.10)',border:'1px solid rgba(0,209,199,0.20)'}}>
-                      <span style={{width:5,height:5,borderRadius:'50%',background:'currentColor',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
+                    <div id="loading-querying-badge" className="loadingQueryingBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,padding:'4px 10px',whiteSpace:'nowrap' as const,flexShrink:0,display:'flex',alignItems:'center',gap:6,color:'#00D1C7',background:'rgba(0,209,199,0.10)',border:'1px solid rgba(0,209,199,0.20)'}}>
+                      <span id="loading-querying-dot" className="loadingQueryingDot" style={{width:5,height:5,borderRadius:'50%',background:'currentColor',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
                       Querying
                     </div>
                   </div>
-                  <div style={{display:'flex',flexDirection:'column' as const,gap:5}}>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                      <span style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
-                      <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#00D1C7'}}>{loadingProgress}%</span>
+                  <div id="loading-progress-row" className="loadingProgressRow" style={{display:'flex',flexDirection:'column' as const,gap:5}}>
+                    <div id="loading-progress-label-row" className="loadingProgressLabelRow" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <span id="loading-progress-label" className="loadingProgressLabel" style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
+                      <span id="loading-progress-pct" className="loadingProgressPct" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#00D1C7'}}>{loadingProgress}%</span>
                     </div>
-                    <div id="loading-progress-track" style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
-                      <div id="loading-progress-fill" style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
-                        <div style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
+                    <div id="loading-progress-track" className="loadingProgressTrack" style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
+                      <div id="loading-progress-fill" className="loadingProgressFill" style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
+                        <div id="loading-shimmer" className="loadingShimmer" style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* White card body */}
-                <div id="loading-steps-list" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
+                <div id="loading-steps-list" className="loadingStepsList" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
 
                   {/* AI engine row */}
-                  <div>
-                    <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',fontFamily:'Inter,sans-serif',marginBottom:10}}>AI Engine</div>
-                    <div style={{display:'grid',gridTemplateColumns:'20px 110px 1fr 72px',alignItems:'center',gap:12,padding:'8px 0'}}>
-                      <div style={{width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                  <div id="loading-engine-section" className="loadingEngineSection">
+                    <div id="loading-engine-label" className="loadingEngineLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',fontFamily:'Inter,sans-serif',marginBottom:10}}>AI Engine</div>
+                    <div id="loading-engine-row" className="loadingEngineRow" style={{display:'grid',gridTemplateColumns:'20px 110px 1fr 72px',alignItems:'center',gap:12,padding:'8px 0'}}>
+                      <div id="loading-engine-icon" className="loadingEngineIcon" style={{width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                         {loadingProgress>=100
-                          ?<div style={{width:16,height:16,borderRadius:'50%',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.5"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
-                          :<div style={{width:14,height:14,border:'1.5px solid #D0D0DC',borderTopColor:'#A100FF',borderRadius:'50%',animation:'d3spin 0.8s linear infinite'}}/>
+                          ?<div id="loading-engine-icon-done" className="loadingEngineIconDone" style={{width:16,height:16,borderRadius:'50%',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.5"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
+                          :<div id="loading-engine-icon-spin" className="loadingEngineIconSpin" style={{width:14,height:14,border:'1.5px solid #D0D0DC',borderTopColor:'#A100FF',borderRadius:'50%',animation:'d3spin 0.8s linear infinite'}}/>
                         }
                       </div>
-                      <div style={{fontSize:12,fontWeight:500,color:'#3D3D50',fontFamily:'Inter,sans-serif'}}>GPT-4o</div>
-                      <div style={{flex:1}}>
-                        <div style={{height:3,background:'#F0F0F4',overflow:'hidden'}}>
+                      <div id="loading-engine-name" className="loadingEngineName" style={{fontSize:12,fontWeight:500,color:'#3D3D50',fontFamily:'Inter,sans-serif'}}>GPT-4o</div>
+                      <div id="loading-engine-bar-wrap" className="loadingEngineBarWrap" style={{flex:1}}>
+                        <div id="loading-engine-bar" className="loadingEngineBar" style={{height:3,background:'#F0F0F4',overflow:'hidden'}}>
                           {loadingProgress>=100
-                            ?<div style={{height:'100%',background:'#00C853',width:'100%'}}/>
-                            :<div style={{height:'100%',width:'100%',background:'linear-gradient(90deg,#E8E8EE,#A100FF,#E8E8EE)',backgroundSize:'200% 100%',animation:'d3indeterminate 1.4s ease-in-out infinite'}}/>
+                            ?<div id="loading-engine-bar-done" className="loadingEngineBarDone" style={{height:'100%',background:'#00C853',width:'100%'}}/>
+                            :<div id="loading-engine-bar-anim" className="loadingEngineBarAnim" style={{height:'100%',width:'100%',background:'linear-gradient(90deg,#E8E8EE,#A100FF,#E8E8EE)',backgroundSize:'200% 100%',animation:'d3indeterminate 1.4s ease-in-out infinite'}}/>
                           }
                         </div>
                       </div>
-                      <div style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,textAlign:'right' as const,whiteSpace:'nowrap' as const,color:loadingProgress>=100?'#00C853':'#A100FF'}}>
+                      <div id="loading-engine-status" className="loadingEngineStatus" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,textAlign:'right' as const,whiteSpace:'nowrap' as const,color:loadingProgress>=100?'#00C853':'#A100FF'}}>
                         {loadingProgress>=100?'Done':'Querying…'}
                       </div>
                     </div>
                   </div>
 
                   {/* Percepta GEO V1 info block */}
-                  <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(161,0,255,0.05)',border:'1px solid rgba(161,0,255,0.18)'}}>
-                    <div style={{width:18,height:18,borderRadius:'50%',background:'rgba(161,0,255,0.15)',border:'1px solid rgba(161,0,255,0.30)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
+                  <div id="loading-v1-note" className="loadingV1Note" style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(161,0,255,0.05)',border:'1px solid rgba(161,0,255,0.18)'}}>
+                    <div id="loading-v1-icon" className="loadingV1Icon" style={{width:18,height:18,borderRadius:'50%',background:'rgba(161,0,255,0.15)',border:'1px solid rgba(161,0,255,0.30)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
                       <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><line x1="5" y1="2" x2="5" y2="5.5" stroke="#A100FF" strokeWidth="2"/><circle cx="5" cy="7.5" r="0.7" fill="#A100FF"/></svg>
                     </div>
-                    <div>
-                      <div style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#A100FF',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
-                      <div style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
+                    <div id="loading-v1-text" className="loadingV1Text">
+                      <div id="loading-v1-label" className="loadingV1Label" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#A100FF',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
+                      <div id="loading-v1-desc" className="loadingV1Desc" style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
                         This analysis runs on <strong style={{color:'#0A0A0F'}}>OpenAI GPT-4o</strong> and models AI visibility patterns across major search engines. <strong style={{color:'#0A0A0F'}}>Multi-engine analysis</strong> — querying ChatGPT, Gemini, Perplexity, and Claude directly — is planned for v2.
                       </div>
                     </div>
                   </div>
 
                   {/* Elapsed */}
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <span style={{fontSize:11,color:'#B8B8CC',fontFamily:'Inter,sans-serif'}}>Elapsed</span>
-                    <span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#7A7A90'}}>{elapsed}</span>
+                  <div id="loading-elapsed-row" className="loadingElapsedRow" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                    <span id="loading-elapsed-label" className="loadingElapsedLabel" style={{fontSize:11,color:'#B8B8CC',fontFamily:'Inter,sans-serif'}}>Elapsed</span>
+                    <span id="loading-elapsed-value" className="loadingElapsedValue" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#7A7A90'}}>{elapsed}</span>
                   </div>
 
                   {/* Nav warning */}
-                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
+                  <div id="loading-nav-warning" className="loadingNavWarning" style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
                     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#F5A623" strokeWidth="1.5" style={{flexShrink:0}}><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.7" fill="#F5A623" stroke="none"/></svg>
                     Leaving this page will cancel the analysis. Results are not saved until complete.
                   </div>
@@ -704,6 +764,7 @@ export default function GeoHub() {
           onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);setHoverParent(null);}}>
           {TOP_TABS.map((tab,i)=>(
             <button key={i}
+              id={`scan-nav-item-${i}`}
               className={`tabBtn${activeParent===i?' tabBtn--active':''}`}
               onClick={()=>{setActiveParent(i);setActiveSub(0);setHoverParent(null);}}
               onMouseEnter={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);hoverTimer.current=setTimeout(()=>setHoverParent(i),120);}}>
@@ -778,6 +839,7 @@ export default function GeoHub() {
             {activeParent===2&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===3&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===3&&activeSub===1&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===3&&activeSub===2&&<ResponseMapTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===4&&<TrendsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===5&&<ActionPlanTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
 
