@@ -52,7 +52,13 @@ ALWAYS follow this formatting style:
     });
 
     const data = await res.json();
-    return NextResponse.json({ response: data.choices[0].message.content });
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) {
+      // OpenRouter returned an error object (bad key, quota, etc.)
+      const errMsg = data?.error?.message ?? data?.message ?? 'No response from AI model.';
+      return NextResponse.json({ error: errMsg }, { status: 502 });
+    }
+    return NextResponse.json({ response: content });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

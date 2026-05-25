@@ -17,11 +17,11 @@ function nameHash(s: string): number {
 
 // ── Tier helpers ──────────────────────────────────────────────────────────────
 const TIER_FILL: Record<string, string> = {
-  fragmented: '#E0003B',
-  emerging:   '#F48500',
-  competitive:'#F3B10C',
-  leader:     '#2F6DFF',
-  authority:  '#00AB7B',
+  fragmented: 'var(--color-tier-fragmented)',
+  emerging:   'var(--color-tier-emerging)',
+  competitive:'var(--color-tier-competitive)',
+  leader:     'var(--color-tier-leader)',
+  authority:  'var(--color-tier-authority)',
 };
 const TIER_TEXT: Record<string, string> = {
   fragmented: '#fff',
@@ -45,6 +45,46 @@ const TIER_RANGE: Record<string, string> = {
   authority:  '≥80%',
 };
 const RANK_TO_TIER: Record<number, string> = { 1:'authority', 2:'leader', 3:'competitive', 4:'emerging', 5:'fragmented' };
+
+// "On white" — darker shade of each tier color for text on light backgrounds
+const TIER_ON_WHITE: Record<string, string> = {
+  fragmented: 'var(--color-tier-fragmented-text)',
+  emerging:   'var(--color-tier-emerging-text)',
+  competitive:'var(--color-tier-competitive-text)',
+  leader:     'var(--color-tier-leader-text)',
+  authority:  'var(--color-tier-authority-text)',
+};
+
+// Subtle stroke color — separates touching bubbles without heavy chrome
+const TIER_STROKE: Record<string, string> = {
+  fragmented: 'rgba(183,0,47,0.4)',
+  emerging:   'rgba(177,95,0,0.4)',
+  competitive:'rgba(153,110,0,0.4)',
+  leader:     'rgba(4,59,204,0.4)',
+  authority:  'rgba(0,118,83,0.4)',
+};
+
+// Y-axis helpers — mirrors the reference HTML logic
+function computeYMax(rawMax: number): number {
+  if (rawMax <= 10)  return 10;
+  if (rawMax <= 20)  return 20;
+  if (rawMax <= 50)  return 50;
+  if (rawMax <= 100) return 100;
+  if (rawMax <= 200) return 200;
+  if (rawMax <= 500) return 500;
+  return Math.ceil(rawMax / 100) * 100;
+}
+function computeYTicks(yMax: number): number[] {
+  let step = 10;
+  if (yMax <= 60)       step = 10;
+  else if (yMax <= 100) step = 20;
+  else if (yMax <= 200) step = 25;
+  else if (yMax <= 500) step = 50;
+  else                  step = 100;
+  const ticks: number[] = [];
+  for (let v = 0; v <= yMax; v += step) ticks.push(v);
+  return ticks;
+}
 
 function winRateToTier(wr: number): string {
   if (wr >= 80) return 'authority';
@@ -151,7 +191,9 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
   const [view, setView]                         = useState<'list' | 'detail'>('list');
   const [currentPrompt, setCurrentPrompt]       = useState<any | null>(null);
   const [page, setPage]                         = useState(1);
+  const [showAppeared, setShowAppeared]         = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedScrollY = useRef<number>(0);
 
   // Bubble positions
   const plotRef = useRef<HTMLDivElement>(null);
@@ -216,7 +258,20 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
 
   useLayoutEffect(() => {
     computePositions();
+    const el = plotRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => computePositions());
+    ro.observe(el);
+    return () => ro.disconnect();
   }, [computePositions]);
+
+  // Restore canvas scroll position when returning from detail → list
+  useLayoutEffect(() => {
+    if (view === 'list' && savedScrollY.current > 0) {
+      const canvas = document.querySelector('.canvas');
+      if (canvas) canvas.scrollTop = savedScrollY.current;
+    }
+  }, [view]);
 
   // ── Derived for active topic ──────────────────────────────────
   const activeSummaryId = hoveredTopicId ?? selectedTopicId;
@@ -224,10 +279,12 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
     ? bubbleData.find((b) => b.id === activeSummaryId)
     : null;
 
-  // Filtered prompt list
-  const filteredRows = selectedTopicId
-    ? rd.filter((r: any) => r.category === selectedTopicId)
-    : rd;
+  // Filtered prompt list — topic filter + optional appeared-only toggle (context-aware)
+  const filteredRows = (() => {
+    let rows = selectedTopicId ? rd.filter((r: any) => r.category === selectedTopicId) : rd;
+    if (showAppeared) rows = rows.filter((r: any) => r.mentioned || r.brand_mentioned);
+    return rows;
+  })();
   const totalFiltered = filteredRows.length;
   const totalPages = Math.ceil(totalFiltered / ROWS_PER_PAGE) || 1;
   const safePage = Math.min(page, totalPages);
@@ -249,9 +306,16 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
     setHoveredTopicId(null);
   }
 
+  function getCanvas(): Element | null {
+    return document.querySelector('.canvas');
+  }
+
   function handleRowClick(item: any) {
+    const canvas = getCanvas();
+    savedScrollY.current = canvas ? canvas.scrollTop : 0;
     setCurrentPrompt(item);
     setView('detail');
+    if (canvas) canvas.scrollTop = 0;
   }
 
   function handleBack() {
@@ -260,11 +324,19 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
   }
 
   // ── Summary sentence ──────────────────────────────────────────
-  function buildSummary(topic: (typeof bubbleData)[0] | null): string {
-    if (!topic) return '';
-    const tier = TIER_LABEL[topic.tier] ?? topic.tier;
+  function buildSummary(topic: (typeof bubbleData)[0] | null): React.ReactNode {
+    if (!topic) return null;
+    const tierLabel = TIER_LABEL[topic.tier] ?? topic.tier;
+    const tierColor = TIER_ON_WHITE[topic.tier] ?? '#2B2B2B';
     const rankLabel = topic.rank ? `avg rank ${topic.rank.toFixed(1)}` : 'no rank data';
-    return `"${topic.name}" is ${tier.toLowerCase()} territory — ${topic.appearances} appearances across ${topic.vol} prompts (${topic.winRate}% win rate, ${rankLabel}).${topic.topCompetitor ? ` Top rival: ${topic.topCompetitor}.` : ''}`;
+    return (
+      <>
+        <strong>"{topic.name}"</strong> is{' '}
+        <span className="ptSummaryTierName" style={{ color: tierColor, fontWeight: 600 }}>{tierLabel.toLowerCase()}</span>
+        {' '}territory — <strong>{topic.appearances}</strong> appearances across <strong>{topic.vol}</strong> prompts ({topic.winRate}% win rate, {rankLabel}).
+        {topic.topCompetitor ? <> Top rival: <strong>{topic.topCompetitor}</strong>.</> : ''}
+      </>
+    );
   }
 
   // ── Highlight text ────────────────────────────────────────────
@@ -345,7 +417,16 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             <div className="ptRecapSummary">{buildRecapSummary(item)}</div>
             <div className="ptRecapMetaRow">
               <RankBadge rank={item.position} size="lg" />
-              <span className="ptRecapDelta">↓1 from previous run (#{ item.position > 1 ? item.position - 1 : item.position }) — placeholder</span>
+              {item.prev_position > 0 && (() => {
+                const moved = item.prev_position - item.position; // positive = moved up (better)
+                if (moved === 0) return <span className="ptRecapDelta ptRecapDelta--flat">= 0</span>;
+                const up = moved > 0;
+                return (
+                  <span className={`ptRecapDelta ptRecapDelta--${up ? 'up' : 'down'}`}>
+                    {up ? '▲' : '▼'} {Math.abs(moved)}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
@@ -438,13 +519,13 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
 
         {/* ── Block 1: Hero stats ─────────────────────────────── */}
         <div className="ptHeroBlock" id="pt-hero-block">
-          <div className="ptHeroEyebrow">
+          {/* <div className="ptHeroEyebrow">
             <Eyebrow>PROMPTS · RUN 1 ·{' '}
               <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
                 {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
               </span>
             </Eyebrow>
-          </div>
+          </div> */}
           <div className="ptHeroGrid">
             <div className="ptHeroStat">
               <div className="ptHeroStatValue">{totalQueries.toLocaleString()}</div>
@@ -477,6 +558,29 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
           const maxApp = Math.max(...bubbleData.map((b) => b.appearances), 1);
           const maxVol = Math.max(...bubbleData.map((b) => b.vol), 1);
           const midVol = maxVol / 2;
+          const yMax   = computeYMax(maxVol);
+          const yTicks = computeYTicks(yMax);
+
+          // Quadrant helper
+          function getQuadrant(rank: number, vol: number): 'urgent' | 'stronghold' | 'lowpri' | 'niche' {
+            const isLeft = rank >= 3;
+            const isTop  = vol > midVol;
+            if (isLeft  && isTop)  return 'urgent';
+            if (!isLeft && isTop)  return 'stronghold';
+            if (isLeft  && !isTop) return 'lowpri';
+            return 'niche';
+          }
+          const QUADRANT_LABEL: Record<string, string> = {
+            urgent: 'Urgent gap', stronghold: 'Stronghold',
+            lowpri: 'Low priority', niche: 'Niche win',
+          };
+          // Mobile sort: urgent → stronghold → niche → lowpri, then vol desc
+          const QUADRANT_PRIORITY: Record<string, number> = { urgent: 0, stronghold: 1, niche: 2, lowpri: 3 };
+          const mobileSorted = [...bubbleData].sort((a, b) => {
+            const pA = QUADRANT_PRIORITY[getQuadrant(a.rank, a.vol)];
+            const pB = QUADRANT_PRIORITY[getQuadrant(b.rank, b.vol)];
+            return pA !== pB ? pA - pB : b.vol - a.vol;
+          });
 
           const tiers: Array<keyof typeof TIER_FILL> = ['fragmented', 'emerging', 'competitive', 'leader', 'authority'];
 
@@ -484,12 +588,14 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             <div className="ptChartBlock" id="pt-chart-block">
               <Eyebrow style={{ marginBottom: 10 }}>TOPIC PERFORMANCE · {bubbleData.length} TOPICS</Eyebrow>
               <div className="ptVexpHeadline">Where are your strongest topics, and where are the gaps?</div>
-              <div className="ptVexpCtaLine">Click any bubble to filter the list below.</div>
+              <div className="ptVexpCtaLine ptVexpCtaLine--desktop">Click any bubble to filter the list below.</div>
+              <div className="ptVexpCtaLine ptVexpCtaLine--mobile">Tap any topic to filter the list below.</div>
 
-              {/* Chart canvas */}
+              {/* ── Desktop chart view ── */}
+              <div className="ptChartView">
               <div className="ptBubbleCanvas">
                 {/* Y-axis title */}
-                <div className="ptYAxisTitle">Volume (prompts)</div>
+                <div className="ptYAxisTitle">Volume <br /> (Number of prompts)</div>
 
                 {/* Plot area */}
                 <div
@@ -498,37 +604,69 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                   ref={plotRef}
                   style={{ position: 'relative' }}
                 >
+                  {/* Quadrant gradient tints */}
+                  <div className="ptQGradTopLeft" />
+                  <div className="ptQGradTopRight" />
+
                   {/* Quadrant midlines */}
                   <div className="ptMidlineV" />
                   <div className="ptMidlineH" />
 
+                  {/* Y-axis gridlines (intermediate — skip 0 and yMax which are the axis lines) */}
+                  {yTicks.filter(v => v > 0 && v < yMax).map(v => (
+                    <div
+                      key={`gl-${v}`}
+                      className="ptYGridline"
+                      style={{ top: `calc(${PLOT_INSET}px + ${((yMax - v) / yMax).toFixed(4)} * (100% - ${2 * PLOT_INSET}px))` }}
+                    />
+                  ))}
+
+                  {/* Y-axis ticks + labels */}
+                  {yTicks.map(v => (
+                    <div key={`yt-${v}`} className="ptYTickWrap" style={{ top: `calc(${PLOT_INSET}px + ${((yMax - v) / yMax).toFixed(4)} * (100% - ${2 * PLOT_INSET}px))` }}>
+                      <div className="ptYTickMark" />
+                      <div className="ptYTickLabel">{v}</div>
+                    </div>
+                  ))}
+
                   {/* Quadrant labels */}
-                  <div className="ptQLabel" style={{ top: 8, left: 8, color: TIER_FILL.fragmented }}>Urgent gaps</div>
-                  <div className="ptQLabel" style={{ top: 8, right: 8, color: TIER_FILL.authority }}>Strongholds</div>
+                  <div className="ptQLabel" style={{ top: 8, left: 8, color: TIER_ON_WHITE.fragmented }}>Urgent gaps</div>
+                  <div className="ptQLabel" style={{ top: 8, right: 8, color: TIER_ON_WHITE.authority }}>Strongholds</div>
                   <div className="ptQLabel" style={{ bottom: 8, left: 8, color: '#8E8E8E' }}>Low priority</div>
                   <div className="ptQLabel" style={{ bottom: 8, right: 8, color: '#6B6B6B' }}>Niche wins</div>
 
-                  {/* Bubbles */}
-                  {bubbleData.map((b) => {
+                  {/* Bubbles — selected/hovered bubble is sorted last so it's always the top DOM node */}
+                  {[...bubbleData]
+                    .sort((a: any, b: any) => {
+                      const aActive = a.id === selectedTopicId || a.id === hoveredTopicId;
+                      const bActive = b.id === selectedTopicId || b.id === hoveredTopicId;
+                      if (aActive && !bActive) return 1;
+                      if (bActive && !aActive) return -1;
+                      return 0;
+                    })
+                    .map((b) => {
                     const pos = bubblePositions[b.id];
                     if (!pos) return null;
-                    const fill = TIER_FILL[b.tier] ?? '#8E8E8E';
+                    const fill   = TIER_FILL[b.tier]   ?? '#8E8E8E';
                     const textColor = TIER_TEXT[b.tier] ?? '#fff';
+                    const stroke = TIER_STROKE[b.tier]  ?? 'transparent';
                     const isSelected = selectedTopicId === b.id;
                     const fontSize = pos.size > 70 ? 12 : pos.size > 55 ? 11 : 10;
+                    const baseZ = Math.round((MAX_BUBBLE - pos.size) / 10) + 2;
                     return (
                       <div
                         key={b.id}
                         className={`ptBubble${isSelected ? ' ptBubble--selected' : ''}`}
                         style={{
-                          left: pos.x,
-                          top: pos.y,
+                          left: pos.x - pos.size / 2,
+                          top: pos.y - pos.size / 2,
                           width: pos.size,
                           height: pos.size,
                           background: fill,
                           color: textColor,
+                          border: `1.5px solid ${stroke}`,
                           fontSize,
-                          zIndex: isSelected ? 5 : 2,
+                          zIndex: isSelected || hoveredTopicId === b.id ? 20 : baseZ,
                         }}
                         onClick={() => handleBubbleClick(b.id)}
                         onMouseEnter={() => handleBubbleEnter(b.id)}
@@ -541,19 +679,63 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                 </div>
               </div>
 
-              {/* X-axis title */}
-              <div className="ptXAxisTitle">← Rank 5 (lower) &nbsp;&nbsp; Avg rank &nbsp;&nbsp; Rank 1 (higher) →</div>
+              {/* X-axis — same 2-col grid as ptBubbleCanvas so ticks align with bubble positions */}
+              <div className="ptXAxisWrap">
+                <div className="ptXAxisSpacer" />{/* matches the 60px Y-axis column */}
+                <div className="ptXAxisTrack">
+                  {[5,4,3,2,1].map(rank => (
+                    <div
+                      key={rank}
+                      className="ptXAxisTick"
+                      style={{ left: `calc(${PLOT_INSET}px + ${((5-rank)/4).toFixed(4)} * (100% - ${2*PLOT_INSET}px))` }}
+                    >
+                      <div className="ptXAxisTickMark" />
+                      <div className="ptXAxisTickLabel">{rank}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="ptXAxisLabel">Avg rank <br /> (1 = top mention, 5 = lowest)</div>
+              </div>{/* end ptChartView */}
+
+              {/* ── Mobile list view ── */}
+              <div className="ptListView" id="pt-list-view">
+                <div className="ptMobileListHeader">
+                  <span className="ptMobileListTitle">Topic Performance</span>
+                  <span className="ptMobileListSort">Sorted by <strong>strategic priority</strong></span>
+                </div>
+                {mobileSorted.map((b) => {
+                  const quadrant = getQuadrant(b.rank, b.vol);
+                  const fill     = TIER_FILL[b.tier] ?? '#8E8E8E';
+                  const textColor = TIER_TEXT[b.tier] ?? '#fff';
+                  const isSelected = selectedTopicId === b.id;
+                  const initial  = b.name.charAt(0).toUpperCase();
+                  return (
+                    <div
+                      key={b.id}
+                      id={`pt-mobile-row-${b.id}`}
+                      className={`ptTopicRow${isSelected ? ' ptTopicRow--selected' : ''}`}
+                      onClick={() => handleBubbleClick(b.id)}
+                    >
+                      <div className="ptTopicDot" style={{ background: fill, color: textColor }}>{initial}</div>
+                      <div className="ptTopicMain">
+                        <div className="ptTopicName">{b.name}</div>
+                        <div className="ptTopicMeta">
+                          <span className="ptTopicStat">{b.vol}</span> prompts
+                          {' · '}<span className="ptTopicStat">{b.appearances}</span> appearances
+                          {' · '}avg rank <span className="ptTopicStat">{b.rank.toFixed(1)}</span>
+                        </div>
+                      </div>
+                      <div className={`ptTopicQuadrant ptTopicQuadrant--${quadrant}`}>
+                        {QUADRANT_LABEL[quadrant]}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Legend */}
               <div className="ptCombinedLegend">
-                <div className="ptLegendEncoding">
-                  <span className="ptLegendGlyph">↔</span>
-                  Rank
-                </div>
-                <div className="ptLegendEncoding">
-                  <span className="ptLegendGlyph">↕</span>
-                  Volume
-                </div>
                 <div className="ptLegendEncoding">
                   <span className="ptLegendGlyphDot" />
                   Size = appearances
@@ -585,28 +767,63 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
 
         {/* ── Block 3: Prompt list ────────────────────────────── */}
         <div className="ptListBlock" id="pt-list-block">
-          <Eyebrow style={{ marginBottom: 14 }}>
-            PROMPT LIST · {totalFiltered} OF {totalQueries}
-          </Eyebrow>
 
-          {/* Filter chip */}
-          {selectedTopicId && (
-            <div className="ptFilterChipRow" id="pt-filter-chip-row">
-              <span
-                className="ptFilterChip ptFilterChip--active"
-                onClick={() => { setSelectedTopicId(null); setPage(1); }}
-              >
-                {selectedTopicId}
-                <span className="ptFilterChipX">×</span>
-              </span>
-              <span
-                className="ptFilterClear"
-                onClick={() => { setSelectedTopicId(null); setPage(1); }}
-              >
-                Clear filters
-              </span>
+          {/* Block header + filters */}
+          <div className="ptListBlockHeader" id="pt-list-block-header">
+            <div className="ptListBlockEyebrow">
+              PROMPT LIST
+              <span className="ptListBlockSep">·</span>
+              <span className="ptListBlockMeta" id="pt-list-meta">{totalFiltered} OF {totalQueries}</span>
+              {selectedTopicId && (
+                <>
+                  <span className="ptListBlockSep">·</span>
+                  <span className="ptListBlockTopic" id="pt-list-block-topic">{selectedTopicId.toUpperCase()}</span>
+                </>
+              )}
+              {showAppeared && (
+                <>
+                  <span className="ptListBlockSep">·</span>
+                  <span className="ptListBlockAppearedLabel" id="pt-list-appeared-label">APPEARED ONLY</span>
+                </>
+              )}
             </div>
-          )}
+            <div className="ptFilterControls" id="pt-filter-controls">
+              {/* Appeared toggle pill */}
+              <button
+                id="pt-appeared-toggle"
+                className={`ptAppearedToggle${showAppeared ? ' ptAppearedToggle--active' : ''}`}
+                onClick={() => { setShowAppeared(p => !p); setPage(1); }}
+                title={showAppeared ? 'Show all prompts' : `Show only prompts where ${brandName || 'brand'} appeared`}
+                role="checkbox"
+                aria-checked={showAppeared}
+              >
+                <span className="ptAppearedCheckbox" id="pt-appeared-checkbox" aria-hidden="true">
+                  {showAppeared && (
+                    <svg width="8" height="6" viewBox="0 0 8 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1,3 3,5 7,1" />
+                    </svg>
+                  )}
+                </span>
+                Appeared
+              </button>
+              {/* Topic dropdown */}
+              {bubbleData.length > 0 && (
+                <div className="ptFilterDropdownWrap" id="pt-filter-dropdown-wrap">
+                  <select
+                    id="pt-filter-dropdown"
+                    className={`ptFilterDropdown${selectedTopicId ? ' ptFilterDropdown--active' : ''}`}
+                    value={selectedTopicId ?? ''}
+                    onChange={(e) => { setSelectedTopicId(e.target.value || null); setPage(1); }}
+                  >
+                    <option value="">All topics</option>
+                    {bubbleData.map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
 
           {/* Table */}
           <table className="ptPromptsTable">
@@ -615,32 +832,44 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                 <th className="ptColPrompt">Prompt</th>
                 <th className="ptColRank">Your rank</th>
                 <th className="ptColBeater">Who beat you</th>
+                <th className="ptColTagMobile" />
                 <th className="ptColArrow" />
               </tr>
             </thead>
             <tbody id="pt-prompt-table-body">
               {pageRows.map((item: any, i: number) => {
                 const beater = item.winner_brand && item.winner_brand !== brandName ? item.winner_brand : null;
+                const showTag = !selectedTopicId && item.category;
                 return (
                   <tr key={i} onClick={() => handleRowClick(item)}>
                     <td className="ptColPrompt">
-                      {!selectedTopicId && item.category && (
-                        <div className="ptPromptTopicTag">{item.category}</div>
+                      {showTag && (
+                        <>
+                          <span className="ptPromptTopicTag ptPromptTopicTag--desktop">{item.category}</span>
+                          <br />
+                        </>
                       )}
-                      <div className="ptPromptText">{item.query}</div>
+                      <div className="ptPromptText">
+                        <span className="ptPromptQuote">&ldquo;{item.query}&rdquo;</span>
+                      </div>
                     </td>
                     <td className="ptColRank">
                       <RankBadge rank={item.position} />
                     </td>
                     <td className="ptColBeater">
-                      {beater ? (
-                        <span className="ptBeaterText">
-                          <span className="ptBeaterWho">{beater}</span> ranked above you
-                        </span>
-                      ) : item.position === 1 ? (
-                        <span className="ptBeaterNone">— You&apos;re #1</span>
-                      ) : (
-                        <span className="ptBeaterNone">—</span>
+                      <div className="ptBeaterText">
+                        {beater ? (
+                          <><span className="ptBeaterWho">{beater}</span> ranked above you</>
+                        ) : item.position === 1 ? (
+                          <span className="ptBeaterNone">— You&apos;re #1</span>
+                        ) : (
+                          <span className="ptBeaterNone">—</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="ptColTagMobile">
+                      {showTag && (
+                        <span className="ptPromptTopicTag ptPromptTopicTag--mobile">{item.category}</span>
                       )}
                     </td>
                     <td className="ptColArrow">
@@ -651,7 +880,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               })}
               {pageRows.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: '24px 12px', color: '#8E8E8E', fontStyle: 'italic', textAlign: 'center' }}>
+                  <td colSpan={5} style={{ padding: '24px 12px', color: '#8E8E8E', fontStyle: 'italic', textAlign: 'center' }}>
                     No prompts found.
                   </td>
                 </tr>
@@ -662,28 +891,20 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
           {/* Footer */}
           <div className="ptListFooter">
             <div className="ptListFooterRow">
-              <span id="pt-list-footer-text">
-                Showing {Math.min((safePage - 1) * ROWS_PER_PAGE + 1, totalFiltered)}–{Math.min(safePage * ROWS_PER_PAGE, totalFiltered)} of {totalFiltered} prompts
-              </span>
               <div className="ptPagerNew">
                 <button
                   className="ptPagerBtnNew"
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage <= 1}
-                >
-                  ← Prev
-                </button>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#4A4A4A' }}>
-                  {safePage} / {totalPages}
-                </span>
+                >← Prev</button>
+                <span className="ptPagerCount">{safePage} / {totalPages}</span>
                 <button
                   className="ptPagerBtnNew"
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safePage >= totalPages}
-                >
-                  Next →
-                </button>
+                >Next →</button>
               </div>
+              <span className="ptCtaLink">Export filtered ↓</span>
             </div>
           </div>
         </div>
@@ -695,7 +916,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               <div className="ptTeaserEyebrow">EXPAND YOUR PROMPT SET</div>
               <div className="ptTeaserHeadline">
                 <span className="ptTeaserCount">{teaserCount}</span> trending prompts in{' '}
-                {indLabel || 'your industry'} you&apos;re not testing yet.
+                {indLabel || 'your industry'}{' '} you&apos;re not testing yet.
               </div>
               <div className="ptTeaserSub">Close coverage gaps before competitors do.</div>
             </div>

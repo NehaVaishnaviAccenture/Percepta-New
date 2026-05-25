@@ -11,7 +11,9 @@
   "dependencies": {
     "@clerk/nextjs": "^6.12.0",
     "@tailwindcss/postcss": "^4.2.2",
+    "@types/cytoscape": "^3.21.9",
     "cheerio": "^1.2.0",
+    "cytoscape": "^3.33.4",
     "lucide-react": "^0.468.0",
     "next": "^16.2.2",
     "react": "^19.0.0",
