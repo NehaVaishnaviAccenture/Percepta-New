@@ -1,4 +1,4 @@
-// v2.7.0: dynamic scope detection, button gating thing adjusted, response map page, etc
+// v2.7.1: fixing response map
 
 'use client';
 

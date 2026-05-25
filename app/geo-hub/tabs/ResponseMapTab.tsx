@@ -19,6 +19,18 @@ function tierFill(tier: string): string {
   return TIER_FILL[tier] || TIER_FILL.emerging;
 }
 
+const TIER_BORDER: Record<string, string> = {
+  authority:   '#007653',
+  leader:      '#043BCC',
+  competitive: '#996E00',
+  emerging:    '#B15F00',
+  fragmented:  '#B7002F',
+};
+
+function tierBorder(tier: string): string {
+  return TIER_BORDER[tier] || TIER_BORDER.emerging;
+}
+
 function tierTextColor(tier: string): string {
   return ['emerging', 'competitive'].includes(tier) ? '#412402' : '#FFFFFF';
 }
@@ -175,7 +187,7 @@ const cyStyle: any[] = [
       'width':               'data(size)',
       'height':              'data(size)',
       'border-width':        2,
-      'border-color':        '#0A0A0A',
+      'border-color':        'data(borderColor)',
       'label':               'data(label)',
       'font-family':         'Inter, system-ui, sans-serif',
       'font-size':          'data(fontSize)',
@@ -370,6 +382,7 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
             volume:       t.volume,
             size:         sz,
             color:        tierFill(t.tier),
+            borderColor:  tierBorder(t.tier),
             textColor:    tierTextColor(t.tier),
             fontSize:     labelFontSize(t.label, sz),
             textMaxWidth: labelMaxWidth(sz),
