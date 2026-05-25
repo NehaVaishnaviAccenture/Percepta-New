@@ -86,7 +86,6 @@
   color: var(--color-text-secondary, #6B6B6B);
   line-height: 1.4;
   margin-top: 8px;
-  max-width: 240px;
 }
 .rmStatPair {
   color: var(--color-text-primary, #0A0A0A);
