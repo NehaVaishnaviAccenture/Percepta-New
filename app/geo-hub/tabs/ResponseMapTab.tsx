@@ -529,23 +529,38 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [deactivate]);
 
-  // Stat-hero responsive — width-based switching.
-  // We check hero.offsetWidth, which does NOT change when --stack is toggled
-  // (the hero is full-width in both modes), so the ResizeObserver can't oscillate.
+  // Stat-hero responsive — label-height switching.
+  // Always measures in the unstacked (3-col) state so the check is stable
+  // and can't oscillate: we remove the stack class, read heights, then
+  // re-apply before React paints so there's no visual flash.
+  // A suppression flag blocks the RO callbacks our own DOM writes trigger.
   const statHeroRef = useRef<HTMLDivElement>(null);
+  const roSuppressRef = useRef(false);
   useEffect(() => {
     const hero = statHeroRef.current;
     if (!hero) return;
 
     function evaluate() {
-      const w = hero?.offsetWidth ?? 0;
-      // Stack only at genuinely mobile widths — canvasInner + rmWrapper add ~144px
-      // of horizontal padding above this element, so 480px hero ≈ sub-700px viewport
-      const needs = w > 0 && w < 480;
-      setStatStackClass(prev => {
-        const next = needs ? 'rmStatHero--stack' : '';
-        return prev === next ? prev : next;
-      });
+      if (roSuppressRef.current) return;
+      roSuppressRef.current = true;
+
+      // Measure in natural 3-col layout
+      hero.classList.remove('rmStatHero--stack');
+      void hero.offsetHeight; // force sync layout read
+
+      const labels = hero.querySelectorAll('.rmStatLabel');
+      // line-height is 20px → 2 lines = 40px; 44px gives a small buffer
+      const anyOverflows = Array.from(labels).some(
+        el => (el as HTMLElement).offsetHeight > 44
+      );
+
+      // Pre-apply to DOM so there's no flash before the React re-render
+      if (anyOverflows) hero.classList.add('rmStatHero--stack');
+
+      setStatStackClass(anyOverflows ? 'rmStatHero--stack' : '');
+
+      // Release after any RO notifications from our DOM writes have fired
+      setTimeout(() => { roSuppressRef.current = false; }, 100);
     }
 
     evaluate();
@@ -759,7 +774,7 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
           </div>
           {/* Stat 3: hub topic */}
           <div id="rm-stat-3" className="rmStat">
-            <div id="rm-stat-3-value" className="rmStatValue">{hub?.label ?? '—'}</div>
+            <div id="rm-stat-3-value" className="rmStatValue rmStatValue--text">{hub?.label ?? '—'}</div>
             <div id="rm-stat-3-label" className="rmStatLabel">
               {hub && <span className="rmTierDot" style={{ background: tierFill(hub.tier) }} />}
               Hub topic — connects to{' '}

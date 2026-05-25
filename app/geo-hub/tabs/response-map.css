@@ -73,6 +73,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Text-based stat value (3rd stat — hub topic name): wraps to max 2 lines */
+.rmStatValue--text {
+  font-size: 36px;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: unset;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.rmStatHero--stack .rmStatValue--text {
+  font-size: 24px;
+  -webkit-line-clamp: 2;
+}
 .rmStatUnit {
   font-size: 22px;
   color: var(--color-text-faint, #B8B8CC);

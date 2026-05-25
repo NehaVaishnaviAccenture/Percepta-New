@@ -1,4 +1,4 @@
-// v2.7.1: fixing response map
+// v2.7.2: fixing response map hero wrapping
 
 'use client';
 
