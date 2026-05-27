@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coverage Tab — Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #f0f0f0;
+  --surface: #ffffff;
+  --border:  #e5e5e5;
+  --border-strong: #c8c8c8;
+  --text:    #111111;
+  --muted:   #888888;
+  --faint:   #cccccc;
+  --harvey:  #444444;
+  --gap:     #B7002F;
+  --partial: #B15F00;
+  --strong:  #007653;
+  --purple:  #A100FF;
+}
+
+body {
+  background: var(--bg);
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--text);
+  padding: 28px 32px 64px;
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ─── Page header ──────────────────────────────────── */
+.section-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: #111;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 4px;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 20px;
+}
+
+/* ─── Summary row ──────────────────────────────────── */
+.summary-row {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.summary-stat {
+  flex: 0 0 auto;
+  padding: 18px 28px;
+  border-right: 1px solid var(--border);
+  min-width: 130px;
+}
+.summary-bar-block {
+  flex: 1;
+  padding: 18px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.stat-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+}
+.stat-number {
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.stat-sub {
+  font-size: 11px;
+  color: #888;
+  margin-top: 5px;
+}
+.stack-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.stack-bar {
+  display: flex;
+  height: 7px;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+.stack-seg { height: 100%; }
+.stack-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #555;
+}
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Quick Win callout ────────────────────────────── */
+.callout {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--purple);
+  padding: 13px 18px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.callout-icon {
+  width: 20px;
+  height: 20px;
+  background: var(--purple);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.callout-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 3px;
+}
+.callout-body {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.55;
+}
+.callout-body strong { color: #111; }
+
+/* ─── Board ─────────────────────────────────────────── */
+.board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+}
+
+.col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 10px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 8px;
+}
+.col-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.col-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--border);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+.col-gap     .col-head  { border-color: var(--gap);     }
+.col-partial .col-head  { border-color: var(--partial);  }
+.col-strong  .col-head  { border-color: var(--strong);   }
+.col-gap     .col-label { color: var(--gap);     }
+.col-partial .col-label { color: var(--partial); }
+.col-strong  .col-label { color: var(--strong);  }
+
+/* ─── Segment card ──────────────────────────────────── */
+.seg-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 5px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.seg-card:last-child { margin-bottom: 0; }
+.seg-card:hover { border-color: var(--border-strong); }
+
+/* Card top row — always visible */
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  cursor: pointer;
+  user-select: none;
+}
+.card-row .name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+.card-row .win-rate {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.card-row .chevron {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  color: var(--faint);
+  transition: transform 0.18s ease, color 0.15s;
+}
+.seg-card.open .chevron {
+  transform: rotate(180deg);
+  color: var(--muted);
+}
+
+/* Expanded drawer */
+.card-drawer {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 10px 11px 11px 33px;
+}
+.seg-card.open .card-drawer {
+  display: block;
+}
+.drawer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* Drawer rows */
+.drawer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dr-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.dr-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.dr-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* Opportunity pill */
+.dr-opp {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+}
+
+/* Gap-to-win bar */
+.gap-bar-track {
+  flex: 1;
+  height: 4px;
+  background: #f0f0f0;
+  position: relative;
+  margin: 0 6px;
+}
+.gap-bar-fill {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+}
+.gap-bar-threshold {
+  position: absolute;
+  top: -3px; bottom: -3px;
+  left: 60%;
+  width: 2px;
+  background: #ccc;
+}
+
+/* Drawer link */
+.drawer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  margin-top: 1px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.drawer-link:hover { color: var(--text); }
+
+/* Divider in drawer */
+.drawer-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 1px 0;
+}
+
+/* Empty column */
+.col-empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--faint);
+  border: 1.5px dashed var(--border);
+  line-height: 1.6;
+}
+
+/* ─── Annotation (mockup-only) ─────────────────────── */
+.annotation {
+  display: inline-block;
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+</style>
+</head>
+<body>
+
+<!-- ── Page header ───────────────────────────────── -->
+<div class="section-eyebrow">Segment Coverage Analysis</div>
+<div class="section-subtitle">Which audience segments is your brand winning vs. losing in AI responses?</div>
+
+
+<!-- ── Coverage Summary ─── NEW ─────────────────── -->
+<div class="annotation">New — Coverage Summary</div>
+<div class="summary-row">
+
+  <div class="summary-stat">
+    <div class="stat-eyebrow">Winning</div>
+    <div class="stat-number" style="color: var(--strong);">0</div>
+    <div class="stat-sub">of 11 segments</div>
+  </div>
+
+  <div class="summary-stat">
+    <div class="stat-eyebrow">Emerging</div>
+    <div class="stat-number" style="color: var(--partial);">2</div>
+    <div class="stat-sub">of 11 segments</div>
+  </div>
+
+  <div class="summary-stat">
+    <div class="stat-eyebrow">Gap</div>
+    <div class="stat-number" style="color: var(--gap);">9</div>
+    <div class="stat-sub">of 11 segments</div>
+  </div>
+
+  <div class="summary-bar-block">
+    <div class="stack-label">Coverage distribution · 35 queries tested</div>
+    <div class="stack-bar">
+      <div class="stack-seg" style="width: 0%; background: #00AB7B;"></div>
+      <div class="stack-seg" style="width: 18%; background: #F48500;"></div>
+      <div class="stack-seg" style="flex: 1; background: #E0003B;"></div>
+    </div>
+    <div class="stack-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#00AB7B;"></div> Winning ≥ 60%</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F48500;"></div> Emerging 30–59%</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#E0003B;"></div> Gap &lt; 30%</div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── Quick Win callout ─── NEW ───────────────────
+     Auto-surfaces the segment closest to 60%
+     threshold so user knows where to focus first
+─────────────────────────────────────────────────── -->
+<div class="annotation">New — Closest to Winning callout</div>
+<div class="callout">
+  <div class="callout-icon">↑</div>
+  <div>
+    <div class="callout-title">Closest to Winning</div>
+    <div class="callout-body">
+      <strong>Cash Back Seekers</strong> is your best opportunity — you're at <strong>41%</strong>, the closest segment to the winning threshold of 60%.
+      Citi currently leads at 44%. This segment is genuinely winnable with focused content.
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Segment Board ─── ENHANCED ──────────────────
+     Board view from segBoard-mini with additional
+     info in the expanded drawer:
+       • leader name + score (was already there)
+       • gap-to-win bar + delta       ← new
+       • query count                  ← new
+       • opportunity label            ← new
+       • "View prompts" link          (kept)
+─────────────────────────────────────────────────── -->
+<div class="annotation">Enhanced — Board (from segBoard-mini)</div>
+<div class="board" id="board"></div>
+
+
+<!-- ── Mockup notes ─────────────────────────────── -->
+<div style="margin-top: 32px; padding: 18px 22px; background: #fff; border: 1px solid #e5e5e5; border-left: 3px solid #FCD34D;">
+  <div style="font-size:10px; font-weight:700; color:#92400E; text-transform:uppercase; letter-spacing:0.07em; margin-bottom:10px;">Mockup Notes</div>
+  <div style="font-size:13px; color:#555; line-height:1.7;">
+    <strong style="color:#111;">Data already available (no API changes needed):</strong><br>
+    &nbsp;&nbsp;• <code style="background:#f3f4f6; padding:1px 5px; font-size:12px;">winRate</code> per segment ✓<br>
+    &nbsp;&nbsp;• <code style="background:#f3f4f6; padding:1px 5px; font-size:12px;">topCompetitor</code> per segment ✓<br>
+    &nbsp;&nbsp;• Query count — derive client-side from <code style="background:#f3f4f6; padding:1px 5px; font-size:12px;">responses_detail</code> filtered by category ✓<br>
+    &nbsp;&nbsp;• Gap-to-win delta — compute as <code style="background:#f3f4f6; padding:1px 5px; font-size:12px;">60 - winRate</code> ✓<br>
+    &nbsp;&nbsp;• Opportunity label — derive from winRate: Quick Win ≥50, Attainable 30–49, Long Play &lt;30, Holding if winning ✓<br><br>
+    <strong style="color:#111;">Needs adding to API response:</strong><br>
+    &nbsp;&nbsp;• <code style="background:#f3f4f6; padding:1px 5px; font-size:12px;">topCompetitorScore</code> — leader's actual win rate per segment (currently only name is stored)
+  </div>
+</div>
+
+
+<script>
+const GAP_SEGS = [
+  { name: 'Business Travelers',      pct: 19, leader: 'Chase',    leaderPct: 61, queries: 4 },
+  { name: 'Rewards & Points',        pct: 22, leader: 'Amex',     leaderPct: 57, queries: 7 },
+  { name: 'Travel Enthusiasts',      pct: 17, leader: 'Chase',    leaderPct: 64, queries: 3 },
+  { name: 'Small Business Owners',   pct: 14, leader: 'Amex',     leaderPct: 70, queries: 4 },
+  { name: 'Balance Transferers',     pct: 23, leader: 'Citi',     leaderPct: 55, queries: 3 },
+  { name: 'Students & Young Adults', pct: 11, leader: 'Discover', leaderPct: 59, queries: 3 },
+  { name: 'Online Shoppers',         pct: 20, leader: 'Citi',     leaderPct: 52, queries: 3 },
+  { name: 'International Users',     pct: 16, leader: 'Amex',     leaderPct: 66, queries: 4 },
+  { name: 'Everyday Spenders',       pct: 25, leader: 'Chase',    leaderPct: 48, queries: 4 },
+];
+
+const PARTIAL_SEGS = [
+  { name: 'Cash Back Seekers',    pct: 41, leader: 'Citi', leaderPct: 44, queries: 5 },
+  { name: 'Premium Card Seekers', pct: 38, leader: 'Amex', leaderPct: 47, queries: 2 },
+];
+
+const STRONG_SEGS = [];
+
+// Harvey ball — monochrome, 3 states
+function harvey(state, size = 13) {
+  const c = 'var(--harvey)';
+  const r = size / 2 - 1.5;
+  const cx = size / 2, cy = size / 2;
+  if (state === 'empty') return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="1.5"/></svg>`;
+  if (state === 'full')  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/></svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;flex-shrink:0"><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${c}" stroke-width="1.5"/><path d="M ${cx} ${cy-r} A ${r} ${r} 0 0 1 ${cx} ${cy+r} L ${cx} ${cy} Z" fill="${c}"/></svg>`;
+}
+
+const chevronSVG = `<svg class="chevron" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,4 6,8 10,4"/></svg>`;
+
+function oppLabel(pct) {
+  if (pct >= 60) return { text: 'Holding',    bg: '#D1FAE5', color: '#007653' };
+  if (pct >= 50) return { text: 'Quick Win',  bg: '#D1FAE5', color: '#007653' };
+  if (pct >= 30) return { text: 'Attainable', bg: '#FEF3C7', color: '#B15F00' };
+  return              { text: 'Long Play',   bg: '#F3F4F6', color: '#6B7280' };
+}
+
+function makeCard(seg, harveyState) {
+  const card = document.createElement('div');
+  card.className = 'seg-card';
+
+  const gapToBeat = Math.max(0, 60 - seg.pct);
+  const opp = oppLabel(seg.pct);
+  const barFillColor = seg.pct >= 60 ? 'var(--strong)' : seg.pct >= 30 ? 'var(--partial)' : 'var(--gap)';
+
+  card.innerHTML = `
+    <div class="card-row">
+      ${harvey(harveyState)}
+      <span class="name">${seg.name}</span>
+      <span class="win-rate">${seg.pct}%</span>
+      ${chevronSVG}
+    </div>
+    <div class="card-drawer">
+      <div class="drawer-inner">
+
+        <!-- Progress toward 60% threshold -->
+        <div class="drawer-row">
+          <span class="dr-label">Coverage</span>
+          <div style="flex:1; display:flex; align-items:center; gap:6px; margin: 0 4px;">
+            <div class="gap-bar-track" style="flex:1; height:4px; background:#f0f0f0; position:relative;">
+              <div style="position:absolute; left:0; top:0; height:100%; width:${seg.pct}%; background:${barFillColor};"></div>
+              <div style="position:absolute; top:-3px; bottom:-3px; left:60%; width:2px; background:#ccc;"></div>
+            </div>
+          </div>
+          <span class="dr-value">${seg.pct}%</span>
+        </div>
+
+        <!-- Leader -->
+        <div class="drawer-row">
+          <span class="dr-label">Leader</span>
+          <span>
+            <span class="dr-value">${seg.leader}</span>
+            <span class="dr-sub"> · ${seg.leaderPct}%</span>
+          </span>
+        </div>
+
+        <!-- Gap to win + query count -->
+        <div class="drawer-row">
+          <span class="dr-label">${seg.pct >= 60 ? 'Status' : 'Gap to win'}</span>
+          <span class="dr-value" style="color: ${seg.pct >= 60 ? 'var(--strong)' : '#888'}">
+            ${seg.pct >= 60 ? 'Above threshold' : '+' + gapToBeat + '% needed'}
+          </span>
+        </div>
+
+        <div class="drawer-divider"></div>
+
+        <!-- Opportunity + query count row -->
+        <div class="drawer-row" style="align-items:center;">
+          <span style="font-size:11px; color:var(--faint);">${seg.queries} quer${seg.queries === 1 ? 'y' : 'ies'} tested</span>
+          <span class="dr-opp" style="background:${opp.bg}; color:${opp.color};">${opp.text}</span>
+        </div>
+
+        <!-- View prompts link -->
+        <button class="drawer-link">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 5.5h7M6 2.5l3 3-3 3"/>
+          </svg>
+          View prompts for this segment
+        </button>
+
+      </div>
+    </div>
+  `;
+
+  card.querySelector('.card-row').addEventListener('click', () => card.classList.toggle('open'));
+  return card;
+}
+
+function makeCol(label, segs, harveyState, cssClass) {
+  const col = document.createElement('div');
+  col.className = `col ${cssClass}`;
+  col.innerHTML = `
+    <div class="col-head">
+      <span class="col-label">${label}</span>
+      <span class="col-count">${segs.length}</span>
+    </div>
+  `;
+  if (segs.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'col-empty';
+    empty.textContent = 'No segments here yet';
+    col.appendChild(empty);
+  } else {
+    segs.forEach(s => col.appendChild(makeCard(s, harveyState)));
+  }
+  return col;
+}
+
+const board = document.getElementById('board');
+board.appendChild(makeCol('Gap',      GAP_SEGS,     'empty', 'col-gap'));
+board.appendChild(makeCol('Emerging', PARTIAL_SEGS, 'half',  'col-partial'));
+board.appendChild(makeCol('Winning',  STRONG_SEGS,  'full',  'col-strong'));
+</script>
+
+</body>
+</html>

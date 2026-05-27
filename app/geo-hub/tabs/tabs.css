@@ -3784,3 +3784,351 @@
   vertical-align: top;
   max-width: 420px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   Health Summary Card  (hsc-)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hsc-card {
+  display: flex;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  margin-bottom: 24px;
+}
+.hsc-card--desktop { flex-direction: row;    overflow: hidden;  }
+.hsc-card--tablet  { flex-direction: column; overflow: visible; }
+.hsc-card--mobile  { flex-direction: column; overflow: visible; }
+
+/* ── Left panel ─────────────────────────────────────────────────── */
+.hsc-left {
+  flex-shrink: 0;
+  padding: 20px;
+  display: flex;
+}
+.hsc-left--desktop {
+  width: 210px;
+  border-right: 2px solid #c8c8c8;
+  flex-direction: column;
+}
+.hsc-left--tablet,
+.hsc-left--mobile {
+  width: 100%;
+  border-bottom: 2px solid #c8c8c8;
+  flex-direction: row;
+}
+
+/* Desktop: score block (score on top with bottom separator) */
+.hsc-geo-block {
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+/* Tablet/mobile: score sub-col */
+.hsc-score-subcol {
+  flex-shrink: 0;
+  padding-right: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Thin divider between score and signals on tablet/mobile */
+.hsc-inner-divider {
+  width: 1px;
+  background: #e5e5e5;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+/* Tablet/mobile: signals sub-col */
+.hsc-signals-subcol {
+  flex: 1;
+  padding-left: 18px;
+  min-width: 0;
+}
+
+/* GEO score typography — colour set inline (dynamic) */
+.hsc-geo-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  color: #888;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+.hsc-geo-number {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.hsc-geo-tier {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Signals section */
+.hsc-signals-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #cccccc;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.hsc-signal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #e5e5e5;
+}
+.hsc-signal-name  { font-size: 13px; color: #888; }
+.hsc-signal-right { display: flex; align-items: center; gap: 5px; }
+.hsc-signal-score { font-size: 14px; font-weight: 700; } /* colour inline */
+.hsc-signal-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; } /* bg inline */
+
+/* ── Right panel ────────────────────────────────────────────────── */
+.hsc-right-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.hsc-right-panel--desktop { flex-direction: row;    overflow: hidden;  }
+.hsc-right-panel--tablet  { flex-direction: row;    overflow: visible; }
+.hsc-right-panel--mobile  { flex-direction: column; overflow: visible; }
+
+/* ── Column (Improvements / Working Well) ───────────────────────── */
+.hsc-col {
+  flex: 1;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.hsc-col--desktop { overflow: hidden; }
+
+.hsc-bhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e5e5e5;
+  flex-shrink: 0;
+  position: relative;
+}
+.hsc-bhead-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hsc-bhead-count  { font-size: 11px; font-weight: 700; } /* colour inline */
+.hsc-bhead-accent { position: absolute; bottom: -1px; left: 0; width: 32px; height: 2px; } /* bg inline */
+
+/* Scrollable (desktop) vs natural-height (tablet/mobile) inner area */
+.hsc-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-top: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #e0e0e0 transparent;
+}
+.hsc-natural { padding-top: 2px; }
+
+/* Items */
+.hsc-item        { padding: 10px 0; border-bottom: 1px solid #e5e5e5; }
+.hsc-item--last  { border-bottom: none; }
+.hsc-item-text   { font-size: 14px; color: #444; line-height: 1.55; }
+.hsc-item-bold   { font-weight: 700; color: #111; }
+.hsc-item-caption {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #cccccc;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+/* Column dividers */
+.hsc-col-divider--v { width: 1px;  background: #e5e5e5; flex-shrink: 0; }
+.hsc-col-divider--h { height: 1px; background: #e5e5e5; flex-shrink: 0; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   Market Queries Board  (mqb-)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.mqb-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.mqb-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #111;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.mqb-meta {
+  font-size: 13px;
+  color: #cccccc;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mqb-info-icon {
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  color: #cccccc;
+  position: relative;
+}
+.mqb-info-icon::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 280px;
+  background: #111;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 7px 10px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 200;
+  white-space: normal;
+}
+.mqb-info-icon:hover::after { opacity: 1; }
+.mqb-board {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.mqb-col      { display: flex; flex-direction: column; }
+.mqb-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 10px;
+  margin-bottom: 8px;
+  /* border-bottom colour set inline (dynamic per column) */
+}
+.mqb-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  /* colour set inline (dynamic per column) */
+}
+.mqb-col-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  background: #e5e5e5;
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+.mqb-col-empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 11px;
+  color: #cccccc;
+  border: 1.5px dashed #e5e5e5;
+  line-height: 1.6;
+}
+
+/* ── Query card ─────────────────────────────────────────────────── */
+.mqb-qcard {
+  background: #fafafa;
+  border: 1px dashed #d0d0d0;
+  margin-bottom: 5px;
+  overflow: hidden;
+}
+.mqb-qcard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 11px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.mqb-qcard-cat {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #888;
+  background: #efefef;
+  border: 1px solid #e5e5e5;
+  padding: 2px 7px;
+}
+.mqb-qcard-chevron {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.18s;
+  flex-shrink: 0;
+}
+.mqb-qcard-chevron--open   { color: #888; transform: rotate(180deg); }
+.mqb-qcard-chevron--closed { color: #ccc; }
+.mqb-qcard-body {
+  padding: 8px 11px 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.mqb-qcard-query {
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  line-height: 1.4;
+}
+.mqb-qcard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid #e5e5e5;
+  padding: 7px 11px;
+  cursor: pointer;
+}
+.mqb-qcard-untested { font-size: 11px; color: #cccccc; font-style: italic; }
+.mqb-qcard-drawer   { border-top: 1px solid #e5e5e5; padding: 9px 11px 10px; }
+.mqb-qcard-context  { font-size: 11px; color: #888; line-height: 1.6; }
+.mqb-qcard-outlook  {
+  margin-top: 8px;
+  padding-left: 9px;
+  border-left: 2px solid #A100FF;
+  font-size: 11px;
+  color: #111;
+  line-height: 1.6;
+  font-weight: 500;
+}
+.mqb-qcard-test-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #888;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 9px;
+}
