@@ -924,7 +924,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               className="ptTeaserCta"
               onClick={() => setActiveParent(5)}
             >
-              See in Action Plan →
+              See in Priorities →
             </button>
           </div>
         )}

@@ -2586,16 +2586,16 @@ No markdown, no explanation, just the JSON array.`;
         prominence: baseline?.prom ?? GEN_BASELINE.prom,
         share_of_voice: baseline?.sov ?? GEN_BASELINE.sov,
         strengths: [
-          'Brand not yet appearing in AI responses.',
-          'Baseline established, clear room to grow.',
-          'Competitors present, confirming category is AI-discoverable.',
+          { bold: 'Baseline established, clear room to grow.', detail: 'Starting from zero gives full visibility into exactly what content needs to be built.', signal: 'Visibility', weight: '30%' },
+          { bold: 'Competitors confirmed in AI responses.', detail: 'Other brands are appearing, which confirms this category is AI-discoverable.', signal: 'Share of Voice', weight: '15%' },
+          { bold: 'No negative associations recorded.', detail: 'A clean slate means there is no reputational drag to overcome before building presence.', signal: 'Sentiment', weight: '20%' },
         ],
         improvements: [
-          'Not mentioned in 20 generic queries.',
-          'AI not associating brand with key industry questions.',
-          'No citation authority established.',
-          'Competitors appearing instead of your brand.',
-          'Content not yet structured for AI discovery.',
+          { bold: 'Not appearing in any AI responses.', detail: 'Brand has zero presence across all queries tested — the highest-impact gap to close.', signal: 'Visibility', weight: '30%' },
+          { bold: 'AI not associating brand with key industry questions.', detail: 'No topical alignment detected between brand content and the queries AI is answering.', signal: 'Prominence', weight: '20%' },
+          { bold: 'No citation authority established.', detail: 'AI models are not sourcing or referencing brand content anywhere in their responses.', signal: 'Citation', weight: '15%' },
+          { bold: 'Competitors dominating every response.', detail: 'Other brands appear consistently across all query categories, taking all available share.', signal: 'Share of Voice', weight: '15%' },
+          { bold: 'Content not structured for AI discovery.', detail: 'Pages likely lack the FAQ and structured formats that AI models prioritize for recommendations.', signal: 'Sentiment', weight: '20%' },
         ],
         actions: [
           { priority: 'High', action: 'Create FAQ and content pages targeting queries in this analysis.' },
@@ -2621,10 +2621,10 @@ Score the brand on each dimension from 0-100. IMPORTANT CONSTRAINTS:
 - prominence: how early in responses did the brand appear? (100 = always first, 0 = always last)
 - share_of_voice: dominance score 0-100. A brand in ${visibility}% of responses with good prominence scores around ${Math.round(visibility * 0.8 + 10)}.
 
-Return ONLY valid JSON, no markdown:
-{"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":["...","...","..."],"improvements":["...","...","...","...","..."],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
+Return ONLY valid JSON, no markdown. For strengths and improvements, "signal" must be one of: Visibility (30%), Sentiment (20%), Prominence (20%), Citation (15%), Share of Voice (15%). Each item needs a one-sentence bold opener and one-sentence detail:
+{"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":[{"bold":"Bold opener sentence.","detail":"Supporting detail sentence.","signal":"Visibility","weight":"30%"},{"bold":"...","detail":"...","signal":"Sentiment","weight":"20%"},{"bold":"...","detail":"...","signal":"Prominence","weight":"20%"}],"improvements":[{"bold":"Bold opener sentence.","detail":"Supporting detail sentence.","signal":"Visibility","weight":"30%"},{"bold":"...","detail":"...","signal":"Prominence","weight":"20%"},{"bold":"...","detail":"...","signal":"Citation","weight":"15%"},{"bold":"...","detail":"...","signal":"Share of Voice","weight":"15%"},{"bold":"...","detail":"...","signal":"Sentiment","weight":"20%"}],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
 
-      const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1000);
+      const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1500);
       try {
         sc = JSON.parse(raw.replace('```json','').replace('```','').trim());
         sc.citation_share = Math.min(sc.citation_share || 0, visibility + 10);

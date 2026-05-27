@@ -77,7 +77,7 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
       <div id="geo-overall-actions-block" className="ovActionsBlock">
         <div id="geo-overall-actions-header" className="ovActionsHeader">
           <div id="geo-overall-actions-title" className="ovActionsTitle">Top 3 priority actions</div>
-          <button id="geo-overall-actions-cta" onClick={()=>setActiveParent(5)} className="ovLinkBtn" style={{whiteSpace:'nowrap'}}>Open Action Plan ›</button>
+          <button id="geo-overall-actions-cta" onClick={()=>setActiveParent(5)} className="ovLinkBtn" style={{whiteSpace:'nowrap'}}>Open Priorities ›</button>
         </div>
         {(recs.length>0?recs:[
           {title:'Build authoritative content in your lowest-scoring query segments'},
