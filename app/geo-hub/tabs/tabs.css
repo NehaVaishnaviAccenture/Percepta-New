@@ -4132,3 +4132,357 @@
   padding: 0;
   margin-top: 9px;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COVERAGE TAB  (cov-)
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* Lead */
+.cov-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #A100FF;
+  margin-bottom: 14px;
+}
+.cov-lead {
+  font-weight: 600;
+  font-size: clamp(20px, 2.4vw, 28px);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
+  margin: 0 0 8px;
+}
+.cov-lead-sub {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  color: #6B6B6B;
+  line-height: 1.7;
+}
+.cov-lead-sub b { color: #0A0A0A; font-weight: 600; }
+.cov-sep { color: #B8B8B8; margin: 0 8px; }
+
+/* Filter bar */
+.cov-filter-bar {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cov-filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8E8E8E;
+  flex-shrink: 0;
+}
+.cov-filter-select {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: #fff;
+  border: 1px solid var(--color-border-mid);
+  padding: 5px 28px 5px 10px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6B6B' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 120ms, color 120ms;
+  outline: none;
+}
+.cov-filter-select:hover { border-color: var(--color-text-faint); }
+.cov-filter-select:focus { border-color: var(--color-brand); }
+.cov-filter-select--active {
+  background-color: #F5E6FF;
+  border-color: var(--color-brand-chip-border);
+  color: var(--color-brand-dark);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B00A8' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.cov-filter-right { margin-left: auto; }
+.cov-filter-reset {
+  font-size: 12px;
+  color: #6B6B6B;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+  transition: color 160ms;
+}
+.cov-filter-reset:hover { color: #0A0A0A; text-decoration: underline; }
+
+/* Board — single white card, three lanes */
+.cov-board {
+  margin-top: 20px;
+  background: #ffffff;
+  border: 1px solid #E5E5E5;
+  padding: 22px 22px 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 28px;
+}
+.cov-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cov-col-head-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 10px;
+}
+.cov-col-label {
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
+}
+.cov-col-count {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6B6B6B;
+  background: #F2F2F2;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.cov-col-threshold {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  color: #8E8E8E;
+  letter-spacing: 0.02em;
+}
+/* Column underlines — ink-neutral progression → reward */
+.cov-col-underline {
+  height: 2px;
+  background: #8E8E8E;
+}
+.cov-col--contested .cov-col-underline { background: #0A0A0A; }
+.cov-col--winning   .cov-col-underline { background: #00D1C7; }
+.cov-col--winning   .cov-col-count {
+  background: #CCF5F3;
+  color: #00A89F;
+}
+.cov-col-body {
+  padding: 14px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+.cov-col-empty {
+  flex: 1;
+  border: 1px dashed #D6D6D6;
+  margin-top: 4px;
+  padding: 48px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  min-height: 200px;
+}
+.cov-col-empty-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: #8E8E8E;
+}
+.cov-col-empty-sub {
+  font-size: 12px;
+  color: #B8B8B8;
+  max-width: 200px;
+  line-height: 1.5;
+}
+
+/* Card */
+.cov-card {
+  border: 1px solid #E5E5E5;
+  background: #ffffff;
+  transition: border-color 160ms;
+}
+.cov-card:hover { border-color: #B8B8B8; }
+.cov-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.cov-card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0A0A0A;
+  flex: 1;
+  min-width: 0;
+}
+.cov-card-coverage {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0A0A0A;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.cov-card-chev {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #8E8E8E;
+  transition: transform 160ms;
+}
+.cov-card-chev--open { transform: rotate(180deg); }
+
+/* Foot strip — opportunity label */
+.cov-card-foot-strip {
+  padding: 5px 14px 7px;
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  color: #6B6B6B;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-top: 1px solid #E5E5E5;
+  background: #FBFAFA;
+}
+.cov-card-foot-strip--win { color: #00A89F; }
+
+/* Expanded body */
+.cov-card-body {
+  padding: 4px 14px 14px;
+  border-top: 1px solid #E5E5E5;
+}
+
+/* Coverage bar row */
+.cov-bar-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 44px;
+  gap: 12px;
+  align-items: center;
+  padding-top: 14px;
+}
+.cov-row-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8E8E8E;
+}
+.cov-row-val {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0A0A0A;
+  text-align: right;
+}
+
+/* Bar track */
+.cov-bar {
+  position: relative;
+  height: 6px;
+  background: #E5E5E5;
+}
+.cov-bar-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  background: #2B2B2B;
+  transition: width 300ms ease;
+}
+.cov-bar-fill--win { background: #00D1C7; }
+
+/* 60% threshold tick */
+.cov-bar-threshold {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 1px;
+  background: #6B6B6B;
+  left: 60%;
+}
+.cov-bar-threshold::after {
+  content: 'win';
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 9px;
+  color: #8E8E8E;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+/* Info rows */
+.cov-info-row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  padding-top: 10px;
+}
+.cov-row-content {
+  font-size: 12px;
+  color: #0A0A0A;
+}
+.cov-delta {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: #2B2B2B;
+}
+.cov-leader-name { font-weight: 600; }
+.cov-leader-pct {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  color: #6B6B6B;
+  margin-left: 5px;
+}
+.cov-leader-pct::before {
+  content: '·';
+  margin-right: 5px;
+  color: #B8B8B8;
+}
+
+/* Card footer row */
+.cov-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #E5E5E5;
+}
+.cov-queries-tested {
+  font-size: 11px;
+  color: #6B6B6B;
+}
+.cov-queries-tested b { color: #0A0A0A; font-weight: 600; }
+
+/* Prompts link */
+.cov-prompts-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6B00A8;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 10px;
+  text-decoration: none;
+  transition: color 160ms;
+}
+.cov-prompts-link:hover { text-decoration: underline; color: #A100FF; }
