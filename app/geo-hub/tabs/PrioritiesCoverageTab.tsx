@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface TabProps {
   result: any;
@@ -9,97 +9,389 @@ interface TabProps {
   setActiveSub: (n: number) => void;
 }
 
-export default function PrioritiesCoverageTab({ result, resultComps }: TabProps) {
-  const brandNameLower = (result.brand_name || '').toLowerCase();
-  const filterDominated = (d: string) =>
-    d.split(',').map((s: string) => s.trim())
-     .filter((s: string) => !s.toLowerCase().includes(brandNameLower) && !brandNameLower.includes(s.toLowerCase()))
-     .join(', ') || 'Top Competitors';
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const rd          = result.responses_detail || [];
-  const recClusters = result.query_clusters   || [];
-  const topComp1    = resultComps[0]?.Brand   || 'Top Competitor';
-  const topComp2    = resultComps[1]?.Brand   || 'Competitor';
+const WIN_THRESHOLD       = 60;
+const CONTESTED_THRESHOLD = 30;
 
-  const SEG_DEFS = recClusters.map((c: any) => ({
-    name:       c.category,
-    cats:       [c.category],
-    dominated:  c.topCompetitor || topComp1,
-    dominated2: topComp2,
-  }));
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const segRate = (cats: string[]) => {
-    let rows = rd.filter((r: any) => cats.some(c => (r.category || '') === c));
-    if (rows.length === 0) rows = rd.filter((r: any) => cats.some(c => (r.category || '').toLowerCase().includes(c.toLowerCase())));
-    if (rows.length === 0) return null;
-    return Math.round((rows.filter((r: any) => r.mentioned).length / rows.length) * 100);
-  };
+function preWinOpp(winRate: number): string {
+  if (winRate >= 50) return 'Quick Win';
+  if (winRate >= 25) return 'Attainable';
+  return 'Long Play';
+}
 
-  const WIN_THRESHOLD      = 60;
-  const EMERGING_THRESHOLD = 30;
-
-  const getClusterRate = (cats: string[]): number | null => {
-    for (const cat of cats) {
-      const cluster = recClusters.find((c: any) => c.category === cat);
-      if (cluster) return cluster.winRate;
-      const fuzzy = recClusters.find((c: any) =>
-        c.category.toLowerCase().includes(cat.toLowerCase()) ||
-        cat.toLowerCase().includes(c.category.toLowerCase())
-      );
-      if (fuzzy) return fuzzy.winRate;
+function buildLead(brand: string, gapN: number, conN: number, winN: number): string {
+  const total = gapN + conN + winN;
+  if (total === 0) return `No segment data found for ${brand} yet.`;
+  if (winN > 0 && winN >= gapN && winN >= conN) return `${brand} leads across most audience segments.`;
+  if (gapN > conN && gapN > winN) {
+    if (conN > 0) {
+      return `Most of ${brand}'s audience segments are gap territory — only ${conN} ${conN === 1 ? 'is' : 'are'} contested.`;
     }
-    return segRate(cats);
-  };
+    return `Most of ${brand}'s audience segments are gap territory.`;
+  }
+  if (conN >= gapN && conN > winN) return `Coverage is mostly contested — winnable with effort.`;
+  return `Coverage is split across all three tiers.`;
+}
 
-  const getClusterComp = (cats: string[]): string => {
-    for (const cat of cats) {
-      const cluster = recClusters.find((c: any) => c.category === cat);
-      if (cluster?.topCompetitor) return cluster.topCompetitor;
-    }
-    return '';
-  };
+// ─────────────────────────────────────────────────────────────────────────────
+// Chevron SVG
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const segments = SEG_DEFS.map((def: any) => {
-    const rate = getClusterRate(def.cats);
-    if (rate === null) return null;
-    const isWinning  = rate >= WIN_THRESHOLD;
-    const isEmerging = !isWinning && rate >= EMERGING_THRESHOLD;
-    const status     = isWinning ? 'Winning' : isEmerging ? 'Emerging' : 'Gap';
-    const topComp    = getClusterComp(def.cats);
+function ChevronIcon({ open }: { open: boolean }) {
+  return (
+    <svg
+      className={`cov-card-chev${open ? ' cov-card-chev--open' : ''}`}
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="2,4 6,8 10,4" />
+    </svg>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SegCard
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface Segment {
+  name: string;
+  winRate: number;
+  tier: 'gap' | 'contested' | 'winning';
+  opp: string;
+  topCompetitor: string | null;
+  topCompetitorScore: number | null;
+  queryCount: number;
+}
+
+function SegCard({ seg, isFirst, onViewPrompts }: {
+  seg: Segment;
+  isFirst: boolean;
+  onViewPrompts: () => void;
+}) {
+  const [open, setOpen] = useState(isFirst);
+  const isWin   = seg.tier === 'winning';
+  const gapToWin = WIN_THRESHOLD - seg.winRate;
+
+  // Metric row label + value based on position
+  let metricLabel: string;
+  let metricValue: React.ReactNode;
+  let comparatorLabel: string;
+
+  if (!isWin) {
+    metricLabel = 'Gap to win';
+    metricValue = (
+      <span className="cov-delta">+{gapToWin}% to reach {WIN_THRESHOLD}% threshold</span>
+    );
+    comparatorLabel = 'Leader';
+  } else if (seg.opp === 'Defending') {
+    const lead = seg.topCompetitorScore != null ? seg.winRate - seg.topCompetitorScore : null;
+    metricLabel = 'Lead';
+    metricValue = lead != null ? (
+      <span className="cov-delta">
+        +{lead}% over {lead > 25 ? 'the field' : seg.topCompetitor ?? 'the field'}
+      </span>
+    ) : (
+      <span className="cov-delta">Holding the top spot</span>
+    );
+    comparatorLabel = 'Runner-up';
+  } else {
+    // Contender
+    const deficit = seg.topCompetitorScore != null ? seg.topCompetitorScore - seg.winRate : null;
+    metricLabel = 'Gap to lead';
+    metricValue = deficit != null && seg.topCompetitor ? (
+      <span className="cov-delta">−{deficit}% behind {seg.topCompetitor} for the top spot</span>
+    ) : (
+      <span className="cov-delta">Close to the leader</span>
+    );
+    comparatorLabel = 'Leader';
+  }
+
+  return (
+    <div className="cov-card">
+      <div className="cov-card-head" onClick={() => setOpen(!open)}>
+        <span className="cov-card-name">{seg.name}</span>
+        <span className="cov-card-coverage">{seg.winRate}%</span>
+        <ChevronIcon open={open} />
+      </div>
+      <div className={`cov-card-foot-strip${isWin ? ' cov-card-foot-strip--win' : ''}`}>
+        {seg.opp}
+      </div>
+      {open && (
+        <div className="cov-card-body">
+
+          {/* Coverage bar */}
+          <div className="cov-bar-row">
+            <span className="cov-row-label">Coverage</span>
+            <div className="cov-bar">
+              <div
+                className={`cov-bar-fill${isWin ? ' cov-bar-fill--win' : ''}`}
+                style={{ width: `${Math.min(seg.winRate, 100)}%` }}
+              />
+              <div className="cov-bar-threshold" />
+            </div>
+            <span className="cov-row-val">{seg.winRate}%</span>
+          </div>
+
+          {/* Gap / Lead / Gap-to-lead */}
+          <div className="cov-info-row">
+            <span className="cov-row-label">{metricLabel}</span>
+            <span className="cov-row-content">{metricValue}</span>
+          </div>
+
+          {/* Competitor row */}
+          {seg.topCompetitor && (
+            <div className="cov-info-row">
+              <span className="cov-row-label">{comparatorLabel}</span>
+              <span className="cov-row-content">
+                <span className="cov-leader-name">{seg.topCompetitor}</span>
+                {seg.topCompetitorScore != null && (
+                  <span className="cov-leader-pct">{seg.topCompetitorScore}%</span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="cov-card-foot">
+            <span className="cov-queries-tested">
+              <b>{seg.queryCount}</b> {seg.queryCount === 1 ? 'query' : 'queries'} tested
+            </span>
+          </div>
+          <button
+            className="cov-prompts-link"
+            onClick={(e) => { e.stopPropagation(); onViewPrompts(); }}
+          >
+            View prompts for this segment
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M2 5.5h7M6 2.5l3 3-3 3" />
+            </svg>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coverage Tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+export default function PrioritiesCoverageTab({ result, resultComps, setActiveParent }: TabProps) {
+  const [sortBy,     setSortBy]     = useState<string>('gap');
+  const [filterComp, setFilterComp] = useState<string>('all');
+  const [filterOpp,  setFilterOpp]  = useState<string>('all');
+
+  const brand    = result.brand_name || 'Your brand';
+  const rd       = result.responses_detail || [];
+  const clusters = result.query_clusters   || [];
+
+  // Query count per cluster category
+  const queryCountForCat = (category: string): number =>
+    rd.filter((r: any) => (r.category || '').toLowerCase() === category.toLowerCase()).length;
+
+  // Build segments
+  const rawSegments: Segment[] = clusters.map((c: any) => {
+    const winRate = c.winRate ?? 0;
+    const tier: Segment['tier'] =
+      winRate >= WIN_THRESHOLD ? 'winning'
+      : winRate >= CONTESTED_THRESHOLD ? 'contested'
+      : 'gap';
+    // Winning sub-state: without topCompetitorScore we can't detect Contender, default Defending
+    const opp = tier === 'winning'
+      ? (c.topCompetitorScore != null && c.topCompetitorScore > winRate ? 'Contender' : 'Defending')
+      : preWinOpp(winRate);
     return {
-      name:      def.name,
-      status,
-      color:     isWinning ? '#10B981' : isEmerging ? '#F59E0B' : '#EF4444',
-      bg:        isWinning ? '#F0FDF4' : isEmerging ? '#FFFBEB' : '#FFF1F2',
-      border:    isWinning ? '#6EE7B7' : isEmerging ? '#FCD34D' : '#FCA5A5',
-      score:     rate,
-      dominated: topComp
-        ? filterDominated(topComp)
-        : (isWinning ? filterDominated(def.dominated2 || '') : filterDominated(def.dominated || '')),
+      name:               c.category,
+      winRate,
+      tier,
+      opp,
+      topCompetitor:      c.topCompetitor      ?? null,
+      topCompetitorScore: c.topCompetitorScore ?? null,
+      queryCount:         queryCountForCat(c.category),
     };
-  }).filter((s: any): s is NonNullable<typeof s> => s !== null);
+  });
+
+  // Unique competitor names for filter dropdown
+  const compNames = Array.from(
+    new Set(rawSegments.map(s => s.topCompetitor).filter(Boolean))
+  ) as string[];
+
+  // Filter
+  const filtered = rawSegments.filter(s => {
+    if (filterComp !== 'all' && s.topCompetitor !== filterComp) return false;
+    if (filterOpp  !== 'all' && s.opp !== filterOpp)            return false;
+    return true;
+  });
+
+  // Sort
+  const sortFn = (a: Segment, b: Segment): number => {
+    if (sortBy === 'gap')      return a.winRate - b.winRate;            // lowest first = biggest gap
+    if (sortBy === 'coverage') return b.winRate - a.winRate;            // highest first
+    if (sortBy === 'queries')  return b.queryCount - a.queryCount;
+    return a.name.localeCompare(b.name);
+  };
+
+  const gapSegs       = filtered.filter(s => s.tier === 'gap').sort(sortFn);
+  const contestedSegs = filtered.filter(s => s.tier === 'contested').sort(sortFn);
+  const winningSegs   = filtered.filter(s => s.tier === 'winning').sort(sortFn);
+
+  const totalSegments = rawSegments.length;
+  const totalPrompts  = rd.length;
+  const lead          = buildLead(brand, gapSegs.length, contestedSegs.length, winningSegs.length);
+  const hasFilters    = filterComp !== 'all' || filterOpp !== 'all';
 
   return (
     <div id="tab-priorities-coverage">
-      <div className="apSectionTitle">Segment Coverage Analysis</div>
-      <div className="apSectionSubtitle">Which audience segments is your brand winning vs. losing in AI responses?</div>
-      <div className="apSegmentGrid">
-        {segments.map((s: any, i: number) => (
-          <div key={i} className="apSegmentCard" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
-            <div className="apSegmentCardHeader">
-              <span className="apSegmentName" style={{ color: s.color }}>{s.name}</span>
-              <span className="apSegmentStatusPill" style={{ background: s.status === 'Winning' ? '#D1FAE5' : s.status === 'Emerging' ? '#FEF3C7' : '#FEE2E2', color: s.color }}>
-                {s.status}
-              </span>
-            </div>
-            <div className="apSegmentProgressTrack" style={{ background: s.status === 'Winning' ? '#D1FAE5' : s.status === 'Emerging' ? '#FEF3C7' : '#FEE2E2' }}>
-              <div className="apSegmentProgressFill" style={{ background: s.color, width: `${Math.min(s.score, 100)}%` }} />
-            </div>
-            <div className="apSegmentMeta">
-              Score: <strong style={{ color: s.color }}>{s.score}</strong> &nbsp;·&nbsp; Dominated by: {s.dominated}
-            </div>
+
+      {/* Lead */}
+      <div className="cov-eyebrow">Audience coverage</div>
+      <h2 className="cov-lead">{lead}</h2>
+      <div className="cov-lead-sub">
+        <b>{totalSegments}</b> segments analyzed
+        <span className="cov-sep">·</span>
+        <b>{totalPrompts}</b> prompts
+      </div>
+
+      {/* Filter bar */}
+      <div className="cov-filter-bar">
+        <span className="cov-filter-label">Sort</span>
+        <select
+          className={`cov-filter-select${sortBy !== 'gap' ? ' cov-filter-select--active' : ''}`}
+          value={sortBy}
+          onChange={e => setSortBy(e.target.value)}
+        >
+          <option value="gap">Gap size (largest first)</option>
+          <option value="coverage">Coverage % (highest first)</option>
+          <option value="queries">Query volume</option>
+          <option value="alpha">Segment name (A–Z)</option>
+        </select>
+
+        <span className="cov-filter-label">Filter</span>
+        <select
+          className={`cov-filter-select${filterComp !== 'all' ? ' cov-filter-select--active' : ''}`}
+          value={filterComp}
+          onChange={e => setFilterComp(e.target.value)}
+        >
+          <option value="all">Competitor: All</option>
+          {compNames.map(c => (
+            <option key={c} value={c}>Competitor: {c}</option>
+          ))}
+        </select>
+
+        <select
+          className={`cov-filter-select${filterOpp !== 'all' ? ' cov-filter-select--active' : ''}`}
+          value={filterOpp}
+          onChange={e => setFilterOpp(e.target.value)}
+        >
+          <option value="all">Opportunity: All</option>
+          <option value="Quick Win">Opportunity: Quick Win</option>
+          <option value="Attainable">Opportunity: Attainable</option>
+          <option value="Long Play">Opportunity: Long Play</option>
+          <option value="Defending">Opportunity: Defending</option>
+          <option value="Contender">Opportunity: Contender</option>
+        </select>
+
+        {hasFilters && (
+          <div className="cov-filter-right">
+            <button
+              className="cov-filter-reset"
+              onClick={() => { setFilterComp('all'); setFilterOpp('all'); }}
+            >
+              Reset
+            </button>
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Board — single white card, three lanes */}
+      <div className="cov-board">
+
+        {/* Gap */}
+        <div className="cov-col cov-col--gap">
+          <div className="cov-col-head-row">
+            <span className="cov-col-label">Gap</span>
+            <span className="cov-col-count">{gapSegs.length}</span>
+            <span className="cov-col-threshold">&lt;30%</span>
+          </div>
+          <div className="cov-col-underline" />
+          <div className="cov-col-body">
+            {gapSegs.length === 0 ? (
+              <div className="cov-col-empty">
+                <div className="cov-col-empty-title">No gap segments</div>
+                <div className="cov-col-empty-sub">All segments are at 30% coverage or above.</div>
+              </div>
+            ) : gapSegs.map((seg, i) => (
+              <SegCard
+                key={seg.name}
+                seg={seg}
+                isFirst={i === 0}
+                onViewPrompts={() => setActiveParent(3)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Contested */}
+        <div className="cov-col cov-col--contested">
+          <div className="cov-col-head-row">
+            <span className="cov-col-label">Contested</span>
+            <span className="cov-col-count">{contestedSegs.length}</span>
+            <span className="cov-col-threshold">30–59%</span>
+          </div>
+          <div className="cov-col-underline" />
+          <div className="cov-col-body">
+            {contestedSegs.length === 0 ? (
+              <div className="cov-col-empty">
+                <div className="cov-col-empty-title">No contested segments</div>
+                <div className="cov-col-empty-sub">Segments at 30–59% coverage appear here.</div>
+              </div>
+            ) : contestedSegs.map((seg, i) => (
+              <SegCard
+                key={seg.name}
+                seg={seg}
+                isFirst={i === 0}
+                onViewPrompts={() => setActiveParent(3)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Winning */}
+        <div className="cov-col cov-col--winning">
+          <div className="cov-col-head-row">
+            <span className="cov-col-label">Winning</span>
+            <span className="cov-col-count">{winningSegs.length}</span>
+            <span className="cov-col-threshold">≥60%</span>
+          </div>
+          <div className="cov-col-underline" />
+          <div className="cov-col-body">
+            {winningSegs.length === 0 ? (
+              <div className="cov-col-empty">
+                <div className="cov-col-empty-title">No segments here yet</div>
+                <div className="cov-col-empty-sub">Reach 60% coverage in any segment to win the category.</div>
+              </div>
+            ) : winningSegs.map((seg, i) => (
+              <SegCard
+                key={seg.name}
+                seg={seg}
+                isFirst={i === 0}
+                onViewPrompts={() => setActiveParent(3)}
+              />
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );

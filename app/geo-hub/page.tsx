@@ -1,4 +1,4 @@
-// v2.8.0: priorities tab
+// v2.9.0: priorities coverage redo (got some issues about whetehr or not we keep it for v1)
 
 'use client';
 
@@ -613,7 +613,7 @@ export default function GeoHub() {
             </div>
 
             {/* White canvas */}
-            <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#FFFFFF',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
+            <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#f3f4f6',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
               {/* Loading card */}
               <div id="loading-panel" className="loadingPanel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
 
