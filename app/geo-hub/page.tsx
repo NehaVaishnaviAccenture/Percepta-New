@@ -1,4 +1,4 @@
-// v2.9.0: priorities coverage redo (got some issues about whetehr or not we keep it for v1)
+// v2.10.0: priorities overall redo
 
 'use client';
 

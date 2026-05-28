@@ -191,6 +191,7 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
   const [sortBy,     setSortBy]     = useState<string>('gap');
   const [filterComp, setFilterComp] = useState<string>('all');
   const [filterOpp,  setFilterOpp]  = useState<string>('all');
+  const [activeLane, setActiveLane] = useState<string>('gap');
 
   const brand    = result.brand_name || 'Your brand';
   const rd       = result.responses_detail || [];
@@ -315,10 +316,32 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
       </div>
 
       {/* Board — single white card, three lanes */}
-      <div className="cov-board">
+      <div className="cov-board-wrap">
+        {/* Lane toggle — revealed at tablet/mobile by CSS */}
+        <div className="cov-board-toggle">
+          <button
+            className={`cov-lt-btn${activeLane === 'gap' ? ' cov-lt-btn--active' : ''}`}
+            onClick={() => setActiveLane('gap')}
+          >
+            Gap <span className="cov-lt-count">{gapSegs.length}</span>
+          </button>
+          <button
+            className={`cov-lt-btn${activeLane === 'contested' ? ' cov-lt-btn--active' : ''}`}
+            onClick={() => setActiveLane('contested')}
+          >
+            Contested <span className="cov-lt-count">{contestedSegs.length}</span>
+          </button>
+          <button
+            className={`cov-lt-btn cov-lt-btn--winning${activeLane === 'winning' ? ' cov-lt-btn--active' : ''}`}
+            onClick={() => setActiveLane('winning')}
+          >
+            Winning <span className="cov-lt-count">{winningSegs.length}</span>
+          </button>
+        </div>
+        <div className="cov-board">
 
         {/* Gap */}
-        <div className="cov-col cov-col--gap">
+        <div className={`cov-col cov-col--gap${activeLane === 'gap' ? ' cov-col--active' : ''}`}>
           <div className="cov-col-head-row">
             <span className="cov-col-label">Gap</span>
             <span className="cov-col-count">{gapSegs.length}</span>
@@ -343,7 +366,7 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
         </div>
 
         {/* Contested */}
-        <div className="cov-col cov-col--contested">
+        <div className={`cov-col cov-col--contested${activeLane === 'contested' ? ' cov-col--active' : ''}`}>
           <div className="cov-col-head-row">
             <span className="cov-col-label">Contested</span>
             <span className="cov-col-count">{contestedSegs.length}</span>
@@ -368,7 +391,7 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
         </div>
 
         {/* Winning */}
-        <div className="cov-col cov-col--winning">
+        <div className={`cov-col cov-col--winning${activeLane === 'winning' ? ' cov-col--active' : ''}`}>
           <div className="cov-col-head-row">
             <span className="cov-col-label">Winning</span>
             <span className="cov-col-count">{winningSegs.length}</span>
@@ -392,6 +415,7 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
           </div>
         </div>
 
+        </div>
       </div>
     </div>
   );
