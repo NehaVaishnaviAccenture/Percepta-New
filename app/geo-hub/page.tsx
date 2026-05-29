@@ -481,7 +481,7 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151'}}>{elements}</div>;
 }
 
-// ─── FIX 1: RadarChart — enlarged viewBox 500x430, center cx=250 cy=215, LABEL_R=R+40, label wrapping ───
+// ─── FIX 1: RadarChart — show ALL product defs, enlarged viewBox, wrapped labels ───
 function RadarChart({ result }: { result: any }) {
   const [hov,setHov]=useState<number|null>(null);
   const [tooltipPos,setTooltipPos]=useState<{x:number;y:number}|null>(null);
@@ -490,10 +490,11 @@ function RadarChart({ result }: { result: any }) {
   const lob = result.lob || '';
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
-  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions).slice(0, 6);
-  const dims = sorted.length >= 2
-    ? sorted.map(p => ({ label: p.label, val: Math.max(5, Math.min(95, p.pct)), color: p.color }))
-    : productDefs.slice(0,6).map((p,i) => ({ label: p.label, val: 20 + i * 5, color: p.color }));
+  // Always show ALL product defs — fill missing with min value so radar is always complete
+  const dims = productDefs.map(p => {
+    const found = productMentions.find(m => m.label === p.label);
+    return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5, color: p.color };
+  });
   const cx=250,cy=215,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
@@ -561,18 +562,23 @@ function SentimentHeatmap({ result }: { result: any }) {
   const sov = result.share_of_voice || 0;
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
-  const sorted = [...productMentions].sort((a,b) => b.mentions - a.mentions).slice(0, 6);
-  const labels = sorted.map(p => p.label);
+  // Always show ALL product defs as columns — fill missing with 5 so no columns disappear
+  const labels = productDefs.map(p => p.label);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
-  const myScores = sorted.map(p => Math.max(5, Math.min(95, p.pct)));
+  const myScores = productDefs.map(p => {
+    const found = productMentions.find(m => m.label === p.label);
+    return found ? Math.max(5, Math.min(95, found.pct)) : 5;
+  });
   const rows=[
     {name:brand, isYou:true, scores:myScores},
     ...competitors.slice(0,8).map((c:any)=>{
       const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
       const scaleFactors = [c.Vis/Math.max(vis,1), cs/Math.max(sent,1), c.Prom/Math.max(prom,1), c.Cit/Math.max(cit,1), c.Sov/Math.max(sov,1)];
-      const compScores = sorted.map((p, di) => {
+      const compScores = productDefs.map((p, di) => {
+        const found = productMentions.find(m => m.label === p.label);
+        const basePct = found ? found.pct : 5;
         const sf = scaleFactors[di % scaleFactors.length] || 0.75;
-        return Math.max(5, Math.min(95, Math.round(p.pct * sf + seed(c.Brand||'', di)*10 - 5)));
+        return Math.max(5, Math.min(95, Math.round(basePct * sf + seed(c.Brand||'', di)*10 - 5)));
       });
       return {name:c.Brand||'', isYou:false, scores:compScores};
     })
@@ -1297,12 +1303,14 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  {/* FIX 3: 420px fixed left for radar (room for labels), 1fr for heatmap */}
-                  <div style={{display:'grid',gridTemplateColumns:'420px 1fr',gap:14,alignItems:'start'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px'}}>
+                  {/* FIX 3: equal-height grid — radar left fixed 420px, heatmap takes rest; both stretch to same height */}
+                  <div style={{display:'grid',gridTemplateColumns:'420px 1fr',gap:14,alignItems:'stretch'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px',display:'flex',flexDirection:'column' as const}}>
                       <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',marginBottom:1}}>Product Feature Positioning</div>
-                      <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:1}}>Same product categories as the Sankey diagram.</div>
-                      <RadarChart result={result}/>
+                      <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:1}}>All product categories — same as Sankey diagram.</div>
+                      <div style={{flex:1,display:'flex',alignItems:'center'}}>
+                        <RadarChart result={result}/>
+                      </div>
                     </div>
                     <SentimentHeatmap result={result}/>
                   </div>
