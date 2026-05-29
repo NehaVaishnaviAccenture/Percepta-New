@@ -40,15 +40,20 @@ type ProductDef = {label:string; terms:string[]; color:string};
 function getProductDefs(indKey:string, lob:string): ProductDef[] {
   const k = indKey;
   const l = lob.toLowerCase();
-  const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
+  const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#5B21B6','#6B7280','#374151','#0EA5E9','#10B981','#F59E0B','#EF4444'];
 
   if (k==='fin' || l.includes('credit card')) {
     return [
-      {label:'Cash Back Cards',   terms:['cash back','cashback','double cash','freedom','quicksilver','active cash','customized cash','blue cash'], color:TOPIC_COLORS[0]},
-      {label:'Travel Cards',      terms:['travel','sapphire','venture','strata','premier','platinum','autograph','miles','points card'], color:TOPIC_COLORS[1]},
-      {label:'Balance Transfer',  terms:['balance transfer','0% apr','0 apr','zero apr','simplicity','reflect','slate','diamond preferred'], color:TOPIC_COLORS[2]},
-      {label:'Secured Cards',     terms:['secured','credit builder','deposit','credit building','opensky','chime credit'], color:TOPIC_COLORS[3]},
-      {label:'Rewards Cards',     terms:['rewards','points','savor','gold card','preferred','signature','world elite'], color:TOPIC_COLORS[4]},
+      {label:'Cash Back',       terms:['cash back','cashback','double cash','freedom','quicksilver','active cash','customized cash','blue cash','flat rate'], color:TOPIC_COLORS[0]},
+      {label:'Travel Rewards',  terms:['travel','sapphire','venture','strata','premier','platinum','autograph','miles','points card','aadvantage','skymiles','airline','hotel rewards'], color:TOPIC_COLORS[1]},
+      {label:'Balance Transfer',terms:['balance transfer','0% apr','0 apr','zero apr','intro apr','simplicity','reflect','slate','diamond preferred','low interest'], color:TOPIC_COLORS[2]},
+      {label:'Secured / Builder',terms:['secured','credit builder','deposit','credit building','opensky','chime credit','no credit','build credit','first credit'], color:TOPIC_COLORS[3]},
+      {label:'No Annual Fee',   terms:['no annual fee','$0 annual','no fee','free card','without annual'], color:TOPIC_COLORS[4]},
+      {label:'Business Cards',  terms:['business','small business','corporate','employee card','business rewards','ink','spark','business cash'], color:TOPIC_COLORS[5]},
+      {label:'Student Cards',   terms:['student','college','university','discover it student','journey student'], color:TOPIC_COLORS[6]},
+      {label:'Luxury / Premium',terms:['luxury','premium','centurion','black card','reserve','high-end','concierge','lounge access','priority pass'], color:TOPIC_COLORS[7]},
+      {label:'Grocery & Gas',   terms:['grocery','supermarket','gas','fuel','everyday','blue cash everyday','blue cash preferred'], color:TOPIC_COLORS[8]},
+      {label:'Retail / Co-Brand',terms:['retail','store card','amazon','target','walmart','costco','co-brand','co-branded'], color:TOPIC_COLORS[9]},
     ];
   }
   if (k==='fin_cc_travel') { return [
@@ -495,17 +500,22 @@ function RadarChart({ result }: { result: any }) {
     const found = productMentions.find(m => m.label === p.label);
     return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5, color: p.color };
   });
-  const cx=250,cy=215,R=120,n=dims.length;
+  // Dynamic sizing based on number of axes
+  const n=dims.length;
+  // For many axes (8-10), use a larger canvas and smaller radius so labels fit
+  const VW = n > 7 ? 600 : 500;
+  const VH = n > 7 ? 520 : 430;
+  const cx=VW/2, cy=VH/2, R = n > 7 ? 110 : 120;
+  const LABEL_R = R + (n > 7 ? 55 : 44);
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
   const rings=[25,50,75,100];
   const poly=dims.map((d,i)=>pt(i,(d.val/100)*R));
   const sorted2=[...dims].sort((a,b)=>b.val-a.val);
   const top2=sorted2.slice(0,2).map(d=>d.label),bot2=sorted2.slice(-2).map(d=>d.label);
-  const LABEL_R = R + 40;
-  const wrapLabel = (label: string, maxLen = 13): string[] => {
+  const wrapLabel = (label: string, maxLen = 11): string[] => {
     if (label.length <= maxLen) return [label];
-    const words = label.split(' ');
+    const words = label.split(/[\s\/]+/);
     const lines: string[] = [];
     let cur = '';
     words.forEach(w => {
@@ -514,29 +524,32 @@ function RadarChart({ result }: { result: any }) {
       else { lines.push(cur); cur = w; }
     });
     if (cur) lines.push(cur);
-    return lines;
+    return lines.slice(0, 3); // max 3 lines
   };
   return (
     <div style={{position:'relative' as const}}>
-      <svg viewBox="0 0 500 430" style={{width:'100%', overflow:'visible'}}>
-        {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:9,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
+      <svg viewBox={`0 0 ${VW} ${VH}`} style={{width:'100%', overflow:'visible'}}>
+        {rings.map(r=>{const pts=dims.map((_,i)=>pt(i,(r/100)*R));return<g key={r}><polygon points={pts.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="1"/><text x={cx+4} y={cy-(r/100)*R+4} style={{fontSize:8,fill:'#C4B5FD',fontFamily:'Inter,sans-serif'}}>{r}</text></g>;})}
         {dims.map((_,i)=>{const p=pt(i,R);return<line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="#E5E7EB" strokeWidth="1"/>;})}
         <polygon points={poly.map(p=>`${p.x},${p.y}`).join(' ')} fill="#A100FF" fillOpacity="0.18" stroke="#A100FF" strokeWidth="2"/>
-        {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill="#A100FF" stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;})}
+        {dims.map((d,i)=>{const p=pt(i,(d.val/100)*R);return<circle key={i} cx={p.x} cy={p.y} r={hov===i?7:5} fill={d.color} stroke="white" strokeWidth="1.5" style={{cursor:'pointer'}} onMouseEnter={(e)=>{setHov(i);const svgRect=(e.currentTarget as SVGElement).closest('svg')!.getBoundingClientRect();const circRect=(e.currentTarget as SVGElement).getBoundingClientRect();setTooltipPos({x:circRect.left+circRect.width/2-svgRect.left,y:circRect.top-svgRect.top});}} onMouseLeave={()=>{setHov(null);setTooltipPos(null);}}/>;})}
         {dims.map((d,i)=>{
           const lp=pt(i,LABEL_R);
           const isTop=top2.includes(d.label),isBot=bot2.includes(d.label);
           const lines=wrapLabel(d.label);
-          const lineH=13;
+          const lineH=12;
           const totalH=(lines.length-1)*lineH;
+          const fs = n > 7 ? 9.5 : 11;
           return (
             <g key={i}>
               {lines.map((line,li)=>(
                 <text key={li} x={lp.x} y={lp.y-totalH/2+li*lineH} textAnchor="middle" dominantBaseline="middle"
-                  style={{fontSize:11,fill:isTop?'#A100FF':isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:400,fontFamily:'Inter,sans-serif'}}>
+                  style={{fontSize:fs,fill:isTop?d.color:isBot?'#EF4444':'#374151',fontWeight:isTop||isBot?700:500,fontFamily:'Inter,sans-serif'}}>
                   {line}
                 </text>
               ))}
+              {/* Score badge on each axis point */}
+              {d.val > 5 && (()=>{const p2=pt(i,(d.val/100)*R);return null;})()}
             </g>
           );
         })}
@@ -583,8 +596,9 @@ function SentimentHeatmap({ result }: { result: any }) {
       return {name:c.Brand||'', isYou:false, scores:compScores};
     })
   ];
-  const BRAND_COL_W = 118;
-  const COL_W = 82;
+  // Responsive column widths: fewer cols = wider, many cols = narrower but still readable
+  const BRAND_COL_W = 120;
+  const COL_W = labels.length > 7 ? 72 : labels.length > 5 ? 82 : 95;
   const totalGridW = BRAND_COL_W + labels.length * COL_W + (labels.length + 1) * 4;
   const gridCols = `${BRAND_COL_W}px ${labels.map(()=>`${COL_W}px`).join(' ')}`;
   const allScores=rows.flatMap(r=>r.scores),minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
@@ -601,8 +615,8 @@ function SentimentHeatmap({ result }: { result: any }) {
           <div style={{display:'grid',gridTemplateColumns:gridCols,gap:4,marginBottom:4}}>
             <div/>
             {labels.map((lbl,i)=>(
-              <div key={i} style={{fontSize:'0.65rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,lineHeight:1.3,padding:'0 4px 6px',wordBreak:'break-word' as const}}>
-                {lbl.length>11?lbl.replace(/(\w+\s\w+)\s/,'$1\n').split('\n').map((ln,li)=><span key={li} style={{display:'block'}}>{ln}</span>):lbl}
+              <div key={i} style={{fontSize:labels.length>7?'0.58rem':'0.65rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,lineHeight:1.3,padding:'0 3px 6px',wordBreak:'break-word' as const}}>
+                {lbl.split(/[\/\s]+/).map((part,pi)=><span key={pi} style={{display:'block'}}>{part}</span>)}
               </div>
             ))}
           </div>
@@ -1303,12 +1317,12 @@ export default function GeoHub() {
                       </div>
                     ))}
                   </div>
-                  {/* FIX 3: equal-height grid — radar left fixed 420px, heatmap takes rest; both stretch to same height */}
-                  <div style={{display:'grid',gridTemplateColumns:'420px 1fr',gap:14,alignItems:'stretch'}}>
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'10px 14px',display:'flex',flexDirection:'column' as const}}>
-                      <div style={{fontSize:'0.82rem',fontWeight:700,color:'#111827',marginBottom:1}}>Product Feature Positioning</div>
-                      <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:1}}>All product categories — same as Sankey diagram.</div>
-                      <div style={{flex:1,display:'flex',alignItems:'center'}}>
+                  {/* FIX 3: side-by-side equal height — radar 440px fixed, heatmap stretches */}
+                  <div style={{display:'grid',gridTemplateColumns:'440px 1fr',gap:14,alignItems:'stretch'}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 16px',display:'flex',flexDirection:'column' as const,minHeight:0}}>
+                      <div style={{fontSize:'0.85rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Positioning</div>
+                      <div style={{fontSize:'0.7rem',color:'#9CA3AF',marginBottom:6}}>All {result.ind_key==='fin'||((result.lob||'').toLowerCase().includes('credit card'))?'10':'5'} card categories scored by AI mention rate.</div>
+                      <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',minHeight:300}}>
                         <RadarChart result={result}/>
                       </div>
                     </div>
