@@ -1,4 +1,4 @@
-// v2.10.0: priorities overall redo
+// v2.10.1: minor edits (i don't remember what)
 
 'use client';
 
@@ -71,8 +71,10 @@ export default function GeoHub() {
   const scopeDebounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [elapsedSec,setElapsedSec]=useState(0);
   const [analysisError,setAnalysisError]=useState<{title:string;code:string;message:string;reduceDesc:string}|null>(null);
+  const [playbookActions,setPlaybookActions]=useState<any[]|null>(null);
 
-  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
+  // Restore report from session storage on mount — playbook_actions are stored with the result.
+  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved){const parsed=JSON.parse(saved);setResult(parsed);setPlaybookActions(parsed.playbook_actions||[]);}if(savedUrl)setUrl(savedUrl);}catch{}},[]);
   useEffect(()=>{if(loading){setElapsedSec(0);const t=setInterval(()=>setElapsedSec(s=>s+1),1000);return()=>clearInterval(t);}}, [loading]);
 
   // Scope detection: fires when url becomes valid; debounced 700ms
@@ -102,6 +104,7 @@ export default function GeoHub() {
     },700);
     return()=>{if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);};
   },[url]);
+
 
   async function runAnalysis(){
     const effectiveScope=d3ScopeSelected==='+ Custom'?d3CustomScope.trim():d3ScopeSelected;
@@ -139,7 +142,11 @@ export default function GeoHub() {
         } else {
           setAnalysisError({title:'Analysis couldn\'t complete',code:`${status||503} Service Unavailable`,message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
         }
-      } else{setResult(data);setActiveParent(0);setActiveSub(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      } else{
+        // playbook_actions come back in the same response — no second fetch needed.
+        setResult(data);setActiveParent(0);setActiveSub(0);setPlaybookActions(data.playbook_actions||[]);
+        try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}
+      }
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
       const msg:string=e.message||'';
@@ -845,7 +852,7 @@ export default function GeoHub() {
             {activeParent===4&&<TrendsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===5&&activeSub===0&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===5&&activeSub===1&&<PrioritiesCoverageTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===5&&activeSub===2&&<PrioritiesPlaybookTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===5&&activeSub===2&&<PrioritiesPlaybookTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
 
 
           </div>

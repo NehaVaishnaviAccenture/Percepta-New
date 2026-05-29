@@ -3382,6 +3382,40 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       return { category: cat, total, mentioned, winRate, topCompetitor, dailySearches, related };
     });
 
+    // ── Playbook actions — generated inline so the client never needs a second fetch ──
+    let playbookActions: any[] = [];
+    try {
+      const brandName = isDynamic ? detectedBrand : brand;
+      const indLabel  = lobLabel || ind.label;
+      const compCtx   = competitors.length > 0
+        ? `Competitors visible in GEO results: ${competitors.slice(0,10).map((c:any)=>c.Brand).join(', ')}.`
+        : '';
+      const pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions for this brand.
+Brand: ${brandName}, Industry: ${indLabel}, GEO Score: ${geo}. ${compCtx}
+IMPORTANT: Do NOT suggest comparison pages against competitors — they are never published.
+Return ONLY a valid JSON array with no markdown. Include at least 2-3 High, 1-2 Medium, 1 Low. Order: High first, then Medium, then Low.
+Each object must have exactly these fields:
+- "priority": "High" | "Medium" | "Low"
+- "topics": array like [{"name":"Topic"}] or [{"name":"Primary"},{"name":"Secondary","secondary":true}]
+- "title": punchy 5-10 word action title
+- "teaser": one-line 10-15 word opportunity summary
+- "who": array of 2-4 audience segment strings (e.g. "Everyday spenders", "First-time buyers")
+- "evidence": { "topic": string, "score": 0-100 integer (brand score for topic), "delta": integer (brand minus median, can be negative), "prompts": integer (prompts tested on this topic) }
+- "why": 2-3 sentences on why this is a priority. Use <b>bold</b> to highlight the key insight, especially at the end
+- "build": array of 3-5 build steps. Each starts with <b>bolded action verb + noun phrase</b> then detail text
+- "team": suggested owner, e.g. "Content / Marketing", "SEO / Web", "PR / Comms"
+- "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"`;
+      const pbRaw   = await callAI([{ role: 'user', content: pbPrompt }], 0.4, 2048);
+      console.log('[playbook] raw (first 300):', pbRaw?.slice(0, 300));
+      const pbClean = pbRaw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+      try { const p = JSON.parse(pbClean); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {}
+      if (!playbookActions.length) {
+        const m = pbClean.match(/\[[\s\S]*?\](?=\s*$)/) || pbClean.match(/\[[\s\S]*\]/);
+        if (m) { try { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {} }
+      }
+      console.log('[playbook] parsed count:', playbookActions.length);
+    } catch (err) { console.error('[playbook] failed:', err); }
+
     return NextResponse.json({
       brand_name: isDynamic ? detectedBrand : brand,
       industry: ind.name,
@@ -3408,6 +3442,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       page_url: url,
       trending_queries: trendingQueries,
       query_clusters: queryClusters,
+      playbook_actions: playbookActions,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
