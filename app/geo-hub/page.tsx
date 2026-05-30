@@ -1,4 +1,4 @@
-// v2.10.3: minor edits (typescript fix for vercel deployment)
+// v2.10.4: minor edits (ATTEMPT 2: typescript fix for vercel deployment)
 
 'use client';
 
