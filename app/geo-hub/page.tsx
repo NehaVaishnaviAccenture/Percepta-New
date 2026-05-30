@@ -1,4 +1,4 @@
-// v2.10.5: minor edits (ATTEMPT 2: clerk removal for temp vercel deployment)
+// v2.11.0: edited loading page and general search prompts
 
 'use client';
 
@@ -622,7 +622,7 @@ export default function GeoHub() {
             {/* White canvas */}
             <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#f3f4f6',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
               {/* Loading card */}
-              <div id="loading-panel" className="loadingPanel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560}}>
+              <div id="loading-panel" className="loadingPanel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,boxShadow:'0 4px 32px rgba(0,0,0,0.10)'}}>
 
                 {/* Dark card header */}
                 <div id="loading-panel-header" className="loadingPanelHeader" style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
@@ -651,40 +651,17 @@ export default function GeoHub() {
                 </div>
 
                 {/* White card body */}
-                <div id="loading-steps-list" className="loadingStepsList" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:18}}>
+                <div id="loading-steps-list" className="loadingStepsList" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:16}}>
 
-                  {/* AI engine row */}
-                  <div id="loading-engine-section" className="loadingEngineSection">
-                    <div id="loading-engine-label" className="loadingEngineLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',fontFamily:'Inter,sans-serif',marginBottom:10}}>AI Engine</div>
-                    <div id="loading-engine-row" className="loadingEngineRow" style={{display:'grid',gridTemplateColumns:'20px 110px 1fr 72px',alignItems:'center',gap:12,padding:'8px 0'}}>
-                      <div id="loading-engine-icon" className="loadingEngineIcon" style={{width:18,height:18,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                        {loadingProgress>=100
-                          ?<div id="loading-engine-icon-done" className="loadingEngineIconDone" style={{width:16,height:16,borderRadius:'50%',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}><svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="white" strokeWidth="2.5"><polyline points="1.5,5 4,7.5 8.5,2"/></svg></div>
-                          :<div id="loading-engine-icon-spin" className="loadingEngineIconSpin" style={{width:14,height:14,border:'1.5px solid #D0D0DC',borderTopColor:'#A100FF',borderRadius:'50%',animation:'d3spin 0.8s linear infinite'}}/>
-                        }
-                      </div>
-                      <div id="loading-engine-name" className="loadingEngineName" style={{fontSize:12,fontWeight:500,color:'#3D3D50',fontFamily:'Inter,sans-serif'}}>GPT-4o</div>
-                      <div id="loading-engine-bar-wrap" className="loadingEngineBarWrap" style={{flex:1}}>
-                        <div id="loading-engine-bar" className="loadingEngineBar" style={{height:3,background:'#F0F0F4',overflow:'hidden'}}>
-                          {loadingProgress>=100
-                            ?<div id="loading-engine-bar-done" className="loadingEngineBarDone" style={{height:'100%',background:'#00C853',width:'100%'}}/>
-                            :<div id="loading-engine-bar-anim" className="loadingEngineBarAnim" style={{height:'100%',width:'100%',background:'linear-gradient(90deg,#E8E8EE,#A100FF,#E8E8EE)',backgroundSize:'200% 100%',animation:'d3indeterminate 1.4s ease-in-out infinite'}}/>
-                          }
-                        </div>
-                      </div>
-                      <div id="loading-engine-status" className="loadingEngineStatus" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,textAlign:'right' as const,whiteSpace:'nowrap' as const,color:loadingProgress>=100?'#00C853':'#A100FF'}}>
-                        {loadingProgress>=100?'Done':'Querying…'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Percepta GEO V1 info block */}
-                  <div id="loading-v1-note" className="loadingV1Note" style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(161,0,255,0.05)',border:'1px solid rgba(161,0,255,0.18)'}}>
-                    <div id="loading-v1-icon" className="loadingV1Icon" style={{width:18,height:18,borderRadius:'50%',background:'rgba(161,0,255,0.15)',border:'1px solid rgba(161,0,255,0.30)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,marginTop:1}}>
-                      <svg width="9" height="9" viewBox="0 0 10 10" fill="none"><line x1="5" y1="2" x2="5" y2="5.5" stroke="#A100FF" strokeWidth="2"/><circle cx="5" cy="7.5" r="0.7" fill="#A100FF"/></svg>
-                    </div>
+                  {/* Percepta GEO V1 info block — periwinkle, solid filled i icon */}
+                  <div id="loading-v1-note" className="loadingV1Note" style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(91,127,212,0.04)',border:'1px solid rgba(91,127,212,0.18)'}}>
+                    <svg id="loading-v1-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0,marginTop:1}}>
+                      <circle cx="8" cy="8" r="8" fill="#5B7FD4"/>
+                      <circle cx="8" cy="5" r="1.1" fill="white"/>
+                      <rect x="7.1" y="7.2" width="1.8" height="4.5" rx="0.9" fill="white"/>
+                    </svg>
                     <div id="loading-v1-text" className="loadingV1Text">
-                      <div id="loading-v1-label" className="loadingV1Label" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#A100FF',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
+                      <div id="loading-v1-label" className="loadingV1Label" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#5B7FD4',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
                       <div id="loading-v1-desc" className="loadingV1Desc" style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
                         This analysis runs on <strong style={{color:'#0A0A0F'}}>OpenAI GPT-4o</strong> and models AI visibility patterns across major search engines. <strong style={{color:'#0A0A0F'}}>Multi-engine analysis</strong> — querying ChatGPT, Gemini, Perplexity, and Claude directly — is planned for v2.
                       </div>
@@ -697,13 +674,28 @@ export default function GeoHub() {
                     <span id="loading-elapsed-value" className="loadingElapsedValue" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#7A7A90'}}>{elapsed}</span>
                   </div>
 
-                  {/* Nav warning */}
+                  {/* Nav warning — solid filled triangle */}
                   <div id="loading-nav-warning" className="loadingNavWarning" style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
-                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#F5A623" strokeWidth="1.5" style={{flexShrink:0}}><circle cx="8" cy="8" r="7"/><line x1="8" y1="5" x2="8" y2="8.5"/><circle cx="8" cy="11" r="0.7" fill="#F5A623" stroke="none"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
+                      <path d="M7.13 2.17 1.1 12.75A1.03 1.03 0 0 0 2 14.25h12a1.03 1.03 0 0 0 .9-1.5L8.87 2.17a1.03 1.03 0 0 0-1.74 0z" fill="#F5A623"/>
+                      <rect x="7.1" y="5.8" width="1.8" height="3.8" rx="0.9" fill="white"/>
+                      <circle cx="8" cy="11.3" r="1" fill="white"/>
+                    </svg>
                     Leaving this page will cancel the analysis. Results are not saved until complete.
                   </div>
 
                 </div>
+
+                {/* Cancel analysis bar */}
+                <button
+                  id="loading-cancel-btn"
+                  onClick={() => { setLoading(false); setAnalysisError(null); }}
+                  style={{display:'flex',alignItems:'center',justifyContent:'center',gap:7,width:'100%',padding:'13px 24px',background:'#FFF',border:'1px solid #E4E4EC',borderTop:'1px solid #EDEDF2',cursor:'pointer',fontSize:12,fontWeight:500,color:'#A04040',fontFamily:'Inter,sans-serif'}}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="1.5" y1="1.5" x2="10.5" y2="10.5"/><line x1="10.5" y1="1.5" x2="1.5" y2="10.5"/></svg>
+                  Cancel analysis
+                </button>
+
               </div>
             </div>
           </div>

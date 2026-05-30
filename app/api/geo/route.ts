@@ -129,6 +129,13 @@ function getIndustry(domain: string, pageData?: any): string {
   if (isRetirementFirm && !hasAny('/credit-card','/auto-loan','/mortgage','/checking')) return 'fin_retirement';
   if (isWealthAdvisorFirm && !hasAny('/credit-card','/auto-loan','/mortgage','/checking')) return 'fin_wealth';
 
+  // Domain-level override for known retail banks at root/general URLs.
+  // These brands are primarily known as retail banks — without a specific CC path
+  // they should be scored on banking dimensions, not credit card dimensions.
+  const retailBankDomains = ['chase','bankofamerica','wellsfargo','ally','marcus','sofi','synchrony','usaa','navyfederal','penfed','tdbank','usbank','regions','huntington','keybank','fifththird','truist','citizensbank','citizensbank'];
+  const isRetailBank = retailBankDomains.some(k => d.includes(k));
+  if (isRetailBank && !hasAny('/credit-card','/creditcard','/cards')) return 'fin_retail_bank';
+
   if (isFin) {
     // ── Explicit wealth/insurance/investment detection (before CC check) ──
     const wealthDomains = ['principal','fidelity','vanguard','schwab','morganstanley','merrilllynch','edwardjones','raymondjames','ubs','prudential','metlife','transamerica','massmutual','johnhancock','tiaa','nationwide','statestreet','blackrock','invesco','troweprice','empower','securian','lincoln','sunlife','lpl'];
@@ -2380,11 +2387,85 @@ Rules:
     // overrides are bypassed — actual AI responses drive every metric instead.
     const scopeOverride = !!(scope && scope !== 'General');
 
-    // ── Scope-specific query override ────────────────────────────────────────
-    // When the user picks a specific scope (e.g. "Credit Cards"), replace the
-    // generic industry queries with questions that are actually about that scope.
+    // ── Shared query templates — used by both General and specific scope paths ──
+    const SCOPE_TEMPLATES: ((c: string) => string)[] = [
+      (c) => `What is the best ${c.toLowerCase()} available right now?`,
+      (c) => `How do I choose between different ${c.toLowerCase()} options?`,
+      (c) => `Which ${c.toLowerCase()} offers the best value?`,
+      (c) => `What should I know before committing to ${c.toLowerCase()}?`,
+      (c) => `Which ${c.toLowerCase()} is most recommended by experts?`,
+      (c) => `What are the top-rated ${c.toLowerCase()} options in 2025?`,
+      (c) => `How do I compare ${c.toLowerCase()} from different providers?`,
+      (c) => `Which ${c.toLowerCase()} is best for someone just starting out?`,
+      (c) => `What fees or costs are associated with ${c.toLowerCase()}?`,
+      (c) => `What do customers say about ${c.toLowerCase()} after long-term use?`,
+      (c) => `What are the pros and cons of the leading ${c.toLowerCase()} options?`,
+      (c) => `Which ${c.toLowerCase()} is easiest to qualify for?`,
+      (c) => `What is the typical cost of ${c.toLowerCase()}?`,
+      (c) => `What do financial experts recommend for ${c.toLowerCase()}?`,
+      (c) => `Which ${c.toLowerCase()} is most popular right now?`,
+      (c) => `What makes one ${c.toLowerCase()} better than another?`,
+      (c) => `Which ${c.toLowerCase()} has no hidden fees?`,
+      (c) => `How do I get the most value from ${c.toLowerCase()}?`,
+      (c) => `Which ${c.toLowerCase()} is best for everyday use?`,
+      (c) => `What should I watch out for with ${c.toLowerCase()}?`,
+      (c) => `What are common mistakes people make with ${c.toLowerCase()}?`,
+      (c) => `How does ${c.toLowerCase()} compare across the major providers?`,
+      (c) => `Which ${c.toLowerCase()} is the safest and most trusted option?`,
+      (c) => `Which ${c.toLowerCase()} is most recommended for first-time users?`,
+      (c) => `What are the hidden costs of ${c.toLowerCase()}?`,
+      (c) => `Which ${c.toLowerCase()} has the best customer support?`,
+      (c) => `What do experts say about ${c.toLowerCase()} in 2025?`,
+      (c) => `Which ${c.toLowerCase()} is best for long-term use?`,
+      (c) => `How do I get started with ${c.toLowerCase()}?`,
+      (c) => `Which ${c.toLowerCase()} is the overall best pick right now?`,
+    ];
+
+    function buildQueriesFromCats(cats: string[]): string[][] {
+      const result: string[][] = [];
+      for (let i = 0; i < SCOPE_TEMPLATES.length * cats.length; i++) {
+        const catIdx = i % cats.length;
+        const tplIdx = Math.floor(i / cats.length);
+        if (tplIdx < SCOPE_TEMPLATES.length) {
+          result.push([cats[catIdx], SCOPE_TEMPLATES[tplIdx](cats[catIdx])]);
+        }
+      }
+      return result;
+    }
+
+    // ── General scope: generate brand-specific dimensions ────────────────────
+    // "General" means the brand as a whole — not a hardcoded product query set.
+    // Ask AI what this brand is actually known for, then build queries around those dimensions.
+    if (!scope || scope === 'General') {
+      const brandLabel = isDynamic ? detectedBrand : brand;
+      const indLabel = ind.label || ind.name;
+      const generalCatPrompt = `You are a consumer research analyst. List exactly 10 product categories or brand dimensions that consumers most commonly associate with ${brandLabel} when asking AI assistants for recommendations.
+
+These must reflect what this specific brand actually offers and is known for — not generic industry categories.
+Return ONLY a valid JSON array of 10 short strings (2–5 words each). No markdown, no explanation.
+Example for Chase: ["Checking Accounts","Savings Accounts","Credit Cards","Mortgage & Home Loans","Auto Loans","Business Banking","Wealth & Investing","Mobile Banking","Customer Service","Brand Reputation"]
+Example for Nike: ["Running Shoes","Basketball Footwear","Athletic Apparel","Training Gear","Sustainability","Brand Heritage","Athlete Endorsements","Kids & Youth","Customisation","Innovation & Tech"]
+Industry context: ${indLabel}`;
+
+      let generalCats: string[] = [];
+      try {
+        const catRaw = await callAI([{ role: 'user', content: generalCatPrompt }], 0.3, 300);
+        const parsed = JSON.parse(catRaw.replace(/```json|```/g, '').trim());
+        if (Array.isArray(parsed)) generalCats = parsed.map((s: any) => String(s)).slice(0, 10);
+      } catch (err) {
+        return NextResponse.json({ error: 'Could not determine brand dimensions for General analysis. Please try again.' }, { status: 503 });
+      }
+
+      if (generalCats.length < 5) {
+        return NextResponse.json({ error: 'Could not determine brand dimensions for General analysis. Please try again.' }, { status: 503 });
+      }
+
+      const cats10 = (generalCats.length >= 10 ? generalCats : [...generalCats, ...Array(10 - generalCats.length).fill(indLabel)]).slice(0, 10);
+      queries = buildQueriesFromCats(cats10).slice(0, MAX_QUERIES);
+    }
+
+    // ── Specific scope: generate sub-categories within the chosen scope ──────
     if (scope && scope !== 'General') {
-      // Step 1: ask AI for 10 sub-categories within this scope
       const catPrompt = `List exactly 10 specific sub-categories or decision dimensions that consumers think about when researching "${scope}". These will be used as question categories for a GEO analysis.
 
 Return ONLY a valid JSON array of 10 short strings (2–5 words each), e.g.:
@@ -2416,56 +2497,7 @@ No markdown, no explanation, just the JSON array.`;
       }
 
       const cats10 = (scopeCats.length >= 10 ? scopeCats : [...scopeCats, ...Array(10 - scopeCats.length).fill(scope)]).slice(0, 10);
-
-      // Step 2: use question templates to build scope-specific queries
-      const SCOPE_TEMPLATES: ((c: string, s: string) => string)[] = [
-        (c) => `What is the best ${c.toLowerCase()} available right now?`,
-        (c) => `How do I choose between different ${c.toLowerCase()} options?`,
-        (c) => `Which ${c.toLowerCase()} offers the best value?`,
-        (c) => `What should I know before committing to ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is most recommended by experts?`,
-        (c) => `What are the top-rated ${c.toLowerCase()} options in 2025?`,
-        (c) => `How do I compare ${c.toLowerCase()} from different providers?`,
-        (c) => `Which ${c.toLowerCase()} is best for someone just starting out?`,
-        (c) => `What fees or costs are associated with ${c.toLowerCase()}?`,
-        (c) => `What do customers say about ${c.toLowerCase()} after long-term use?`,
-        (c) => `What are the pros and cons of the leading ${c.toLowerCase()} options?`,
-        (c) => `Which ${c.toLowerCase()} is easiest to qualify for?`,
-        (c) => `What is the typical cost of ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is best for someone with excellent credit?`,
-        (c) => `What do financial experts recommend for ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is best for maximizing rewards?`,
-        (c) => `How do I get approved for ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is most popular right now?`,
-        (c) => `What makes one ${c.toLowerCase()} better than another?`,
-        (c) => `Which ${c.toLowerCase()} has no hidden fees?`,
-        (c) => `What is the best ${c.toLowerCase()} for someone building credit?`,
-        (c) => `Which ${c.toLowerCase()} offers the best sign-up bonus or welcome offer?`,
-        (c) => `How do I get the most value from ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is best for everyday spending?`,
-        (c) => `What should I watch out for with ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} is best for large purchases?`,
-        (c) => `What are common mistakes people make with ${c.toLowerCase()}?`,
-        (c) => `Which ${c.toLowerCase()} has the lowest interest rate?`,
-        (c) => `How does ${c.toLowerCase()} compare across the major banks?`,
-        (c) => `Which ${c.toLowerCase()} is the safest and most trusted option?`,
-      ];
-
-      // Interleave queries across all 10 categories so that every category
-      // gets coverage even when MAX_QUERIES < 300.
-      // Pattern: for query index i → category = cats10[i % 10], template = SCOPE_TEMPLATES[Math.floor(i / 10)]
-      // This gives 10 queries per category for a 100-prompt run, vs only 3-4 categories
-      // getting any queries at all with a sequential flatMap + slice approach.
-      const scopeQueries: string[][] = [];
-      for (let i = 0; i < SCOPE_TEMPLATES.length * cats10.length; i++) {
-        const catIdx = i % cats10.length;
-        const tplIdx = Math.floor(i / cats10.length);
-        if (tplIdx < SCOPE_TEMPLATES.length) {
-          scopeQueries.push([cats10[catIdx], SCOPE_TEMPLATES[tplIdx](cats10[catIdx], scope)]);
-        }
-      } // 300 total, interleaved: cats10[0], cats10[1], ..., cats10[9], cats10[0], ...
-
-      queries = scopeQueries.slice(0, MAX_QUERIES);
+      queries = buildQueriesFromCats(cats10).slice(0, MAX_QUERIES);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
