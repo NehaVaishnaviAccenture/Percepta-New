@@ -1,4 +1,4 @@
-// v2.10.2: minor edits (known for, general search chip)
+// v2.10.3: minor edits (typescript fix for vercel deployment)
 
 'use client';
 
