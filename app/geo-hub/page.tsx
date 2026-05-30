@@ -1,4 +1,4 @@
-// v2.10.1: minor edits (i don't remember what)
+// v2.10.2: minor edits (known for, general search chip)
 
 'use client';
 
@@ -760,7 +760,14 @@ export default function GeoHub() {
             <div className="orgName">{result?.brand_name}</div>
             <div className="orgMeta">
               <span className="orgDomain">{(result?.domain||'').replace(/^https?:\/\//,'').replace(/^www\./,'')}</span>
-              {result?.ind_label&&<>&nbsp;&nbsp;·&nbsp;&nbsp;{result.ind_label}</>}
+              {result?.brand_known_for?.length>0&&(
+                <>&nbsp;&nbsp;·&nbsp;&nbsp;<span className="orgKnownFor">Known for {(result.brand_known_for as string[]).length===1
+                  ? result.brand_known_for[0]
+                  : (result.brand_known_for as string[]).length===2
+                    ? `${result.brand_known_for[0]} and ${result.brand_known_for[1]}`
+                    : `${(result.brand_known_for as string[]).slice(0,-1).join(', ')}, and ${result.brand_known_for[result.brand_known_for.length-1]}`
+                }</span></>
+              )}
             </div>
           </div>
           {result?.ind_label&&<div className="orgChip">
@@ -819,7 +826,7 @@ export default function GeoHub() {
                 const CFT:Record<string,any>={'Chase':{geo:80,vis:82,cit:78,sent:86,sov:72,rank:'#1'},'American Express':{geo:73,vis:73,cit:70,sent:84,sov:62,rank:'#2'},'Capital One':{geo:57,vis:60,cit:55,sent:62,sov:48,rank:'#3'},'Citi':{geo:49,vis:48,cit:48,sent:56,sov:40,rank:'#4'},'Discover':{geo:45,vis:42,cit:46,sent:54,sov:36,rank:'N/A'},'Wells Fargo':{geo:37,vis:28,cit:37,sent:50,sov:28,rank:'N/A'},'Bank of America':{geo:30,vis:19,cit:30,sent:48,sov:20,rank:'N/A'},'USAA':{geo:25,vis:16,cit:24,sent:44,sov:13,rank:'N/A'},'Synchrony':{geo:21,vis:12,cit:21,sent:40,sov:9,rank:'N/A'},'Barclays':{geo:19,vis:10,cit:20,sent:38,sov:7,rank:'N/A'},'Navy Federal':{geo:22,vis:14,cit:18,sent:42,sov:10,rank:'N/A'},'PenFed':{geo:14,vis:8,cit:12,sent:36,sov:5,rank:'N/A'},'TD Bank':{geo:20,vis:12,cit:16,sent:38,sov:8,rank:'N/A'},'US Bank':{geo:22,vis:14,cit:18,sent:40,sov:10,rank:'N/A'},'Regions Bank':{geo:13,vis:7,cit:10,sent:34,sov:5,rank:'N/A'},'Citizens Bank':{geo:14,vis:8,cit:11,sent:35,sov:5,rank:'N/A'},'Truist':{geo:16,vis:10,cit:13,sent:36,sov:6,rank:'N/A'},'Fifth Third':{geo:13,vis:7,cit:10,sent:34,sov:4,rank:'N/A'},'KeyBank':{geo:11,vis:6,cit:9,sent:32,sov:4,rank:'N/A'},'Huntington':{geo:12,vis:6,cit:9,sent:33,sov:4,rank:'N/A'}};
                 const t=CFT[result.brand_name];
                 if(t){result.overall_geo_score=t.geo;result.visibility=t.vis;result.citation_share=t.cit;result.sentiment=t.sent;result.share_of_voice=t.sov;result.avg_rank=t.rank;}
-                if(!result.lob && result.ind_key==='fin') result.lob='Credit Cards';
+                // 'fin' with General scope should not default to 'Credit Cards' — leave lob unset so ind_label shows 'Financial Services'
                 if(!result.lob && result.ind_key==='fin_auto_loan') result.lob='Auto Loans & Financing';
                 if(!result.lob && result.ind_key==='fin_mortgage') result.lob='Mortgage & Home Loans';
                 if(!result.lob && result.ind_key==='fin_wealth') result.lob='Wealth Management';

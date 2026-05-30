@@ -3258,7 +3258,8 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
         // Generic retail banking URL -- show all product lines
         return 'Retail Banking -- Savings · Checking · CDs';
       }
-      if (k === 'fin') return 'Credit Cards';
+      // 'fin' is the generic financial fallback — when scope is General (or no scope),
+      // don't label it "Credit Cards"; let ind.label ('Financial Services') speak for the brand as a whole.
       return null;
     })();
 
@@ -3382,15 +3383,18 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       return { category: cat, total, mentioned, winRate, topCompetitor, dailySearches, related };
     });
 
-    // ── Playbook actions — generated inline so the client never needs a second fetch ──
+    // ── Playbook actions + brand_known_for — run in parallel ──
+    const brandName = isDynamic ? detectedBrand : brand;
+    const indLabel  = lobLabel || ind.label;
+
     let playbookActions: any[] = [];
-    try {
-      const brandName = isDynamic ? detectedBrand : brand;
-      const indLabel  = lobLabel || ind.label;
-      const compCtx   = competitors.length > 0
-        ? `Competitors visible in GEO results: ${competitors.slice(0,10).map((c:any)=>c.Brand).join(', ')}.`
-        : '';
-      const pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions for this brand.
+    let brandKnownFor: string[] = [];
+
+    const compCtx = competitors.length > 0
+      ? `Competitors visible in GEO results: ${competitors.slice(0,10).map((c:any)=>c.Brand).join(', ')}.`
+      : '';
+
+    const pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions for this brand.
 Brand: ${brandName}, Industry: ${indLabel}, GEO Score: ${geo}. ${compCtx}
 IMPORTANT: Do NOT suggest comparison pages against competitors — they are never published.
 Return ONLY a valid JSON array with no markdown. Include at least 2-3 High, 1-2 Medium, 1 Low. Order: High first, then Medium, then Low.
@@ -3405,16 +3409,37 @@ Each object must have exactly these fields:
 - "build": array of 3-5 build steps. Each starts with <b>bolded action verb + noun phrase</b> then detail text
 - "team": suggested owner, e.g. "Content / Marketing", "SEO / Web", "PR / Comms"
 - "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"`;
-      const pbRaw   = await callAI([{ role: 'user', content: pbPrompt }], 0.4, 2048);
-      console.log('[playbook] raw (first 300):', pbRaw?.slice(0, 300));
-      const pbClean = pbRaw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
-      try { const p = JSON.parse(pbClean); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {}
-      if (!playbookActions.length) {
-        const m = pbClean.match(/\[[\s\S]*?\](?=\s*$)/) || pbClean.match(/\[[\s\S]*\]/);
-        if (m) { try { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {} }
+
+    const knownForPrompt = `You are a brand analyst. Based on how AI models represent ${brandName} in the ${indLabel} space, list exactly 2 short noun phrases (3-5 words each) describing what this brand is best known for from a consumer perspective. Pick the two most distinctive things.
+Return ONLY a JSON array of 2 strings. No markdown, no explanation.
+Example: ["Rewards credit cards","High-yield savings"]`;
+
+    const [pbResult, knownForResult] = await Promise.allSettled([
+      callAI([{ role: 'user', content: pbPrompt }], 0.4, 2048),
+      callAI([{ role: 'user', content: knownForPrompt }], 0.2, 300),
+    ]);
+
+    try {
+      if (pbResult.status === 'fulfilled') {
+        const pbRaw = pbResult.value;
+        console.log('[playbook] raw (first 300):', pbRaw?.slice(0, 300));
+        const pbClean = pbRaw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+        try { const p = JSON.parse(pbClean); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {}
+        if (!playbookActions.length) {
+          const m = pbClean.match(/\[[\s\S]*?\](?=\s*$)/) || pbClean.match(/\[[\s\S]*\]/);
+          if (m) { try { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {} }
+        }
+        console.log('[playbook] parsed count:', playbookActions.length);
       }
-      console.log('[playbook] parsed count:', playbookActions.length);
     } catch (err) { console.error('[playbook] failed:', err); }
+
+    try {
+      if (knownForResult.status === 'fulfilled') {
+        const kfRaw = knownForResult.value.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+        const kfParsed = JSON.parse(kfRaw);
+        if (Array.isArray(kfParsed) && kfParsed.length > 0) brandKnownFor = kfParsed.slice(0, 2);
+      }
+    } catch { /* leave brandKnownFor empty */ }
 
     return NextResponse.json({
       brand_name: isDynamic ? detectedBrand : brand,
@@ -3443,6 +3468,7 @@ Each object must have exactly these fields:
       trending_queries: trendingQueries,
       query_clusters: queryClusters,
       playbook_actions: playbookActions,
+      brand_known_for: brandKnownFor,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

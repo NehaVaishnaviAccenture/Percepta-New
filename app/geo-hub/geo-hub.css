@@ -166,6 +166,10 @@
   color: #C084FC;
 }
 
+.orgKnownFor {
+  color: rgba(255, 255, 255, 0.55);
+}
+
 .orgChip {
   font-size: 10px;
   font-weight: 600;
