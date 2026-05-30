@@ -545,7 +545,7 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
       roSuppressRef.current = true;
 
       // Measure in natural 3-col layout
-      hero.classList.remove('rmStatHero--stack');
+      hero!.classList.remove('rmStatHero--stack');
       void hero.offsetHeight; // force sync layout read
 
       const labels = hero.querySelectorAll('.rmStatLabel');
