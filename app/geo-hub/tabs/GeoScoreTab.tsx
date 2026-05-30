@@ -161,10 +161,10 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
           </div>
           <div id="gso-comp-weakness" className="gsoWeakness" style={{borderLeft:`2px solid ${weakColor}`}}>
             <div id="gso-comp-weakness-label" className="gsoWeaknessLabel" style={{color:weakColor}}>Holding you back</div>
-            <p id="gso-comp-weakness-text" className="gsoWeaknessText">
+            <div id="gso-comp-weakness-text" className="gsoWeaknessText">
               {weakest.label} ({weakest.score}) is your weakest signal.{' '}
-              <div id="gso-comp-weakness-cta" className="gsoWeaknessCta" onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</div>
-            </p>
+              <span id="gso-comp-weakness-cta" className="gsoWeaknessCta" onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</span>
+            </div>
           </div>
         </div>
       </div>
