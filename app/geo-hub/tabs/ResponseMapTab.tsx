@@ -544,18 +544,21 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
       if (roSuppressRef.current) return;
       roSuppressRef.current = true;
 
-      // Measure in natural 3-col layout
-      hero!.classList.remove('rmStatHero--stack');
-      void hero.offsetHeight; // force sync layout read
+      const el = hero;
+      if (!el) return;
 
-      const labels = hero.querySelectorAll('.rmStatLabel');
+      // Measure in natural 3-col layout
+      el.classList.remove('rmStatHero--stack');
+      void el.offsetHeight; // force sync layout read
+
+      const labels = el.querySelectorAll('.rmStatLabel');
       // line-height is 20px → 2 lines = 40px; 44px gives a small buffer
       const anyOverflows = Array.from(labels).some(
-        el => (el as HTMLElement).offsetHeight > 44
+        label => (label as HTMLElement).offsetHeight > 44
       );
 
       // Pre-apply to DOM so there's no flash before the React re-render
-      if (anyOverflows) hero.classList.add('rmStatHero--stack');
+      if (anyOverflows) el.classList.add('rmStatHero--stack');
 
       setStatStackClass(anyOverflows ? 'rmStatHero--stack' : '');
 
