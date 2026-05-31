@@ -523,13 +523,13 @@ function RadarChart({ result }: { result: any }) {
     return '#EF4444';
   };
 
-  // Radar SVG dimensions — small and compact
-  const SVG_W  = 320;
-  const SVG_H  = 320;
+  // Radar SVG dimensions — larger radar, labels have room
+  const SVG_W  = 460;
+  const SVG_H  = 460;
   const rCX    = SVG_W / 2;
   const rCY    = SVG_H / 2;
-  const R      = n > 7 ? 98 : 108;
-  const LABEL_R = R + (n > 7 ? 40 : 42);
+  const R      = n > 7 ? 140 : 155;
+  const LABEL_R = R + (n > 7 ? 46 : 50);
 
   const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
   const pt    = (i: number, r: number) => ({
@@ -578,12 +578,12 @@ function RadarChart({ result }: { result: any }) {
       </div>
 
       {/* Main layout: radar SVG left + scorecard HTML right */}
-      <div style={{ display:'flex', gap:32, alignItems:'flex-start' }}>
+      <div style={{ display:'flex', gap:24, alignItems:'flex-start' }}>
 
         {/* ── Radar SVG ── */}
-        <div style={{ flexShrink:0, width: SVG_W + 80 }}>
-          <svg width={SVG_W + 80} height={SVG_H + 80}
-            viewBox={`${-40} ${-40} ${SVG_W+80} ${SVG_H+80}`}
+        <div style={{ flexShrink:0, width: SVG_W + 100 }}>
+          <svg width={SVG_W + 100} height={SVG_H + 100}
+            viewBox={`${-50} ${-50} ${SVG_W+100} ${SVG_H+100}`}
             style={{ overflow:'visible', display:'block' }}>
             <defs>
               {/* Rose→peach→yellow — NO blue/lavender outer */}
@@ -646,7 +646,7 @@ function RadarChart({ result }: { result: any }) {
                   <text key={li}
                     x={lp.x.toFixed(1)} y={(lp.y - th/2 + li*lh).toFixed(1)}
                     textAnchor="middle" dominantBaseline="middle"
-                    style={{fontSize: n>7?9.5:11, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+                    style={{fontSize: n>7?10:11.5, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
                     {ln}
                   </text>
                 ))}
@@ -656,45 +656,45 @@ function RadarChart({ result }: { result: any }) {
         </div>
 
         {/* ── Scorecard HTML (right side) ── */}
-        <div style={{ flex:1, minWidth:0, paddingTop:20 }}>
+        <div style={{ flex:1, minWidth:0, paddingTop:8 }}>
           {rows.map((row, i) => (
             <div key={i}
               onMouseEnter={()=>setHovRow(i)}
               onMouseLeave={()=>setHovRow(null)}
               style={{
                 display:'flex', alignItems:'center',
-                padding:'10px 0',
+                padding:'6px 0',
                 borderBottom: i < rows.length-1 ? '1px solid #F3F4F6' : 'none',
                 background: hovRow===i ? '#FAFAFA' : 'transparent',
                 borderRadius: 4,
               }}>
               {/* Category name */}
-              <div style={{ flex:1, fontSize:'0.88rem', fontWeight:400, color:'#111827', fontFamily:'Inter,sans-serif' }}>
+              <div style={{ flex:1, fontSize:'0.82rem', fontWeight:400, color:'#111827', fontFamily:'Inter,sans-serif' }}>
                 {row.label}
               </div>
               {/* Score */}
-              <div style={{ fontSize:'1.35rem', fontWeight:800, color:tierColor(row.val), marginRight:10, minWidth:36, textAlign:'right' as const }}>
+              <div style={{ fontSize:'1.15rem', fontWeight:800, color:tierColor(row.val), marginRight:8, minWidth:30, textAlign:'right' as const }}>
                 {row.val}
               </div>
               {/* vs median */}
-              <div style={{ fontSize:'0.72rem', color:'#9CA3AF', minWidth:90 }}>
+              <div style={{ fontSize:'0.68rem', color:'#9CA3AF', minWidth:80 }}>
                 {row.diff >= 0 ? '+' : ''}{row.diff} vs. median
               </div>
             </div>
           ))}
 
           {/* Legend */}
-          <div style={{ marginTop:14, display:'flex', flexWrap:'wrap' as const, gap:'6px 16px' }}>
+          <div style={{ marginTop:10, display:'flex', flexWrap:'wrap' as const, gap:'4px 12px' }}>
             {LEGEND.map((l,i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
-                <div style={{ width:11, height:11, borderRadius:2, background:l.color, flexShrink:0 }}/>
-                <span style={{ fontSize:'0.72rem', color:'#374151', fontWeight:600 }}>{l.label}</span>
-                <span style={{ fontSize:'0.68rem', color:'#9CA3AF' }}>{l.range}</span>
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:4 }}>
+                <div style={{ width:10, height:10, borderRadius:2, background:l.color, flexShrink:0 }}/>
+                <span style={{ fontSize:'0.68rem', color:'#374151', fontWeight:600 }}>{l.label}</span>
+                <span style={{ fontSize:'0.64rem', color:'#9CA3AF' }}>{l.range}</span>
               </div>
             ))}
-            <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-              <svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="#374151" strokeWidth="1.5" strokeDasharray="4,3"/></svg>
-              <span style={{ fontSize:'0.72rem', color:'#374151' }}>Median of {Math.min(competitors.length,10)} competitors</span>
+            <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+              <svg width="18" height="10"><line x1="0" y1="5" x2="18" y2="5" stroke="#374151" strokeWidth="1.5" strokeDasharray="4,3"/></svg>
+              <span style={{ fontSize:'0.68rem', color:'#374151' }}>Median of {Math.min(competitors.length,10)} competitors</span>
             </div>
           </div>
         </div>
