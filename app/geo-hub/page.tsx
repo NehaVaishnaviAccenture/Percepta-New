@@ -726,7 +726,197 @@ function RadarChart({ result }: { result: any }) {
   );
 }
 
-// ─── FIX 2: SentimentHeatmap — fixed column widths (118px brand + 82px each), scrollable, values always visible ───
+// ─── PromptRadarChart — same visual as RadarChart but axes = query_clusters (prompt categories) ───
+function PromptRadarChart({ result }: { result: any }) {
+  const [hovRow, setHovRow] = useState<number|null>(null);
+  const competitors = result.competitors || [];
+  const clusters    = result.query_clusters || [];
+
+  // Use top 6-10 query clusters by winRate as axes
+  const rawDims = clusters.length >= 3
+    ? [...clusters]
+        .sort((a: any, b: any) => (b.winRate || 0) - (a.winRate || 0))
+        .slice(0, 10)
+        .map((c: any) => ({ label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) }))
+    : [];
+
+  if (rawDims.length < 3) return null; // don't render if no cluster data
+
+  const dims = rawDims;
+  const n    = dims.length;
+
+  // Deterministic median using competitor GEO as scale factor
+  const compMedians: number[] = dims.map((d) => {
+    if (!competitors.length) return Math.max(5, Math.round(d.val * 0.65));
+    const vals = competitors.slice(0, 10).map((c: any) => {
+      const sf = Math.min(1.4, (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1));
+      return Math.max(5, Math.min(85, Math.round(d.val * sf)));
+    });
+    const s = [...vals].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 === 0 ? Math.round((s[m-1]+s[m])/2) : s[m];
+  });
+
+  const tierColor = (v: number): string => {
+    if (v >= 80) return '#10B981';
+    if (v >= 70) return '#3B82F6';
+    if (v >= 56) return '#F59E0B';
+    if (v >= 45) return '#F97316';
+    return '#EF4444';
+  };
+
+  const rows = dims
+    .map((d, i) => ({ label: d.label, val: d.val, diff: d.val - compMedians[i] }))
+    .sort((a, b) => b.val - a.val);
+
+  const R    = n > 7 ? 140 : 155;
+  const LR   = R + 46;
+  const LPAD = 20;
+  const VB   = (LR + LPAD) * 2;
+  const CX   = VB / 2;
+  const CY   = VB / 2;
+
+  const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
+  const pt    = (i: number, r: number) => ({
+    x: CX + r * Math.cos(angle(i)),
+    y: CY - r * Math.sin(angle(i)),
+  });
+
+  const brandPts = dims.map((d, i) => pt(i, (d.val / 100) * R));
+  const medPts   = compMedians.map((v, i) => pt(i, (v / 100) * R));
+  const outerPts = dims.map((_, i) => pt(i, R));
+  const rings    = [25, 50, 75, 100];
+  const gId      = 'prg';
+  const rowH     = n > 7 ? 36 : 46;
+
+  const wrap = (lbl: string): string[] => {
+    const words = lbl.split(/[\s\/\-&]+/);
+    const out: string[] = []; let cur = '';
+    words.forEach(w => {
+      if (!cur) { cur = w; }
+      else if ((cur + ' ' + w).length <= 10) { cur += ' ' + w; }
+      else { out.push(cur); cur = w; }
+    });
+    if (cur) out.push(cur);
+    return out.slice(0, 2);
+  };
+
+  const LEGEND = [
+    { color:'#EF4444', label:'Fragmented',  range:'0-44'   },
+    { color:'#F97316', label:'Emerging',    range:'45-55'  },
+    { color:'#F59E0B', label:'Competitive', range:'56-69'  },
+    { color:'#3B82F6', label:'Leader',      range:'70-79'  },
+    { color:'#10B981', label:'Authority',   range:'80-100' },
+  ];
+
+  return (
+    <div style={{ background:'white', borderRadius:14, border:'1px solid #E5E7EB', padding:'20px 24px', marginTop:14 }}>
+      <div style={{ fontSize:'0.68rem', fontWeight:800, color:'#A100FF', letterSpacing:'0.10em', textTransform:'uppercase' as const, marginBottom:16 }}>
+        Your Prompt Category Shape · vs. Median Competitor
+      </div>
+
+      <div style={{ display:'flex', alignItems:'stretch' }}>
+        {/* LEFT — Radar */}
+        <div style={{ width:'50%', flexShrink:0 }}>
+          <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
+            <defs>
+              <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.90"/>
+                <stop offset="15%"  stopColor="#E879F9" stopOpacity="0.82"/>
+                <stop offset="32%"  stopColor="#F472B6" stopOpacity="0.70"/>
+                <stop offset="50%"  stopColor="#FB923C" stopOpacity="0.55"/>
+                <stop offset="68%"  stopColor="#FDE68A" stopOpacity="0.38"/>
+                <stop offset="85%"  stopColor="#FEF9C3" stopOpacity="0.20"/>
+                <stop offset="100%" stopColor="#FFFFFF"  stopOpacity="0.00"/>
+              </radialGradient>
+            </defs>
+            <polygon points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill={`url(#${gId})`}/>
+            {rings.map(rv => {
+              const pts = dims.map((_,i) => pt(i,(rv/100)*R));
+              return <g key={rv}>
+                <polygon points={pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke="#E5E7EB" strokeWidth="0.9"/>
+                <text x={CX+4} y={CY-(rv/100)*R+3} style={{fontSize:9, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>{rv}</text>
+              </g>;
+            })}
+            {dims.map((_,i) => {
+              const p = pt(i,R);
+              return <line key={i} x1={CX} y1={CY} x2={p.x.toFixed(1)} y2={p.y.toFixed(1)} stroke="#E5E7EB" strokeWidth="0.9"/>;
+            })}
+            <polygon points={medPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke="#6B7280" strokeWidth="1.4" strokeDasharray="5,4" opacity="0.70"/>
+            <polygon points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="#A100FF" fillOpacity="0.06" stroke="#A100FF" strokeWidth="2.5"/>
+            {dims.map((d,i) => {
+              const p = brandPts[i];
+              return <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="6" fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
+            })}
+            {dims.map((d,i) => {
+              const lp = pt(i, LR);
+              const lines = wrap(d.label);
+              const lh = 14; const th = (lines.length-1)*lh;
+              return <g key={i}>
+                {lines.map((ln,li) => (
+                  <text key={li} x={lp.x.toFixed(1)} y={(lp.y - th/2 + li*lh).toFixed(1)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    style={{fontSize:n>7?10:11.5, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+                    {ln}
+                  </text>
+                ))}
+              </g>;
+            })}
+          </svg>
+        </div>
+
+        {/* RIGHT — Scorecard */}
+        <div style={{ width:'50%', paddingLeft:24, display:'flex', flexDirection:'column' as const, justifyContent:'center', alignSelf:'stretch' }}>
+          {rows.map((row, i) => (
+            <div key={i}
+              onMouseEnter={()=>setHovRow(i)}
+              onMouseLeave={()=>setHovRow(null)}
+              style={{
+                display:'flex', alignItems:'center',
+                padding:`${rowH > 40 ? 9 : 5}px 0`,
+                borderBottom: i < rows.length-1 ? '1px solid #F3F4F6' : 'none',
+                background: hovRow===i ? '#FAFAFA' : 'transparent',
+              }}>
+              <div style={{ flex:1, fontSize: n>7 ? '0.82rem' : '0.9rem', fontWeight:400, color:'#111827', fontFamily:'Inter,sans-serif' }}>{row.label}</div>
+              <div style={{ fontSize: n>7 ? '1.15rem' : '1.3rem', fontWeight:800, color:tierColor(row.val), textAlign:'right' as const, marginRight:8, minWidth:32 }}>{row.val}</div>
+              <div style={{ fontSize:'0.7rem', color:'#9CA3AF', whiteSpace:'nowrap' as const, minWidth:86 }}>{row.diff >= 0 ? '+' : ''}{row.diff} vs. median</div>
+            </div>
+          ))}
+          <div style={{ marginTop:14, display:'flex', flexDirection:'column' as const, alignItems:'center' }}>
+            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px', marginBottom:4, justifyContent:'center' }}>
+              {LEGEND.slice(0,3).map((l,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:2, background:l.color, flexShrink:0 }}/>
+                  <span style={{ fontSize:'0.7rem', color:'#374151', fontWeight:600 }}>{l.label}</span>
+                  <span style={{ fontSize:'0.65rem', color:'#9CA3AF' }}>{l.range}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px', justifyContent:'center' }}>
+              {LEGEND.slice(3).map((l,i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                  <div style={{ width:10, height:10, borderRadius:2, background:l.color, flexShrink:0 }}/>
+                  <span style={{ fontSize:'0.7rem', color:'#374151', fontWeight:600 }}>{l.label}</span>
+                  <span style={{ fontSize:'0.65rem', color:'#9CA3AF' }}>{l.range}</span>
+                </div>
+              ))}
+              <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                <svg width="20" height="10" style={{flexShrink:0}}><line x1="0" y1="5" x2="20" y2="5" stroke="#6B7280" strokeWidth="1.4" strokeDasharray="4,3"/></svg>
+                <span style={{ fontSize:'0.7rem', color:'#374151' }}>Median of {Math.min(competitors.length,10)} competitors</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ fontSize:'0.7rem', color:'#9CA3AF', marginTop:12 }}>
+        Win rate per prompt category — how often your brand appeared when AI was asked about this topic.
+      </div>
+    </div>
+  );
+}
+
+
 function SentimentHeatmap({ result }: { result: any }) {
   const [hovCell,setHovCell]=useState<string|null>(null);
   const rd = result.responses_detail || [];
@@ -1485,6 +1675,8 @@ export default function GeoHub() {
                   </div>
                   {/* Radar full-width — self-contained with scorecard + legend */}
                   <RadarChart result={result}/>
+                  {/* Prompt category radar — same style, uses query_clusters */}
+                  <PromptRadarChart result={result}/>
                   {/* Heatmap below */}
                   <div style={{marginTop:14}}>
                     <SentimentHeatmap result={result}/>
