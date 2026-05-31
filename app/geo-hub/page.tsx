@@ -583,9 +583,9 @@ function RadarChart({ result }: { result: any }) {
         <div style={{ width:'50%', flexShrink:0 }}>
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block', overflow:'visible' }}>
             <defs>
-              {/* Warm glow: bright magenta core → hot pink → orange → yellow fade
-                  Matches both image 1 and image 2 gradient exactly */}
-              <radialGradient id={gId} cx="50%" cy="50%" r="50%">
+              {/* Warm glow gradient — applied to hex polygon directly via gradientUnits=userSpaceOnUse */}
+              <radialGradient id={gId} cx={CX+PAD} cy={CY+PAD} r={R}
+                gradientUnits="userSpaceOnUse">
                 <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.90"/>
                 <stop offset="15%"  stopColor="#E879F9" stopOpacity="0.82"/>
                 <stop offset="32%"  stopColor="#F472B6" stopOpacity="0.70"/>
@@ -594,15 +594,12 @@ function RadarChart({ result }: { result: any }) {
                 <stop offset="85%"  stopColor="#FEF9C3" stopOpacity="0.20"/>
                 <stop offset="100%" stopColor="#FFFFFF"  stopOpacity="0.00"/>
               </radialGradient>
-              {/* Clip gradient to hex so it doesn't bleed outside rings */}
-              <clipPath id={clipId}>
-                <polygon points={outerPts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}/>
-              </clipPath>
             </defs>
 
-            {/* Gradient — hex-clipped */}
-            <circle cx={CX+PAD} cy={CY+PAD} r={R}
-              fill={`url(#${gId})`} clipPath={`url(#${clipId})`}/>
+            {/* Gradient fill directly on outer hex polygon — no circle bleed */}
+            <polygon
+              points={outerPts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}
+              fill={`url(#${gId})`}/>
 
             {/* Grid rings */}
             {rings.map(rv => {
