@@ -739,7 +739,7 @@ function PromptRadarChart({ result }: { result: any }) {
   const rawDims = clusters.length >= 3
     ? [...clusters]
         .sort((a: any, b: any) => (b.winRate || 0) - (a.winRate || 0))
-        .slice(0, 10)
+        .slice(0, 6)
         .map((c: any) => ({ label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) }))
     : [];
 
