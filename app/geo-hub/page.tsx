@@ -524,14 +524,13 @@ function RadarChart({ result }: { result: any }) {
     .map((d, i) => ({ label: d.label, val: d.val, diff: d.val - compMedians[i] }))
     .sort((a, b) => b.val - a.val);
 
-  // Radar geometry — viewBox sized tightly to radar + labels only
+  // Radar geometry — VB tight, CX/CY exactly centered
   const R    = n > 7 ? 140 : 155;
-  const LR   = R + 44;       // label radius
-  const PAD  = LR + 18;      // padding = label radius + small buffer
-  const SIZE = R * 2;        // inner radar diameter
-  const CX   = PAD + R;      // center x in viewBox
-  const CY   = PAD + R;      // center y in viewBox
-  const VB   = SIZE + PAD * 2; // total viewBox = radar + labels both sides
+  const LR   = R + 46;            // label radius
+  const LPAD = 20;                // extra buffer beyond labels
+  const VB   = (LR + LPAD) * 2;  // viewBox = label reach * 2, perfectly centered
+  const CX   = VB / 2;
+  const CY   = VB / 2;
 
   const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
   const pt    = (i: number, r: number) => ({
