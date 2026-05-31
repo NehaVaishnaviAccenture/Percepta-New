@@ -494,22 +494,26 @@ function RadarChart({ result }: { result: any }) {
   const productDefs     = getProductDefs(result.ind_key || 'gen', result.lob || '');
   const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
 
-  const dims = productDefs.map(p => {
+  // Use top 6 by score — fixes tiny blob when most categories are 5
+  const allDims = productDefs.map(p => {
     const found = productMentions.find(m => m.label === p.label);
     return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
   });
+  const dims = [...allDims].sort((a,b) => b.val - a.val).slice(0, 6);
   const n = dims.length;
 
-  // Median = median GEO score of all competitors — same value on every axis
-  // This draws a regular polygon as the reference line, honest and clean
+  // Median competitor: take median GEO, scale each axis proportionally to brand
+  // This gives an irregular polygon that mirrors the brand shape at median level
   const medianGEO: number = (() => {
     if (!competitors.length) return Math.round((result.overall_geo_score || 50) * 0.70);
     const geos = competitors.slice(0, 10).map((c: any) => c.GEO || c.Vis || 30).sort((a: number, b: number) => a - b);
     const m = Math.floor(geos.length / 2);
     return geos.length % 2 === 0 ? Math.round((geos[m-1]+geos[m])/2) : geos[m];
   })();
-  // Every axis gets the same median value — draws a regular polygon
-  const compMedians: number[] = dims.map(() => medianGEO);
+  const brandGEO = result.overall_geo_score || result.visibility || 50;
+  const medianRatio = medianGEO / Math.max(brandGEO, 1);
+  // Each axis: brand_val × ratio, so median polygon mirrors brand shape but scaled down
+  const compMedians: number[] = dims.map(d => Math.max(5, Math.min(90, Math.round(d.val * medianRatio))));
 
   const tierColor = (v: number): string => {
     if (v >= 80) return '#10B981';
@@ -744,14 +748,16 @@ function PromptRadarChart({ result }: { result: any }) {
   const dims = rawDims;
   const n    = dims.length;
 
-  // Median GEO of competitors — flat regular polygon reference
+  // Median competitor scaled per axis
   const medianGEO: number = (() => {
     if (!competitors.length) return Math.round((result.overall_geo_score || 50) * 0.70);
     const geos = competitors.slice(0, 10).map((c: any) => c.GEO || c.Vis || 30).sort((a: number, b: number) => a - b);
     const m = Math.floor(geos.length / 2);
     return geos.length % 2 === 0 ? Math.round((geos[m-1]+geos[m])/2) : geos[m];
   })();
-  const compMedians: number[] = dims.map(() => medianGEO);
+  const brandGEO = result.overall_geo_score || result.visibility || 50;
+  const medianRatio = medianGEO / Math.max(brandGEO, 1);
+  const compMedians: number[] = dims.map(d => Math.max(5, Math.min(90, Math.round(d.val * medianRatio))));
 
   const tierColor = (v: number): string => {
     if (v >= 80) return '#10B981';
