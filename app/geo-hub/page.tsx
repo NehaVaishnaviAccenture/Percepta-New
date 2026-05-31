@@ -499,7 +499,7 @@ function RadarChart({ result }: { result: any }) {
     const found = productMentions.find(m => m.label === p.label);
     return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
   });
-  const dims = [...allDims].sort((a,b) => b.val - a.val).slice(0, 6);
+  const dims = [...allDims].sort((a,b) => b.val - a.val);
   const n = dims.length;
 
   // Median competitor: take median GEO, scale each axis proportionally to brand
@@ -594,9 +594,9 @@ function RadarChart({ result }: { result: any }) {
               </radialGradient>
             </defs>
 
-            {/* Radial gradient on outer hex */}
+            {/* Gradient ONLY inside brand polygon — no fill outside */}
             <polygon
-              points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill={`url(#${gId})`}/>
 
             {/* Grid rings */}
@@ -736,7 +736,6 @@ function PromptRadarChart({ result }: { result: any }) {
   const rawDims = clusters.length >= 3
     ? [...clusters]
         .sort((a: any, b: any) => (b.winRate || 0) - (a.winRate || 0))
-        .slice(0, 6)
         .map((c: any) => ({ label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) }))
     : [];
 
@@ -827,9 +826,9 @@ function PromptRadarChart({ result }: { result: any }) {
                 <stop offset="100%" stopColor="#FEF3C7" stopOpacity="0.10"/>
               </radialGradient>
             </defs>
-            {/* Radial gradient on outer hex */}
+            {/* Gradient ONLY inside brand polygon — no fill outside */}
             <polygon
-              points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill={`url(#${gId})`}/>
             {rings.map(rv => {
               const pts = dims.map((_,i) => pt(i,(rv/100)*R));
