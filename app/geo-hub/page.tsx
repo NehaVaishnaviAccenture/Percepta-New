@@ -587,13 +587,13 @@ function RadarChart({ result }: { result: any }) {
             <defs>
               <radialGradient id={gId} cx={CX} cy={CY} r={R}
                 gradientUnits="userSpaceOnUse">
-                <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.88"/>
-                <stop offset="18%"  stopColor="#E879F9" stopOpacity="0.78"/>
-                <stop offset="36%"  stopColor="#F472B6" stopOpacity="0.65"/>
-                <stop offset="54%"  stopColor="#FB923C" stopOpacity="0.50"/>
-                <stop offset="72%"  stopColor="#FDE68A" stopOpacity="0.38"/>
-                <stop offset="88%"  stopColor="#FEF3C7" stopOpacity="0.28"/>
-                <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0.18"/>
+                <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.75"/>
+                <stop offset="20%"  stopColor="#E879F9" stopOpacity="0.55"/>
+                <stop offset="38%"  stopColor="#F472B6" stopOpacity="0.35"/>
+                <stop offset="54%"  stopColor="#FB923C" stopOpacity="0.18"/>
+                <stop offset="68%"  stopColor="#FDE68A" stopOpacity="0.10"/>
+                <stop offset="82%"  stopColor="#FEF3C7" stopOpacity="0.05"/>
+                <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0.02"/>
               </radialGradient>
             </defs>
 
@@ -823,13 +823,13 @@ function PromptRadarChart({ result }: { result: any }) {
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
             <defs>
               <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
-                <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.88"/>
-                <stop offset="18%"  stopColor="#E879F9" stopOpacity="0.78"/>
-                <stop offset="36%"  stopColor="#F472B6" stopOpacity="0.65"/>
-                <stop offset="54%"  stopColor="#FB923C" stopOpacity="0.50"/>
-                <stop offset="72%"  stopColor="#FDE68A" stopOpacity="0.38"/>
-                <stop offset="88%"  stopColor="#FEF3C7" stopOpacity="0.28"/>
-                <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0.18"/>
+                <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.75"/>
+                <stop offset="20%"  stopColor="#E879F9" stopOpacity="0.55"/>
+                <stop offset="38%"  stopColor="#F472B6" stopOpacity="0.35"/>
+                <stop offset="54%"  stopColor="#FB923C" stopOpacity="0.18"/>
+                <stop offset="68%"  stopColor="#FDE68A" stopOpacity="0.10"/>
+                <stop offset="82%"  stopColor="#FEF3C7" stopOpacity="0.05"/>
+                <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0.02"/>
               </radialGradient>
             </defs>
             <polygon points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill={`url(#${gId})`}/>
