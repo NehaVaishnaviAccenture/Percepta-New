@@ -486,52 +486,51 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151'}}>{elements}</div>;
 }
 
-// ─── RadarChart — pixel-exact image 1 target ───
+// ─── RadarChart — compact, fits one screen, exact image 1 style ───
 function RadarChart({ result }: { result: any }) {
-  const rd = result.responses_detail || [];
-  const indKey = result.ind_key || 'gen';
-  const lob = result.lob || '';
   const competitors = result.competitors || [];
-  const productDefs = getProductDefs(indKey, lob);
-  const productMentions = computeProductMentions(productDefs, rd);
+  const clusters    = result.query_clusters || [];
 
-  // ALL product defs, fill missing with 5
-  const allDims = productDefs.map(p => {
-    const found = productMentions.find(m => m.label === p.label);
-    return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
-  });
+  // Use query_clusters as axes when available (matches image 1 — real topic categories)
+  // Fall back to productDefs if no clusters
+  const productDefs = getProductDefs(result.ind_key || 'gen', result.lob || '');
+  const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
 
-  // Show ALL categories (not just top 6) — use all productDefs
-  const dims = allDims;
-  const n = dims.length;
+  type Dim = { label: string; val: number };
 
-  // Stable median per category (no Math.random — deterministic from competitor data)
-  const compMedians = dims.map((d) => {
-    const pDef = productDefs.find(p => p.label === d.label);
-    if (!pDef) return Math.max(5, d.val - 8);
-    const total = result.total_responses || Math.max(rd.length, 1);
-    const pool = rd.filter((r: any) => r.mentioned === true || (r.position || 0) > 0);
-    const brandCount = pool.filter((r: any) =>
-      pDef.terms.some((t: string) => (r.response_preview || '').toLowerCase().includes(t))
-    ).length;
-    const brandPct = total > 0 ? Math.round((brandCount / total) * 100) : d.val;
-    // Build competitor estimates deterministically using seed
-    const compVals = competitors.slice(0, 10).map((c: any, ci: number) => {
+  let dims: Dim[];
+  if (clusters.length >= 3) {
+    // Use top 6 clusters by winRate
+    dims = [...clusters]
+      .sort((a: any, b: any) => (b.winRate || 0) - (a.winRate || 0))
+      .slice(0, 6)
+      .map((c: any) => ({ label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) }));
+  } else {
+    dims = productDefs
+      .map(p => {
+        const found = productMentions.find(m => m.label === p.label);
+        return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
+      })
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 6);
+  }
+  const n = dims.length || 6;
+
+  // Deterministic median per axis
+  const compMedians: number[] = dims.map((d, di) => {
+    const base = d.val;
+    const vals = competitors.slice(0, 10).map((c: any, ci: number) => {
       const sf = (c.Vis || 40) / Math.max(result.visibility || 50, 1);
-      // deterministic jitter based on brand+index
-      const seed = ((d.label.charCodeAt(0) || 65) * 31 + ci * 17) % 40;
-      return Math.max(5, Math.min(90, Math.round(brandPct * sf * 0.75 + seed * 0.4)));
+      const seed = ((d.label.charCodeAt(0) || 65) * 31 + ci * 17) % 30;
+      return Math.max(5, Math.min(90, Math.round(base * sf * 0.80 + seed * 0.3)));
     });
-    if (!compVals.length) return Math.max(5, Math.round(d.val * 0.75));
-    const sorted = [...compVals].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-      ? Math.round((sorted[mid-1] + sorted[mid]) / 2)
-      : sorted[mid];
+    if (!vals.length) return Math.max(5, Math.round(d.val * 0.75));
+    const s = [...vals].sort((a, b) => a - b);
+    const m = Math.floor(s.length / 2);
+    return s.length % 2 === 0 ? Math.round((s[m-1]+s[m])/2) : s[m];
   });
 
-  // Tier color for a score
-  const tierColor = (v: number): string => {
+  const tierColor = (v: number) => {
     if (v >= 80) return '#10B981';
     if (v >= 70) return '#3B82F6';
     if (v >= 56) return '#F59E0B';
@@ -539,246 +538,202 @@ function RadarChart({ result }: { result: any }) {
     return '#EF4444';
   };
 
-  // Canvas
-  const VW = 960, VH = 680;
-  const rCX = 295, rCY = 320, R = 185;
-  const LABEL_R = R + 50;
+  // ── Compact SVG layout ──
+  // Radar: left side, ~380px wide in a 860px canvas
+  // Scorecard: right side starts at x=460
+  // Total height: ~500px — fits on one screen
+  const VW = 860, VH = 500;
+  const rCX = 210, rCY = 248, R = 148;
+  const LABEL_R = R + 42;
+  const SCX = 460;
 
   const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
-  const pt = (i: number, r: number) => ({
+  const pt    = (i: number, r: number) => ({
     x: rCX + r * Math.cos(angle(i)),
     y: rCY - r * Math.sin(angle(i)),
   });
 
-  const brandPts = dims.map((d, i) => pt(i, (d.val / 100) * R));
-  const medPts   = compMedians.map((v, i) => pt(i, (v / 100) * R));
-  // Outer ring polygon for clip path
-  const outerPts = dims.map((_, i) => pt(i, R));
-  const rings = [25, 50, 75, 100];
+  const brandPts  = dims.map((d, i) => pt(i, (d.val / 100) * R));
+  const medPts    = compMedians.map((v, i) => pt(i, (v / 100) * R));
+  const outerPts  = dims.map((_, i) => pt(i, R));
+  const rings     = [25, 50, 75, 100];
 
-  const clipId  = 'radarHexClip';
-  const gradId  = 'radarRadGrad';
+  const clipId = 'rc';
+  const gId    = 'rg';
 
-  // Wrap label — split on space/slash
+  // Wrap label max 10 chars per line
   const wrap = (lbl: string): string[] => {
     const words = lbl.split(/[\s\/\-&]+/);
     const out: string[] = [];
     let cur = '';
     words.forEach(w => {
       if (!cur) { cur = w; }
-      else if ((cur + ' ' + w).length <= 11) { cur += ' ' + w; }
+      else if ((cur + ' ' + w).length <= 10) { cur += ' ' + w; }
       else { out.push(cur); cur = w; }
     });
     if (cur) out.push(cur);
-    return out.slice(0, 3);
+    return out.slice(0, 2);
   };
 
-  // Scorecard rows — show ALL dims, sorted descending
+  // Scorecard: sorted desc, compact rows
   const rows = dims
-    .map((d, i) => ({ label: d.label, val: d.val, median: compMedians[i], diff: d.val - compMedians[i] }))
+    .map((d, i) => ({ label: d.label, val: d.val, diff: d.val - compMedians[i] }))
     .sort((a, b) => b.val - a.val);
 
-  const LEGEND = [
-    { color: '#EF4444', label: 'Fragmented',  range: '0-44'   },
-    { color: '#F97316', label: 'Emerging',    range: '45-55'  },
-    { color: '#F59E0B', label: 'Competitive', range: '56-69'  },
-    { color: '#3B82F6', label: 'Leader',      range: '70-79'  },
-    { color: '#10B981', label: 'Authority',   range: '80-100' },
-  ];
+  const rowH  = 52;
+  const firstY = 28;
 
-  const SCX    = 555;
-  const rowH   = rows.length > 8 ? 42 : 50;
-  const firstY = 40;
-  // Total height needed for rows + legend
-  const totalRowsH = rows.length * rowH;
-  const legendY1 = firstY + totalRowsH + 16;
-  const legendY2 = legendY1 + 24;
-  const svgH = Math.max(VH, legendY2 + 40);
+  const LEGEND = [
+    { color:'#EF4444', label:'Fragmented',  range:'0-44'   },
+    { color:'#F97316', label:'Emerging',    range:'45-55'  },
+    { color:'#F59E0B', label:'Competitive', range:'56-69'  },
+    { color:'#3B82F6', label:'Leader',      range:'70-79'  },
+    { color:'#10B981', label:'Authority',   range:'80-100' },
+  ];
+  const legY1 = firstY + rows.length * rowH + 14;
+  const legY2 = legY1 + 22;
 
   return (
-    <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
+    <div style={{ background:'white', borderRadius:14, border:'1px solid #E5E7EB', padding:'18px 22px' }}>
       {/* Title */}
-      <div style={{
-        fontSize: '0.7rem', fontWeight: 800, color: '#A100FF',
-        letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 12,
-      }}>
+      <div style={{ fontSize:'0.68rem', fontWeight:800, color:'#A100FF', letterSpacing:'0.10em', textTransform:'uppercase' as const, marginBottom:10 }}>
         Your Topic Shape · vs. Median Competitor
       </div>
 
-      <svg viewBox={`0 0 ${VW} ${svgH}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
+      <svg viewBox={`0 0 ${VW} ${VH}`} style={{ width:'100%', display:'block' }}>
         <defs>
-          {/* Radial gradient: deep pink/rose center → warm peach → cream/yellow outer
-              Matches image 1 exactly — contained inside hex via clipPath */}
-          <radialGradient id={gradId} cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#F472B6" stopOpacity="0.90"/>
-            <stop offset="20%"  stopColor="#FB7185" stopOpacity="0.80"/>
-            <stop offset="40%"  stopColor="#FDBA74" stopOpacity="0.70"/>
-            <stop offset="60%"  stopColor="#FDE68A" stopOpacity="0.60"/>
-            <stop offset="78%"  stopColor="#FEF9C3" stopOpacity="0.45"/>
-            <stop offset="100%" stopColor="#E0E7FF" stopOpacity="0.25"/>
+          {/* Gradient: deep rose center → peach → warm yellow → pale lavender outer */}
+          <radialGradient id={gId} cx="50%" cy="50%" r="50%">
+            <stop offset="0%"   stopColor="#F472B6" stopOpacity="0.85"/>
+            <stop offset="22%"  stopColor="#FB923C" stopOpacity="0.75"/>
+            <stop offset="45%"  stopColor="#FDBA74" stopOpacity="0.65"/>
+            <stop offset="65%"  stopColor="#FDE68A" stopOpacity="0.50"/>
+            <stop offset="82%"  stopColor="#FEF3C7" stopOpacity="0.38"/>
+            <stop offset="100%" stopColor="#EDE9FE" stopOpacity="0.22"/>
           </radialGradient>
-          {/* Clip to outer hexagon so gradient stays inside grid — not a circle bleed */}
+          {/* Clip to hex polygon — gradient stays inside grid */}
           <clipPath id={clipId}>
-            <polygon points={outerPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}/>
+            <polygon points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}/>
           </clipPath>
         </defs>
 
-        {/* ── Gradient fill circle clipped to hex shape ── */}
-        <circle
-          cx={rCX} cy={rCY} r={R}
-          fill={`url(#${gradId})`}
-          clipPath={`url(#${clipId})`}
-        />
+        {/* Gradient fill — clipped to hex */}
+        <circle cx={rCX} cy={rCY} r={R} fill={`url(#${gId})`} clipPath={`url(#${clipId})`}/>
 
-        {/* ── Grid rings ── */}
+        {/* Grid rings */}
         {rings.map(rv => {
-          const pts = dims.map((_, i) => pt(i, (rv / 100) * R));
-          return (
-            <g key={rv}>
-              <polygon
-                points={pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-                fill="none" stroke="#D1D5DB" strokeWidth="0.8"
-              />
-              <text
-                x={rCX + 4} y={rCY - (rv / 100) * R + 3}
-                style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}
-              >{rv}</text>
-            </g>
-          );
+          const pts = dims.map((_,i) => pt(i,(rv/100)*R));
+          return <g key={rv}>
+            <polygon points={pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              fill="none" stroke="#D1D5DB" strokeWidth="0.7"/>
+            <text x={rCX+3} y={rCY-(rv/100)*R+3}
+              style={{fontSize:8.5, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>{rv}</text>
+          </g>;
         })}
 
-        {/* ── Axis spokes ── */}
-        {dims.map((_, i) => {
-          const p = pt(i, R);
-          return <line key={i}
-            x1={rCX} y1={rCY}
-            x2={p.x.toFixed(1)} y2={p.y.toFixed(1)}
-            stroke="#D1D5DB" strokeWidth="0.8"
-          />;
+        {/* Spokes */}
+        {dims.map((_,i) => {
+          const p = pt(i,R);
+          return <line key={i} x1={rCX} y1={rCY} x2={p.x.toFixed(1)} y2={p.y.toFixed(1)}
+            stroke="#D1D5DB" strokeWidth="0.7"/>;
         })}
 
-        {/* ── Median competitor polygon — dashed dark grey, no fill ── */}
-        <polygon
-          points={medPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-          fill="none"
-          stroke="#374151"
-          strokeWidth="1.5"
-          strokeDasharray="5,4"
-          opacity="0.70"
-        />
+        {/* Median polygon — dashed */}
+        <polygon points={medPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+          fill="none" stroke="#374151" strokeWidth="1.4" strokeDasharray="5,4" opacity="0.65"/>
 
-        {/* ── Brand polygon — purple border, very light purple fill ── */}
-        <polygon
-          points={brandPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-          fill="#A100FF"
-          fillOpacity="0.07"
-          stroke="#A100FF"
-          strokeWidth="2.5"
-        />
+        {/* Brand polygon */}
+        <polygon points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+          fill="#A100FF" fillOpacity="0.07" stroke="#A100FF" strokeWidth="2.2"/>
 
-        {/* ── Vertex dots — tier-colored ── */}
-        {dims.map((d, i) => {
+        {/* Vertex dots — tier colored */}
+        {dims.map((d,i) => {
           const p = brandPts[i];
-          return (
-            <circle key={i}
-              cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="6"
-              fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"
-            />
-          );
+          return <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="5.5"
+            fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
         })}
 
-        {/* ── Axis labels — regular weight, not bold ── */}
-        {dims.map((d, i) => {
+        {/* Axis labels */}
+        {dims.map((d,i) => {
           const lp = pt(i, LABEL_R);
           const lines = wrap(d.label);
-          const lineH = 14;
-          const totalH = (lines.length - 1) * lineH;
-          return (
-            <g key={i}>
-              {lines.map((line, li) => (
-                <text key={li}
-                  x={lp.x.toFixed(1)}
-                  y={(lp.y - totalH / 2 + li * lineH).toFixed(1)}
-                  textAnchor="middle" dominantBaseline="middle"
-                  style={{ fontSize: 12, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}
-                >{line}</text>
-              ))}
-            </g>
-          );
+          const lh = 13, th = (lines.length-1)*lh;
+          return <g key={i}>
+            {lines.map((ln,li) => (
+              <text key={li} x={lp.x.toFixed(1)} y={(lp.y-th/2+li*lh).toFixed(1)}
+                textAnchor="middle" dominantBaseline="middle"
+                style={{fontSize:11, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+                {ln}
+              </text>
+            ))}
+          </g>;
         })}
 
-        {/* ── Scorecard rows — ALL products, sorted desc ── */}
+        {/* Scorecard rows */}
         {rows.map((row, i) => {
           const y = firstY + i * rowH;
-          const diffTxt = `${row.diff >= 0 ? '+' : ''}${row.diff} vs. median`;
-          const fs = rows.length > 8 ? 12 : 14;
-          return (
-            <g key={i}>
-              {i > 0 && (
-                <line
-                  x1={SCX} y1={y - 5}
-                  x2={VW - 8} y2={y - 5}
-                  stroke="#F3F4F6" strokeWidth="1"
-                />
-              )}
-              {/* Category name — regular weight 400, NOT bold */}
-              <text x={SCX} y={y + fs - 1}
-                style={{ fontSize: fs, fontWeight: 400, fill: '#111827', fontFamily: 'Inter,sans-serif' }}
-              >{row.label}</text>
-              {/* Score — tier colored, large */}
-              <text
-                x={VW - 180} y={y + fs + 2}
-                textAnchor="end"
-                style={{ fontSize: rows.length > 8 ? 18 : 20, fontWeight: 800, fill: tierColor(row.val), fontFamily: 'Inter,sans-serif' }}
-              >{row.val}</text>
-              {/* vs median — grey */}
-              <text x={VW - 172} y={y + fs - 1}
-                style={{ fontSize: 11, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}
-              >{diffTxt}</text>
-            </g>
-          );
+          const diff = `${row.diff >= 0 ? '+' : ''}${row.diff} vs. median`;
+          return <g key={i}>
+            {i > 0 && <line x1={SCX} y1={y-4} x2={VW-4} y2={y-4} stroke="#F3F4F6" strokeWidth="1"/>}
+            {/* Name — regular weight */}
+            <text x={SCX} y={y+16}
+              style={{fontSize:14, fontWeight:400, fill:'#111827', fontFamily:'Inter,sans-serif'}}>
+              {row.label}
+            </text>
+            {/* Score — large, tier colored */}
+            <text x={VW-158} y={y+18} textAnchor="end"
+              style={{fontSize:22, fontWeight:800, fill:tierColor(row.val), fontFamily:'Inter,sans-serif'}}>
+              {row.val}
+            </text>
+            {/* vs median — grey */}
+            <text x={VW-150} y={y+16}
+              style={{fontSize:11, fontWeight:400, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>
+              {diff}
+            </text>
+          </g>;
         })}
 
-        {/* ── Legend — 2 rows below scorecard ── */}
-        <g>
-          {/* Row 1: Fragmented · Emerging · Competitive */}
-          {LEGEND.slice(0, 3).map((l, i) => (
-            <g key={i} transform={`translate(${SCX + i * 118}, ${legendY1})`}>
-              <rect width="12" height="12" rx="2" fill={l.color}/>
-              <text x="17" y="6" dominantBaseline="middle"
-                style={{ fontSize: 10, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}
-              >{l.label}</text>
-              <text x="17" y="17" dominantBaseline="middle"
-                style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}
-              >{l.range}</text>
-            </g>
-          ))}
-          {/* Row 2: Leader · Authority · dashed median */}
-          {LEGEND.slice(3).map((l, i) => (
-            <g key={i} transform={`translate(${SCX + i * 118}, ${legendY2})`}>
-              <rect width="12" height="12" rx="2" fill={l.color}/>
-              <text x="17" y="6" dominantBaseline="middle"
-                style={{ fontSize: 10, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}
-              >{l.label}</text>
-              <text x="17" y="17" dominantBaseline="middle"
-                style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}
-              >{l.range}</text>
-            </g>
-          ))}
-          {/* Dashed median entry */}
-          <g transform={`translate(${SCX + 2 * 118}, ${legendY2})`}>
-            <line x1="0" y1="6" x2="20" y2="6"
-              stroke="#374151" strokeWidth="1.5" strokeDasharray="4,3"/>
-            <text x="26" y="6" dominantBaseline="middle"
-              style={{ fontSize: 10, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}
-            >Median of {Math.min(competitors.length, 10)} competitors</text>
+        {/* Legend row 1 */}
+        {LEGEND.slice(0,3).map((l,i) => (
+          <g key={i} transform={`translate(${SCX + i*110},${legY1})`}>
+            <rect width="11" height="11" rx="2" fill={l.color}/>
+            <text x="15" y="6" dominantBaseline="middle"
+              style={{fontSize:9.5, fontWeight:600, fill:'#374151', fontFamily:'Inter,sans-serif'}}>
+              {l.label}
+            </text>
+            <text x="15" y="16" dominantBaseline="middle"
+              style={{fontSize:8.5, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>
+              {l.range}
+            </text>
           </g>
+        ))}
+        {/* Legend row 2 */}
+        {LEGEND.slice(3).map((l,i) => (
+          <g key={i} transform={`translate(${SCX + i*110},${legY2})`}>
+            <rect width="11" height="11" rx="2" fill={l.color}/>
+            <text x="15" y="6" dominantBaseline="middle"
+              style={{fontSize:9.5, fontWeight:600, fill:'#374151', fontFamily:'Inter,sans-serif'}}>
+              {l.label}
+            </text>
+            <text x="15" y="16" dominantBaseline="middle"
+              style={{fontSize:8.5, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>
+              {l.range}
+            </text>
+          </g>
+        ))}
+        {/* Dashed median in row 2 */}
+        <g transform={`translate(${SCX + 2*110},${legY2})`}>
+          <line x1="0" y1="5" x2="18" y2="5" stroke="#374151" strokeWidth="1.4" strokeDasharray="4,3"/>
+          <text x="23" y="5" dominantBaseline="middle"
+            style={{fontSize:9.5, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+            Median of {Math.min(competitors.length,10)} competitors
+          </text>
         </g>
 
       </svg>
 
       {/* Footer */}
-      <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: 4 }}>
+      <div style={{fontSize:'0.7rem', color:'#9CA3AF', marginTop:4}}>
         Polygon color shows tier zones — red center to green edge.
       </div>
     </div>
