@@ -486,31 +486,30 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151'}}>{elements}</div>;
 }
 
-// ─── RadarChart — ALWAYS products as axes, compact single-screen ───
+// ─── RadarChart — HTML scorecard right + SVG radar left, compact, exact image 1 ───
 function RadarChart({ result }: { result: any }) {
+  const [hovRow, setHovRow] = useState<number|null>(null);
   const competitors = result.competitors || [];
 
-  // ALWAYS use productDefs as axes — never query_clusters
-  const productDefs    = getProductDefs(result.ind_key || 'gen', result.lob || '');
+  // ALWAYS productDefs as axes
+  const productDefs     = getProductDefs(result.ind_key || 'gen', result.lob || '');
   const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
 
-  // All product defs, fill missing with 5, keep ALL (no slice)
   const allDims = productDefs.map(p => {
     const found = productMentions.find(m => m.label === p.label);
     return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
   });
-
   const dims = allDims;
   const n    = dims.length;
 
-  // Deterministic median competitor score per axis
-  const compMedians: number[] = dims.map((d, _di) => {
-    const vals = competitors.slice(0, 10).map((c: any, ci: number) => {
-      const sf   = (c.Vis || 40) / Math.max(result.visibility || 50, 1);
-      const seed = ((d.label.charCodeAt(0) || 65) * 31 + ci * 17) % 30;
-      return Math.max(5, Math.min(90, Math.round(d.val * sf * 0.80 + seed * 0.3)));
+  // Median: use each competitor's GEO score as a scale factor on each axis
+  // This gives a realistic, data-driven median that's lower than brand scores
+  const compMedians: number[] = dims.map((d) => {
+    if (!competitors.length) return Math.max(5, Math.round(d.val * 0.65));
+    const vals = competitors.slice(0, 10).map((c: any) => {
+      const sf = Math.min(1.5, (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1));
+      return Math.max(5, Math.min(85, Math.round(d.val * sf)));
     });
-    if (!vals.length) return Math.max(5, Math.round(d.val * 0.75));
     const s = [...vals].sort((a, b) => a - b);
     const m = Math.floor(s.length / 2);
     return s.length % 2 === 0 ? Math.round((s[m-1]+s[m])/2) : s[m];
@@ -524,21 +523,13 @@ function RadarChart({ result }: { result: any }) {
     return '#EF4444';
   };
 
-  // ── Layout: fixed viewBox that fits within ~420px rendered height ──
-  // Radar left (cx=220), scorecard right (x=480)
-  // Fewer products (≤6) → bigger R; more (7-10) → smaller R
-  const rowH    = n > 7 ? 38 : 44;
-  const scRows  = n;                            // all dims in scorecard
-  const scH     = scRows * rowH + 60;           // rows + legend
-  const radarH  = 400;
-  const VH      = Math.max(radarH, scH) + 20;
-  const VW      = 920;
-
-  const R       = n > 7 ? 130 : 148;
-  const rCX     = 220;
-  const rCY     = VH / 2;
-  const LABEL_R = R + (n > 7 ? 46 : 48);
-  const SCX     = 480;
+  // Radar SVG dimensions — small and compact
+  const SVG_W  = 320;
+  const SVG_H  = 320;
+  const rCX    = SVG_W / 2;
+  const rCY    = SVG_H / 2;
+  const R      = n > 7 ? 98 : 108;
+  const LABEL_R = R + (n > 7 ? 40 : 42);
 
   const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
   const pt    = (i: number, r: number) => ({
@@ -550,14 +541,12 @@ function RadarChart({ result }: { result: any }) {
   const medPts   = compMedians.map((v, i) => pt(i, (v / 100) * R));
   const outerPts = dims.map((_, i) => pt(i, R));
   const rings    = [25, 50, 75, 100];
-  const clipId   = 'rhc';
-  const gId      = 'rhg';
+  const clipId   = 'rhc2';
+  const gId      = 'rhg2';
 
-  // Label wrapping — max 10 chars per line, max 2 lines
   const wrap = (lbl: string): string[] => {
     const words = lbl.split(/[\s\/\-&]+/);
-    const out: string[] = [];
-    let cur = '';
+    const out: string[] = []; let cur = '';
     words.forEach(w => {
       if (!cur) { cur = w; }
       else if ((cur + ' ' + w).length <= 10) { cur += ' ' + w; }
@@ -567,171 +556,152 @@ function RadarChart({ result }: { result: any }) {
     return out.slice(0, 2);
   };
 
-  // Scorecard: all dims sorted desc
+  // Scorecard rows sorted desc
   const rows = dims
     .map((d, i) => ({ label: d.label, val: d.val, diff: d.val - compMedians[i] }))
     .sort((a, b) => b.val - a.val);
 
   const LEGEND = [
-    { color: '#EF4444', label: 'Fragmented',  range: '0-44'   },
-    { color: '#F97316', label: 'Emerging',    range: '45-55'  },
-    { color: '#F59E0B', label: 'Competitive', range: '56-69'  },
-    { color: '#3B82F6', label: 'Leader',      range: '70-79'  },
-    { color: '#10B981', label: 'Authority',   range: '80-100' },
+    { color:'#EF4444', label:'Fragmented',  range:'0-44'   },
+    { color:'#F97316', label:'Emerging',    range:'45-55'  },
+    { color:'#F59E0B', label:'Competitive', range:'56-69'  },
+    { color:'#3B82F6', label:'Leader',      range:'70-79'  },
+    { color:'#10B981', label:'Authority',   range:'80-100' },
   ];
 
-  const firstY = Math.round((VH - rows.length * rowH) / 2 - 10);
-  const legY1  = firstY + rows.length * rowH + 12;
-  const legY2  = legY1 + 20;
-
   return (
-    <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '16px 20px' }}>
-      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#A100FF', letterSpacing: '0.10em', textTransform: 'uppercase' as const, marginBottom: 8 }}>
+    <div style={{ background:'white', borderRadius:14, border:'1px solid #E5E7EB', padding:'18px 22px' }}>
+
+      {/* Title */}
+      <div style={{ fontSize:'0.68rem', fontWeight:800, color:'#A100FF', letterSpacing:'0.10em', textTransform:'uppercase' as const, marginBottom:14 }}>
         Your Topic Shape · vs. Median Competitor
       </div>
 
-      <svg viewBox={`0 0 ${VW} ${VH}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        <defs>
-          {/* Gradient: deep rose → warm peach → cream yellow → pale lavender. Hex-clipped. */}
-          <radialGradient id={gId} cx="50%" cy="50%" r="50%">
-            <stop offset="0%"   stopColor="#F472B6" stopOpacity="0.85"/>
-            <stop offset="22%"  stopColor="#FB923C" stopOpacity="0.75"/>
-            <stop offset="45%"  stopColor="#FDBA74" stopOpacity="0.65"/>
-            <stop offset="65%"  stopColor="#FDE68A" stopOpacity="0.50"/>
-            <stop offset="82%"  stopColor="#FEF3C7" stopOpacity="0.35"/>
-            <stop offset="100%" stopColor="#EDE9FE" stopOpacity="0.20"/>
-          </radialGradient>
-          <clipPath id={clipId}>
-            <polygon points={outerPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}/>
-          </clipPath>
-        </defs>
+      {/* Main layout: radar SVG left + scorecard HTML right */}
+      <div style={{ display:'flex', gap:32, alignItems:'flex-start' }}>
 
-        {/* Gradient fill — clipped to hex, NOT a circle blob */}
-        <circle cx={rCX} cy={rCY} r={R} fill={`url(#${gId})`} clipPath={`url(#${clipId})`}/>
+        {/* ── Radar SVG ── */}
+        <div style={{ flexShrink:0, width: SVG_W + 80 }}>
+          <svg width={SVG_W + 80} height={SVG_H + 80}
+            viewBox={`${-40} ${-40} ${SVG_W+80} ${SVG_H+80}`}
+            style={{ overflow:'visible', display:'block' }}>
+            <defs>
+              {/* Rose→peach→yellow — NO blue/lavender outer */}
+              <radialGradient id={gId} cx="50%" cy="50%" r="50%">
+                <stop offset="0%"   stopColor="#F472B6" stopOpacity="0.90"/>
+                <stop offset="25%"  stopColor="#FB923C" stopOpacity="0.78"/>
+                <stop offset="48%"  stopColor="#FDBA74" stopOpacity="0.65"/>
+                <stop offset="70%"  stopColor="#FDE68A" stopOpacity="0.50"/>
+                <stop offset="88%"  stopColor="#FEF3C7" stopOpacity="0.32"/>
+                <stop offset="100%" stopColor="#FEF9C3" stopOpacity="0.15"/>
+              </radialGradient>
+              <clipPath id={clipId}>
+                <polygon points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}/>
+              </clipPath>
+            </defs>
 
-        {/* Grid rings */}
-        {rings.map(rv => {
-          const pts = dims.map((_, i) => pt(i, (rv / 100) * R));
-          return (
-            <g key={rv}>
-              <polygon points={pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-                fill="none" stroke="#D1D5DB" strokeWidth="0.7"/>
-              <text x={rCX + 3} y={rCY - (rv / 100) * R + 3}
-                style={{ fontSize: 8.5, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>
-                {rv}
-              </text>
-            </g>
-          );
-        })}
+            {/* Gradient — clipped to hex */}
+            <circle cx={rCX} cy={rCY} r={R} fill={`url(#${gId})`} clipPath={`url(#${clipId})`}/>
 
-        {/* Spokes */}
-        {dims.map((_, i) => {
-          const p = pt(i, R);
-          return <line key={i} x1={rCX} y1={rCY} x2={p.x.toFixed(1)} y2={p.y.toFixed(1)}
-            stroke="#D1D5DB" strokeWidth="0.7"/>;
-        })}
+            {/* Grid rings */}
+            {rings.map(rv => {
+              const pts = dims.map((_,i) => pt(i,(rv/100)*R));
+              return <g key={rv}>
+                <polygon points={pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+                  fill="none" stroke="#D1D5DB" strokeWidth="0.7"/>
+                <text x={rCX+3} y={rCY-(rv/100)*R+3}
+                  style={{fontSize:8, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>{rv}</text>
+              </g>;
+            })}
 
-        {/* Median polygon — dashed */}
-        <polygon points={medPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-          fill="none" stroke="#374151" strokeWidth="1.4" strokeDasharray="5,4" opacity="0.65"/>
+            {/* Spokes */}
+            {dims.map((_,i) => {
+              const p = pt(i,R);
+              return <line key={i} x1={rCX} y1={rCY} x2={p.x.toFixed(1)} y2={p.y.toFixed(1)}
+                stroke="#D1D5DB" strokeWidth="0.7"/>;
+            })}
 
-        {/* Brand polygon */}
-        <polygon points={brandPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-          fill="#A100FF" fillOpacity="0.07" stroke="#A100FF" strokeWidth="2.2"/>
+            {/* Median polygon — dashed */}
+            <polygon points={medPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              fill="none" stroke="#374151" strokeWidth="1.4" strokeDasharray="5,4" opacity="0.65"/>
 
-        {/* Vertex dots */}
-        {dims.map((d, i) => {
-          const p = brandPts[i];
-          return <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="5"
-            fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
-        })}
+            {/* Brand polygon */}
+            <polygon points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              fill="#A100FF" fillOpacity="0.07" stroke="#A100FF" strokeWidth="2.2"/>
 
-        {/* Axis labels */}
-        {dims.map((d, i) => {
-          const lp    = pt(i, LABEL_R);
-          const lines = wrap(d.label);
-          const lh    = 13;
-          const th    = (lines.length - 1) * lh;
-          return (
-            <g key={i}>
-              {lines.map((ln, li) => (
-                <text key={li}
-                  x={lp.x.toFixed(1)}
-                  y={(lp.y - th / 2 + li * lh).toFixed(1)}
-                  textAnchor="middle" dominantBaseline="middle"
-                  style={{ fontSize: n > 7 ? 10 : 11, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}>
-                  {ln}
-                </text>
-              ))}
-            </g>
-          );
-        })}
+            {/* Vertex dots */}
+            {dims.map((d,i) => {
+              const p = brandPts[i];
+              return <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="5"
+                fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
+            })}
 
-        {/* Scorecard rows */}
-        {rows.map((row, i) => {
-          const y   = firstY + i * rowH;
-          const diff = `${row.diff >= 0 ? '+' : ''}${row.diff} vs. median`;
-          return (
-            <g key={i}>
-              {i > 0 && <line x1={SCX} y1={y - 4} x2={VW - 6} y2={y - 4} stroke="#F3F4F6" strokeWidth="1"/>}
-              <text x={SCX} y={y + rowH * 0.42}
-                style={{ fontSize: n > 7 ? 12 : 13, fontWeight: 400, fill: '#111827', fontFamily: 'Inter,sans-serif' }}>
+            {/* Axis labels */}
+            {dims.map((d,i) => {
+              const lp    = pt(i, LABEL_R);
+              const lines = wrap(d.label);
+              const lh    = 13; const th = (lines.length-1)*lh;
+              return <g key={i}>
+                {lines.map((ln,li) => (
+                  <text key={li}
+                    x={lp.x.toFixed(1)} y={(lp.y - th/2 + li*lh).toFixed(1)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    style={{fontSize: n>7?9.5:11, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+                    {ln}
+                  </text>
+                ))}
+              </g>;
+            })}
+          </svg>
+        </div>
+
+        {/* ── Scorecard HTML (right side) ── */}
+        <div style={{ flex:1, minWidth:0, paddingTop:20 }}>
+          {rows.map((row, i) => (
+            <div key={i}
+              onMouseEnter={()=>setHovRow(i)}
+              onMouseLeave={()=>setHovRow(null)}
+              style={{
+                display:'flex', alignItems:'center',
+                padding:'10px 0',
+                borderBottom: i < rows.length-1 ? '1px solid #F3F4F6' : 'none',
+                background: hovRow===i ? '#FAFAFA' : 'transparent',
+                borderRadius: 4,
+              }}>
+              {/* Category name */}
+              <div style={{ flex:1, fontSize:'0.88rem', fontWeight:400, color:'#111827', fontFamily:'Inter,sans-serif' }}>
                 {row.label}
-              </text>
-              <text x={VW - 158} y={y + rowH * 0.48} textAnchor="end"
-                style={{ fontSize: n > 7 ? 18 : 20, fontWeight: 800, fill: tierColor(row.val), fontFamily: 'Inter,sans-serif' }}>
+              </div>
+              {/* Score */}
+              <div style={{ fontSize:'1.35rem', fontWeight:800, color:tierColor(row.val), marginRight:10, minWidth:36, textAlign:'right' as const }}>
                 {row.val}
-              </text>
-              <text x={VW - 150} y={y + rowH * 0.42}
-                style={{ fontSize: 10.5, fontWeight: 400, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>
-                {diff}
-              </text>
-            </g>
-          );
-        })}
+              </div>
+              {/* vs median */}
+              <div style={{ fontSize:'0.72rem', color:'#9CA3AF', minWidth:90 }}>
+                {row.diff >= 0 ? '+' : ''}{row.diff} vs. median
+              </div>
+            </div>
+          ))}
 
-        {/* Legend row 1 */}
-        {LEGEND.slice(0, 3).map((l, i) => (
-          <g key={i} transform={`translate(${SCX + i * 112}, ${legY1})`}>
-            <rect width="11" height="11" rx="2" fill={l.color}/>
-            <text x="15" y="6" dominantBaseline="middle"
-              style={{ fontSize: 9.5, fontWeight: 600, fill: '#374151', fontFamily: 'Inter,sans-serif' }}>
-              {l.label}
-            </text>
-            <text x="15" y="16" dominantBaseline="middle"
-              style={{ fontSize: 8.5, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>
-              {l.range}
-            </text>
-          </g>
-        ))}
+          {/* Legend */}
+          <div style={{ marginTop:14, display:'flex', flexWrap:'wrap' as const, gap:'6px 16px' }}>
+            {LEGEND.map((l,i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                <div style={{ width:11, height:11, borderRadius:2, background:l.color, flexShrink:0 }}/>
+                <span style={{ fontSize:'0.72rem', color:'#374151', fontWeight:600 }}>{l.label}</span>
+                <span style={{ fontSize:'0.68rem', color:'#9CA3AF' }}>{l.range}</span>
+              </div>
+            ))}
+            <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+              <svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="#374151" strokeWidth="1.5" strokeDasharray="4,3"/></svg>
+              <span style={{ fontSize:'0.72rem', color:'#374151' }}>Median of {Math.min(competitors.length,10)} competitors</span>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        {/* Legend row 2 */}
-        {LEGEND.slice(3).map((l, i) => (
-          <g key={i} transform={`translate(${SCX + i * 112}, ${legY2})`}>
-            <rect width="11" height="11" rx="2" fill={l.color}/>
-            <text x="15" y="6" dominantBaseline="middle"
-              style={{ fontSize: 9.5, fontWeight: 600, fill: '#374151', fontFamily: 'Inter,sans-serif' }}>
-              {l.label}
-            </text>
-            <text x="15" y="16" dominantBaseline="middle"
-              style={{ fontSize: 8.5, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>
-              {l.range}
-            </text>
-          </g>
-        ))}
-
-        {/* Dashed median legend */}
-        <g transform={`translate(${SCX + 2 * 112}, ${legY2})`}>
-          <line x1="0" y1="5" x2="18" y2="5" stroke="#374151" strokeWidth="1.4" strokeDasharray="4,3"/>
-          <text x="23" y="5" dominantBaseline="middle"
-            style={{ fontSize: 9.5, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 400 }}>
-            Median of {Math.min(competitors.length, 10)} competitors
-          </text>
-        </g>
-
-      </svg>
-
-      <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginTop: 4 }}>
+      {/* Footer */}
+      <div style={{ fontSize:'0.7rem', color:'#9CA3AF', marginTop:10 }}>
         Polygon color shows tier zones — red center to green edge.
       </div>
     </div>
