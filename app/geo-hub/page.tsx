@@ -575,8 +575,8 @@ function RadarChart({ result }: { result: any }) {
         Your Topic Shape · vs. Median Competitor
       </div>
 
-      {/* 50/50 flex */}
-      <div style={{ display:'flex', alignItems:'flex-start' }}>
+      {/* 50/50 flex — stretch so both sides same height */}
+      <div style={{ display:'flex', alignItems:'stretch' }}>
 
         {/* LEFT — Radar 50% */}
         <div style={{ width:'50%', flexShrink:0 }}>
@@ -661,8 +661,8 @@ function RadarChart({ result }: { result: any }) {
           </svg>
         </div>
 
-        {/* RIGHT — Scorecard 50% */}
-        <div style={{ width:'50%', paddingLeft:24, paddingTop:4 }}>
+        {/* RIGHT — Scorecard 50% — vertically centered */}
+        <div style={{ width:'50%', paddingLeft:24, display:'flex', flexDirection:'column' as const, justifyContent:'center', alignSelf:'stretch' }}>
           {rows.map((row, i) => (
             <div key={i}
               onMouseEnter={()=>setHovRow(i)}
