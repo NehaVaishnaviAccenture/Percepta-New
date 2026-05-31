@@ -500,17 +500,16 @@ function RadarChart({ result }: { result: any }) {
   });
   const n = dims.length;
 
-  // Deterministic median using competitor GEO as scale factor
-  const compMedians: number[] = dims.map((d) => {
-    if (!competitors.length) return Math.max(5, Math.round(d.val * 0.65));
-    const vals = competitors.slice(0, 10).map((c: any) => {
-      const sf = Math.min(1.4, (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1));
-      return Math.max(5, Math.min(85, Math.round(d.val * sf)));
-    });
-    const s = [...vals].sort((a, b) => a - b);
-    const m = Math.floor(s.length / 2);
-    return s.length % 2 === 0 ? Math.round((s[m-1]+s[m])/2) : s[m];
-  });
+  // Median = median GEO score of all competitors — same value on every axis
+  // This draws a regular polygon as the reference line, honest and clean
+  const medianGEO: number = (() => {
+    if (!competitors.length) return Math.round((result.overall_geo_score || 50) * 0.70);
+    const geos = competitors.slice(0, 10).map((c: any) => c.GEO || c.Vis || 30).sort((a: number, b: number) => a - b);
+    const m = Math.floor(geos.length / 2);
+    return geos.length % 2 === 0 ? Math.round((geos[m-1]+geos[m])/2) : geos[m];
+  })();
+  // Every axis gets the same median value — draws a regular polygon
+  const compMedians: number[] = dims.map(() => medianGEO);
 
   const tierColor = (v: number): string => {
     if (v >= 80) return '#10B981';
@@ -745,17 +744,14 @@ function PromptRadarChart({ result }: { result: any }) {
   const dims = rawDims;
   const n    = dims.length;
 
-  // Deterministic median using competitor GEO as scale factor
-  const compMedians: number[] = dims.map((d) => {
-    if (!competitors.length) return Math.max(5, Math.round(d.val * 0.65));
-    const vals = competitors.slice(0, 10).map((c: any) => {
-      const sf = Math.min(1.4, (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1));
-      return Math.max(5, Math.min(85, Math.round(d.val * sf)));
-    });
-    const s = [...vals].sort((a, b) => a - b);
-    const m = Math.floor(s.length / 2);
-    return s.length % 2 === 0 ? Math.round((s[m-1]+s[m])/2) : s[m];
-  });
+  // Median GEO of competitors — flat regular polygon reference
+  const medianGEO: number = (() => {
+    if (!competitors.length) return Math.round((result.overall_geo_score || 50) * 0.70);
+    const geos = competitors.slice(0, 10).map((c: any) => c.GEO || c.Vis || 30).sort((a: number, b: number) => a - b);
+    const m = Math.floor(geos.length / 2);
+    return geos.length % 2 === 0 ? Math.round((geos[m-1]+geos[m])/2) : geos[m];
+  })();
+  const compMedians: number[] = dims.map(() => medianGEO);
 
   const tierColor = (v: number): string => {
     if (v >= 80) return '#10B981';
