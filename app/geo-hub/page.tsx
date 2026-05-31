@@ -584,16 +584,20 @@ function RadarChart({ result }: { result: any }) {
         {/* LEFT — Radar 50% */}
         <div style={{ width:'50%', flexShrink:0 }}>
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
-            {/* no defs needed */}
+            <defs>
+              <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#E879F9" stopOpacity="0.65"/>
+                <stop offset="30%"  stopColor="#F472B6" stopOpacity="0.50"/>
+                <stop offset="55%"  stopColor="#FB923C" stopOpacity="0.35"/>
+                <stop offset="75%"  stopColor="#FDE68A" stopOpacity="0.22"/>
+                <stop offset="100%" stopColor="#FEF3C7" stopOpacity="0.10"/>
+              </radialGradient>
+            </defs>
 
-            {/* Outer hex: very light warm cream */}
+            {/* Radial gradient on outer hex */}
             <polygon
               points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#FBBF24" fillOpacity="0.12"/>
-            {/* Brand polygon: soft pink fill */}
-            <polygon
-              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#F9A8D4" fillOpacity="0.45"/>
+              fill={`url(#${gId})`}/>
 
             {/* Grid rings */}
             {rings.map(rv => {
@@ -627,7 +631,7 @@ function RadarChart({ result }: { result: any }) {
             {/* Brand polygon */}
             <polygon
               points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="none" stroke="#A100FF" strokeWidth="2.5"/>
+              fill="#A100FF" fillOpacity="0.06" stroke="#A100FF" strokeWidth="2.5"/>
 
             {/* Vertex dots */}
             {dims.map((d,i) => {
@@ -814,15 +818,19 @@ function PromptRadarChart({ result }: { result: any }) {
         {/* LEFT — Radar */}
         <div style={{ width:'50%', flexShrink:0 }}>
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
-            {/* no defs needed */}
-            {/* Outer hex: very light warm cream */}
+            <defs>
+              <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#E879F9" stopOpacity="0.65"/>
+                <stop offset="30%"  stopColor="#F472B6" stopOpacity="0.50"/>
+                <stop offset="55%"  stopColor="#FB923C" stopOpacity="0.35"/>
+                <stop offset="75%"  stopColor="#FDE68A" stopOpacity="0.22"/>
+                <stop offset="100%" stopColor="#FEF3C7" stopOpacity="0.10"/>
+              </radialGradient>
+            </defs>
+            {/* Radial gradient on outer hex */}
             <polygon
               points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#FBBF24" fillOpacity="0.12"/>
-            {/* Brand polygon: soft pink fill */}
-            <polygon
-              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#F9A8D4" fillOpacity="0.45"/>
+              fill={`url(#${gId})`}/>
             {rings.map(rv => {
               const pts = dims.map((_,i) => pt(i,(rv/100)*R));
               return <g key={rv}>
@@ -835,7 +843,7 @@ function PromptRadarChart({ result }: { result: any }) {
               return <line key={i} x1={CX} y1={CY} x2={p.x.toFixed(1)} y2={p.y.toFixed(1)} stroke="#EFEFEF" strokeWidth="0.8"/>;
             })}
             <polygon points={medPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke="#9CA3AF" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.70"/>
-            <polygon points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="none" stroke="#A100FF" strokeWidth="2.5"/>
+            <polygon points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} fill="#A100FF" fillOpacity="0.06" stroke="#A100FF" strokeWidth="2.5"/>
             {dims.map((d,i) => {
               const p = brandPts[i];
               return <circle key={i} cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="6" fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
