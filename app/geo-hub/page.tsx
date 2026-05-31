@@ -585,18 +585,20 @@ function RadarChart({ result }: { result: any }) {
         <div style={{ width:'50%', flexShrink:0 }}>
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
             <defs>
-              <filter id={`${gId}blur`} x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="18" result="blur"/>
-                <feColorMatrix type="saturate" values="1.4"/>
-              </filter>
+              <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#E879F9" stopOpacity="0.70"/>
+                <stop offset="25%"  stopColor="#F472B6" stopOpacity="0.55"/>
+                <stop offset="45%"  stopColor="#FB923C" stopOpacity="0.40"/>
+                <stop offset="62%"  stopColor="#FDE68A" stopOpacity="0.28"/>
+                <stop offset="78%"  stopColor="#FEF3C7" stopOpacity="0.15"/>
+                <stop offset="100%" stopColor="#FFFFFF"  stopOpacity="0.00"/>
+              </radialGradient>
             </defs>
 
-            {/* Soft glow on brand polygon using blur filter — no outer hex fill */}
+            {/* Warm gradient on outer hex */}
             <polygon
-              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#C026D3"
-              fillOpacity="0.18"
-              filter={`url(#${gId}blur)`}/>
+              points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              fill={`url(#${gId})`}/>
 
             {/* Grid rings */}
             {rings.map(rv => {
@@ -818,16 +820,19 @@ function PromptRadarChart({ result }: { result: any }) {
         <div style={{ width:'50%', flexShrink:0 }}>
           <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
             <defs>
-              <filter id={`${gId}blur`} x="-60%" y="-60%" width="220%" height="220%">
-                <feGaussianBlur stdDeviation="18" result="blur"/>
-                <feColorMatrix type="saturate" values="1.4"/>
-              </filter>
+              <radialGradient id={gId} cx={CX} cy={CY} r={R} gradientUnits="userSpaceOnUse">
+                <stop offset="0%"   stopColor="#E879F9" stopOpacity="0.70"/>
+                <stop offset="25%"  stopColor="#F472B6" stopOpacity="0.55"/>
+                <stop offset="45%"  stopColor="#FB923C" stopOpacity="0.40"/>
+                <stop offset="62%"  stopColor="#FDE68A" stopOpacity="0.28"/>
+                <stop offset="78%"  stopColor="#FEF3C7" stopOpacity="0.15"/>
+                <stop offset="100%" stopColor="#FFFFFF"  stopOpacity="0.00"/>
+              </radialGradient>
             </defs>
-            {/* Glow on brand polygon only */}
+            {/* Warm gradient on outer hex */}
             <polygon
-              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
-              fill="#C026D3" fillOpacity="0.18"
-              filter={`url(#${gId}blur)`}/>
+              points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
+              fill={`url(#${gId})`}/>
             {rings.map(rv => {
               const pts = dims.map((_,i) => pt(i,(rv/100)*R));
               return <g key={rv}>
