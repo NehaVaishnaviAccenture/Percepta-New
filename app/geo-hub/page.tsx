@@ -524,12 +524,14 @@ function RadarChart({ result }: { result: any }) {
     .map((d, i) => ({ label: d.label, val: d.val, diff: d.val - compMedians[i] }))
     .sort((a, b) => b.val - a.val);
 
-  // Radar geometry — compact square viewBox, labels outside
-  const PAD = 70;            // padding for labels on each side
-  const SVG  = 500;          // inner radar area
-  const CX   = SVG / 2, CY = SVG / 2;
-  const R    = n > 7 ? 148 : 168;
-  const LR   = R + 46;       // label radius
+  // Radar geometry — viewBox sized tightly to radar + labels only
+  const R    = n > 7 ? 140 : 155;
+  const LR   = R + 44;       // label radius
+  const PAD  = LR + 18;      // padding = label radius + small buffer
+  const SIZE = R * 2;        // inner radar diameter
+  const CX   = PAD + R;      // center x in viewBox
+  const CY   = PAD + R;      // center y in viewBox
+  const VB   = SIZE + PAD * 2; // total viewBox = radar + labels both sides
 
   const angle = (i: number) => (Math.PI / 2) - (2 * Math.PI * i) / n;
   const pt    = (i: number, r: number) => ({
@@ -541,8 +543,6 @@ function RadarChart({ result }: { result: any }) {
   const medPts   = compMedians.map((v, i) => pt(i, (v  / 100) * R));
   const outerPts = dims.map((_, i) => pt(i, R));
   const rings    = [25, 50, 75, 100];
-  const VB       = SVG + PAD * 2;   // total viewBox size incl. label padding
-  const clipId   = 'rc4';
   const gId      = 'rg4';
 
   const wrap = (lbl: string): string[] => {
@@ -581,10 +581,9 @@ function RadarChart({ result }: { result: any }) {
 
         {/* LEFT — Radar 50% */}
         <div style={{ width:'50%', flexShrink:0 }}>
-          <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block', overflow:'visible' }}>
+          <svg viewBox={`0 0 ${VB} ${VB}`} style={{ width:'100%', display:'block' }}>
             <defs>
-              {/* Warm glow gradient — applied to hex polygon directly via gradientUnits=userSpaceOnUse */}
-              <radialGradient id={gId} cx={CX+PAD} cy={CY+PAD} r={R}
+              <radialGradient id={gId} cx={CX} cy={CY} r={R}
                 gradientUnits="userSpaceOnUse">
                 <stop offset="0%"   stopColor="#C026D3" stopOpacity="0.90"/>
                 <stop offset="15%"  stopColor="#E879F9" stopOpacity="0.82"/>
@@ -596,9 +595,9 @@ function RadarChart({ result }: { result: any }) {
               </radialGradient>
             </defs>
 
-            {/* Gradient fill directly on outer hex polygon — no circle bleed */}
+            {/* Gradient on outer hex polygon */}
             <polygon
-              points={outerPts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}
+              points={outerPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill={`url(#${gId})`}/>
 
             {/* Grid rings */}
@@ -606,9 +605,9 @@ function RadarChart({ result }: { result: any }) {
               const pts = dims.map((_,i) => pt(i,(rv/100)*R));
               return <g key={rv}>
                 <polygon
-                  points={pts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}
+                  points={pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
                   fill="none" stroke="#E5E7EB" strokeWidth="0.9"/>
-                <text x={CX+PAD+4} y={CY+PAD-(rv/100)*R+3}
+                <text x={CX+4} y={CY-(rv/100)*R+3}
                   style={{fontSize:9, fill:'#9CA3AF', fontFamily:'Inter,sans-serif'}}>
                   {rv}
                 </text>
@@ -619,27 +618,27 @@ function RadarChart({ result }: { result: any }) {
             {dims.map((_,i) => {
               const p = pt(i,R);
               return <line key={i}
-                x1={CX+PAD} y1={CY+PAD}
-                x2={(p.x+PAD).toFixed(1)} y2={(p.y+PAD).toFixed(1)}
+                x1={CX} y1={CY}
+                x2={p.x.toFixed(1)} y2={p.y.toFixed(1)}
                 stroke="#E5E7EB" strokeWidth="0.9"/>;
             })}
 
             {/* Median dashed polygon */}
             <polygon
-              points={medPts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}
+              points={medPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill="none" stroke="#6B7280" strokeWidth="1.4"
               strokeDasharray="5,4" opacity="0.70"/>
 
             {/* Brand polygon */}
             <polygon
-              points={brandPts.map(p=>`${(p.x+PAD).toFixed(1)},${(p.y+PAD).toFixed(1)}`).join(' ')}
+              points={brandPts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}
               fill="#A100FF" fillOpacity="0.06" stroke="#A100FF" strokeWidth="2.5"/>
 
             {/* Vertex dots */}
             {dims.map((d,i) => {
               const p = brandPts[i];
               return <circle key={i}
-                cx={(p.x+PAD).toFixed(1)} cy={(p.y+PAD).toFixed(1)} r="6"
+                cx={p.x.toFixed(1)} cy={p.y.toFixed(1)} r="6"
                 fill={tierColor(d.val)} stroke="white" strokeWidth="1.5"/>;
             })}
 
@@ -651,8 +650,8 @@ function RadarChart({ result }: { result: any }) {
               return <g key={i}>
                 {lines.map((ln,li) => (
                   <text key={li}
-                    x={(lp.x+PAD).toFixed(1)}
-                    y={(lp.y+PAD - th/2 + li*lh).toFixed(1)}
+                    x={lp.x.toFixed(1)}
+                    y={(lp.y - th/2 + li*lh).toFixed(1)}
                     textAnchor="middle" dominantBaseline="middle"
                     style={{fontSize:n>7?10:11.5, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
                     {ln}
@@ -690,9 +689,9 @@ function RadarChart({ result }: { result: any }) {
             </div>
           ))}
 
-          {/* Legend — 2 rows */}
-          <div style={{ marginTop:12 }}>
-            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px', marginBottom:4 }}>
+          {/* Legend — centered in column, 2 rows */}
+          <div style={{ marginTop:14, display:'flex', flexDirection:'column' as const, alignItems:'center' }}>
+            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px', marginBottom:4, justifyContent:'center' }}>
               {LEGEND.slice(0,3).map((l,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
                   <div style={{ width:10, height:10, borderRadius:2, background:l.color, flexShrink:0 }}/>
@@ -701,7 +700,7 @@ function RadarChart({ result }: { result: any }) {
                 </div>
               ))}
             </div>
-            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px' }}>
+            <div style={{ display:'flex', flexWrap:'wrap' as const, gap:'3px 12px', justifyContent:'center' }}>
               {LEGEND.slice(3).map((l,i) => (
                 <div key={i} style={{ display:'flex', alignItems:'center', gap:5 }}>
                   <div style={{ width:10, height:10, borderRadius:2, background:l.color, flexShrink:0 }}/>
