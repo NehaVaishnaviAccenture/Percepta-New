@@ -2492,8 +2492,8 @@ Return exactly this JSON:
                               // Specific fix based on actual clusters
                               const topMissingCluster = g.relatedClusters.filter((c:any)=>(c.winRate||0)<50)[0];
                               const specificFix = topMissingCluster
-                                ? `Create AI-optimized content targeting "${topMissingCluster.category}" queries — specifically ${g.terms.slice(0,2).join(', ')} content that answers what consumers ask`
-                                : `Publish structured content about ${g.label} that AI can cite — focus on ${g.terms.slice(0,2).join(' and ')}`;
+                                ? `Create AI-optimized content targeting "${topMissingCluster.category}" queries — specifically ${g.label.toLowerCase()} content that directly answers what consumers ask`
+                                : `Publish structured content about ${g.label} that AI can cite — focus on ${g.label.toLowerCase()} product pages and comparison guides`;
                               return (
                                 <div key={i} style={{background:'white',border:`1px solid ${borderColor}40`,borderLeft:`4px solid ${borderColor}`,borderRadius:12,padding:'18px 20px',boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
                                   {/* Topic */}
