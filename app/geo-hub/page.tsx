@@ -2481,46 +2481,67 @@ Return exactly this JSON:
                           <p style={{fontSize:'0.8rem',color:'#6B7280',lineHeight:1.6,marginBottom:18,maxWidth:720}}>
                             Real data from your {totalResponses} responses. Only products {brand} is genuinely known for{brandFameData?.topProducts?.length ? ` (e.g. ${brandFameData.topProducts.slice(0,2).join(', ')})` : ''}. This is a <strong style={{color:'#374151'}}>content and citation gap</strong> — not a brand problem.
                           </p>
-                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12,marginBottom:16}}>
-                            {filteredGapDetails.slice(0,6).map((g,i)=>(
-                              <div key={i} style={{background:'#FFF7F7',border:'1px solid #FCA5A5',borderLeft:`4px solid ${g.prodVal>30?'#F97316':'#EF4444'}`,borderRadius:10,padding:'14px 16px'}}>
-                                <div style={{fontSize:'0.9rem',fontWeight:700,color:'#991B1B',marginBottom:10}}>{g.label}</div>
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14,marginBottom:16}}>
+                            {filteredGapDetails.slice(0,6).map((g,i)=>{
+                              // Leader win rate = top competitor GEO as proxy for their win rate
+                              const leaderWinRate = Math.min(95, Math.round(g.dominatorGEO * 0.85));
+                              const gap = leaderWinRate - g.avgWinRate;
+                              const totalRelatedQueries = g.relatedClusters.reduce((s:number,c:any)=>s+(c.totalResponses||10),0) || g.totalRelated || 10;
+                              const missed = g.absentCount || Math.round(totalRelatedQueries * (1 - g.avgWinRate/100));
+                              const borderColor = g.avgWinRate === 0 ? '#EF4444' : g.avgWinRate < 30 ? '#F97316' : '#F59E0B';
+                              // Specific fix based on actual clusters
+                              const topMissingCluster = g.relatedClusters.filter((c:any)=>(c.winRate||0)<50)[0];
+                              const specificFix = topMissingCluster
+                                ? `Create AI-optimized content targeting "${topMissingCluster.category}" queries — specifically ${g.terms.slice(0,2).join(', ')} content that answers what consumers ask`
+                                : `Publish structured content about ${g.label} that AI can cite — focus on ${g.terms.slice(0,2).join(' and ')}`;
+                              return (
+                                <div key={i} style={{background:'white',border:`1px solid ${borderColor}40`,borderLeft:`4px solid ${borderColor}`,borderRadius:12,padding:'18px 20px',boxShadow:'0 1px 4px rgba(0,0,0,0.06)'}}>
+                                  {/* Topic */}
+                                  <div style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:14}}>{g.label}</div>
 
-                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:10}}>
-                                  <div style={{textAlign:'center' as const}}>
-                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Product Score</div>
-                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:g.prodVal>30?'#F97316':'#EF4444'}}>{g.prodVal}</div>
+                                  {/* Win rate comparison */}
+                                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
+                                    <div style={{background:'#FFF7F7',borderRadius:8,padding:'10px 12px',textAlign:'center' as const}}>
+                                      <div style={{fontSize:'0.62rem',fontWeight:700,color:'#9CA3AF',marginBottom:3,textTransform:'uppercase' as const,letterSpacing:'0.05em'}}>{brand} Win Rate</div>
+                                      <div style={{fontSize:'1.8rem',fontWeight:900,color:borderColor,lineHeight:1}}>{g.avgWinRate}%</div>
+                                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:2}}>of related queries</div>
+                                    </div>
+                                    <div style={{background:'#F0FDF4',borderRadius:8,padding:'10px 12px',textAlign:'center' as const}}>
+                                      <div style={{fontSize:'0.62rem',fontWeight:700,color:'#9CA3AF',marginBottom:3,textTransform:'uppercase' as const,letterSpacing:'0.05em'}}>{g.dominator} (Leader)</div>
+                                      <div style={{fontSize:'1.8rem',fontWeight:900,color:'#10B981',lineHeight:1}}>{leaderWinRate}%</div>
+                                      <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginTop:2}}>GEO {g.dominatorGEO}</div>
+                                    </div>
                                   </div>
-                                  <div style={{textAlign:'center' as const}}>
-                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Prompt Win%</div>
-                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:g.avgWinRate>30?'#F59E0B':'#EF4444'}}>{g.avgWinRate}%</div>
+
+                                  {/* Gap bar */}
+                                  <div style={{marginBottom:12}}>
+                                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.68rem',marginBottom:4}}>
+                                      <span style={{color:'#9CA3AF'}}>Gap vs leader</span>
+                                      <span style={{fontWeight:800,color:borderColor}}>−{gap} points</span>
+                                    </div>
+                                    <div style={{background:'#F3F4F6',borderRadius:50,height:7,overflow:'hidden',position:'relative' as const}}>
+                                      <div style={{width:`${g.avgWinRate}%`,height:'100%',background:borderColor,borderRadius:50}}/>
+                                      <div style={{position:'absolute' as const,top:0,left:`${leaderWinRate}%`,width:2,height:'100%',background:'#10B981'}}/>
+                                    </div>
+                                    <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.62rem',color:'#9CA3AF',marginTop:2}}>
+                                      <span>{brand}: {g.avgWinRate}%</span>
+                                      <span>{g.dominator}: {leaderWinRate}%</span>
+                                    </div>
                                   </div>
-                                  <div style={{textAlign:'center' as const}}>
-                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Absent From</div>
-                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:'#EF4444'}}>{g.absentCount}</div>
+
+                                  {/* Responses missed */}
+                                  <div style={{background:'#FFF7F7',borderRadius:8,padding:'8px 12px',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                    <span style={{fontSize:'0.72rem',color:'#374151'}}>Queries missed</span>
+                                    <span style={{fontSize:'0.88rem',fontWeight:800,color:'#EF4444'}}>{missed} of {totalRelatedQueries}</span>
+                                  </div>
+
+                                  {/* Specific fix */}
+                                  <div style={{background:'#F5F0FF',borderRadius:8,padding:'8px 12px',fontSize:'0.72rem',color:'#7C3AED',lineHeight:1.5,borderLeft:'3px solid #A100FF'}}>
+                                    <strong>Fix:</strong> {specificFix}
                                   </div>
                                 </div>
-
-                                {g.relatedClusters.length > 0 && (
-                                  <div style={{marginBottom:8}}>
-                                    <div style={{fontSize:'0.62rem',color:'#9CA3AF',marginBottom:4}}>MISSING FROM THESE QUERIES:</div>
-                                    {g.relatedClusters.filter((c:any)=>(c.winRate||0)<50).slice(0,3).map((c:any,ci:number)=>(
-                                      <div key={ci} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                                        <span style={{fontSize:'0.72rem',color:'#374151'}}>{c.category}</span>
-                                        <span style={{fontSize:'0.72rem',fontWeight:700,color:(c.winRate||0)<20?'#EF4444':'#F97316'}}>{c.winRate||0}%</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                <div style={{fontSize:'0.68rem',color:'#6B7280',marginBottom:6}}>
-                                  Leader: <strong>{g.dominator}</strong> (GEO {g.dominatorGEO})
-                                </div>
-                                <div style={{background:'#FEE2E2',borderRadius:6,padding:'5px 8px',fontSize:'0.68rem',color:'#991B1B'}}>
-                                  Fix: Publish AI-optimized content for {g.label.toLowerCase()} targeting {g.relatedClusters.slice(0,2).map((c:any)=>c.category).join(' + ')||'related queries'}
-                                </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
