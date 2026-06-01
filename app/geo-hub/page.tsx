@@ -1014,7 +1014,7 @@ function SentimentHeatmap({ result }: { result: any }) {
                   {row.name}
                 </td>
                 {/* Score cells */}
-                {row.scores.map((val, ci) => {
+                {row.scores.map((val: number, ci: number) => {
                   const k = `${ri}-${ci}`;
                   const { bg, text } = tierBg(val);
                   const isH = hovCell === k;
