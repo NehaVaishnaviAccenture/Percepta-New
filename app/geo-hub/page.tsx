@@ -1408,6 +1408,7 @@ export default function GeoHub() {
   const [queryPage,setQueryPage]=useState(1);
   const [cachedActions,setCachedActions]=useState<any[]|null>(null);
   const [actionsLoading,setActionsLoading]=useState(false);
+  const [brandFameData,setBrandFameData]=useState<{famousFor:string[];notFamousFor:string[];topProducts:string[]}|null>(null);
   const [hovBar,setHovBar]=useState<number|null>(null);
   const [expandedDomain,setExpandedDomain]=useState<string|null>(null);
   const [promptCount,setPromptCount]=useState(100);
@@ -1416,7 +1417,7 @@ export default function GeoHub() {
   const [highlightedBubble,setHighlightedBubble]=useState<string|null>(null);
   const [visView, setVisView] = useState<'scatter'|'scurve'>('scatter');
 
-  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);}catch{}},[]);
+  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url'),savedFame=sessionStorage.getItem('geo_fame');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);if(savedFame)setBrandFameData(JSON.parse(savedFame));}catch{}},[]);
 
   async function runAnalysis(){
     if(!url.trim()||!url.startsWith('http')){setError('Please enter a valid URL starting with http:// or https://');return;}
@@ -1430,7 +1431,35 @@ export default function GeoHub() {
       timers.forEach(t=>clearTimeout(t));setLoadingProgress(100);
       await new Promise(r=>setTimeout(r,400));
       if(data.error)setError(data.error);
-      else{setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}}
+      else{
+        setResult(data);setCachedActions(null);setActionsLoading(false);setQueryPage(1);setSelectedCluster(null);setFilterCat('All');setActiveTab(0);
+        try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}
+        // Preload brand fame data — fires same time as recommendations, no extra loading state
+        const bName = data.brand_name || '';
+        const bLob  = data.ind_label || data.lob || 'credit cards';
+        const bProds = (getProductDefs(data.ind_key||'gen', data.lob||'')).map((p:any)=>p.label).join(', ');
+        const famePrompt = `You are a brand research expert. Answer ONLY with valid JSON, no markdown.
+
+What is "${bName}" genuinely famous for in ${bLob}? Be accurate — only include products/categories where ${bName} has a strong real-world reputation.
+
+Return exactly this JSON:
+{
+  "famousFor": ["list of up to 6 specific ${bLob} products or categories ${bName} is genuinely well-known for"],
+  "notFamousFor": ["list of products from this list that ${bName} is NOT particularly known for: ${bProds}"],
+  "topProducts": ["top 3 specific product names ${bName} is most associated with"]
+}`;
+        fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system:'You are a brand research expert. Respond with valid JSON only.',prompt:famePrompt})})
+          .then(r=>r.json())
+          .then(fd=>{
+            try{
+              const clean=(fd.response||'').replace(/```json|```/g,'').trim();
+              const parsed = JSON.parse(clean);
+              setBrandFameData(parsed);
+              try{sessionStorage.setItem('geo_fame',JSON.stringify(parsed));}catch{}
+            }catch{ setBrandFameData(null); }
+          })
+          .catch(()=>setBrandFameData(null));
+      }
     }catch(e:any){timers.forEach(t=>clearTimeout(t));setError(e.message);}
     setLoading(false);
   }
@@ -2431,22 +2460,29 @@ export default function GeoHub() {
                         return { name, cats, count: cats.length, geo: compData?.GEO||0, pct: Math.round((cats.length/Math.max(clusters.length,1))*100) };
                       });
 
+                    // Filter gap cards to only products brand is actually known for (from preloaded fame data)
+                    const notFamous = (brandFameData?.notFamousFor || []).map((s:string)=>s.toLowerCase());
+                    const filteredGapDetails = brandFameData
+                      ? prodGapDetails.filter(g => !notFamous.some(nf =>
+                          g.label.toLowerCase().includes(nf.split(' ')[0]) ||
+                          nf.includes(g.label.toLowerCase().split(' ')[0])
+                        ))
+                      : prodGapDetails;
+
                     return (
                       <>
                       {/* ── Presence Gap: product × prompt matrix ── */}
-                      {prodGapDetails.length > 0 && (
+                      {filteredGapDetails.length > 0 && (
                         <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:16}}>
                           <div style={{fontSize:'0.65rem',fontWeight:800,color:'#EF4444',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:8}}>⚠ Presence Gap Analysis</div>
                           <h3 style={{fontSize:'1.15rem',fontWeight:800,color:'#111827',marginBottom:6}}>
                             {brand} has these products — but AI isn't recommending them.
                           </h3>
                           <p style={{fontSize:'0.8rem',color:'#6B7280',lineHeight:1.6,marginBottom:18,maxWidth:720}}>
-                            Real data from your {totalResponses} responses. For each product, we checked which prompt categories should trigger it and how often {brand} actually appeared. This is a <strong style={{color:'#374151'}}>content and citation gap</strong> — not a brand problem.
+                            Real data from your {totalResponses} responses. Only products {brand} is genuinely known for{brandFameData?.topProducts?.length ? ` (e.g. ${brandFameData.topProducts.slice(0,2).join(', ')})` : ''}. This is a <strong style={{color:'#374151'}}>content and citation gap</strong> — not a brand problem.
                           </p>
-
-                          {/* Product gap cards */}
                           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12,marginBottom:16}}>
-                            {prodGapDetails.slice(0,6).map((g,i)=>(
+                            {filteredGapDetails.slice(0,6).map((g,i)=>(
                               <div key={i} style={{background:'#FFF7F7',border:'1px solid #FCA5A5',borderLeft:`4px solid ${g.prodVal>30?'#F97316':'#EF4444'}`,borderRadius:10,padding:'14px 16px'}}>
                                 <div style={{fontSize:'0.9rem',fontWeight:700,color:'#991B1B',marginBottom:10}}>{g.label}</div>
 
@@ -2585,7 +2621,7 @@ export default function GeoHub() {
                             {[
                               {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
                               {score:String(geo+7), label:'Near-term (+7)', sub:`Fix ${quickWins.slice(0,2).map(c=>c.category).join(' + ')||'top quick wins'} — crosses into Competitive tier`, bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
-                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Cover ${prodGapDetails.slice(0,2).map(g=>g.label).join(' + ')||'gap products'} — challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
+                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Cover ${filteredGapDetails.slice(0,2).map(g=>g.label).join(' + ')||'gap products'} — challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
                             ].map((step,i)=>(
                               <div key={i} style={{display:'flex',gap:12,marginBottom:8}}>
                                 <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center'}}>
@@ -2607,7 +2643,7 @@ export default function GeoHub() {
                                   icon:'📄',
                                   title:'LLM-ready content',
                                   sub: prodGapDetails.length>0
-                                    ? `Cover ${prodGapDetails.slice(0,2).map(g=>g.label).join(' & ')} blind spots`
+                                    ? `Cover ${filteredGapDetails.slice(0,2).map(g=>g.label).join(' & ')||'key'} blind spots`
                                     : 'Close content gaps on missing topics',
                                   priority:'High',
                                 },
