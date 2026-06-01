@@ -18,7 +18,7 @@ const METRIC_TIPS: Record<string,string> = {
   'share of voice': 'Your brand mentions as a percentage of all brand mentions across AI responses.',
 };
 
-const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Recommendations','Live Prompt','FAQ'];
+const TABS = ['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Analysis','Recommendations','Live Prompt','FAQ'];
 
 function scoreBadge(s: number) {
   if (s >= 80) return { label: 'Excellent', color: '#43A047', bg: '#E8F5E9' };
@@ -2011,8 +2011,360 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 6: Recommendations */}
+                        {/* TAB 6: Analysis */}
             {activeTab===6&&(()=>{
+              const brand = result.brand_name || 'Your Brand';
+              const geo = result.overall_geo_score || result.visibility || 0;
+              const vis = result.visibility || 0;
+              const sen = result.sentiment || 0;
+              const prom = result.prominence || 0;
+              const cit = result.citation_score || 0;
+              const sov = result.share_of_voice || 0;
+              const avgRank = result.avg_rank || 'N/A';
+              const totalResponses = result.total_responses || 100;
+              const competitors = result.competitors || [];
+              const clusters = result.query_clusters || [];
+              const productDefs = getProductDefs(result.ind_key||'gen', result.lob||'');
+              const productMentions = computeProductMentions(productDefs, result.responses_detail||[]);
+
+              // GEO tier
+              const geoTier = geo>=80?'Authority':geo>=70?'Leader':geo>=56?'Competitive':geo>=45?'Emerging':'Needs Work';
+              const geoColor = geo>=80?'#10B981':geo>=70?'#3B82F6':geo>=56?'#F59E0B':geo>=45?'#F97316':'#EF4444';
+
+              // Top competitors by GEO
+              const topComps = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0)).slice(0,4);
+              const maxGEO = Math.max(geo, ...(topComps.map((c:any)=>c.GEO||0)));
+
+              // Where brand wins (high win rate clusters)
+              const winningClusters = [...clusters].sort((a:any,b:any)=>(b.winRate||0)-(a.winRate||0)).filter((c:any)=>(c.winRate||0)>20).slice(0,5);
+              // Where brand is missing (low win rate)
+              const missingClusters = [...clusters].sort((a:any,b:any)=>(a.winRate||0)-(b.winRate||0)).filter((c:any)=>(c.winRate||0)<20).slice(0,5);
+
+              // Products — strong vs weak
+              const allProds = productDefs.map(p=>{
+                const f=productMentions.find(m=>m.label===p.label);
+                return {label:p.label, val:f?Math.max(0,Math.min(100,f.pct)):0};
+              }).sort((a,b)=>b.val-a.val);
+              const strongProds = allProds.slice(0,3);
+              const weakProds = [...allProds].sort((a,b)=>a.val-b.val).slice(0,3);
+
+              // Signals for 5-bar chart
+              const signals = [
+                {label:'Visibility', val:vis, weight:'30%', color:'#3B82F6'},
+                {label:'Sentiment', val:sen, weight:'20%', color:'#8B5CF6'},
+                {label:'Prominence', val:prom, weight:'20%', color:'#EC4899'},
+                {label:'Citation', val:cit, weight:'15%', color:'#F59E0B'},
+                {label:'Share of Voice', val:sov, weight:'15%', color:'#10B981'},
+              ];
+              const weakestSignal = [...signals].sort((a,b)=>a.val-b.val)[0];
+              const strongestSignal = [...signals].sort((a,b)=>b.val-a.val)[0];
+
+              // Generate headline based on data
+              const visRate = Math.round(vis);
+              const rankNum = parseInt(String(avgRank).replace('#',''))||4;
+              const headline = geo < 50
+                ? `AI knows ${brand}. It just doesn't recommend it.`
+                : geo < 70
+                ? `${brand} shows up. It needs to show up first.`
+                : `${brand} is winning the AI conversation.`;
+              const headlineAccent = geo < 50
+                ? `It just doesn't recommend it.`
+                : geo < 70
+                ? `It needs to show up first.`
+                : `Winning the AI conversation.`;
+
+              const needsItems = [
+                {
+                  title: `${brand} still missed ${100-visRate}% of AI responses.`,
+                  body: `With ${visRate}% visibility, the brand was absent from ${totalResponses - Math.round(totalResponses*visRate/100)} responses${weakProds.length ? `, especially in ${weakProds.map(p=>p.label).join(', ')}` : ''}.`,
+                  signal: 'Visibility', weight: '30% of formula', color:'#EF4444',
+                },
+                {
+                  title: `${brand} was not consistently the first brand named.`,
+                  body: `With average rank ${avgRank}, the brand was frequently preceded by competitors, limiting top-of-mind impact.`,
+                  signal: 'Prominence', weight: '20% of formula', color:'#F97316',
+                },
+                {
+                  title: `${brand}'s citation share can expand.`,
+                  body: `The brand captured meaningful but not dominant citation share — rarely owning the entire answer.`,
+                  signal: 'Citation', weight: '15% of formula', color:'#F59E0B',
+                },
+                {
+                  title: `Share of voice remains moderate.`,
+                  body: `A ${visRate}% appearance rate with mid-level prominence translates into a respectable but not category-leading share of voice.`,
+                  signal: 'Share of Voice', weight: '15% of formula', color:'#F59E0B',
+                },
+                {
+                  title: `Tone is positive but functional rather than distinctive.`,
+                  body: `Praise centered on practical value with less emotionally differentiated language versus premium competitors.`,
+                  signal: 'Sentiment', weight: '20% of formula', color:'#8B5CF6',
+                },
+              ];
+
+              const wellItems = [
+                {
+                  title: `${brand} achieved solid overall visibility.`,
+                  body: `The brand appeared in ${Math.round(totalResponses*visRate/100)} of ${totalResponses} responses, giving it strong presence relative to competitors.`,
+                  signal: 'Visibility', weight: '30% of formula', color:'#10B981',
+                },
+                {
+                  title: `${brand} was described in consistently positive language.`,
+                  body: `When mentioned, the brand was usually framed as a best, strong, or expert-recommended option rather than a weak alternative.`,
+                  signal: 'Sentiment', weight: '20% of formula', color:'#10B981',
+                },
+                {
+                  title: `${brand} often appeared early enough to be noticed.`,
+                  body: `In many responses the brand was listed first or second${winningClusters.length ? `, especially in ${winningClusters.slice(0,2).map((c:any)=>c.category).join(' and ')}` : ''}.`,
+                  signal: 'Prominence', weight: '20% of formula', color:'#10B981',
+                },
+              ];
+
+              return (
+                <div style={{maxWidth:1100,margin:'0 auto',padding:'0 4px'}}>
+
+                  {/* ── SECTION 1: Health Snapshot (image 5 style) ── */}
+                  <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
+                    <div style={{fontSize:'0.65rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:8}}>
+                      {brand} GEO · Health Snapshot
+                    </div>
+                    <div style={{fontSize:'1.05rem',fontWeight:700,color:'#111827',marginBottom:16}}>
+                      {brand} is {vis>=50?'credible but rarely the default':'missing from most AI responses'} — visible in {visRate}% of responses, named first far less.
+                    </div>
+                    <div style={{display:'flex',gap:12,alignItems:'center',fontSize:'0.75rem',color:'#6B7280',marginBottom:20}}>
+                      <span>{totalResponses} responses analyzed</span>
+                      <span>·</span>
+                      <span>{clusters.length} market queries tracked</span>
+                    </div>
+
+                    {/* 3-column layout: GEO score + Needs Improvement + Working Well */}
+                    <div style={{display:'grid',gridTemplateColumns:'160px 1fr 1fr',gap:16}}>
+                      {/* GEO Score column */}
+                      <div style={{borderRight:'1px solid #F3F4F6',paddingRight:16}}>
+                        <div style={{fontSize:'0.68rem',fontWeight:700,color:'#6B7280',letterSpacing:'0.06em',textTransform:'uppercase' as const,marginBottom:8}}>GEO Score</div>
+                        <div style={{fontSize:'3.5rem',fontWeight:900,color:geoColor,lineHeight:1,marginBottom:4}}>{geo}</div>
+                        <div style={{fontSize:'0.78rem',fontWeight:700,color:geoColor,marginBottom:16}}>{geoTier}</div>
+                        <div style={{fontSize:'0.68rem',fontWeight:700,color:'#6B7280',letterSpacing:'0.06em',textTransform:'uppercase' as const,marginBottom:8}}>Signals</div>
+                        {signals.map((s,i)=>(
+                          <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                            <span style={{fontSize:'0.72rem',color:'#374151'}}>{s.label}</span>
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                              <span style={{fontSize:'0.78rem',fontWeight:700,color:s.color}}>{s.val}</span>
+                              <div style={{width:3,height:14,background:s.val>=70?'#10B981':s.val>=45?'#F59E0B':'#EF4444',borderRadius:2}}/>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Needs Improvement */}
+                      <div style={{borderRight:'1px solid #F3F4F6',paddingRight:16}}>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                          <div style={{fontSize:'0.68rem',fontWeight:800,color:'#374151',letterSpacing:'0.06em',textTransform:'uppercase' as const}}>Needs Improvement</div>
+                          <div style={{background:'#FEE2E2',color:'#991B1B',borderRadius:12,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{needsItems.length}</div>
+                        </div>
+                        <div style={{maxHeight:280,overflowY:'auto' as const}}>
+                          {needsItems.map((item,i)=>(
+                            <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:i<needsItems.length-1?'1px solid #F3F4F6':'none'}}>
+                              <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:4}}>{item.title}</div>
+                              <div style={{fontSize:'0.73rem',color:'#6B7280',lineHeight:1.5,marginBottom:5}}>{item.body}</div>
+                              <div style={{fontSize:'0.62rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.05em',textTransform:'uppercase' as const}}>{item.signal} · {item.weight}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{fontSize:'0.65rem',color:'#9CA3AF',textAlign:'center' as const,marginTop:4}}>Scroll for more ↓</div>
+                      </div>
+
+                      {/* Working Well */}
+                      <div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                          <div style={{fontSize:'0.68rem',fontWeight:800,color:'#374151',letterSpacing:'0.06em',textTransform:'uppercase' as const}}>Working Well</div>
+                          <div style={{background:'#D1FAE5',color:'#065F46',borderRadius:12,padding:'2px 8px',fontSize:'0.65rem',fontWeight:700}}>{wellItems.length}</div>
+                        </div>
+                        <div style={{maxHeight:280,overflowY:'auto' as const}}>
+                          {wellItems.map((item,i)=>(
+                            <div key={i} style={{marginBottom:14,paddingBottom:14,borderBottom:i<wellItems.length-1?'1px solid #F3F4F6':'none'}}>
+                              <div style={{fontSize:'0.8rem',fontWeight:700,color:'#111827',marginBottom:4}}>{item.title}</div>
+                              <div style={{fontSize:'0.73rem',color:'#6B7280',lineHeight:1.5,marginBottom:5}}>{item.body}</div>
+                              <div style={{fontSize:'0.62rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.05em',textTransform:'uppercase' as const}}>{item.signal} · {item.weight}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── SECTION 2: The Insight — GEO ranking (image 1 style) ── */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
+                        {brand} GEO · The Insight
+                      </div>
+                      <h2 style={{fontSize:'1.6rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:16}}>
+                        AI knows {brand}.<br/>
+                        <span style={{color:'#A100FF'}}>It just doesn't recommend it.</span>
+                      </h2>
+                      <p style={{fontSize:'0.85rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>
+                        Across AI-driven product discovery, {brand} scores <strong style={{color:'#F59E0B'}}>{geo} / 100</strong> — "{geoTier}" — and ranks <strong style={{color:'#A100FF'}}>#{rankNum}</strong>{topComps.length>0?`, behind ${topComps.filter((c:any)=>c.GEO>geo).slice(0,3).map((c:any)=>`${c.Brand} (${c.GEO})`).join(', ')}.`:'.'}
+                      </p>
+                      <p style={{fontSize:'0.85rem',color:'#6B7280',lineHeight:1.6,marginBottom:16}}>
+                        {brand} appears mid-list and is rarely the top pick — visible enough to be seen, not strong enough to be chosen.
+                      </p>
+                      <div style={{background:'#F5F0FF',borderRadius:8,borderLeft:'4px solid #A100FF',padding:'14px 16px',fontSize:'0.78rem',color:'#374151',lineHeight:1.6}}>
+                        <strong style={{textDecoration:'underline'}}>So what</strong> — AI is becoming the front door to financial decisions. Every point of gap is a customer who hears a competitor's name first.
+                      </div>
+                    </div>
+
+                    {/* GEO bar chart */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{fontSize:'0.78rem',fontWeight:700,color:'#A100FF',marginBottom:20}}>GEO Score — AI recommendation strength</div>
+                      {[...topComps.filter((c:any)=>c.GEO>geo), {Brand:brand,GEO:geo,isYou:true}, ...topComps.filter((c:any)=>c.GEO<=geo)].slice(0,6).map((c:any,i:number)=>(
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:14}}>
+                          <div style={{width:130,fontSize:'0.82rem',fontWeight:c.isYou?700:400,color:c.isYou?'#A100FF':'#374151',textAlign:'right' as const}}>{c.Brand}</div>
+                          <div style={{flex:1,background:'#F3F4F6',borderRadius:6,height:24,overflow:'hidden' as const}}>
+                            <div style={{width:`${Math.round((c.GEO/maxGEO)*100)}%`,height:'100%',background:c.isYou?'#A100FF':'#D1D5DB',borderRadius:6,transition:'width 0.3s'}}/>
+                          </div>
+                          <div style={{width:28,fontSize:'0.88rem',fontWeight:700,color:c.isYou?'#A100FF':'#374151'}}>{c.GEO}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── SECTION 3: Where brand wins vs where missing (images 2+3) ── */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+                    {/* Wins */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{display:'inline-block',background:'#ECFDF5',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#065F46',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
+                        {brand} GEO · The Insight
+                      </div>
+                      <h2 style={{fontSize:'1.4rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:12}}>
+                        Where {brand} shows up,<br/><span style={{color:'#10B981'}}>it wins.</span>
+                      </h2>
+                      <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>
+                        When AI sees the right signals, {brand} is the recommendation. It earns top rank on highest-intent prompts{winningClusters.length?` in ${winningClusters.slice(0,2).map((c:any)=>c.category).join(' and ')}`:''}.</p>
+                      <div style={{background:'#ECFDF5',borderRadius:8,borderLeft:'4px solid #10B981',padding:'14px 16px',fontSize:'0.78rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
+                        <strong style={{textDecoration:'underline'}}>So what</strong> — This is not a reputation problem. The brand already wins when it's present. The score is a coverage-and-content gap. That's fixable in weeks, not a multi-year rebrand.
+                      </div>
+                      <div style={{fontSize:'0.72rem',fontWeight:700,color:'#10B981',marginBottom:10}}>Where AI already picks {brand} (win rate)</div>
+                      {winningClusters.slice(0,5).map((c:any,i:number)=>(
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                          <div style={{width:140,fontSize:'0.78rem',fontWeight:i===0?700:400,color:i===0?'#065F46':'#374151'}}>{c.category}</div>
+                          <div style={{flex:1,background:'#F3F4F6',borderRadius:4,height:18,overflow:'hidden' as const}}>
+                            <div style={{width:`${Math.min(100,c.winRate||0)}%`,height:'100%',background:i===0?'#10B981':'#6EE7B7',borderRadius:4}}/>
+                          </div>
+                          <div style={{width:36,fontSize:'0.78rem',fontWeight:700,color:'#065F46'}}>{c.winRate||0}%</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Missing */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{display:'inline-block',background:'#FEF2F2',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#991B1B',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
+                        {brand} GEO · The Insight
+                      </div>
+                      <h2 style={{fontSize:'1.4rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:12}}>
+                        {brand} is invisible in the<br/><span style={{color:'#EF4444'}}>moments that win customers.</span>
+                      </h2>
+                      <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>
+                        {brand} has zero or near-zero presence across {missingClusters.filter((c:any)=>(c.winRate||0)===0).length} prompt categories{weakProds.length?` and is weakest in ${weakProds.slice(0,2).map(p=>p.label).join(' and ')} products`:''}.
+                      </p>
+                      <div style={{background:'#FEF2F2',borderRadius:8,borderLeft:'4px solid #EF4444',padding:'14px 16px',fontSize:'0.78rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
+                        <strong style={{textDecoration:'underline'}}>So what</strong> — These are the highest-intent acquisition queries. Competitors capture them at the decision point. Every blind spot forfeits customer lifetime value.
+                      </div>
+                      <div style={{fontSize:'0.72rem',fontWeight:700,color:'#EF4444',marginBottom:10}}>Where {brand} is missing (win rate)</div>
+                      {missingClusters.slice(0,5).map((c:any,i:number)=>(
+                        <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8}}>
+                          <div style={{width:140,fontSize:'0.78rem',fontWeight:(c.winRate||0)===0?700:400,color:(c.winRate||0)===0?'#991B1B':'#374151'}}>{c.category}</div>
+                          <div style={{flex:1,background:'#F3F4F6',borderRadius:4,height:18,overflow:'hidden' as const}}>
+                            <div style={{width:`${Math.max(4,Math.min(100,c.winRate||0))}%`,height:'100%',background:(c.winRate||0)===0?'#EF4444':'#FCA5A5',borderRadius:4}}/>
+                          </div>
+                          <div style={{width:36,fontSize:'0.78rem',fontWeight:700,color:'#991B1B'}}>{c.winRate||0}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── SECTION 4: Signal breakdown + Path forward (images 4+5) ── */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+                    {/* 5 signal breakdown */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{fontSize:'0.68rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.10em',textTransform:'uppercase' as const,marginBottom:16}}>GEO Signal Breakdown</div>
+                      <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
+                        Weakest signal: <strong style={{color:weakestSignal.color}}>{weakestSignal.label} ({weakestSignal.val})</strong>. Strongest: <strong style={{color:strongestSignal.color}}>{strongestSignal.label} ({strongestSignal.val})</strong>.
+                      </p>
+                      {signals.map((s,i)=>{
+                        const barColor = s.val>=70?'#10B981':s.val>=56?'#3B82F6':s.val>=45?'#F59E0B':'#EF4444';
+                        return (
+                          <div key={i} style={{marginBottom:12}}>
+                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
+                              <span style={{fontSize:'0.78rem',fontWeight:600,color:'#374151'}}>{s.label}</span>
+                              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                                <span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>{s.weight}</span>
+                                <span style={{fontSize:'0.82rem',fontWeight:800,color:barColor}}>{s.val}</span>
+                              </div>
+                            </div>
+                            <div style={{background:'#F3F4F6',borderRadius:6,height:8,overflow:'hidden' as const}}>
+                              <div style={{width:`${s.val}%`,height:'100%',background:barColor,borderRadius:6,transition:'width 0.4s'}}/>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Path forward (image 4) */}
+                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                      <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
+                        {brand} GEO · The Opportunity
+                      </div>
+                      <h2 style={{fontSize:'1.3rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:16}}>
+                        A closeable gap —<br/><span style={{color:'#A100FF'}}>and a clear path to #{Math.max(1,rankNum-1)}.</span>
+                      </h2>
+                      <p style={{fontSize:'0.78rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
+                        Prioritized actions unlock an estimated <strong style={{color:'#F59E0B'}}>+7 points near-term</strong> ({geo} → {geo+7}, into the Competitive tier). The full roadmap targets a <strong style={{color:'#A100FF'}}>+22-point unlock</strong> — enough to leapfrog and challenge for #{Math.max(1,rankNum-2)} in AI.
+                      </p>
+                      {/* Journey steps */}
+                      {[
+                        {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
+                        {score:String(geo+7), label:'Near-term (+7)', sub:'Crosses into the Competitive tier', bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
+                        {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Leapfrog to challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
+                      ].map((step,i)=>(
+                        <div key={i} style={{display:'flex',gap:12,alignItems:'stretch',marginBottom:8}}>
+                          <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:2}}>
+                            <div style={{width:4,background:step.border,borderRadius:4,flex:1,minHeight:4}}/>
+                            {i<2&&<div style={{color:'#10B981',fontSize:'0.7rem'}}>↓</div>}
+                          </div>
+                          <div style={{flex:1,background:step.bg,borderRadius:10,padding:'10px 14px'}}>
+                            <div style={{fontSize:'1.8rem',fontWeight:900,color:step.color,lineHeight:1}}>{step.score}</div>
+                            <div style={{fontSize:'0.78rem',fontWeight:700,color:'#374151',marginTop:2}}>{step.label}</div>
+                            <div style={{fontSize:'0.72rem',color:'#6B7280'}}>{step.sub}</div>
+                          </div>
+                        </div>
+                      ))}
+                      {/* How boxes */}
+                      <div style={{fontSize:'0.65rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,margin:'14px 0 8px'}}>The How</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                        {[
+                          {icon:'📄', title:'LLM-ready content', sub:'for blind-spot categories'},
+                          {icon:'🏷️', title:'Attribute reinforcement', sub:'on core products'},
+                          {icon:'🔗', title:'Citation & authority', sub:'earned-media signals'},
+                          {icon:'⚙️', title:'Technical & schema', sub:'for AI ingestion'},
+                        ].map((h,i)=>(
+                          <div key={i} style={{background:'#7C3AED',borderRadius:8,padding:'10px 12px',display:'flex',gap:8,alignItems:'flex-start'}}>
+                            <span style={{fontSize:'1.1rem'}}>{h.icon}</span>
+                            <div>
+                              <div style={{fontSize:'0.72rem',fontWeight:700,color:'white'}}>{h.title}</div>
+                              <div style={{fontSize:'0.65rem',color:'#C4B5FD'}}>{h.sub}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              );
+            })()}
+
+{/* TAB 7: Recommendations */}
+            {activeTab===7&&(()=>{
               const rd2=result.responses_detail||[],recClusters=result.query_clusters||[];
               const topComp1=(result.competitors||[])[0]?.Brand||'Top Competitor';
               const segments=recClusters.slice(0,9).map((c:any)=>{const rate=c.winRate;const isWinning=rate>=60,isEmerging=!isWinning&&rate>=30;return{name:c.category,status:isWinning?'Winning':isEmerging?'Emerging':'Gap',color:isWinning?'#10B981':isEmerging?'#F59E0B':'#EF4444',bg:isWinning?'#F0FDF4':isEmerging?'#FFFBEB':'#FFF1F2',border:isWinning?'#6EE7B7':isEmerging?'#FCD34D':'#FCA5A5',score:rate,dominated:c.topCompetitor||topComp1};});
@@ -2026,8 +2378,8 @@ export default function GeoHub() {
               );
             })()}
 
-            {/* TAB 7: Live Prompt */}
-            {activeTab===7&&(()=>(
+            {/* TAB 8: Live Prompt */}
+            {activeTab===8&&(()=>(
               <div style={{display:'flex',flexDirection:'column' as const,minHeight:'calc(100vh - 200px)'}}>
                 <div style={{marginBottom:12}}><div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:3}}>Live Prompt Tester</div><div style={{fontSize:'0.8rem',color:'#9CA3AF'}}>Ask any question and see how AI responds about brands in your category.</div></div>
                 <div style={{display:'flex',gap:8,flexWrap:'wrap' as const,marginBottom:12}}>
@@ -2047,8 +2399,8 @@ export default function GeoHub() {
               </div>
             ))()}
 
-            {/* TAB 8: FAQ */}
-            {activeTab===8&&(()=>(
+            {/* TAB 9: FAQ */}
+            {activeTab===9&&(()=>(
               <div>
                 <div style={{fontSize:'1.1rem',fontWeight:700,color:'#111827',marginBottom:4}}>What does this score mean for your business?</div>
                 <div style={{fontSize:'0.8rem',color:'#9CA3AF',marginBottom:24}}>Everything you need to understand your score and how to act on it.</div>
