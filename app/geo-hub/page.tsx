@@ -494,10 +494,20 @@ function RadarChart({ result }: { result: any }) {
   const productDefs     = getProductDefs(result.ind_key || 'gen', result.lob || '');
   const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
 
-  // Use top 6 by score — fixes tiny blob when most categories are 5
+  // Value = prominence per product category
+  // Prominence proxy: when brand mentioned in this category's responses, avg position inverted
+  // position 1 = 95, position 2 = 80, position 3 = 65, not mentioned = 5
+  const rd = result.responses_detail || [];
   const allDims = productDefs.map(p => {
-    const found = productMentions.find(m => m.label === p.label);
-    return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
+    const catResponses = rd.filter((r: any) =>
+      (r.mentioned === true || (r.position || 0) > 0) &&
+      p.terms.some((t: string) => (r.response_preview || '').toLowerCase().includes(t))
+    );
+    if (!catResponses.length) return { label: p.label, val: 5 };
+    const avgPos = catResponses.reduce((sum: number, r: any) => sum + (r.position || 3), 0) / catResponses.length;
+    // Invert: position 1 → high score, position 5+ → low score
+    const prominenceScore = Math.max(5, Math.min(95, Math.round(100 - (avgPos - 1) * 18)));
+    return { label: p.label, val: prominenceScore };
   });
   const dims = [...allDims].sort((a,b) => b.val - a.val);
   const n = dims.length;
@@ -575,7 +585,7 @@ function RadarChart({ result }: { result: any }) {
 
       {/* Title */}
       <div style={{ fontSize:'0.68rem', fontWeight:800, color:'#A100FF', letterSpacing:'0.10em', textTransform:'uppercase' as const, marginBottom:16 }}>
-        Your Topic Shape · vs. Median Competitor
+        Product Prominence · How Early AI Names You Per Category
       </div>
 
       {/* 50/50 flex — stretch so both sides same height */}
@@ -720,7 +730,7 @@ function RadarChart({ result }: { result: any }) {
 
       {/* Footer */}
       <div style={{ fontSize:'0.7rem', color:'#9CA3AF', marginTop:12 }}>
-        Polygon color shows tier zones — red center to green edge.
+        Higher score = AI names you earlier in responses for that category.
       </div>
     </div>
   );
@@ -732,11 +742,24 @@ function PromptRadarChart({ result }: { result: any }) {
   const competitors = result.competitors || [];
   const clusters    = result.query_clusters || [];
 
-  // Use top 6-10 query clusters by winRate as axes
+  // Value = prominence per prompt cluster
+  // Use avg position (inverted) when brand mentioned in that cluster's responses
+  const rd2 = result.responses_detail || [];
   const rawDims = clusters.length >= 3
     ? [...clusters]
         .sort((a: any, b: any) => (b.winRate || 0) - (a.winRate || 0))
-        .map((c: any) => ({ label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) }))
+        .map((c: any) => {
+          const clusterResponses = rd2.filter((r: any) =>
+            r.category === c.category && (r.mentioned === true || (r.position || 0) > 0)
+          );
+          if (!clusterResponses.length) {
+            // fall back to winRate-based prominence estimate
+            return { label: c.category, val: Math.max(5, Math.min(95, c.winRate || 5)) };
+          }
+          const avgPos = clusterResponses.reduce((sum: number, r: any) => sum + (r.position || 3), 0) / clusterResponses.length;
+          const prominenceScore = Math.max(5, Math.min(95, Math.round(100 - (avgPos - 1) * 18)));
+          return { label: c.category, val: prominenceScore };
+        })
     : [];
 
   if (rawDims.length < 3) return null; // don't render if no cluster data
@@ -810,7 +833,7 @@ function PromptRadarChart({ result }: { result: any }) {
   return (
     <div style={{ background:'white', borderRadius:14, border:'1px solid #E5E7EB', padding:'20px 24px', marginTop:14 }}>
       <div style={{ fontSize:'0.68rem', fontWeight:800, color:'#A100FF', letterSpacing:'0.10em', textTransform:'uppercase' as const, marginBottom:16 }}>
-        Your Prompt Category Shape · vs. Median Competitor
+        Prompt Prominence · How Early AI Names You Per Query Topic
       </div>
 
       <div style={{ display:'flex', alignItems:'stretch' }}>
@@ -909,7 +932,7 @@ function PromptRadarChart({ result }: { result: any }) {
       </div>
 
       <div style={{ fontSize:'0.7rem', color:'#9CA3AF', marginTop:12 }}>
-        Win rate per prompt category — how often your brand appeared when AI was asked about this topic.
+        Higher score = AI names you earlier in responses for that prompt topic.
       </div>
     </div>
   );
@@ -926,57 +949,54 @@ function SentimentHeatmap({ result }: { result: any }) {
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
 
-  // Top 6 product categories by brand score
-  const topCats = productDefs
-    .map(p => {
-      const found = productMentions.find(m => m.label === p.label);
-      return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
-    })
-    .sort((a, b) => b.val - a.val)
-    .slice(0, 6);
+  // 3 real columns: Sentiment, Prominence, Avg Rank — real data only
+  const cols = ['Sentiment', 'Prominence', 'Avg Rank'];
+  const COL_W = 140;
+  const BRAND_W = 140;
 
-  const cols = topCats.map(c => c.label);
-
-  // Seed for deterministic competitor scores
-  const seed = (s: string, i: number) => {
-    let h = 0; for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
-    return ((h + i * 6271) % 40) / 100;
-  };
-
-  const brandScores = topCats.map(c => c.val);
-
-  const rows = [
-    { name: brand, isYou: true, scores: brandScores },
-    ...competitors.slice(0, 9).map((c: any) => ({
-      name: c.Brand || '',
-      isYou: false,
-      scores: topCats.map((cat, di) => {
-        const sf = (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1);
-        return Math.max(5, Math.min(95, Math.round(cat.val * sf + seed(c.Brand || '', di) * 15 - 5)));
-      }),
-    })),
+  // Brand row
+  const rawRank = String(result.avg_rank || '#N/A').replace('#','');
+  const rankVal = isNaN(Number(rawRank)) ? 50 : Math.max(5, Math.min(95, Math.round(100 - (Number(rawRank) - 1) * 15)));
+  const brandScores = [
+    Math.round(result.sentiment || 0),
+    Math.round(result.prominence || 0),
+    rankVal,
   ];
 
-  // Tier color matching image 1
+  const rows = [
+    { name: brand, isYou: true, scores: brandScores, rawRank: String(result.avg_rank || 'N/A') },
+    ...competitors.slice(0, 9).map((c: any) => {
+      const cRankRaw = String(c.Rank || c.rank || 'N/A').replace('#','');
+      const cRankVal = isNaN(Number(cRankRaw)) ? 50 : Math.max(5, Math.min(95, Math.round(100 - (Number(cRankRaw)-1)*15)));
+      return {
+        name: c.Brand || '',
+        isYou: false,
+        scores: [
+          Math.round(c.Sen || c.Sentiment || 0),
+          Math.round(c.Prom || c.Prominence || 0),
+          cRankVal,
+        ],
+        rawRank: String(c.Rank || c.rank || 'N/A'),
+      };
+    }),
+  ];
+
   const tierBg = (v: number) => {
-    if (v >= 80) return { bg: '#6EE7C2', text: '#065F46' };  // green — Authority
-    if (v >= 70) return { bg: '#93C5FD', text: '#1E3A8A' };  // blue — Leader
-    if (v >= 56) return { bg: '#FCD34D', text: '#78350F' };  // gold — Competitive
-    if (v >= 45) return { bg: '#FDBA74', text: '#7C2D12' };  // orange — Emerging
-    return { bg: '#FDA4AF', text: '#881337' };                // pink — Fragmented
+    if (v >= 80) return { bg: '#6EE7C2', text: '#065F46' };
+    if (v >= 70) return { bg: '#93C5FD', text: '#1E3A8A' };
+    if (v >= 56) return { bg: '#FCD34D', text: '#78350F' };
+    if (v >= 45) return { bg: '#FDBA74', text: '#7C2D12' };
+    return { bg: '#FDA4AF', text: '#881337' };
   };
 
-  const strongest = [...topCats].sort((a,b) => b.val - a.val)[0];
-  const weakest   = [...topCats].sort((a,b) => a.val - b.val)[0];
-
-  const COL_W = 88;
-  const BRAND_W = 130;
+  const strongest = { label: 'Sentiment', val: brandScores[0] };
+  const weakest   = { label: 'Avg Rank', val: brandScores[2] };
 
   return (
     <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
       {/* Title */}
       <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#A100FF', letterSpacing: '0.10em', textTransform: 'uppercase' as const, marginBottom: 16 }}>
-        The Field · By Topic
+        The Field · Sentiment · Prominence · Avg Rank
       </div>
 
       <div style={{ overflowX: 'auto' as const }}>
@@ -1018,6 +1038,8 @@ function SentimentHeatmap({ result }: { result: any }) {
                   const k = `${ri}-${ci}`;
                   const { bg, text } = tierBg(val);
                   const isH = hovCell === k;
+                  // For Avg Rank column (ci=2), show the raw rank string
+                  const displayVal = ci === 2 ? `#${(row as any).rawRank}` : val;
                   return (
                     <td key={ci}
                       onMouseEnter={() => setHovCell(k)}
@@ -1037,7 +1059,7 @@ function SentimentHeatmap({ result }: { result: any }) {
                         transform: isH ? 'scale(1.06)' : 'scale(1)',
                         cursor: 'default',
                       }}>
-                        {val}
+                        {displayVal}
                       </div>
                     </td>
                   );
