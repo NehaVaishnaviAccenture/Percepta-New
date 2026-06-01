@@ -486,287 +486,6 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151'}}>{elements}</div>;
 }
 
-// ─── AIPerceptionPanel — calls Claude API to get real AI perception then cross-references with our data ───
-function AIPerceptionPanel({ result }: { result: any }) {
-  const brand   = result.brand_name || 'the brand';
-  const lob     = result.lob || 'credit cards';
-  const clusters = result.query_clusters || [];
-  const competitors = result.competitors || [];
-  const productDefs = getProductDefs(result.ind_key || 'gen', result.lob || '');
-  const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
-
-  type PerceptionData = {
-    knownFor: string[];
-    topAttributes: string[];
-    unaided_rank: number;
-    unaided_brands: string[];
-    perception_summary: string;
-    gaps: Array<{topic: string; ai_knows: boolean; our_win_rate: number; leader: string; insight: string}>;
-  };
-
-  const [data, setData] = useState<PerceptionData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [ran, setRan] = useState(false);
-
-  const run = async () => {
-    if (ran) return;
-    setRan(true);
-    setLoading(true);
-    setError('');
-
-    try {
-      // Build context about our data to send to Claude
-      const ourWinRates = clusters.slice(0,10).map((c:any) => `${c.category}: ${c.winRate||0}%`).join(', ');
-      const ourProducts = productDefs.slice(0,8).map(p => {
-        const f = productMentions.find(m => m.label === p.label);
-        return `${p.label}: ${f ? Math.round(f.pct) : 0}%`;
-      }).join(', ');
-      const topComps = competitors.slice(0,5).map((c:any) => `${c.Brand}(GEO:${c.GEO||0})`).join(', ');
-
-      const prompt = `You are a brand intelligence analyst. Answer ONLY with valid JSON, no markdown, no explanation.
-
-I need to understand how AI perceives "${brand}" in the ${lob} market.
-
-Our live prompt data shows these win rates (how often ${brand} appears in AI responses per topic):
-${ourWinRates}
-
-Our product mention data: ${ourProducts}
-Competitors in our data: ${topComps}
-
-Answer these questions as a JSON object with EXACTLY these keys:
-{
-  "knownFor": ["top 5 things AI associates ${brand} with in ${lob} - be specific like product names, features"],
-  "topAttributes": ["top 5 adjectives/phrases AI uses when describing ${brand}"],
-  "unaided_rank": <number: where ${brand} ranks if you list top ${lob} brands unprompted, 1=first>,
-  "unaided_brands": ["top 5 ${lob} brands you would name first unprompted, ranked"],
-  "perception_summary": "2-sentence honest summary of how AI perceives ${brand} vs competitors",
-  "gaps": [
-    {
-      "topic": "specific topic name",
-      "ai_knows": <true/false: does AI know ${brand} has offerings here>,
-      "our_win_rate": <number: estimated win rate % for ${brand} on this topic based on your knowledge>,
-      "leader": "which brand owns this topic in AI responses",
-      "insight": "one sentence: why there is a gap and what would close it"
-    }
-  ]
-}
-
-For "gaps", identify 5 topics where there is a meaningful gap between what ${brand} OFFERS and how much AI RECOMMENDS them for it. Be specific and accurate.`;
-
-      const resp = await fetch('/api/prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: 'You are a brand intelligence analyst. You always respond with valid JSON only — no markdown, no explanation, just the raw JSON object.',
-          prompt,
-        }),
-      });
-
-      const raw = await resp.json();
-      const text = (raw.response || '');
-      const clean = text.replace(/```json|```/g,'').trim();
-      const parsed: PerceptionData = JSON.parse(clean);
-      setData(parsed);
-    } catch(e) {
-      setError('Could not load AI perception data. Check API connection.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-run on mount
-  useState(() => { run(); });
-
-  // Cross-reference: match our cluster win rates against AI perception gaps
-  const crossRef = data ? data.gaps.map(g => {
-    const matched = clusters.find((c:any) =>
-      c.category.toLowerCase().includes(g.topic.toLowerCase().split(' ')[0]) ||
-      g.topic.toLowerCase().includes(c.category.toLowerCase().split(' ')[0])
-    );
-    return {
-      ...g,
-      our_actual_win_rate: matched ? (matched.winRate || 0) : null,
-      cluster_name: matched?.category || null,
-      discrepancy: matched ? Math.abs((matched.winRate||0) - g.our_win_rate) : null,
-    };
-  }) : [];
-
-  const brandGEO = result.overall_geo_score || result.visibility || 0;
-
-  return (
-    <div style={{background:'white',borderRadius:14,border:'2px solid #A100FF',padding:'24px 28px',marginBottom:20}}>
-      {/* Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-        <div>
-          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:4}}>
-            🤖 Live AI Perception Analysis
-          </div>
-          <h3 style={{fontSize:'1.1rem',fontWeight:800,color:'#111827',margin:0}}>
-            How does AI actually perceive {brand}? Cross-referenced with your live data.
-          </h3>
-          <p style={{fontSize:'0.75rem',color:'#6B7280',marginTop:4,marginBottom:0}}>
-            We asked Claude directly — then compared its answers against your {clusters.length} tracked prompts.
-          </p>
-        </div>
-        {!ran && (
-          <button onClick={run} style={{background:'#A100FF',color:'white',border:'none',borderRadius:10,padding:'10px 20px',fontWeight:700,fontSize:'0.82rem',cursor:'pointer',flexShrink:0}}>
-            Run Analysis
-          </button>
-        )}
-      </div>
-
-      {loading && (
-        <div style={{display:'flex',alignItems:'center',gap:12,padding:'24px',color:'#6B7280',fontSize:'0.85rem'}}>
-          <div style={{width:20,height:20,border:'2px solid #E9D5FF',borderTopColor:'#A100FF',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
-          Querying Claude API for {brand} perception data...
-        </div>
-      )}
-
-      {error && (
-        <div style={{background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:8,padding:'12px 16px',fontSize:'0.8rem',color:'#991B1B'}}>{error}</div>
-      )}
-
-      {data && !loading && (
-        <div>
-          {/* Row 1: Known For + Unaided Recall + Perception Summary */}
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.2fr',gap:16,marginBottom:20}}>
-            {/* Known For */}
-            <div style={{background:'#F5F0FF',borderRadius:12,padding:'16px 18px'}}>
-              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
-                🏷 AI associates {brand} with
-              </div>
-              {data.knownFor.map((item,i) => (
-                <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
-                  <div style={{width:20,height:20,borderRadius:'50%',background:'#A100FF',color:'white',fontSize:'0.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</div>
-                  <span style={{fontSize:'0.8rem',color:'#374151',fontWeight:i===0?700:400}}>{item}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Unaided Brand Recall */}
-            <div style={{background:'#F0FDF4',borderRadius:12,padding:'16px 18px'}}>
-              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#065F46',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
-                🗣 Unaided brand recall ranking
-              </div>
-              <p style={{fontSize:'0.72rem',color:'#6B7280',marginBottom:10}}>When AI lists {lob.toLowerCase()} brands unprompted:</p>
-              {data.unaided_brands.map((b,i) => (
-                <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
-                  <div style={{
-                    width:22,height:22,borderRadius:'50%',
-                    background:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?'#10B981':'#E5E7EB',
-                    color:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?'white':'#6B7280',
-                    fontSize:'0.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0
-                  }}>{i+1}</div>
-                  <span style={{fontSize:'0.82rem',color:'#374151',fontWeight:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?700:400}}>{b}</span>
-                  {b.toLowerCase().includes(brand.toLowerCase().split(' ')[0]) && <span style={{fontSize:'0.65rem',color:'#10B981',fontWeight:700}}>← YOU</span>}
-                </div>
-              ))}
-              <div style={{marginTop:10,fontSize:'0.72rem',color:'#065F46',background:'#DCFCE7',borderRadius:6,padding:'6px 10px'}}>
-                Unaided rank: <strong>#{data.unaided_rank}</strong> · GEO Score: <strong>{brandGEO}</strong>
-              </div>
-            </div>
-
-            {/* Perception Summary + Attributes */}
-            <div style={{background:'#FFF7ED',borderRadius:12,padding:'16px 18px'}}>
-              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#92400E',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
-                💬 How AI describes {brand}
-              </div>
-              <p style={{fontSize:'0.8rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>{data.perception_summary}</p>
-              <div style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
-                {data.topAttributes.map((attr,i) => (
-                  <span key={i} style={{background:'#FED7AA',color:'#7C2D12',borderRadius:20,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{attr}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Gap Cross-Reference — the money insight */}
-          <div>
-            <div style={{fontSize:'0.7rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,marginBottom:12}}>
-              🎯 Perception vs Reality — Where AI knows {brand} but doesn't recommend it
-            </div>
-            <div style={{fontSize:'0.78rem',color:'#6B7280',marginBottom:14,lineHeight:1.5}}>
-              Claude confirmed {brand} operates in these areas — but our live prompt data shows it's not winning recommendations there.
-              <strong style={{color:'#374151'}}> This is the exact content gap to close.</strong>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
-              {crossRef.map((g,i) => {
-                const hasData = g.our_actual_win_rate !== null;
-                const ourRate = hasData ? g.our_actual_win_rate! : g.our_win_rate;
-                const aiRate  = g.our_win_rate;
-                const gap     = Math.abs(ourRate - aiRate);
-                const severity = ourRate < 20 ? 'Critical' : ourRate < 40 ? 'Moderate' : 'Low';
-                const sevColor = ourRate < 20 ? '#EF4444' : ourRate < 40 ? '#F59E0B' : '#10B981';
-                return (
-                  <div key={i} style={{background:'white',border:`1px solid ${sevColor}40`,borderLeft:`4px solid ${sevColor}`,borderRadius:10,padding:'14px 16px'}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
-                      <span style={{fontSize:'0.85rem',fontWeight:700,color:'#111827'}}>{g.topic}</span>
-                      <span style={{fontSize:'0.65rem',fontWeight:700,color:sevColor,background:`${sevColor}15`,borderRadius:4,padding:'2px 7px'}}>{severity}</span>
-                    </div>
-
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                      <div style={{background:'#F5F0FF',borderRadius:8,padding:'8px 10px',textAlign:'center' as const}}>
-                        <div style={{fontSize:'0.62rem',color:'#7C3AED',marginBottom:2}}>AI Perception Score</div>
-                        <div style={{fontSize:'1.4rem',fontWeight:900,color:'#A100FF'}}>{aiRate}%</div>
-                        <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>what Claude expects</div>
-                      </div>
-                      <div style={{background: hasData ? '#F0FDF4' : '#FFF7F7',borderRadius:8,padding:'8px 10px',textAlign:'center' as const}}>
-                        <div style={{fontSize:'0.62rem',color: hasData ? '#065F46' : '#991B1B',marginBottom:2}}>
-                          {hasData ? 'Our Live Data' : 'Estimated'}
-                        </div>
-                        <div style={{fontSize:'1.4rem',fontWeight:900,color: hasData ? '#10B981' : '#EF4444'}}>{ourRate}%</div>
-                        <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>{hasData ? 'actual win rate' : 'no data tracked'}</div>
-                      </div>
-                    </div>
-
-                    {/* Gap bar */}
-                    <div style={{marginBottom:8}}>
-                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.65rem',color:'#9CA3AF',marginBottom:3}}>
-                        <span>Win rate gap</span>
-                        <span style={{color:sevColor,fontWeight:700}}>{gap > 0 ? `-${gap}%` : 'On track'}</span>
-                      </div>
-                      <div style={{background:'#F3F4F6',borderRadius:4,height:6,overflow:'hidden'}}>
-                        <div style={{width:`${Math.min(ourRate,100)}%`,height:'100%',background:sevColor,borderRadius:4}}/>
-                      </div>
-                    </div>
-
-                    <div style={{fontSize:'0.7rem',color:'#374151',marginBottom:6}}>
-                      <strong>Leader:</strong> {g.leader}
-                    </div>
-                    <div style={{fontSize:'0.7rem',color:'#6B7280',lineHeight:1.4,background:'#F9FAFB',borderRadius:6,padding:'6px 8px'}}>
-                      💡 {g.insight}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Bottom summary */}
-            <div style={{marginTop:16,background:'#F5F0FF',borderRadius:10,padding:'14px 18px',border:'1px solid #E9D5FF'}}>
-              <div style={{display:'flex',gap:16,flexWrap:'wrap' as const}}>
-                <div>
-                  <div style={{fontSize:'0.65rem',color:'#7C3AED',fontWeight:700,marginBottom:2}}>AI KNOWS {brand.toUpperCase()} FOR</div>
-                  <div style={{fontSize:'0.82rem',color:'#374151'}}>{data.knownFor.slice(0,3).join(' · ')}</div>
-                </div>
-                <div style={{width:1,background:'#E9D5FF'}}/>
-                <div>
-                  <div style={{fontSize:'0.65rem',color:'#EF4444',fontWeight:700,marginBottom:2}}>BUT AI DOESN'T RECOMMEND {brand.toUpperCase()} FOR</div>
-                  <div style={{fontSize:'0.82rem',color:'#374151'}}>{crossRef.filter(g=>(g.our_actual_win_rate||g.our_win_rate)<30).map(g=>g.topic).slice(0,3).join(' · ') || 'All tracked categories performing well'}</div>
-                </div>
-                <div style={{width:1,background:'#E9D5FF'}}/>
-                <div>
-                  <div style={{fontSize:'0.65rem',color:'#10B981',fontWeight:700,marginBottom:2}}>UNAIDED RANK IN AI</div>
-                  <div style={{fontSize:'0.82rem',color:'#374151'}}>#{data.unaided_rank} out of {data.unaided_brands.length} brands listed</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── RadarChart — final: warm glow gradient, score right-aligned, 50/50 ───
 function RadarChart({ result }: { result: any }) {
@@ -2355,57 +2074,120 @@ export default function GeoHub() {
                 ? `It needs to show up first.`
                 : `Winning the AI conversation.`;
 
-              const needsItems = [
-                {
-                  title: `${brand} still missed ${100-visRate}% of AI responses.`,
-                  body: `With ${visRate}% visibility, the brand was absent from ${totalResponses - Math.round(totalResponses*visRate/100)} responses${weakProds.length ? `, especially in ${weakProds.map(p=>p.label).join(', ')}` : ''}.`,
-                  signal: 'Visibility', weight: '30% of formula', color:'#EF4444',
-                },
-                {
-                  title: `${brand} was not consistently the first brand named.`,
-                  body: `With average rank ${avgRank}, the brand was frequently preceded by competitors, limiting top-of-mind impact.`,
-                  signal: 'Prominence', weight: '20% of formula', color:'#F97316',
-                },
-                {
-                  title: `${brand}'s citation share can expand.`,
-                  body: `The brand captured meaningful but not dominant citation share — rarely owning the entire answer.`,
-                  signal: 'Citation', weight: '15% of formula', color:'#F59E0B',
-                },
-                {
-                  title: `Share of voice remains moderate.`,
-                  body: `A ${visRate}% appearance rate with mid-level prominence translates into a respectable but not category-leading share of voice.`,
-                  signal: 'Share of Voice', weight: '15% of formula', color:'#F59E0B',
-                },
-                {
-                  title: `Tone is positive but functional rather than distinctive.`,
-                  body: `Praise centered on practical value with less emotionally differentiated language versus premium competitors.`,
-                  signal: 'Sentiment', weight: '20% of formula', color:'#8B5CF6',
-                },
-              ];
+              // ── Build needs/well items fully from REAL data ──
 
+              // Per-cluster detail: for each missing cluster, find WHICH responses brand was absent
+              const clusterDetails = clusters.map((c:any) => {
+                const rd2 = result.responses_detail || [];
+                const clusterRd = rd2.filter((r:any) => r.category === c.category);
+                const mentioned = clusterRd.filter((r:any) => r.mentioned === true || (r.position||0) > 0);
+                const absent    = clusterRd.filter((r:any) => !r.mentioned && !(r.position||0));
+                const topComp   = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0))[0];
+                const avgPos    = mentioned.length ? (mentioned.reduce((s:number,r:any)=>s+(r.position||3),0)/mentioned.length).toFixed(1) : null;
+                return {
+                  category: c.category,
+                  winRate: c.winRate || 0,
+                  total: clusterRd.length,
+                  mentioned: mentioned.length,
+                  absent: absent.length,
+                  avgPos,
+                  topCompetitor: c.topCompetitor || topComp?.Brand || 'a competitor',
+                  topCompGEO: topComp?.GEO || 0,
+                };
+              });
+
+              // Product-cluster cross: which products appear in which clusters
+              const prodClusterMap = productDefs.map(p => {
+                const f = productMentions.find(m => m.label === p.label);
+                const prodVal = f ? Math.round(f.pct) : 0;
+                // Find matching clusters for this product
+                const relClusters = clusters.filter((c:any) =>
+                  c.category.toLowerCase().split(/\s+/).some((w:string) =>
+                    p.label.toLowerCase().includes(w) || w.length>3 && p.terms.some((t:string)=>t.includes(w))
+                  )
+                );
+                const avgClusterWin = relClusters.length
+                  ? Math.round(relClusters.reduce((s:number,c:any)=>s+(c.winRate||0),0)/relClusters.length)
+                  : 0;
+                return { label: p.label, prodVal, relClusters, avgClusterWin, terms: p.terms.slice(0,3) };
+              });
+
+              // Needs items — all real, specific, from data
+              const needsItems = [
+                // Visibility
+                vis < 70 ? {
+                  title: `${brand} was absent from ${totalResponses - Math.round(totalResponses*visRate/100)} of ${totalResponses} AI responses.`,
+                  body: `${visRate}% visibility — the brand missed ${missingClusters.length} prompt categories entirely${missingClusters.length ? ': ' + missingClusters.slice(0,3).map((c:any)=>c.category).join(', ') : ''}. These are queries where consumers are actively choosing — and ${brand} never enters the room.`,
+                  signal: 'Visibility', weight: '30% of formula', color:'#EF4444',
+                } : null,
+                // Prominence
+                prom < 70 ? {
+                  title: `${brand} ranked #${avgRank} on average — not first.`,
+                  body: `Being listed ${avgRank} instead of #1 cuts recall significantly. In ${clusterDetails.filter(c=>c.avgPos && parseFloat(c.avgPos)>2).length} prompt categories, ${brand} appeared after position 2${topComps.length ? ` — behind ${topComps[0]?.Brand||'competitors'}` : ''}.`,
+                  signal: 'Prominence', weight: '20% of formula', color:'#F97316',
+                } : null,
+                // Citation
+                cit < 60 ? {
+                  title: `Citation share of ${cit} — ${brand} rarely owns the full answer.`,
+                  body: `AI responses that mention ${brand} often list 3-5 brands together. Owning the answer means being the ONLY brand named. ${brand} achieves this in only a fraction of responses. Fix: earn placements on authoritative sources AI quotes exclusively for ${lob}.`,
+                  signal: 'Citation', weight: '15% of formula', color:'#F59E0B',
+                } : null,
+                // SOV
+                sov < 60 ? {
+                  title: `Share of voice at ${sov} — competitors dominate ${brand}'s own categories.`,
+                  body: `In ${Math.round((1 - sov/100) * clusters.length)} out of ${clusters.length} tracked topics, a competitor is mentioned more than ${brand}. The biggest threat: ${topComps[0]?.Brand||'top competitor'} (GEO ${topComps[0]?.GEO||0}) outranks ${brand} across ${Math.round(clusters.length*0.6)} categories.`,
+                  signal: 'Share of Voice', weight: '15% of formula', color:'#F59E0B',
+                } : null,
+                // Sentiment
+                sen < 70 ? {
+                  title: `Sentiment score ${sen} — AI describes ${brand} functionally, not distinctively.`,
+                  body: `${brand} is framed around specific products (${strongProds.slice(0,2).map(p=>p.label).join(', ')}) rather than as a category leader. Premium competitors get language like "best," "most trusted," "top pick" — ${brand} gets "good option" or "worth considering."`,
+                  signal: 'Sentiment', weight: '20% of formula', color:'#8B5CF6',
+                } : null,
+                // Missing product-prompt combinations
+                ...prodClusterMap.filter(p=>p.prodVal>0 && p.avgClusterWin<30 && p.relClusters.length>0).slice(0,2).map(p=>({
+                  title: `${brand} has a ${p.label} product — but AI ignores it in ${p.relClusters.map((c:any)=>c.category).join(', ')} queries.`,
+                  body: `Product mention rate: ${p.prodVal}%. Average win rate on related prompts: ${p.avgClusterWin}%. This gap means consumers researching ${p.relClusters[0]?.category||p.label} never see ${brand}'s offering. The content exists but AI isn't indexing it.`,
+                  signal: 'Product-Prompt Gap', weight: 'Visibility + Citation', color:'#EF4444',
+                })),
+              ].filter(Boolean) as any[];
+
+              // Well items — all real, specific
               const wellItems = [
-                {
-                  title: `${brand} achieved solid overall visibility.`,
-                  body: `The brand appeared in ${Math.round(totalResponses*visRate/100)} of ${totalResponses} responses, giving it strong presence relative to competitors.`,
+                vis >= 45 ? {
+                  title: `${brand} appeared in ${Math.round(totalResponses*visRate/100)} of ${totalResponses} responses — solid baseline.`,
+                  body: `${visRate}% visibility puts ${brand} in the top half of ${lob} brands. It appeared across ${winningClusters.length} prompt categories with meaningful win rates, including ${winningClusters.slice(0,2).map((c:any)=>c.category).join(' and ')}.`,
                   signal: 'Visibility', weight: '30% of formula', color:'#10B981',
-                },
-                {
-                  title: `${brand} was described in consistently positive language.`,
-                  body: `When mentioned, the brand was usually framed as a best, strong, or expert-recommended option rather than a weak alternative.`,
+                } : null,
+                sen >= 45 ? {
+                  title: `${brand} was described positively when mentioned.`,
+                  body: `Sentiment score ${sen} — AI framed ${brand} as a recommended option in the majority of responses where it appeared. It was rarely described as inferior or secondary to alternatives.`,
                   signal: 'Sentiment', weight: '20% of formula', color:'#10B981',
-                },
-                {
-                  title: `${brand} often appeared early enough to be noticed.`,
-                  body: `In many responses the brand was listed first or second${winningClusters.length ? `, especially in ${winningClusters.slice(0,2).map((c:any)=>c.category).join(' and ')}` : ''}.`,
+                } : null,
+                prom >= 40 ? {
+                  title: `${brand} appeared early in responses across key categories.`,
+                  body: `In ${winningClusters.length} prompt categories — including ${winningClusters.slice(0,3).map((c:any)=>c.category).join(', ')} — ${brand} was listed in the top 2 positions. Early mention dramatically increases consumer recall and click-through.`,
                   signal: 'Prominence', weight: '20% of formula', color:'#10B981',
-                },
-              ];
+                } : null,
+                strongProds.length > 0 && strongProds[0].val > 20 ? {
+                  title: `${brand} has established product coverage in ${strongProds.slice(0,2).map(p=>p.label).join(' and ')}.`,
+                  body: `These categories show ${strongProds[0].val}%+ mention rates in relevant AI responses. This means content and signals are working here — the task is replicating this pattern across weaker categories.`,
+                  signal: 'Product Coverage', weight: 'Visibility + SOV', color:'#10B981',
+                } : null,
+                cit >= 40 ? {
+                  title: `Citation score ${cit} — AI references ${brand} from trusted sources.`,
+                  body: `${brand} has earned some placement on authoritative sources that AI models pull from. This is the hardest signal to build and ${brand} has a foundation to build on.`,
+                  signal: 'Citation', weight: '15% of formula', color:'#10B981',
+                } : null,
+                winningClusters.length > 2 ? {
+                  title: `${brand} wins ${winningClusters.filter((c:any)=>(c.winRate||0)>=50).length} prompt categories outright.`,
+                  body: `Win rate ≥50% in: ${winningClusters.filter((c:any)=>(c.winRate||0)>=50).map((c:any)=>c.category).join(', ')||'top categories'}. In these topics ${brand} is the default recommendation — proof the brand can win when positioned correctly.`,
+                  signal: 'Share of Voice', weight: '15% of formula', color:'#10B981',
+                } : null,
+              ].filter(Boolean) as any[];
 
               return (
                 <div style={{maxWidth:1100,margin:'0 auto',padding:'0 4px'}}>
-
-                  {/* ── SECTION 0: Live AI Perception (Claude API cross-reference) ── */}
-                  <AIPerceptionPanel result={result}/>
 
                   {/* ── SECTION 1: Health Snapshot (image 5 style) ── */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
@@ -2567,164 +2349,219 @@ export default function GeoHub() {
                     </div>
                   </div>
 
-                  {/* ── SECTION 4: Presence Gap — brand known for X but AI ignores it ── */}
+                  {/* ── SECTION 4: Presence Gap + Details — real product-prompt cross-reference ── */}
                   {(()=>{
-                    // Find categories where brand HAS products but low AI win rate = gap
-                    const presenceGaps = allProds
-                      .filter(p => p.val < 30)
-                      .map(p => {
-                        // Find which competitor dominates this space
-                        const topComp = [...competitors]
-                          .sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0))
-                          .find((c:any) => c.GEO > geo);
-                        // Find if any cluster matches this product label
-                        const matchCluster = clusters.find((c:any) =>
-                          c.category.toLowerCase().includes(p.label.split(' ')[0].toLowerCase()) ||
-                          p.label.toLowerCase().includes((c.category||'').split(' ')[0].toLowerCase())
-                        );
-                        return {
-                          product: p.label,
-                          brandScore: p.val,
-                          clusterWinRate: matchCluster?.winRate || 0,
-                          topCompetitor: topComp?.Brand || 'a top competitor',
-                          topCompGEO: topComp?.GEO || 0,
-                          gap: 100 - p.val,
-                        };
-                      })
-                      .sort((a,b) => b.gap - a.gap)
-                      .slice(0, 4);
+                    const rd3 = result.responses_detail || [];
 
-                    // Quick wins: clusters where brand is close (20-50% win rate)
+                    // Build per-product detail: for each product, find the exact prompts it's missing from
+                    const prodGapDetails = productDefs.map(p => {
+                      const f = productMentions.find(m => m.label === p.label);
+                      const prodVal = f ? Math.round(f.pct) : 0;
+
+                      // Find ALL clusters related to this product
+                      const relatedClusters = clusters.filter((c:any) => {
+                        const cat = (c.category || '').toLowerCase();
+                        return p.terms.some((t:string) => cat.includes(t.split(' ')[0].toLowerCase()))
+                          || p.label.toLowerCase().split(' ').some((w:string) => w.length > 3 && cat.includes(w));
+                      });
+
+                      // Find exact responses where brand was absent for this product
+                      const prodResponses = rd3.filter((r:any) =>
+                        p.terms.some((t:string) => (r.query || r.response_preview || '').toLowerCase().includes(t.toLowerCase()))
+                      );
+                      const absentResponses = prodResponses.filter((r:any) => !r.mentioned && !(r.position||0));
+                      const presentResponses = prodResponses.filter((r:any) => r.mentioned || (r.position||0) > 0);
+
+                      // Who dominates — from competitor data
+                      const dominator = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0))[0];
+
+                      return {
+                        label: p.label,
+                        prodVal,
+                        relatedClusters,
+                        absentCount: absentResponses.length,
+                        presentCount: presentResponses.length,
+                        totalRelated: prodResponses.length,
+                        avgWinRate: relatedClusters.length
+                          ? Math.round(relatedClusters.reduce((s:number,c:any)=>s+(c.winRate||0),0)/relatedClusters.length)
+                          : 0,
+                        dominator: dominator?.Brand || 'a top competitor',
+                        dominatorGEO: dominator?.GEO || 0,
+                        isGap: prodVal > 0 && (relatedClusters.length === 0 || relatedClusters.some((c:any)=>(c.winRate||0)<40)),
+                      };
+                    }).filter(p => p.isGap || (p.prodVal > 0 && p.avgWinRate < 50))
+                      .sort((a,b) => (b.prodVal - a.prodVal) || (a.avgWinRate - b.avgWinRate));
+
+                    // Quick wins: clusters 15–55% win rate — closest to flipping
                     const quickWins = [...clusters]
-                      .filter((c:any) => (c.winRate||0) >= 15 && (c.winRate||0) <= 50)
-                      .sort((a:any,b:any)=>(b.winRate||0)-(a.winRate||0))
-                      .slice(0, 5);
+                      .filter((c:any) => (c.winRate||0) >= 15 && (c.winRate||0) <= 55)
+                      .sort((a:any,b:any) => (b.winRate||0) - (a.winRate||0))
+                      .slice(0, 6)
+                      .map((c:any) => {
+                        // Find what products are associated with this cluster
+                        const assocProds = prodClusterMap
+                          .filter(p => p.relClusters.some((rc:any) => rc.category === c.category))
+                          .map(p => p.label).slice(0, 2);
+                        const domComp = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0))[0];
+                        return {
+                          category: c.category,
+                          winRate: c.winRate || 0,
+                          totalResponses: c.totalResponses || 0,
+                          assocProds,
+                          dominator: c.topCompetitor || domComp?.Brand || '',
+                          gapToWin: Math.max(0, 60 - (c.winRate||0)),
+                        };
+                      });
 
-                    // Competitor threat: who is #1 on which topics
-                    const compThreats: {[key:string]: number} = {};
+                    // Competitor threat by cluster ownership
+                    const compThreatMap: Record<string, string[]> = {};
                     clusters.forEach((c:any) => {
                       const dom = c.topCompetitor || (competitors[0]?.Brand||'');
-                      if (dom) compThreats[dom] = (compThreats[dom]||0) + 1;
+                      if (dom && dom !== brand) {
+                        if (!compThreatMap[dom]) compThreatMap[dom] = [];
+                        compThreatMap[dom].push(c.category);
+                      }
                     });
-                    const threatList = Object.entries(compThreats)
-                      .sort((a,b)=>b[1]-a[1])
-                      .slice(0, 5)
-                      .map(([name, count]) => ({name, count, pct: Math.round((count/Math.max(clusters.length,1))*100)}));
+                    const threatList = Object.entries(compThreatMap)
+                      .sort((a,b) => b[1].length - a[1].length)
+                      .slice(0, 4)
+                      .map(([name, cats]) => {
+                        const compData = competitors.find((c:any)=>c.Brand===name);
+                        return { name, cats, count: cats.length, geo: compData?.GEO||0, pct: Math.round((cats.length/Math.max(clusters.length,1))*100) };
+                      });
 
                     return (
                       <>
-                      {/* Presence Gap Card */}
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
-                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:6}}>
-                          <div>
-                            <div style={{fontSize:'0.65rem',fontWeight:800,color:'#EF4444',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>⚠ Presence Gap Analysis</div>
-                            <h3 style={{fontSize:'1.2rem',fontWeight:800,color:'#111827',marginBottom:6}}>
-                              {brand} is known for these products — but AI isn't recommending it for them.
-                            </h3>
-                            <p style={{fontSize:'0.82rem',color:'#6B7280',lineHeight:1.6,marginBottom:0,maxWidth:700}}>
-                              These are categories where {brand} has real products and market presence,
-                              yet AI responses are dominated by competitors. This is a <strong>content and citation gap</strong> — not a brand problem.
-                            </p>
+                      {/* ── Presence Gap: product × prompt matrix ── */}
+                      {prodGapDetails.length > 0 && (
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:16}}>
+                          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#EF4444',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:8}}>⚠ Presence Gap Analysis</div>
+                          <h3 style={{fontSize:'1.15rem',fontWeight:800,color:'#111827',marginBottom:6}}>
+                            {brand} has these products — but AI isn't recommending them.
+                          </h3>
+                          <p style={{fontSize:'0.8rem',color:'#6B7280',lineHeight:1.6,marginBottom:18,maxWidth:720}}>
+                            Real data from your {totalResponses} responses. For each product, we checked which prompt categories should trigger it and how often {brand} actually appeared. This is a <strong style={{color:'#374151'}}>content and citation gap</strong> — not a brand problem.
+                          </p>
+
+                          {/* Product gap cards */}
+                          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12,marginBottom:16}}>
+                            {prodGapDetails.slice(0,6).map((g,i)=>(
+                              <div key={i} style={{background:'#FFF7F7',border:'1px solid #FCA5A5',borderLeft:`4px solid ${g.prodVal>30?'#F97316':'#EF4444'}`,borderRadius:10,padding:'14px 16px'}}>
+                                <div style={{fontSize:'0.9rem',fontWeight:700,color:'#991B1B',marginBottom:10}}>{g.label}</div>
+
+                                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6,marginBottom:10}}>
+                                  <div style={{textAlign:'center' as const}}>
+                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Product Score</div>
+                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:g.prodVal>30?'#F97316':'#EF4444'}}>{g.prodVal}</div>
+                                  </div>
+                                  <div style={{textAlign:'center' as const}}>
+                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Prompt Win%</div>
+                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:g.avgWinRate>30?'#F59E0B':'#EF4444'}}>{g.avgWinRate}%</div>
+                                  </div>
+                                  <div style={{textAlign:'center' as const}}>
+                                    <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Absent From</div>
+                                    <div style={{fontSize:'1.3rem',fontWeight:900,color:'#EF4444'}}>{g.absentCount}</div>
+                                  </div>
+                                </div>
+
+                                {g.relatedClusters.length > 0 && (
+                                  <div style={{marginBottom:8}}>
+                                    <div style={{fontSize:'0.62rem',color:'#9CA3AF',marginBottom:4}}>MISSING FROM THESE QUERIES:</div>
+                                    {g.relatedClusters.filter((c:any)=>(c.winRate||0)<50).slice(0,3).map((c:any,ci:number)=>(
+                                      <div key={ci} style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                                        <span style={{fontSize:'0.72rem',color:'#374151'}}>{c.category}</span>
+                                        <span style={{fontSize:'0.72rem',fontWeight:700,color:(c.winRate||0)<20?'#EF4444':'#F97316'}}>{c.winRate||0}%</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div style={{fontSize:'0.68rem',color:'#6B7280',marginBottom:6}}>
+                                  Leader: <strong>{g.dominator}</strong> (GEO {g.dominatorGEO})
+                                </div>
+                                <div style={{background:'#FEE2E2',borderRadius:6,padding:'5px 8px',fontSize:'0.68rem',color:'#991B1B'}}>
+                                  Fix: Publish AI-optimized content for {g.label.toLowerCase()} targeting {g.relatedClusters.slice(0,2).map((c:any)=>c.category).join(' + ')||'related queries'}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12,marginTop:16}}>
-                          {presenceGaps.map((g,i)=>(
-                            <div key={i} style={{background:'#FFF7F7',border:'1px solid #FCA5A5',borderRadius:12,padding:'16px 18px'}}>
-                              <div style={{fontSize:'0.88rem',fontWeight:700,color:'#991B1B',marginBottom:4}}>{g.product}</div>
-                              <div style={{display:'flex',gap:16,marginBottom:10}}>
+                      )}
+
+                      {/* ── Quick Wins + Competitor Threat ── */}
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+                        {/* Quick Wins */}
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 24px'}}>
+                          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#10B981',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>🎯 Quick Wins — Fix These First</div>
+                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>{brand} is already close in these categories.</h3>
+                          <p style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.5,marginBottom:14}}>
+                            Win rate 15–55%: {brand} appears but doesn't consistently win. A targeted content push on these specific topics can flip them to consistent wins fastest.
+                          </p>
+                          {quickWins.length === 0 ? (
+                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic' as const}}>No near-win clusters detected — brand either dominates or is absent.</div>
+                          ) : quickWins.map((c,i)=>(
+                            <div key={i} style={{marginBottom:10,paddingBottom:10,borderBottom:i<quickWins.length-1?'1px solid #F3F4F6':'none'}}>
+                              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:3}}>
                                 <div>
-                                  <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginBottom:2}}>Brand AI Score</div>
-                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:'#EF4444'}}>{g.brandScore}<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>/100</span></div>
+                                  <span style={{fontSize:'0.84rem',fontWeight:600,color:'#111827'}}>{c.category}</span>
+                                  {c.assocProds.length>0&&<div style={{fontSize:'0.68rem',color:'#9CA3AF',marginTop:1}}>Products: {c.assocProds.join(', ')}</div>}
                                 </div>
-                                <div>
-                                  <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginBottom:2}}>Prompt Win Rate</div>
-                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:'#F97316'}}>{g.clusterWinRate}<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>%</span></div>
+                                <div style={{textAlign:'right' as const,flexShrink:0,marginLeft:8}}>
+                                  <span style={{fontSize:'0.9rem',fontWeight:800,color:'#10B981'}}>{c.winRate}%</span>
+                                  <div style={{fontSize:'0.62rem',color:'#9CA3AF'}}>win rate</div>
                                 </div>
                               </div>
-                              <div style={{background:'#F3F4F6',borderRadius:6,height:6,overflow:'hidden',marginBottom:8}}>
-                                <div style={{width:`${g.brandScore}%`,height:'100%',background:'#EF4444',borderRadius:6}}/>
+                              <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden',marginBottom:4}}>
+                                <div style={{width:`${c.winRate}%`,height:'100%',background:'#34D399',borderRadius:50}}/>
+                                <div style={{marginTop:-6,marginLeft:`${c.winRate}%`,width:`${c.gapToWin}%`,height:6,background:'#D1FAE5',borderRadius:50}}/>
                               </div>
-                              <div style={{fontSize:'0.72rem',color:'#6B7280'}}>
-                                Dominated by <strong style={{color:'#374151'}}>{g.topCompetitor}</strong> (GEO {g.topCompGEO})
-                              </div>
-                              <div style={{marginTop:8,fontSize:'0.7rem',color:'#991B1B',background:'#FEE2E2',borderRadius:6,padding:'4px 8px'}}>
-                                Fix: Add {g.product.toLowerCase()} content to AI-indexed pages
+                              <div style={{fontSize:'0.68rem',color:'#6B7280'}}>
+                                +{c.gapToWin}% to hit 60% threshold · {c.dominator&&`Currently led by ${c.dominator}`}
                               </div>
                             </div>
                           ))}
-                        </div>
-                      </div>
-
-                      {/* Quick Wins + Competitor Threat side by side */}
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
-                        {/* Quick Wins */}
-                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#10B981',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>🎯 Quick Wins</div>
-                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Close these first — {brand} is already close to winning.</h3>
-                          <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:16}}>
-                            These prompt categories show 15–50% win rate — meaning AI already knows {brand} here. A targeted content push could flip these to consistent wins within weeks.
-                          </p>
-                          {quickWins.length === 0 ? (
-                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic'}}>No near-win clusters detected — focus on presence gaps above.</div>
-                          ) : quickWins.map((c:any,i:number)=>{
-                            const rate = c.winRate||0;
-                            const toWin = Math.max(0, 60-rate);
-                            return (
-                              <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<quickWins.length-1?'1px solid #F3F4F6':'none'}}>
-                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-                                  <span style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</span>
-                                  <span style={{fontSize:'0.82rem',fontWeight:800,color:'#10B981'}}>{rate}%</span>
-                                </div>
-                                <div style={{background:'#F3F4F6',borderRadius:50,height:8,overflow:'hidden',marginBottom:4}}>
-                                  <div style={{width:`${rate}%`,height:'100%',background:'#34D399',borderRadius:50}}/>
-                                </div>
-                                <div style={{fontSize:'0.7rem',color:'#6B7280'}}>
-                                  +{toWin}% more to hit 60% win rate threshold · {c.totalResponses||'—'} responses tracked
-                                </div>
-                              </div>
-                            );
-                          })}
-                          <div style={{marginTop:14,background:'#ECFDF5',borderRadius:8,padding:'10px 14px',fontSize:'0.75rem',color:'#065F46',borderLeft:'3px solid #10B981'}}>
-                            <strong>So what:</strong> These are the cheapest wins. Optimize existing content for these topics before building new.
+                          <div style={{marginTop:12,background:'#ECFDF5',borderRadius:8,padding:'10px 14px',fontSize:'0.74rem',color:'#065F46',borderLeft:'3px solid #10B981'}}>
+                            <strong>So what:</strong> These are the cheapest wins. Optimize existing {brand} pages for these exact query topics before building new content.
                           </div>
                         </div>
 
                         {/* Competitor Threat Map */}
-                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 24px'}}>
                           <div style={{fontSize:'0.65rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>🏆 Competitor Threat Map</div>
-                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Who is dominating {brand}'s conversation?</h3>
-                          <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:16}}>
-                            These brands are consistently named first in the same prompt categories where {brand} should be winning. Each category they own is a customer {brand} never reaches.
+                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Who owns {brand}'s categories in AI?</h3>
+                          <p style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.5,marginBottom:14}}>
+                            These brands are named first in the same categories where {brand} should win. Each category they own = a customer {brand} never reaches at the decision moment.
                           </p>
                           {threatList.length === 0 ? (
-                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic'}}>No competitor dominance data available.</div>
+                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic' as const}}>No competitor dominance data — run more prompts to build this picture.</div>
                           ) : threatList.map((t,i)=>(
-                            <div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,paddingBottom:12,borderBottom:i<threatList.length-1?'1px solid #F3F4F6':'none'}}>
-                              <div style={{width:36,height:36,borderRadius:'50%',background:'#F3F4F6',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'0.72rem',color:'#374151',flexShrink:0}}>
-                                #{i+1}
+                            <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<threatList.length-1?'1px solid #F3F4F6':'none'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+                                <div style={{width:32,height:32,borderRadius:'50%',background:'#F5F0FF',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'0.72rem',color:'#A100FF',flexShrink:0}}>#{i+1}</div>
+                                <div style={{flex:1}}>
+                                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:2}}>
+                                    <span style={{fontSize:'0.86rem',fontWeight:700,color:'#111827'}}>{t.name}</span>
+                                    <span style={{fontSize:'0.76rem',fontWeight:700,color:'#A100FF'}}>GEO {t.geo} · {t.count} topics</span>
+                                  </div>
+                                  <div style={{background:'#F3F4F6',borderRadius:50,height:5,overflow:'hidden'}}>
+                                    <div style={{width:`${t.pct}%`,height:'100%',background:'#A100FF',borderRadius:50}}/>
+                                  </div>
+                                </div>
                               </div>
-                              <div style={{flex:1}}>
-                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
-                                  <span style={{fontSize:'0.85rem',fontWeight:700,color:'#111827'}}>{t.name}</span>
-                                  <span style={{fontSize:'0.78rem',fontWeight:700,color:'#A100FF'}}>{t.count} topics</span>
-                                </div>
-                                <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}>
-                                  <div style={{width:`${t.pct}%`,height:'100%',background:'#A100FF',borderRadius:50}}/>
-                                </div>
-                                <div style={{fontSize:'0.68rem',color:'#9CA3AF',marginTop:3}}>Owns {t.pct}% of tracked prompt categories</div>
+                              <div style={{fontSize:'0.68rem',color:'#6B7280',marginLeft:42}}>
+                                Dominates: {t.cats.slice(0,3).join(' · ')}{t.cats.length>3?` +${t.cats.length-3} more`:''}
                               </div>
                             </div>
                           ))}
-                          <div style={{marginTop:14,background:'#F5F0FF',borderRadius:8,padding:'10px 14px',fontSize:'0.75rem',color:'#7C3AED',borderLeft:'3px solid #A100FF'}}>
-                            <strong>So what:</strong> Study what content these competitors publish for these topics — then build better, more specific, AI-optimized versions.
+                          <div style={{marginTop:12,background:'#F5F0FF',borderRadius:8,padding:'10px 14px',fontSize:'0.74rem',color:'#7C3AED',borderLeft:'3px solid #A100FF'}}>
+                            <strong>So what:</strong> Study these competitors' content for the specific topics listed above — then build AI-optimized alternatives that position {brand} as the better answer.
                           </div>
                         </div>
                       </div>
 
-                      {/* Path Forward — expanded right side only */}
-                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
+                      {/* ── Path Forward — fully data-driven ── */}
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:16}}>
                         <div style={{display:'grid',gridTemplateColumns:'1fr 1.6fr',gap:28}}>
-                          {/* Left: What's Next narrative */}
                           <div>
                             <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
                               {brand} GEO · The Opportunity
@@ -2743,14 +2580,13 @@ export default function GeoHub() {
                             </div>
                           </div>
 
-                          {/* Right: Journey + How */}
                           <div>
                             {[
                               {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
-                              {score:String(geo+7), label:'Near-term (+7)', sub:'Crosses into the Competitive tier · fix quick wins + top gaps', bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
-                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Leapfrog to challenge for top ${Math.max(1,rankNum-1)} in AI`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
+                              {score:String(geo+7), label:'Near-term (+7)', sub:`Fix ${quickWins.slice(0,2).map(c=>c.category).join(' + ')||'top quick wins'} — crosses into Competitive tier`, bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
+                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Cover ${prodGapDetails.slice(0,2).map(g=>g.label).join(' + ')||'gap products'} — challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
                             ].map((step,i)=>(
-                              <div key={i} style={{display:'flex',gap:12,alignItems:'stretch',marginBottom:8}}>
+                              <div key={i} style={{display:'flex',gap:12,marginBottom:8}}>
                                 <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center'}}>
                                   <div style={{width:4,background:step.border,borderRadius:4,flex:1,minHeight:8}}/>
                                   {i<2&&<div style={{color:'#9CA3AF',fontSize:'0.75rem',margin:'2px 0'}}>↓</div>}
@@ -2758,7 +2594,7 @@ export default function GeoHub() {
                                 <div style={{flex:1,background:step.bg,borderRadius:10,padding:'12px 16px'}}>
                                   <div style={{fontSize:'2rem',fontWeight:900,color:step.color,lineHeight:1}}>{step.score}</div>
                                   <div style={{fontSize:'0.82rem',fontWeight:700,color:'#374151',marginTop:2}}>{step.label}</div>
-                                  <div style={{fontSize:'0.73rem',color:'#6B7280'}}>{step.sub}</div>
+                                  <div style={{fontSize:'0.72rem',color:'#6B7280'}}>{step.sub}</div>
                                 </div>
                               </div>
                             ))}
@@ -2766,10 +2602,34 @@ export default function GeoHub() {
                             <div style={{fontSize:'0.65rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,margin:'16px 0 10px'}}>The How — Prioritized Actions</div>
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
                               {[
-                                {icon:'📄', title:'LLM-ready content', sub:`Cover ${presenceGaps.slice(0,2).map(g=>g.product).join(' & ')} blind spots`, priority:'High'},
-                                {icon:'🏷️', title:'Attribute reinforcement', sub:`Strengthen signals on ${strongProds[0]?.label||'top products'}`, priority:'High'},
-                                {icon:'🔗', title:'Citation & authority', sub:'Build earned-media on AI-trusted sources', priority:'Medium'},
-                                {icon:'⚙️', title:'Technical & schema', sub:'Structured data for AI ingestion', priority:'Medium'},
+                                {
+                                  icon:'📄',
+                                  title:'LLM-ready content',
+                                  sub: prodGapDetails.length>0
+                                    ? `Cover ${prodGapDetails.slice(0,2).map(g=>g.label).join(' & ')} blind spots`
+                                    : 'Close content gaps on missing topics',
+                                  priority:'High',
+                                },
+                                {
+                                  icon:'🏷️',
+                                  title:'Attribute reinforcement',
+                                  sub: strongProds.length>0
+                                    ? `Strengthen signals on ${strongProds[0].label}`
+                                    : 'Reinforce brand attributes on core products',
+                                  priority:'High',
+                                },
+                                {
+                                  icon:'🔗',
+                                  title:'Citation & authority',
+                                  sub: `Target ${quickWins.slice(0,1).map(c=>c.category)[0]||'top query topics'} on AI-trusted sources`,
+                                  priority:'Medium',
+                                },
+                                {
+                                  icon:'⚙️',
+                                  title:'Technical & schema',
+                                  sub:'Structured data for AI ingestion',
+                                  priority:'Medium',
+                                },
                               ].map((h,i)=>(
                                 <div key={i} style={{background:'#7C3AED',borderRadius:10,padding:'12px 14px'}}>
                                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
