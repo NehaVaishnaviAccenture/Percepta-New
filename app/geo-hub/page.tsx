@@ -552,11 +552,11 @@ function RadarChart({ result }: { result: any }) {
     const out: string[] = []; let cur = '';
     words.forEach(w => {
       if (!cur) { cur = w; }
-      else if ((cur + ' ' + w).length <= 10) { cur += ' ' + w; }
+      else if ((cur + ' ' + w).length <= 9) { cur += ' ' + w; }
       else { out.push(cur); cur = w; }
     });
     if (cur) out.push(cur);
-    return out.slice(0, 2);
+    return out.slice(0, 3);
   };
 
   const LEGEND = [
@@ -652,7 +652,7 @@ function RadarChart({ result }: { result: any }) {
                     x={lp.x.toFixed(1)}
                     y={(lp.y - th/2 + li*lh).toFixed(1)}
                     textAnchor="middle" dominantBaseline="middle"
-                    style={{fontSize:n>7?10:11.5, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
+                    style={{fontSize:n>7?9:11, fill:'#374151', fontFamily:'Inter,sans-serif', fontWeight:400}}>
                     {ln}
                   </text>
                 ))}
@@ -768,7 +768,7 @@ function PromptRadarChart({ result }: { result: any }) {
     .sort((a, b) => b.val - a.val);
 
   const R    = n > 7 ? 140 : 155;
-  const LR   = R + 46;
+  const LR   = R + 62;
   const LPAD = 20;
   const VB   = (LR + LPAD) * 2;
   const CX   = VB / 2;
@@ -917,86 +917,168 @@ function PromptRadarChart({ result }: { result: any }) {
 
 
 function SentimentHeatmap({ result }: { result: any }) {
-  const [hovCell,setHovCell]=useState<string|null>(null);
+  const [hovCell, setHovCell] = useState<string|null>(null);
   const rd = result.responses_detail || [];
   const indKey = result.ind_key || 'gen';
   const lob = result.lob || '';
   const brand = result.brand_name || '';
   const competitors = result.competitors || [];
-  const sent = result.sentiment || 0;
-  const prom = result.prominence || 0;
-  const vis = result.visibility || 0;
-  const cit = result.citation_share || 0;
-  const sov = result.share_of_voice || 0;
   const productDefs = getProductDefs(indKey, lob);
   const productMentions = computeProductMentions(productDefs, rd);
-  // Always show ALL product defs as columns — fill missing with 5 so no columns disappear
-  const labels = productDefs.map(p => p.label);
-  const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
-  const myScores = productDefs.map(p => {
-    const found = productMentions.find(m => m.label === p.label);
-    return found ? Math.max(5, Math.min(95, found.pct)) : 5;
-  });
-  const rows=[
-    {name:brand, isYou:true, scores:myScores},
-    ...competitors.slice(0,8).map((c:any)=>{
-      const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
-      const scaleFactors = [c.Vis/Math.max(vis,1), cs/Math.max(sent,1), c.Prom/Math.max(prom,1), c.Cit/Math.max(cit,1), c.Sov/Math.max(sov,1)];
-      const compScores = productDefs.map((p, di) => {
-        const found = productMentions.find(m => m.label === p.label);
-        const basePct = found ? found.pct : 5;
-        const sf = scaleFactors[di % scaleFactors.length] || 0.75;
-        return Math.max(5, Math.min(95, Math.round(basePct * sf + seed(c.Brand||'', di)*10 - 5)));
-      });
-      return {name:c.Brand||'', isYou:false, scores:compScores};
+
+  // Top 6 product categories by brand score
+  const topCats = productDefs
+    .map(p => {
+      const found = productMentions.find(m => m.label === p.label);
+      return { label: p.label, val: found ? Math.max(5, Math.min(95, found.pct)) : 5 };
     })
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 6);
+
+  const cols = topCats.map(c => c.label);
+
+  // Seed for deterministic competitor scores
+  const seed = (s: string, i: number) => {
+    let h = 0; for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
+    return ((h + i * 6271) % 40) / 100;
+  };
+
+  const brandScores = topCats.map(c => c.val);
+
+  const rows = [
+    { name: brand, isYou: true, scores: brandScores },
+    ...competitors.slice(0, 9).map((c: any) => ({
+      name: c.Brand || '',
+      isYou: false,
+      scores: topCats.map((cat, di) => {
+        const sf = (c.GEO || c.Vis || 30) / Math.max(result.overall_geo_score || result.visibility || 50, 1);
+        return Math.max(5, Math.min(95, Math.round(cat.val * sf + seed(c.Brand || '', di) * 15 - 5)));
+      }),
+    })),
   ];
-  // Responsive column widths: fewer cols = wider, many cols = narrower but still readable
-  const BRAND_COL_W = 120;
-  const COL_W = labels.length > 7 ? 72 : labels.length > 5 ? 82 : 95;
-  const totalGridW = BRAND_COL_W + labels.length * COL_W + (labels.length + 1) * 4;
-  const gridCols = `${BRAND_COL_W}px ${labels.map(()=>`${COL_W}px`).join(' ')}`;
-  const allScores=rows.flatMap(r=>r.scores),minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
-  const cellColor=(val:number)=>{const t=(val-minS)/Math.max(maxS-minS,1);if(t<0.2)return{bg:'#F3F4F6',text:'#9CA3AF'};if(t<0.4)return{bg:'#EDE9FE',text:'#6D28D9'};if(t<0.6)return{bg:'#C4B5FD',text:'#5B21B6'};if(t<0.8)return{bg:'#8B5CF6',text:'white'};return{bg:'#5B21B6',text:'white'};};
-  const compRows=rows.slice(1);
-  const dimWins=labels.map((lbl,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:lbl,score:yourScore,beaten};});
-  const strongest=[...dimWins].sort((a,b)=>b.score-a.score)[0],weakest=[...dimWins].sort((a,b)=>a.score-b.score)[0];
+
+  // Tier color matching image 1
+  const tierBg = (v: number) => {
+    if (v >= 80) return { bg: '#6EE7C2', text: '#065F46' };  // green — Authority
+    if (v >= 70) return { bg: '#93C5FD', text: '#1E3A8A' };  // blue — Leader
+    if (v >= 56) return { bg: '#FCD34D', text: '#78350F' };  // gold — Competitive
+    if (v >= 45) return { bg: '#FDBA74', text: '#7C2D12' };  // orange — Emerging
+    return { bg: '#FDA4AF', text: '#881337' };                // pink — Fragmented
+  };
+
+  const strongest = [...topCats].sort((a,b) => b.val - a.val)[0];
+  const weakest   = [...topCats].sort((a,b) => a.val - b.val)[0];
+
+  const COL_W = 88;
+  const BRAND_W = 130;
+
   return (
-    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'14px 18px'}}>
-      <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827',marginBottom:2}}>Product Feature Strength vs Competitors</div>
-      <div style={{fontSize:'0.75rem',color:'#9CA3AF',marginBottom:14}}>Darker = stronger AI association. Hover to highlight.</div>
-      <div style={{overflowX:'auto' as const}}>
-        <div style={{minWidth:totalGridW}}>
-          <div style={{display:'grid',gridTemplateColumns:gridCols,gap:4,marginBottom:4}}>
-            <div/>
-            {labels.map((lbl,i)=>(
-              <div key={i} style={{fontSize:labels.length>7?'0.58rem':'0.65rem',color:'#9CA3AF',fontWeight:600,textAlign:'center' as const,lineHeight:1.3,padding:'0 3px 6px',wordBreak:'break-word' as const}}>
-                {lbl.split(/[\/\s]+/).map((part,pi)=><span key={pi} style={{display:'block'}}>{part}</span>)}
-              </div>
-            ))}
-          </div>
-          {rows.map((r,ri)=>(
-            <div key={ri} style={{display:'grid',gridTemplateColumns:gridCols,gap:4,marginBottom:4}}>
-              <div style={{fontSize:'0.73rem',color:r.isYou?'#A100FF':'#374151',fontWeight:r.isYou?700:400,textAlign:'right' as const,paddingRight:8,display:'flex',alignItems:'center',justifyContent:'flex-end',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' as const}}>{r.name}</div>
-              {r.scores.map((val:number,ci:number)=>{
-                const k=`${ri}-${ci}`,{bg,text}=cellColor(val),isH=hovCell===k;
-                return <div key={`c${k}`} onMouseEnter={()=>setHovCell(k)} onMouseLeave={()=>setHovCell(null)}
-                  style={{borderRadius:5,background:bg,display:'flex',alignItems:'center',justifyContent:'center',
-                    fontSize:isH?'0.8rem':'0.7rem',fontWeight:700,color:text,cursor:'default',
-                    transition:'transform 0.1s, font-size 0.1s',transform:isH?'scale(1.06)':'scale(1)',
-                    border:r.isYou?'2px solid #A100FF':'2px solid transparent',
-                    boxSizing:'border-box' as const,height:30,minHeight:30}}>
-                  {val}
-                </div>;
-              })}
-            </div>
-          ))}
-        </div>
+    <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
+      {/* Title */}
+      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#A100FF', letterSpacing: '0.10em', textTransform: 'uppercase' as const, marginBottom: 16 }}>
+        The Field · By Topic
       </div>
-      {strongest&&weakest&&<div style={{background:'#F5F0FF',borderRadius:8,border:'1px solid #E9D5FF',padding:'8px 14px',fontSize:'0.78rem',color:'#7500C0',marginTop:10}}>💡 Strongest in <strong>{strongest.dim}</strong> ({strongest.score}%) · Weakest in <strong>{weakest.dim}</strong> ({weakest.score}%).</div>}
+
+      <div style={{ overflowX: 'auto' as const }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: BRAND_W + cols.length * COL_W }}>
+          {/* Column headers */}
+          <thead>
+            <tr>
+              <th style={{ width: BRAND_W, padding: '0 12px 12px 0' }}/>
+              {cols.map((col, i) => (
+                <th key={i} style={{
+                  width: COL_W, padding: '0 4px 12px',
+                  fontSize: '0.62rem', fontWeight: 700, color: '#9CA3AF',
+                  letterSpacing: '0.07em', textTransform: 'uppercase' as const,
+                  textAlign: 'center' as const,
+                }}>
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} style={{
+                outline: row.isYou ? '2px solid #A100FF' : 'none',
+                outlineOffset: '-1px',
+              }}>
+                {/* Brand name */}
+                <td style={{
+                  padding: '6px 12px 6px 0',
+                  fontSize: '0.84rem',
+                  fontWeight: row.isYou ? 700 : 400,
+                  color: row.isYou ? '#A100FF' : '#374151',
+                  whiteSpace: 'nowrap' as const,
+                }}>
+                  {row.name}
+                </td>
+                {/* Score cells */}
+                {row.scores.map((val, ci) => {
+                  const k = `${ri}-${ci}`;
+                  const { bg, text } = tierBg(val);
+                  const isH = hovCell === k;
+                  return (
+                    <td key={ci}
+                      onMouseEnter={() => setHovCell(k)}
+                      onMouseLeave={() => setHovCell(null)}
+                      style={{ padding: '4px' }}>
+                      <div style={{
+                        background: bg,
+                        color: text,
+                        borderRadius: 6,
+                        height: 40,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: isH ? '1rem' : '0.9rem',
+                        fontWeight: 700,
+                        transition: 'transform 0.1s',
+                        transform: isH ? 'scale(1.06)' : 'scale(1)',
+                        cursor: 'default',
+                      }}>
+                        {val}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Hover hint */}
+      <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 14px', marginTop: 14, fontStyle: 'italic' as const, fontSize: '0.78rem', color: '#6B7280' }}>
+        Hover any cell to see detail.
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: '6px 16px', flexWrap: 'wrap' as const, marginTop: 12 }}>
+        {[
+          { bg: '#FDA4AF', text: '#881337', label: 'Fragmented', range: '0-44' },
+          { bg: '#FDBA74', text: '#7C2D12', label: 'Emerging',   range: '45-55' },
+          { bg: '#FCD34D', text: '#78350F', label: 'Competitive',range: '56-69' },
+          { bg: '#93C5FD', text: '#1E3A8A', label: 'Leader',     range: '70-79' },
+          { bg: '#6EE7C2', text: '#065F46', label: 'Authority',  range: '80-100' },
+        ].map((l, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 14, height: 14, borderRadius: 3, background: l.bg, flexShrink: 0 }}/>
+            <span style={{ fontSize: '0.72rem', color: '#374151', fontWeight: 600 }}>{l.label}</span>
+            <span style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>{l.range}</span>
+          </div>
+        ))}
+      </div>
+
+      {strongest && weakest && (
+        <div style={{ background: '#F5F0FF', borderRadius: 8, border: '1px solid #E9D5FF', padding: '8px 14px', fontSize: '0.78rem', color: '#7500C0', marginTop: 10 }}>
+          💡 Strongest in <strong>{strongest.label}</strong> ({strongest.val}%) · Weakest in <strong>{weakest.label}</strong> ({weakest.val}%).
+        </div>
+      )}
     </div>
   );
 }
+
 
 // Scatter plot — NO median dotted lines
 function ScatterPlot({ brand, vis, sent, cit, competitors, topCompBrand }: { brand:string; vis:number; sent:number; cit:number; competitors:any[]; topCompBrand:string }) {
