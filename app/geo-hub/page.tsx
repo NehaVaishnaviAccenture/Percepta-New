@@ -2723,9 +2723,41 @@ Return exactly this JSON:
                     const gap = targetedWin !== null ? generalWin - targetedWin : 0;
                     const isUnderperform = targetedWin !== null && targetedWin < generalWin;
 
-                    // Derived targeted GEO score (visibility-weighted)
+                    // Compute all 5 GEO signals from targeted query responses directly
+                    const tAllResponses = tc.flatMap((c:any)=>c.responses||[]);
+                    const tAllPos = tAllResponses.filter((r:any)=>r.position>0).map((r:any)=>r.position as number);
+                    const tAvgPos = tAllPos.length>0 ? tAllPos.reduce((a:number,b:number)=>a+b,0)/tAllPos.length : 3.5;
+
+                    // Visibility: % of targeted queries where brand was mentioned
+                    const tVis = targetedWin ?? 0;
+
+                    // Prominence: how early brand appears (same inverted-rank formula as main)
+                    const tProm = Math.round(Math.max(10, Math.min(90, 95-(tAvgPos-1)*15)));
+
+                    // Sentiment: ratio of positive vs negative keywords in responses where brand mentioned
+                    const posWords=['best','top','recommended','leading','excellent','great','trusted','popular','effective','strong','ideal','perfect','premier'];
+                    const negWords=['worst','poor','bad','avoid','expensive','weak','limited','disappointing','inferior','unreliable'];
+                    const tMentionedResps=tAllResponses.filter((r:any)=>r.mentioned);
+                    let tPos=0,tNeg=0;
+                    tMentionedResps.forEach((r:any)=>{const t=(r.response_preview||'').toLowerCase();posWords.forEach((w:string)=>{if(t.includes(w))tPos++;});negWords.forEach((w:string)=>{if(t.includes(w))tNeg++;});});
+                    const tSen = tMentionedResps.length>0
+                      ? Math.round(Math.max(20, Math.min(90, 50 + ((tPos-tNeg)/Math.max(tPos+tNeg,1))*30 + tProm*0.10)))
+                      : 30;
+
+                    // Citation: how often brand is the only/first brand mentioned (exclusivity proxy)
+                    const tExclusive = tMentionedResps.filter((r:any)=>r.position===1).length;
+                    const tCit = tAllResponses.length>0
+                      ? Math.round(Math.max(10, Math.min(85, (tExclusive/tAllResponses.length)*100*1.2 + tProm*0.10)))
+                      : 10;
+
+                    // Share of Voice: brand mentions vs total responses (all responses, not just where mentioned)
+                    const tSov = totalTargetedQ>0
+                      ? Math.round(Math.max(10, Math.min(85, (totalTargetedWon/totalTargetedQ)*85)))
+                      : 10;
+
+                    // T-GEO: same formula as main GEO score
                     const tGeo = targetedWin !== null
-                      ? Math.round(targetedWin*0.35 + avgProm*0.25 + sen*0.20 + cit*0.10 + sov*0.10)
+                      ? Math.round(tVis*0.30 + tSen*0.20 + tProm*0.20 + tCit*0.15 + tSov*0.15)
                       : null;
 
                     return (
@@ -2793,12 +2825,12 @@ Return exactly this JSON:
                                     <MetricCard label="win rate" val={`${targetedWin??0}%`}/>
                                     {/* Avg Rank */}
                                     <MetricCard label="avg rank" val={(()=>{const pos=tc.flatMap((c:any)=>(c.responses||[]).filter((r:any)=>r.position>0).map((r:any)=>r.position));return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})()}/>
-                                    {/* Sentiment — from main */}
-                                    <MetricCard label="sentiment score" val={sen}/>
-                                    {/* Citation — from main */}
-                                    <MetricCard label="citation score" val={cit}/>
-                                    {/* Share of Voice — from main */}
-                                    <MetricCard label="share of voice" val={sov}/>
+                                    {/* Sentiment — from targeted responses */}
+                                    <MetricCard label="sentiment score" val={tSen}/>
+                                    {/* Citation — from targeted responses */}
+                                    <MetricCard label="citation score" val={tCit}/>
+                                    {/* Share of Voice — from targeted responses */}
+                                    <MetricCard label="share of voice" val={tSov}/>
                                     {/* vs General gap */}
                                     <div style={{background: gap>5?'#FFF1F2':gap<0?'#F0FDF4':'#F9FAFB', borderRadius:14, border:`1.5px solid ${gap>5?'#FCA5A5':gap<0?'#6EE7B7':'#E5E7EB'}`, padding:'14px 16px', textAlign:'center' as const}}>
                                       <div style={{fontSize:'0.6rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.08em',textTransform:'uppercase' as const,marginBottom:6}}>vs General</div>
