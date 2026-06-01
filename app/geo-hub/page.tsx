@@ -2015,6 +2015,7 @@ export default function GeoHub() {
                         {/* TAB 6: Analysis */}
             {activeTab===6&&(()=>{
               const brand = result.brand_name || 'Your Brand';
+              const lob   = result.ind_label || result.lob || 'this category';
               const geo = result.overall_geo_score || result.visibility || 0;
               const vis = result.visibility || 0;
               const sen = result.sentiment || 0;
