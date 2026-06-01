@@ -2711,115 +2711,170 @@ Return exactly this JSON:
                     );
                   })()}
 
-                  {/* ── TARGETED QUERY TOGGLE ── */}
+                  {/* ── TARGETED QUERY ANALYSIS ── */}
                   {(()=>{
                     const open = targetedOpen; const setOpen = setTargetedOpen;
                     const tc = result.targeted_clusters || [];
+                    const totalTargetedQ = tc.reduce((s:number,c:any)=>s+(c.total||0),0);
+                    const totalTargetedWon = tc.reduce((s:number,c:any)=>s+(c.mentioned||0),0);
+                    const targetedWin = totalTargetedQ > 0 ? Math.round((totalTargetedWon/totalTargetedQ)*100) : null;
                     const generalWin = Math.round(vis);
-                    const targetedWin = tc.length > 0
-                      ? Math.round(tc.reduce((s:number,c:any)=>s+(c.winRate||0),0)/tc.length)
+                    const avgProm = tc.length > 0 ? Math.round(tc.reduce((s:number,c:any)=>s+(c.prominence||0),0)/tc.length) : 0;
+                    const gap = targetedWin !== null ? generalWin - targetedWin : 0;
+                    const isUnderperform = targetedWin !== null && targetedWin < generalWin;
+
+                    // Derived targeted GEO score (visibility-weighted)
+                    const tGeo = targetedWin !== null
+                      ? Math.round(targetedWin*0.35 + avgProm*0.25 + sen*0.20 + cit*0.10 + sov*0.10)
                       : null;
 
                     return (
                       <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',overflow:'hidden',marginBottom:8}}>
-                        {/* Toggle header */}
-                        <button
-                          onClick={()=>setOpen(o=>!o)}
-                          style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 24px',background:'none',border:'none',cursor:'pointer',textAlign:'left' as const}}>
+
+                        {/* ── Header toggle ── */}
+                        <button onClick={()=>setOpen((o:boolean)=>!o)} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 24px',background:'none',border:'none',cursor:'pointer',textAlign:'left' as const}}>
                           <div style={{display:'flex',alignItems:'center',gap:12}}>
-                            <span style={{fontSize:'1.1rem'}}>🎯</span>
+                            <span style={{fontSize:'1.2rem'}}>🎯</span>
                             <div>
-                              <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827'}}>Targeted Query Analysis</div>
+                              <div style={{fontSize:'0.95rem',fontWeight:700,color:'#111827'}}>Targeted Query Analysis</div>
                               <div style={{fontSize:'0.72rem',color:'#9CA3AF',marginTop:2}}>
-                                {tc.length > 0
-                                  ? `${tc.reduce((s:number,c:any)=>s+c.total,0)} queries across ${tc.length} product categories ${brand} is known for`
-                                  : 'Queries built around this brand\'s specific products — run separately from main score'}
+                                {tc.length>0 ? `${totalTargetedQ} queries across ${tc.length} product categories ${brand} is known for` : `Queries built around ${brand}'s specific products — run separately from main score`}
                               </div>
                             </div>
                           </div>
-                          <div style={{display:'flex',alignItems:'center',gap:12,flexShrink:0}}>
-                            {tc.length > 0 && targetedWin !== null && (
-                              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                          <div style={{display:'flex',alignItems:'center',gap:16,flexShrink:0}}>
+                            {tc.length>0 && targetedWin!==null && (
+                              <div style={{display:'flex',gap:6,alignItems:'center'}}>
                                 <div style={{textAlign:'center' as const}}>
-                                  <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>General</div>
-                                  <div style={{fontSize:'0.9rem',fontWeight:800,color:generalWin>=60?'#10B981':generalWin>=30?'#F59E0B':'#EF4444'}}>{generalWin}%</div>
+                                  <div style={{fontSize:'0.58rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'0.06em'}}>GENERAL</div>
+                                  <div style={{fontSize:'1rem',fontWeight:900,color:generalWin>=60?'#10B981':generalWin>=30?'#F59E0B':'#EF4444'}}>{generalWin}%</div>
                                 </div>
-                                <div style={{fontSize:'0.7rem',color:'#9CA3AF'}}>vs</div>
+                                <div style={{fontSize:'0.75rem',color:'#D1D5DB',fontWeight:300}}>|</div>
                                 <div style={{textAlign:'center' as const}}>
-                                  <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>Targeted</div>
-                                  <div style={{fontSize:'0.9rem',fontWeight:800,color:targetedWin>=60?'#10B981':targetedWin>=30?'#F59E0B':'#EF4444'}}>{targetedWin}%</div>
+                                  <div style={{fontSize:'0.58rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'0.06em'}}>TARGETED</div>
+                                  <div style={{fontSize:'1rem',fontWeight:900,color:targetedWin>=60?'#10B981':targetedWin>=30?'#F59E0B':'#EF4444'}}>{targetedWin}%</div>
                                 </div>
+                                {tGeo!==null && (
+                                  <>
+                                    <div style={{fontSize:'0.75rem',color:'#D1D5DB',fontWeight:300}}>|</div>
+                                    <div style={{textAlign:'center' as const}}>
+                                      <div style={{fontSize:'0.58rem',color:'#9CA3AF',fontWeight:600,letterSpacing:'0.06em'}}>T-GEO</div>
+                                      <div style={{fontSize:'1rem',fontWeight:900,color:'#A100FF'}}>{tGeo}</div>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             )}
-                            <div style={{fontSize:'0.75rem',color:'#A100FF',fontWeight:600}}>{open ? '▲ Hide' : '▼ Show'}</div>
+                            <div style={{fontSize:'0.75rem',color:'#A100FF',fontWeight:600,whiteSpace:'nowrap' as const}}>{open?'▲ Hide':'▼ Show'}</div>
                           </div>
                         </button>
 
-                        {/* Expanded content */}
+                        {/* ── Expanded body ── */}
                         {open && (
-                          <div style={{borderTop:'1px solid #F3F4F6',padding:'20px 24px'}}>
-                            {tc.length === 0 ? (
-                              <div style={{textAlign:'center' as const,padding:'32px 0',color:'#9CA3AF',fontSize:'0.85rem'}}>
+                          <div style={{borderTop:'1px solid #F3F4F6'}}>
+                            {tc.length===0 ? (
+                              <div style={{textAlign:'center' as const,padding:'40px 0',color:'#9CA3AF',fontSize:'0.85rem'}}>
                                 <div style={{fontSize:'2rem',marginBottom:8}}>🔄</div>
-                                Targeted query data not yet available. Re-run the analysis to include targeted queries.
+                                Targeted query data not available. Re-run analysis to include targeted queries.
                               </div>
                             ) : (
                               <>
-                                {/* Summary insight */}
-                                <div style={{background: targetedWin !== null && targetedWin < generalWin ? '#FFF7F7' : '#F0FDF4', borderRadius:10, padding:'14px 18px', marginBottom:18, display:'flex', gap:16, alignItems:'center', border:`1px solid ${targetedWin !== null && targetedWin < generalWin ? '#FCA5A5' : '#6EE7B7'}`}}>
-                                  <div style={{fontSize:'1.8rem'}}>{targetedWin !== null && targetedWin < generalWin ? '⚠️' : '✅'}</div>
+                                {/* ── Scorecard row ── */}
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:0,borderBottom:'1px solid #F3F4F6'}}>
+                                  {[
+                                    {label:'Targeted GEO',val:tGeo??'—',sub:'Product-specific score',color:'#A100FF',big:true},
+                                    {label:'Win Rate',val:`${targetedWin??0}%`,sub:`${totalTargetedWon}/${totalTargetedQ} queries won`,color:targetedWin!==null&&targetedWin>=60?'#10B981':targetedWin!==null&&targetedWin>=30?'#F59E0B':'#EF4444',big:false},
+                                    {label:'Prominence',val:avgProm,sub:'Avg position score',color:'#8B5CF6',big:false},
+                                    {label:'Sentiment',val:sen,sub:'From main analysis',color:'#EC4899',big:false},
+                                    {label:'Citation',val:cit,sub:'From main analysis',color:'#F59E0B',big:false},
+                                    {label:'vs General',val:gap===0?'Even':gap>0?`-${gap}pts`:`+${Math.abs(gap)}pts`,sub:gap>0?'Below general score':gap<0?'Above general score':'Matches general',color:gap>5?'#EF4444':gap<0?'#10B981':'#6B7280',big:false},
+                                  ].map((m,i)=>(
+                                    <div key={i} style={{padding:'16px 18px',borderRight:i<5?'1px solid #F3F4F6':'none',textAlign:'center' as const}}>
+                                      <div style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:4}}>{m.label}</div>
+                                      <div style={{fontSize:m.big?'2rem':'1.6rem',fontWeight:900,color:m.color,lineHeight:1}}>{m.val}</div>
+                                      <div style={{fontSize:'0.62rem',color:'#9CA3AF',marginTop:4,lineHeight:1.3}}>{m.sub}</div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* ── Gap insight banner ── */}
+                                <div style={{margin:'16px 24px 0',background:isUnderperform?'#FFF7F7':'#F0FDF4',borderRadius:10,padding:'12px 18px',display:'flex',gap:14,alignItems:'flex-start',border:`1px solid ${isUnderperform?'#FCA5A5':'#6EE7B7'}`}}>
+                                  <span style={{fontSize:'1.4rem',flexShrink:0}}>{isUnderperform?'⚠️':'✅'}</span>
                                   <div>
-                                    <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827',marginBottom:3}}>
-                                      {targetedWin !== null && targetedWin < generalWin
-                                        ? `${brand} wins ${generalWin}% on general queries — but only ${targetedWin}% on queries about its own products.`
+                                    <div style={{fontSize:'0.88rem',fontWeight:700,color:'#111827',marginBottom:2}}>
+                                      {isUnderperform
+                                        ? `${brand} wins ${generalWin}% on general queries — only ${targetedWin}% on its own product queries.`
                                         : `${brand} performs consistently on product-specific queries (${targetedWin}% vs ${generalWin}% general).`}
                                     </div>
-                                    <div style={{fontSize:'0.76rem',color:'#6B7280',lineHeight:1.5}}>
-                                      {targetedWin !== null && targetedWin < generalWin
-                                        ? `Gap of ${generalWin - targetedWin!} points — AI knows ${brand} but doesn't recommend it when consumers ask about its own products. This is a content and citation gap, not a brand awareness problem.`
-                                        : `Targeted query performance is strong — ${brand}'s product content is well-indexed by AI.`}
+                                    <div style={{fontSize:'0.75rem',color:'#6B7280',lineHeight:1.5}}>
+                                      {isUnderperform
+                                        ? `A ${gap}-point gap — AI knows ${brand} but doesn't recommend it when consumers ask about its own products. Content and citation gap, not a brand awareness problem.`
+                                        : `Product content is well-indexed by AI. Focus on closing gaps in specific product categories below.`}
                                     </div>
                                   </div>
                                 </div>
 
-                                {/* Product cards */}
-                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12}}>
-                                  {tc.map((c:any,i:number) => {
-                                    const leaderWin = Math.min(90, (competitors[0]?.GEO||70));
-                                    const gap = leaderWin - (c.winRate||0);
-                                    const color = (c.winRate||0)>=60?'#10B981':(c.winRate||0)>=30?'#F59E0B':'#EF4444';
-                                    return (
-                                      <div key={i} style={{background:'white',border:`1px solid ${color}30`,borderLeft:`4px solid ${color}`,borderRadius:10,padding:'14px 16px'}}>
-                                        <div style={{fontSize:'0.9rem',fontWeight:700,color:'#111827',marginBottom:10}}>{c.product}</div>
-                                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                                          <div style={{background:'#F9FAFB',borderRadius:8,padding:'8px',textAlign:'center' as const}}>
-                                            <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Win Rate</div>
-                                            <div style={{fontSize:'1.4rem',fontWeight:900,color}}>{c.winRate}%</div>
+                                {/* ── Product cards ── */}
+                                <div style={{padding:'16px 24px 8px'}}>
+                                  <div style={{fontSize:'0.65rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:12}}>Product Performance Breakdown</div>
+                                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:14}}>
+                                    {tc.map((c:any,i:number)=>{
+                                      const color=(c.winRate||0)>=60?'#10B981':(c.winRate||0)>=30?'#F59E0B':'#EF4444';
+                                      const leaderWin=Math.min(90,competitors[0]?.GEO||70);
+                                      const prodGap=leaderWin-(c.winRate||0);
+                                      return (
+                                        <div key={i} style={{background:'#FAFAFA',border:`1px solid ${color}25`,borderLeft:`4px solid ${color}`,borderRadius:10,padding:'16px'}}>
+                                          {/* Product name + badge */}
+                                          <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:12,gap:8}}>
+                                            <div style={{fontSize:'0.88rem',fontWeight:800,color:'#111827',lineHeight:1.3}}>{c.product}</div>
+                                            <span style={{background:color+'20',color,fontSize:'0.62rem',fontWeight:700,padding:'2px 8px',borderRadius:50,whiteSpace:'nowrap' as const,flexShrink:0}}>
+                                              {(c.winRate||0)>=60?'Strong':(c.winRate||0)>=30?'Emerging':'Gap'}
+                                            </span>
                                           </div>
-                                          <div style={{background:'#F9FAFB',borderRadius:8,padding:'8px',textAlign:'center' as const}}>
-                                            <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginBottom:2}}>Prominence</div>
-                                            <div style={{fontSize:'1.4rem',fontWeight:900,color:'#A100FF'}}>{c.prominence||0}</div>
+
+                                          {/* Metrics row */}
+                                          <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:10}}>
+                                            {[
+                                              {label:'Win Rate',val:`${c.winRate||0}%`,color},
+                                              {label:'Prominence',val:c.prominence||0,color:'#A100FF'},
+                                              {label:'Queries',val:`${c.mentioned||0}/${c.total||0}`,color:'#6B7280'},
+                                            ].map((m,mi)=>(
+                                              <div key={mi} style={{background:'white',borderRadius:7,padding:'7px 6px',textAlign:'center' as const,border:'1px solid #F3F4F6'}}>
+                                                <div style={{fontSize:'0.55rem',color:'#9CA3AF',marginBottom:1}}>{m.label}</div>
+                                                <div style={{fontSize:'1.05rem',fontWeight:900,color:m.color}}>{m.val}</div>
+                                              </div>
+                                            ))}
                                           </div>
-                                        </div>
-                                        <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden',marginBottom:8}}>
-                                          <div style={{width:`${c.winRate||0}%`,height:'100%',background:color,borderRadius:50}}/>
-                                        </div>
-                                        <div style={{fontSize:'0.7rem',color:'#6B7280',marginBottom:4}}>
-                                          {c.topCompetitor && <span>Led by <strong>{c.topCompetitor}</strong> · </span>}
-                                          {c.mentioned}/{c.total} queries won
-                                        </div>
-                                        {(c.responses||[]).slice(0,2).map((r:any,ri:number)=>(
-                                          <div key={ri} style={{fontSize:'0.68rem',color:r.mentioned?'#065F46':'#991B1B',background:r.mentioned?'#F0FDF4':'#FFF7F7',borderRadius:5,padding:'4px 7px',marginBottom:3}}>
-                                            {r.mentioned?'✓':'✗'} {r.query}
+
+                                          {/* Win bar */}
+                                          <div style={{background:'#E5E7EB',borderRadius:50,height:5,overflow:'hidden',marginBottom:8}}>
+                                            <div style={{width:`${c.winRate||0}%`,height:'100%',background:color,borderRadius:50,transition:'width 0.4s'}}/>
                                           </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  })}
+
+                                          {/* Leader + gap */}
+                                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+                                            <div style={{fontSize:'0.68rem',color:'#6B7280'}}>
+                                              {c.topCompetitor?<span>Led by <strong style={{color:'#374151'}}>{c.topCompetitor}</strong></span>:<span style={{color:'#10B981'}}>No clear leader</span>}
+                                            </div>
+                                            {prodGap>0&&<div style={{fontSize:'0.65rem',color:'#EF4444',fontWeight:700}}>Gap: {prodGap}pts</div>}
+                                          </div>
+
+                                          {/* Ran queries */}
+                                          <div style={{fontSize:'0.6rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.08em',textTransform:'uppercase' as const,marginBottom:5}}>Ran Queries</div>
+                                          {(c.responses||[]).map((r:any,ri:number)=>(
+                                            <div key={ri} style={{display:'flex',gap:5,alignItems:'flex-start',fontSize:'0.7rem',color:r.mentioned?'#065F46':'#991B1B',background:r.mentioned?'#F0FDF4':'#FFF7F7',border:`1px solid ${r.mentioned?'#6EE7B7':'#FCA5A5'}`,borderRadius:6,padding:'5px 8px',marginBottom:4,lineHeight:1.4}}>
+                                              <span style={{flexShrink:0,fontWeight:700}}>{r.mentioned?'✓':'✗'}</span>
+                                              <span>{r.query}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
 
-                                {/* Legend */}
-                                <div style={{marginTop:14,fontSize:'0.7rem',color:'#9CA3AF',textAlign:'center' as const}}>
+                                {/* Footer note */}
+                                <div style={{padding:'12px 24px 18px',fontSize:'0.68rem',color:'#9CA3AF',textAlign:'center' as const}}>
                                   These queries were generated based on {brand}'s known products and run separately — they do not affect the main GEO score.
                                 </div>
                               </>
