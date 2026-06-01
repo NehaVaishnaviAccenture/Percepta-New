@@ -2725,7 +2725,8 @@ Return exactly this JSON:
 
                     // Compute all 5 GEO signals from targeted query responses directly
                     const tAllResponses = tc.flatMap((c:any)=>c.responses||[]);
-                    const tAllPos = tAllResponses.filter((r:any)=>r.position>0).map((r:any)=>r.position as number);
+                    // Unmentioned responses count as position 5 (worst case) so rank isn't artificially inflated
+                    const tAllPos = tAllResponses.map((r:any)=>r.position>0?r.position as number:5);
                     const tAvgPos = tAllPos.length>0 ? tAllPos.reduce((a:number,b:number)=>a+b,0)/tAllPos.length : 3.5;
 
                     // Visibility: % of targeted queries where brand was mentioned
@@ -2824,7 +2825,7 @@ Return exactly this JSON:
                                     {/* Win Rate */}
                                     <MetricCard label="win rate" val={`${targetedWin??0}%`}/>
                                     {/* Avg Rank */}
-                                    <MetricCard label="avg rank" val={(()=>{const pos=tc.flatMap((c:any)=>(c.responses||[]).filter((r:any)=>r.position>0).map((r:any)=>r.position));return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})()}/>
+                                    <MetricCard label="avg rank" val={(()=>{const pos=tc.flatMap((c:any)=>(c.responses||[]).map((r:any)=>r.position>0?r.position:5));return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})()}/>
                                     {/* Sentiment — from targeted responses */}
                                     <MetricCard label="sentiment score" val={tSen}/>
                                     {/* Citation — from targeted responses */}
@@ -2879,7 +2880,7 @@ Return exactly this JSON:
                                           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:10}}>
                                             {[
                                               {label:'Win Rate',val:`${c.winRate||0}%`,color},
-                                              {label:'Avg Rank',val:(()=>{const pos=(c.responses||[]).filter((r:any)=>r.position>0).map((r:any)=>r.position);return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})(),color:'#A100FF'},
+                                              {label:'Avg Rank',val:(()=>{const pos=(c.responses||[]).map((r:any)=>r.position>0?r.position:5);return `#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`;})(),color:'#A100FF'},
                                               {label:'Queries',val:`${c.mentioned||0}/${c.total||0}`,color:'#6B7280'},
                                             ].map((m,mi)=>(
                                               <div key={mi} style={{background:'white',borderRadius:7,padding:'7px 6px',textAlign:'center' as const,border:'1px solid #F3F4F6'}}>
