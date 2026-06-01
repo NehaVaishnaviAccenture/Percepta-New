@@ -2282,82 +2282,227 @@ export default function GeoHub() {
                     </div>
                   </div>
 
-                  {/* ── SECTION 4: Signal breakdown + Path forward (images 4+5) ── */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
-                    {/* 5 signal breakdown */}
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{fontSize:'0.68rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.10em',textTransform:'uppercase' as const,marginBottom:16}}>GEO Signal Breakdown</div>
-                      <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
-                        Weakest signal: <strong style={{color:weakestSignal.color}}>{weakestSignal.label} ({weakestSignal.val})</strong>. Strongest: <strong style={{color:strongestSignal.color}}>{strongestSignal.label} ({strongestSignal.val})</strong>.
-                      </p>
-                      {signals.map((s,i)=>{
-                        const barColor = s.val>=70?'#10B981':s.val>=56?'#3B82F6':s.val>=45?'#F59E0B':'#EF4444';
-                        return (
-                          <div key={i} style={{marginBottom:12}}>
-                            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-                              <span style={{fontSize:'0.78rem',fontWeight:600,color:'#374151'}}>{s.label}</span>
-                              <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                                <span style={{fontSize:'0.65rem',color:'#9CA3AF'}}>{s.weight}</span>
-                                <span style={{fontSize:'0.82rem',fontWeight:800,color:barColor}}>{s.val}</span>
-                              </div>
-                            </div>
-                            <div style={{background:'#F3F4F6',borderRadius:6,height:8,overflow:'hidden' as const}}>
-                              <div style={{width:`${s.val}%`,height:'100%',background:barColor,borderRadius:6,transition:'width 0.4s'}}/>
-                            </div>
-                          </div>
+                  {/* ── SECTION 4: Presence Gap — brand known for X but AI ignores it ── */}
+                  {(()=>{
+                    // Find categories where brand HAS products but low AI win rate = gap
+                    const presenceGaps = allProds
+                      .filter(p => p.val < 30)
+                      .map(p => {
+                        // Find which competitor dominates this space
+                        const topComp = [...competitors]
+                          .sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0))
+                          .find((c:any) => c.GEO > geo);
+                        // Find if any cluster matches this product label
+                        const matchCluster = clusters.find((c:any) =>
+                          c.category.toLowerCase().includes(p.label.split(' ')[0].toLowerCase()) ||
+                          p.label.toLowerCase().includes((c.category||'').split(' ')[0].toLowerCase())
                         );
-                      })}
-                    </div>
+                        return {
+                          product: p.label,
+                          brandScore: p.val,
+                          clusterWinRate: matchCluster?.winRate || 0,
+                          topCompetitor: topComp?.Brand || 'a top competitor',
+                          topCompGEO: topComp?.GEO || 0,
+                          gap: 100 - p.val,
+                        };
+                      })
+                      .sort((a,b) => b.gap - a.gap)
+                      .slice(0, 4);
 
-                    {/* Path forward (image 4) */}
-                    <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
-                      <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
-                        {brand} GEO · The Opportunity
-                      </div>
-                      <h2 style={{fontSize:'1.3rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:16}}>
-                        A closeable gap —<br/><span style={{color:'#A100FF'}}>and a clear path to #{Math.max(1,rankNum-1)}.</span>
-                      </h2>
-                      <p style={{fontSize:'0.78rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
-                        Prioritized actions unlock an estimated <strong style={{color:'#F59E0B'}}>+7 points near-term</strong> ({geo} → {geo+7}, into the Competitive tier). The full roadmap targets a <strong style={{color:'#A100FF'}}>+22-point unlock</strong> — enough to leapfrog and challenge for #{Math.max(1,rankNum-2)} in AI.
-                      </p>
-                      {/* Journey steps */}
-                      {[
-                        {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
-                        {score:String(geo+7), label:'Near-term (+7)', sub:'Crosses into the Competitive tier', bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
-                        {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Leapfrog to challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
-                      ].map((step,i)=>(
-                        <div key={i} style={{display:'flex',gap:12,alignItems:'stretch',marginBottom:8}}>
-                          <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center',gap:2}}>
-                            <div style={{width:4,background:step.border,borderRadius:4,flex:1,minHeight:4}}/>
-                            {i<2&&<div style={{color:'#10B981',fontSize:'0.7rem'}}>↓</div>}
-                          </div>
-                          <div style={{flex:1,background:step.bg,borderRadius:10,padding:'10px 14px'}}>
-                            <div style={{fontSize:'1.8rem',fontWeight:900,color:step.color,lineHeight:1}}>{step.score}</div>
-                            <div style={{fontSize:'0.78rem',fontWeight:700,color:'#374151',marginTop:2}}>{step.label}</div>
-                            <div style={{fontSize:'0.72rem',color:'#6B7280'}}>{step.sub}</div>
+                    // Quick wins: clusters where brand is close (20-50% win rate)
+                    const quickWins = [...clusters]
+                      .filter((c:any) => (c.winRate||0) >= 15 && (c.winRate||0) <= 50)
+                      .sort((a:any,b:any)=>(b.winRate||0)-(a.winRate||0))
+                      .slice(0, 5);
+
+                    // Competitor threat: who is #1 on which topics
+                    const compThreats: {[key:string]: number} = {};
+                    clusters.forEach((c:any) => {
+                      const dom = c.topCompetitor || (competitors[0]?.Brand||'');
+                      if (dom) compThreats[dom] = (compThreats[dom]||0) + 1;
+                    });
+                    const threatList = Object.entries(compThreats)
+                      .sort((a,b)=>b[1]-a[1])
+                      .slice(0, 5)
+                      .map(([name, count]) => ({name, count, pct: Math.round((count/Math.max(clusters.length,1))*100)}));
+
+                    return (
+                      <>
+                      {/* Presence Gap Card */}
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:6}}>
+                          <div>
+                            <div style={{fontSize:'0.65rem',fontWeight:800,color:'#EF4444',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>⚠ Presence Gap Analysis</div>
+                            <h3 style={{fontSize:'1.2rem',fontWeight:800,color:'#111827',marginBottom:6}}>
+                              {brand} is known for these products — but AI isn't recommending it for them.
+                            </h3>
+                            <p style={{fontSize:'0.82rem',color:'#6B7280',lineHeight:1.6,marginBottom:0,maxWidth:700}}>
+                              These are categories where {brand} has real products and market presence,
+                              yet AI responses are dominated by competitors. This is a <strong>content and citation gap</strong> — not a brand problem.
+                            </p>
                           </div>
                         </div>
-                      ))}
-                      {/* How boxes */}
-                      <div style={{fontSize:'0.65rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,margin:'14px 0 8px'}}>The How</div>
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                        {[
-                          {icon:'📄', title:'LLM-ready content', sub:'for blind-spot categories'},
-                          {icon:'🏷️', title:'Attribute reinforcement', sub:'on core products'},
-                          {icon:'🔗', title:'Citation & authority', sub:'earned-media signals'},
-                          {icon:'⚙️', title:'Technical & schema', sub:'for AI ingestion'},
-                        ].map((h,i)=>(
-                          <div key={i} style={{background:'#7C3AED',borderRadius:8,padding:'10px 12px',display:'flex',gap:8,alignItems:'flex-start'}}>
-                            <span style={{fontSize:'1.1rem'}}>{h.icon}</span>
-                            <div>
-                              <div style={{fontSize:'0.72rem',fontWeight:700,color:'white'}}>{h.title}</div>
-                              <div style={{fontSize:'0.65rem',color:'#C4B5FD'}}>{h.sub}</div>
+                        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12,marginTop:16}}>
+                          {presenceGaps.map((g,i)=>(
+                            <div key={i} style={{background:'#FFF7F7',border:'1px solid #FCA5A5',borderRadius:12,padding:'16px 18px'}}>
+                              <div style={{fontSize:'0.88rem',fontWeight:700,color:'#991B1B',marginBottom:4}}>{g.product}</div>
+                              <div style={{display:'flex',gap:16,marginBottom:10}}>
+                                <div>
+                                  <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginBottom:2}}>Brand AI Score</div>
+                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:'#EF4444'}}>{g.brandScore}<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>/100</span></div>
+                                </div>
+                                <div>
+                                  <div style={{fontSize:'0.65rem',color:'#9CA3AF',marginBottom:2}}>Prompt Win Rate</div>
+                                  <div style={{fontSize:'1.4rem',fontWeight:900,color:'#F97316'}}>{g.clusterWinRate}<span style={{fontSize:'0.7rem',color:'#9CA3AF'}}>%</span></div>
+                                </div>
+                              </div>
+                              <div style={{background:'#F3F4F6',borderRadius:6,height:6,overflow:'hidden',marginBottom:8}}>
+                                <div style={{width:`${g.brandScore}%`,height:'100%',background:'#EF4444',borderRadius:6}}/>
+                              </div>
+                              <div style={{fontSize:'0.72rem',color:'#6B7280'}}>
+                                Dominated by <strong style={{color:'#374151'}}>{g.topCompetitor}</strong> (GEO {g.topCompGEO})
+                              </div>
+                              <div style={{marginTop:8,fontSize:'0.7rem',color:'#991B1B',background:'#FEE2E2',borderRadius:6,padding:'4px 8px'}}>
+                                Fix: Add {g.product.toLowerCase()} content to AI-indexed pages
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Quick Wins + Competitor Threat side by side */}
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:20}}>
+                        {/* Quick Wins */}
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#10B981',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>🎯 Quick Wins</div>
+                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Close these first — {brand} is already close to winning.</h3>
+                          <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:16}}>
+                            These prompt categories show 15–50% win rate — meaning AI already knows {brand} here. A targeted content push could flip these to consistent wins within weeks.
+                          </p>
+                          {quickWins.length === 0 ? (
+                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic'}}>No near-win clusters detected — focus on presence gaps above.</div>
+                          ) : quickWins.map((c:any,i:number)=>{
+                            const rate = c.winRate||0;
+                            const toWin = Math.max(0, 60-rate);
+                            return (
+                              <div key={i} style={{marginBottom:12,paddingBottom:12,borderBottom:i<quickWins.length-1?'1px solid #F3F4F6':'none'}}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                                  <span style={{fontSize:'0.82rem',fontWeight:600,color:'#111827'}}>{c.category}</span>
+                                  <span style={{fontSize:'0.82rem',fontWeight:800,color:'#10B981'}}>{rate}%</span>
+                                </div>
+                                <div style={{background:'#F3F4F6',borderRadius:50,height:8,overflow:'hidden',marginBottom:4}}>
+                                  <div style={{width:`${rate}%`,height:'100%',background:'#34D399',borderRadius:50}}/>
+                                </div>
+                                <div style={{fontSize:'0.7rem',color:'#6B7280'}}>
+                                  +{toWin}% more to hit 60% win rate threshold · {c.totalResponses||'—'} responses tracked
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <div style={{marginTop:14,background:'#ECFDF5',borderRadius:8,padding:'10px 14px',fontSize:'0.75rem',color:'#065F46',borderLeft:'3px solid #10B981'}}>
+                            <strong>So what:</strong> These are the cheapest wins. Optimize existing content for these topics before building new.
+                          </div>
+                        </div>
+
+                        {/* Competitor Threat Map */}
+                        <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px'}}>
+                          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:6}}>🏆 Competitor Threat Map</div>
+                          <h3 style={{fontSize:'1rem',fontWeight:800,color:'#111827',marginBottom:4}}>Who is dominating {brand}'s conversation?</h3>
+                          <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:16}}>
+                            These brands are consistently named first in the same prompt categories where {brand} should be winning. Each category they own is a customer {brand} never reaches.
+                          </p>
+                          {threatList.length === 0 ? (
+                            <div style={{fontSize:'0.8rem',color:'#9CA3AF',fontStyle:'italic'}}>No competitor dominance data available.</div>
+                          ) : threatList.map((t,i)=>(
+                            <div key={i} style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,paddingBottom:12,borderBottom:i<threatList.length-1?'1px solid #F3F4F6':'none'}}>
+                              <div style={{width:36,height:36,borderRadius:'50%',background:'#F3F4F6',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:'0.72rem',color:'#374151',flexShrink:0}}>
+                                #{i+1}
+                              </div>
+                              <div style={{flex:1}}>
+                                <div style={{display:'flex',justifyContent:'space-between',marginBottom:3}}>
+                                  <span style={{fontSize:'0.85rem',fontWeight:700,color:'#111827'}}>{t.name}</span>
+                                  <span style={{fontSize:'0.78rem',fontWeight:700,color:'#A100FF'}}>{t.count} topics</span>
+                                </div>
+                                <div style={{background:'#F3F4F6',borderRadius:50,height:6,overflow:'hidden'}}>
+                                  <div style={{width:`${t.pct}%`,height:'100%',background:'#A100FF',borderRadius:50}}/>
+                                </div>
+                                <div style={{fontSize:'0.68rem',color:'#9CA3AF',marginTop:3}}>Owns {t.pct}% of tracked prompt categories</div>
+                              </div>
+                            </div>
+                          ))}
+                          <div style={{marginTop:14,background:'#F5F0FF',borderRadius:8,padding:'10px 14px',fontSize:'0.75rem',color:'#7C3AED',borderLeft:'3px solid #A100FF'}}>
+                            <strong>So what:</strong> Study what content these competitors publish for these topics — then build better, more specific, AI-optimized versions.
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Path Forward — expanded right side only */}
+                      <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1.6fr',gap:28}}>
+                          {/* Left: What's Next narrative */}
+                          <div>
+                            <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
+                              {brand} GEO · The Opportunity
+                            </div>
+                            <h2 style={{fontSize:'1.4rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:12}}>
+                              A closeable gap —<br/><span style={{color:'#A100FF'}}>and a clear path to #{Math.max(1,rankNum-1)}.</span>
+                            </h2>
+                            <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>
+                              Prioritized actions unlock an estimated <strong style={{color:'#F59E0B'}}>+7 points near-term</strong> ({geo} → {geo+7}, into the Competitive tier). The full roadmap targets a <strong style={{color:'#A100FF'}}>+22-point unlock</strong>.
+                            </p>
+                            <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
+                              {brand} doesn't need to outspend the market — it needs to send the right signals, in the right places, in the right order.
+                            </p>
+                            <div style={{background:'#F5F0FF',borderRadius:8,borderLeft:'4px solid #A100FF',padding:'14px 16px',fontSize:'0.78rem',color:'#374151',lineHeight:1.6}}>
+                              <strong style={{textDecoration:'underline'}}>So what</strong> — Percepta turns this diagnosis into a sequenced, forecasted roadmap. Every action is ranked by ROI — not by effort.
                             </div>
                           </div>
-                        ))}
+
+                          {/* Right: Journey + How */}
+                          <div>
+                            {[
+                              {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
+                              {score:String(geo+7), label:'Near-term (+7)', sub:'Crosses into the Competitive tier · fix quick wins + top gaps', bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
+                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Leapfrog to challenge for top ${Math.max(1,rankNum-1)} in AI`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
+                            ].map((step,i)=>(
+                              <div key={i} style={{display:'flex',gap:12,alignItems:'stretch',marginBottom:8}}>
+                                <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center'}}>
+                                  <div style={{width:4,background:step.border,borderRadius:4,flex:1,minHeight:8}}/>
+                                  {i<2&&<div style={{color:'#9CA3AF',fontSize:'0.75rem',margin:'2px 0'}}>↓</div>}
+                                </div>
+                                <div style={{flex:1,background:step.bg,borderRadius:10,padding:'12px 16px'}}>
+                                  <div style={{fontSize:'2rem',fontWeight:900,color:step.color,lineHeight:1}}>{step.score}</div>
+                                  <div style={{fontSize:'0.82rem',fontWeight:700,color:'#374151',marginTop:2}}>{step.label}</div>
+                                  <div style={{fontSize:'0.73rem',color:'#6B7280'}}>{step.sub}</div>
+                                </div>
+                              </div>
+                            ))}
+
+                            <div style={{fontSize:'0.65rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,margin:'16px 0 10px'}}>The How — Prioritized Actions</div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                              {[
+                                {icon:'📄', title:'LLM-ready content', sub:`Cover ${presenceGaps.slice(0,2).map(g=>g.product).join(' & ')} blind spots`, priority:'High'},
+                                {icon:'🏷️', title:'Attribute reinforcement', sub:`Strengthen signals on ${strongProds[0]?.label||'top products'}`, priority:'High'},
+                                {icon:'🔗', title:'Citation & authority', sub:'Build earned-media on AI-trusted sources', priority:'Medium'},
+                                {icon:'⚙️', title:'Technical & schema', sub:'Structured data for AI ingestion', priority:'Medium'},
+                              ].map((h,i)=>(
+                                <div key={i} style={{background:'#7C3AED',borderRadius:10,padding:'12px 14px'}}>
+                                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
+                                    <span style={{fontSize:'1.2rem'}}>{h.icon}</span>
+                                    <span style={{fontSize:'0.6rem',fontWeight:700,background:h.priority==='High'?'#EF4444':'#F59E0B',color:'white',borderRadius:4,padding:'1px 6px'}}>{h.priority}</span>
+                                  </div>
+                                  <div style={{fontSize:'0.75rem',fontWeight:700,color:'white',marginBottom:2}}>{h.title}</div>
+                                  <div style={{fontSize:'0.65rem',color:'#C4B5FD',lineHeight:1.4}}>{h.sub}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+
+                      </>
+                    );
+                  })()}
 
                 </div>
               );
