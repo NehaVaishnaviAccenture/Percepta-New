@@ -2050,7 +2050,7 @@ STRICT RULES:
 - ZERO brand names in any query — no "${brand}", no competitor names, no product names like "simplicity", "double cash", "sapphire", "venture" etc.
 - Queries must be generic consumer questions that any brand in this category could answer.
 - Good example: "which credit card has the best balance transfer intro offer"
-- Bad example: "citi simplicity balance transfer offer" — REJECTED, contains brand/product name.`;
+- Bad example: "which [brand name] card has a balance transfer offer" — REJECTED, contains brand name.`;
 
       const fameRaw = await callAI([{role:'user', content: brandFamePrompt}], 0.2, 1200);
       const fameData = JSON.parse(fameRaw.replace(/```json|```/g,'').trim());
@@ -2059,11 +2059,17 @@ STRICT RULES:
       if (knownFor.length > 0) {
         const allTargetedQA: {product:string;query:string;ans:string;mentioned:boolean;position:number}[] = [];
         const flatQ: {product:string;query:string}[] = [];
-        // Post-process: strip any queries that contain brand/product names
-        const brandTokens = [brand.toLowerCase(), ...brand.toLowerCase().split(/\s+/)].filter(t=>t.length>3);
-        const allKnownProducts = knownFor.map(k=>k.product.toLowerCase().split(/\s+/).filter((w:string)=>w.length>3)).flat();
-        const forbiddenTokens = [...new Set([...brandTokens, ...allKnownProducts])];
-        const isClean = (q:string) => !forbiddenTokens.some(t => q.toLowerCase().includes(t));
+        // Post-process: only strip queries that contain the brand name itself (not generic product words)
+        const brandLower = brand.toLowerCase();
+        const brandWords = brandLower.split(/\s+/).filter((w:string)=>w.length>4); // only long words e.g. "citibank" not "cash"
+        const isClean = (q:string) => {
+          const ql = q.toLowerCase();
+          // Block if full brand name appears
+          if (ql.includes(brandLower)) return false;
+          // Block if any long brand word appears (e.g. "citibank", "american", "express")
+          if (brandWords.some((w:string) => ql.includes(w))) return false;
+          return true;
+        };
         knownFor.forEach(k => k.queries.slice(0,10).filter(isClean).forEach(q => flatQ.push({product:k.product, query:q})));
 
         const TBATCH = 10;
