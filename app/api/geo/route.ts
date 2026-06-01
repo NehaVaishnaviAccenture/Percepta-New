@@ -2044,7 +2044,13 @@ Only include areas where ${brand} has a strong real-world market reputation.
 
 Return exactly this JSON:
 {"knownFor":[{"product":"product name","queries":["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10"]}]}
-Maximum 5 products, 10 queries each. Total must be exactly 50 queries.`;
+
+STRICT RULES:
+- Maximum 5 products, 10 queries each. Total must be exactly 50 queries.
+- ZERO brand names in any query — no "${brand}", no competitor names, no product names like "simplicity", "double cash", "sapphire", "venture" etc.
+- Queries must be generic consumer questions that any brand in this category could answer.
+- Good example: "which credit card has the best balance transfer intro offer"
+- Bad example: "citi simplicity balance transfer offer" — REJECTED, contains brand/product name.`;
 
       const fameRaw = await callAI([{role:'user', content: brandFamePrompt}], 0.2, 1200);
       const fameData = JSON.parse(fameRaw.replace(/```json|```/g,'').trim());
@@ -2053,7 +2059,12 @@ Maximum 5 products, 10 queries each. Total must be exactly 50 queries.`;
       if (knownFor.length > 0) {
         const allTargetedQA: {product:string;query:string;ans:string;mentioned:boolean;position:number}[] = [];
         const flatQ: {product:string;query:string}[] = [];
-        knownFor.forEach(k => k.queries.slice(0,10).forEach(q => flatQ.push({product:k.product, query:q})));
+        // Post-process: strip any queries that contain brand/product names
+        const brandTokens = [brand.toLowerCase(), ...brand.toLowerCase().split(/\s+/)].filter(t=>t.length>3);
+        const allKnownProducts = knownFor.map(k=>k.product.toLowerCase().split(/\s+/).filter((w:string)=>w.length>3)).flat();
+        const forbiddenTokens = [...new Set([...brandTokens, ...allKnownProducts])];
+        const isClean = (q:string) => !forbiddenTokens.some(t => q.toLowerCase().includes(t));
+        knownFor.forEach(k => k.queries.slice(0,10).filter(isClean).forEach(q => flatQ.push({product:k.product, query:q})));
 
         const TBATCH = 10;
         const tbatches: {product:string;query:string}[][] = [];
