@@ -184,7 +184,11 @@ function getIndustry(domain: string, pageData?: any): string {
 // ── IMPORTANT: paste your full INDUSTRY_DATA object here unchanged ──
 // copy const INDUSTRY_DATA: Record<string, any> = { ... }; from your existing route.ts
 // ─────────────────────────────────────────────────────────────────────
-const INDUSTRY_DATA: Record<string, any> = {} as any; // REPLACE WITH YOUR FULL INDUSTRY_DATA
+//const INDUSTRY_DATA: Record<string, any> = {} as any; 
+
+const INDUSTRY_DATA: Record<string, any> = {
+  fin: {
+    name: 'financial services / credit cards',// REPLACE WITH YOUR FULL INDUSTRY_DATA
 // ─────────────────────────────────────────────────────────────────────
 
 const ALL_KNOWN_BRANDS = [
