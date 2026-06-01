@@ -2464,13 +2464,20 @@ Return exactly this JSON:
                         return { name, cats, count: cats.length, geo: compData?.GEO||0, pct: Math.round((cats.length/Math.max(clusters.length,1))*100) };
                       });
 
-                    // Filter gap cards to only products brand is actually known for (from preloaded fame data)
+                    // Filter gap cards — use famousFor whitelist if available, notFamousFor blacklist as fallback
+                    const famousFor = (brandFameData?.famousFor || []).map((s:string)=>s.toLowerCase());
                     const notFamous = (brandFameData?.notFamousFor || []).map((s:string)=>s.toLowerCase());
                     const filteredGapDetails = brandFameData
-                      ? prodGapDetails.filter(g => !notFamous.some(nf =>
-                          g.label.toLowerCase().includes(nf.split(' ')[0]) ||
-                          nf.includes(g.label.toLowerCase().split(' ')[0])
-                        ))
+                      ? prodGapDetails.filter(g => {
+                          const gl = g.label.toLowerCase();
+                          const glWord = gl.split(' ')[0];
+                          // If we have famousFor list, only show products brand IS known for
+                          if (famousFor.length > 0) {
+                            return famousFor.some(ff => ff.includes(glWord) || gl.includes(ff.split(' ')[0]));
+                          }
+                          // Fallback: exclude products brand is NOT known for
+                          return !notFamous.some(nf => gl.includes(nf.split(' ')[0]) || nf.includes(glWord));
+                        })
                       : prodGapDetails;
 
                     return (
@@ -2550,6 +2557,64 @@ Return exactly this JSON:
                         </div>
                       )}
 
+                      {/* ── WHERE BRAND WINS vs WHERE IT'S MISSING — image 3 style ── */}
+                      {(()=>{
+                        const winningProds = productMentions.filter((p:any)=>p.pct>=40).sort((a:any,b:any)=>b.pct-a.pct).slice(0,5);
+                        const missingProds = productMentions.filter((p:any)=>p.pct<40).sort((a:any,b:any)=>a.pct-b.pct).slice(0,5);
+                        const topCompName = competitors[0]?.Brand || 'Top Competitor';
+                        return (
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
+                            {/* Winning */}
+                            <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 24px'}}>
+                              <div style={{display:'inline-block',background:'#F0FDF4',borderRadius:8,padding:'3px 10px',fontSize:'0.62rem',fontWeight:700,color:'#10B981',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>{brand} GEO · The Insight</div>
+                              <h3 style={{fontSize:'1.1rem',fontWeight:900,color:'#111827',lineHeight:1.3,marginBottom:8}}>
+                                Where {brand} shows up,<br/><span style={{color:'#10B981'}}>it wins.</span>
+                              </h3>
+                              <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:4}}>
+                                When AI sees the right signals, {brand} is the recommendation. These product categories show the strongest presence.
+                              </p>
+                              <div style={{background:'#F0FDF4',borderRadius:8,borderLeft:'4px solid #10B981',padding:'10px 14px',fontSize:'0.75rem',color:'#374151',lineHeight:1.5,marginBottom:14}}>
+                                <strong style={{textDecoration:'underline'}}>So what</strong> — This is not a reputation problem. The brand already wins when it's present. The score is a coverage-and-content gap. That's fixable in weeks, not a multi-year rebrand.
+                              </div>
+                              <div style={{fontSize:'0.65rem',fontWeight:700,color:'#10B981',marginBottom:8}}>Where AI already picks {brand} (win rate)</div>
+                              {winningProds.length>0 ? winningProds.map((p:any,i:number)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+                                  <div style={{fontSize:'0.78rem',fontWeight:i===0?800:600,color:i===0?'#111827':'#374151',minWidth:130}}>{p.label}</div>
+                                  <div style={{flex:1,background:'#E5E7EB',borderRadius:50,height:8,overflow:'hidden'}}>
+                                    <div style={{width:`${p.pct}%`,height:'100%',background:'#10B981',borderRadius:50}}/>
+                                  </div>
+                                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'#10B981',minWidth:36,textAlign:'right' as const}}>{Math.round(p.pct)}%</div>
+                                </div>
+                              )) : <div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>No strong product wins yet — all categories are gaps to close.</div>}
+                            </div>
+
+                            {/* Missing */}
+                            <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'22px 24px'}}>
+                              <div style={{display:'inline-block',background:'#FFF1F2',borderRadius:8,padding:'3px 10px',fontSize:'0.62rem',fontWeight:700,color:'#EF4444',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>{brand} GEO · The Insight</div>
+                              <h3 style={{fontSize:'1.1rem',fontWeight:900,color:'#111827',lineHeight:1.3,marginBottom:8}}>
+                                {brand} is invisible in the<br/><span style={{color:'#EF4444'}}>moments that win customers.</span>
+                              </h3>
+                              <p style={{fontSize:'0.78rem',color:'#6B7280',lineHeight:1.5,marginBottom:4}}>
+                                {brand} has zero or near-zero presence across {missingProds.length} product categories and is weakest in {missingProds.slice(0,2).map((p:any)=>p.label).join(' and ')}.
+                              </p>
+                              <div style={{background:'#FFF1F2',borderRadius:8,borderLeft:'4px solid #EF4444',padding:'10px 14px',fontSize:'0.75rem',color:'#374151',lineHeight:1.5,marginBottom:14}}>
+                                <strong style={{textDecoration:'underline'}}>So what</strong> — These are the highest-intent acquisition queries. Competitors capture them at the decision point. Every blind spot forfeits customer lifetime value.
+                              </div>
+                              <div style={{fontSize:'0.65rem',fontWeight:700,color:'#EF4444',marginBottom:8}}>Where {brand} is missing (win rate)</div>
+                              {missingProds.length>0 ? missingProds.map((p:any,i:number)=>(
+                                <div key={i} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+                                  <div style={{fontSize:'0.78rem',fontWeight:i===0?800:600,color:i===0?'#111827':'#374151',minWidth:130}}>{p.label}</div>
+                                  <div style={{flex:1,background:'#E5E7EB',borderRadius:50,height:8,overflow:'hidden'}}>
+                                    <div style={{width:`${Math.max(p.pct,2)}%`,height:'100%',background:'#EF4444',borderRadius:50}}/>
+                                  </div>
+                                  <div style={{fontSize:'0.78rem',fontWeight:700,color:'#EF4444',minWidth:36,textAlign:'right' as const}}>{Math.round(p.pct)}%</div>
+                                </div>
+                              )) : <div style={{fontSize:'0.78rem',color:'#9CA3AF'}}>No major gaps — brand has solid coverage across products.</div>}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       {/* ── Quick Wins + Competitor Threat ── */}
                       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16,marginBottom:16}}>
                         {/* Quick Wins */}
@@ -2628,12 +2693,23 @@ Return exactly this JSON:
                             <div style={{display:'inline-block',background:'#EDE9FE',borderRadius:8,padding:'4px 12px',fontSize:'0.62rem',fontWeight:700,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:14}}>
                               {brand} GEO · The Opportunity
                             </div>
+                            {(()=>{
+                              // Near-term target: fix quickest clusters (15-55% win rate), each ~+2pts
+                              const nearTermGain = Math.min(15, quickWins.length * 2 + 3);
+                              const nearTermScore = geo + nearTermGain;
+                              const nearTermTier = nearTermScore>=80?'Authority':nearTermScore>=70?'Leader':nearTermScore>=56?'Competitive':nearTermScore>=45?'Emerging':'Needs Work';
+                              // Full potential: close all gap products, target next competitor's GEO
+                              const nextComp = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0)).find((c:any)=>(c.GEO||0)>geo);
+                              const fullGain = Math.min(30, filteredGapDetails.length * 4 + nearTermGain);
+                              const fullScore = Math.min(geo + fullGain, nextComp?.GEO ?? geo + fullGain);
+                              const fullTier = fullScore>=80?'Authority':fullScore>=70?'Leader':fullScore>=56?'Competitive':fullScore>=45?'Emerging':'Needs Work';
+                              return (<>
                             <h2 style={{fontSize:'1.4rem',fontWeight:900,color:'#111827',lineHeight:1.2,marginBottom:12}}>
-                              A closeable gap —<br/><span style={{color:'#A100FF'}}>and a clear path to #{Math.max(1,rankNum-1)}.</span>
+                              A closeable gap —<br/><span style={{color:'#A100FF'}}>and a clear path forward.</span>
                             </h2>
                             <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>
-                              Prioritized actions unlock an estimated <strong style={{color:'#F59E0B'}}>+7 points near-term</strong> ({geo} → {geo+7}, into the Competitive tier). The full roadmap targets a <strong style={{color:'#A100FF'}}>+22-point unlock</strong>.
-                            </p>
+                              Prioritized actions unlock an estimated <strong style={{color:'#F59E0B'}}>+{nearTermGain} points near-term</strong> ({geo} → {nearTermScore}, into the {nearTermTier} tier). The full roadmap targets <strong style={{color:'#A100FF'}}>+{fullGain} points</strong>{nextComp?<> — matching <strong>{nextComp.Brand}</strong> at {nextComp.GEO}</>:''}.
+                            </p></>);})()}
                             <p style={{fontSize:'0.82rem',color:'#374151',lineHeight:1.6,marginBottom:16}}>
                               {brand} doesn't need to outspend the market — it needs to send the right signals, in the right places, in the right order.
                             </p>
@@ -2643,11 +2719,21 @@ Return exactly this JSON:
                           </div>
 
                           <div>
-                            {[
-                              {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
-                              {score:String(geo+7), label:'Near-term (+7)', sub:`Fix ${quickWins.slice(0,2).map(c=>c.category).join(' + ')||'top quick wins'} — crosses into Competitive tier`, bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
-                              {score:`#${Math.max(1,rankNum-1)}`, label:`In reach (+22 pts)`, sub:`Cover ${filteredGapDetails.slice(0,2).map(g=>g.label).join(' + ')||'gap products'} — challenge for top ${Math.max(1,rankNum-1)}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
-                            ].map((step,i)=>(
+                            {(()=>{
+                              const nearTermGain2 = Math.min(15, quickWins.length * 2 + 3);
+                              const nearTermScore2 = geo + nearTermGain2;
+                              const nearTermTier2 = nearTermScore2>=80?'Authority':nearTermScore2>=70?'Leader':nearTermScore2>=56?'Competitive':nearTermScore2>=45?'Emerging':'Needs Work';
+                              const nextComp2 = [...competitors].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0)).find((c:any)=>(c.GEO||0)>geo);
+                              const fullGain2 = Math.min(30, filteredGapDetails.length * 4 + nearTermGain2);
+                              const fullScore2 = Math.min(geo + fullGain2, nextComp2?.GEO ?? geo + fullGain2);
+                              const fullTier2 = fullScore2>=80?'Authority':fullScore2>=70?'Leader':fullScore2>=56?'Competitive':fullScore2>=45?'Emerging':'Needs Work';
+                              const steps = [
+                                {score:String(geo), label:'Today', sub:`"${geoTier}" · current position`, bg:'#FEF3C7', border:'#F59E0B', color:'#92400E'},
+                                {score:String(nearTermScore2), label:`Near-term (+${nearTermGain2})`, sub:`Fix ${quickWins.slice(0,2).map((c:any)=>c.category).join(' + ')||'top quick wins'} — enters ${nearTermTier2} tier`, bg:'#EDE9FE', border:'#A100FF', color:'#A100FF'},
+                                {score:String(fullScore2), label:`Full potential (+${fullGain2})`, sub:`Cover ${filteredGapDetails.slice(0,2).map((g:any)=>g.label).join(' + ')||'gap products'}${nextComp2?` — matches ${nextComp2.Brand}`:''}`, bg:'#ECFDF5', border:'#10B981', color:'#065F46'},
+                              ];
+                              return steps;
+                            })().map((step,i)=>(
                               <div key={i} style={{display:'flex',gap:12,marginBottom:8}}>
                                 <div style={{display:'flex',flexDirection:'column' as const,alignItems:'center'}}>
                                   <div style={{width:4,background:step.border,borderRadius:4,flex:1,minHeight:8}}/>
