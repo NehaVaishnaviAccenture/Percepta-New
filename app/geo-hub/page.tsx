@@ -1,4 +1,4 @@
-// v2.11.0: edited loading page and general search prompts
+// v2.12.0: edited detailed tested prompts page
 
 'use client';
 
@@ -640,10 +640,10 @@ export default function GeoHub() {
                   <div id="loading-progress-row" className="loadingProgressRow" style={{display:'flex',flexDirection:'column' as const,gap:5}}>
                     <div id="loading-progress-label-row" className="loadingProgressLabelRow" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                       <span id="loading-progress-label" className="loadingProgressLabel" style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
-                      <span id="loading-progress-pct" className="loadingProgressPct" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#00D1C7'}}>{loadingProgress}%</span>
+                      <span id="loading-progress-pct" className="loadingProgressPct" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'rgb(189, 74, 255)'}}>{loadingProgress}%</span>
                     </div>
                     <div id="loading-progress-track" className="loadingProgressTrack" style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
-                      <div id="loading-progress-fill" className="loadingProgressFill" style={{height:'100%',background:'#00D1C7',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
+                      <div id="loading-progress-fill" className="loadingProgressFill" style={{height:'100%',background:'rgb(161, 0, 255)',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
                         <div id="loading-shimmer" className="loadingShimmer" style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
                       </div>
                     </div>

@@ -373,7 +373,12 @@ function ActionView({
 
           <div className="pb-rail-actions">
             <button className="pb-avf-btn">See supporting prompts →</button>
-            <button className="pb-avd-link">Export this action ↓</button>
+            <button className="pb-avd-link">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+              </svg>
+              Export this action
+            </button>
             <button className="pb-avd-link">See these segments in Coverage →</button>
           </div>
         </aside>

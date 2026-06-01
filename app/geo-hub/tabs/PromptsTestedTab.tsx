@@ -1,6 +1,21 @@
 'use client';
 import React, { useState, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 
+// Mirrors ALL_KNOWN_BRANDS in route.ts — used to highlight any brand mention in transcripts,
+// not just the tracked top-10 competitors.
+const KNOWN_BRANDS_FOR_HIGHLIGHT = [
+  'chase','american express','amex','capital one','citi','citibank','discover','wells fargo',
+  'bank of america','synchrony','barclays','usaa','navy federal','penfed','ally','marcus',
+  'sofi','td bank','us bank','regions','huntington','keybank','fifth third','truist','citizens bank',
+  'tesla','toyota','bmw','honda','ford','mercedes','hyundai','kia','nissan','volkswagen','subaru','mazda','lexus',
+  'marriott','hilton','hyatt','ihg','wyndham','best western','radisson','accor','four seasons','ritz-carlton',
+  'netflix','disney','hbo','amazon','hulu','peacock','paramount','spotify','apple',
+  'walmart','target','costco','best buy','ebay','etsy','shopify','home depot','kroger',
+  'microsoft','google','salesforce','adobe','oracle','sap','ibm','cisco',
+  'nike','adidas','under armour','lululemon','new balance','puma','reebok','asics','brooks','hoka',
+  'unitedhealth','anthem','aetna','cigna','humana','cvs','walgreens','kaiser',
+];
+
 interface TabProps {
   result: any;
   resultComps: any[];
@@ -45,6 +60,12 @@ const TIER_RANGE: Record<string, string> = {
   authority:  '≥80%',
 };
 const RANK_TO_TIER: Record<number, string> = { 1:'authority', 2:'leader', 3:'competitive', 4:'emerging', 5:'fragmented' };
+
+// Rank badge colors — independent of GEO score tiers
+function rankBadgeStyle(rank: number): { background: string; color: string } {
+  if (rank === 1) return { background: '#A100FF', color: '#fff' };    // #1 — purple (brand win)
+  return { background: '#00D1C7', color: '#0A3D3B' };                 // all others — cyan
+}
 
 // "On white" — darker shade of each tier color for text on light backgrounds
 const TIER_ON_WHITE: Record<string, string> = {
@@ -100,19 +121,17 @@ function RankBadge({ rank, size = 'sm' }: { rank: number; size?: 'sm' | 'lg' }) 
     const cls = size === 'lg' ? 'ptRecapRankBadge ptRecapRankBadge--missed' : 'ptRankBadge ptRankBadge--missed';
     return <span className={cls}>— missed</span>;
   }
-  const tier = RANK_TO_TIER[rank] ?? 'fragmented';
-  const fill = TIER_FILL[tier];
-  const text = TIER_TEXT[tier];
+  const { background, color } = rankBadgeStyle(rank);
   if (size === 'lg') {
     return (
-      <span className="ptRecapRankBadge" style={{ background: fill, color: text }}>
-        #{rank}<span className="ptRankOut"> / 5</span>
+      <span className="ptRecapRankBadge" style={{ background, color }}>
+        #{rank}
       </span>
     );
   }
   return (
-    <span className="ptRankBadge" style={{ background: fill, color: text }}>
-      #{rank}<span className="ptRankOut"> / 5</span>
+    <span className="ptRankBadge" style={{ background, color }}>
+      #{rank}
     </span>
   );
 }
@@ -340,7 +359,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
   }
 
   // ── Highlight text ────────────────────────────────────────────
-  function highlightText(text: string, brand: string, competitor: string): string {
+  function highlightText(text: string, brand: string, competitors: string[]): string {
     if (!text) return '';
     let escaped = text
       .replace(/&/g, '&amp;')
@@ -348,15 +367,17 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
       .replace(/>/g, '&gt;');
     if (brand) {
       escaped = escaped.replace(
-        new RegExp(brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+        new RegExp(`\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
         (m) => `<span class="ptMentionBrand">${m}</span>`,
       );
     }
-    if (competitor && competitor !== brand) {
-      escaped = escaped.replace(
-        new RegExp(competitor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-        (m) => `<span class="ptMentionCompetitor">${m}</span>`,
-      );
+    for (const comp of competitors) {
+      if (comp && comp !== brand) {
+        escaped = escaped.replace(
+          new RegExp(`\\b${comp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'),
+          (m) => `<span class="ptMentionCompetitor">${m}</span>`,
+        );
+      }
     }
     return escaped;
   }
@@ -385,11 +406,24 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
     const promptTruncated = item.query ? (item.query.length > 60 ? item.query.slice(0, 57) + '…' : item.query) : '';
     const responseText = item.response_preview || '';
     const hasResponse = Boolean(responseText);
+    // All competitor names: tracked resultComps + known brands list, normalized to lowercase and deduplicated
+    const trackedCompNames = resultComps
+      .map((c: any) => (c.Brand || c.brand_name || '').toLowerCase())
+      .filter((n: string) => n && n !== brandName.toLowerCase());
+    const allCompNames: string[] = [
+      ...new Set([
+        ...trackedCompNames,
+        ...KNOWN_BRANDS_FOR_HIGHLIGHT.filter(b => b !== brandName.toLowerCase()),
+      ]),
+    ];
     const brandCount = hasResponse
       ? (responseText.match(new RegExp(brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length
       : 0;
-    const compCount = hasResponse && beater
-      ? (responseText.match(new RegExp(beater.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length
+    // Sum of all competitor mentions across the full competitor list — word boundaries to avoid partial matches
+    const compCount = hasResponse
+      ? allCompNames.reduce((sum, comp) => {
+          return sum + (responseText.match(new RegExp(`\\b${comp.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi')) || []).length;
+        }, 0)
       : 0;
 
     return (
@@ -406,6 +440,9 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
 
           {/* Recap block */}
           <div className="ptRecapBlock" id="pt-recap-block">
+            <div className="ptRecapRankBadgeCorner">
+              <RankBadge rank={item.position} size="lg" />
+            </div>
             <div className="ptRecapEyebrow">
               {item.category && <span className="ptRecapTopic">{item.category.toUpperCase()}</span>}
               {item.category && <span className="ptRecapSep">·</span>}
@@ -416,7 +453,6 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             </div>
             <div className="ptRecapSummary">{buildRecapSummary(item)}</div>
             <div className="ptRecapMetaRow">
-              <RankBadge rank={item.position} size="lg" />
               {item.prev_position > 0 && (() => {
                 const moved = item.prev_position - item.position; // positive = moved up (better)
                 if (moved === 0) return <span className="ptRecapDelta ptRecapDelta--flat">= 0</span>;
@@ -444,13 +480,13 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                     {brandName && (
                       <span className="ptCountItem">
                         <span className="ptCountSwatch" style={{ background: '#F5E6FF', border: '1px solid #E6C2FF' }} />
-                        {brandName} ×{brandCount}
+                        You ×{brandCount}
                       </span>
                     )}
-                    {beater && (
+                    {compCount > 0 && (
                       <span className="ptCountItem">
                         <span className="ptCountSwatch" style={{ background: '#E0F2FE', border: '1px solid #BAE6FD' }} />
-                        {beater} ×{compCount}
+                        Competitor mentions ×{compCount}
                       </span>
                     )}
                   </span>
@@ -461,7 +497,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               {hasResponse ? (
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: highlightText(responseText, brandName, beater ?? ''),
+                    __html: highlightText(responseText, brandName, allCompNames),
                   }}
                 />
               ) : (
@@ -472,38 +508,22 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             </div>
           </div>
 
-          {/* Competitor breakdown */}
-          <div className="ptCompBlock" id="pt-comp-block">
-            <Eyebrow style={{ marginBottom: 14 }}>COMPETITOR BREAKDOWN</Eyebrow>
-            {!beater || item.position === 1 ? (
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600, color: TIER_FILL.authority, padding: '12px 0' }}>
-                YOU RANKED #1 — NO COMPETITORS ABOVE
+          {/* Footer actions — B1: run prominent, export tucked below */}
+          <div className="ptFooterActions" id="pt-footer-actions" style={{flexDirection:'column',padding:0,gap:0}}>
+            <div id="ptFooterUpper" style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 24px',gap:16}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                {item.category && <span className="ptFooterChip">{item.category}</span>}
+                {item.category && <span className="ptFooterChipDot"/>}
+                <span className="ptFooterChip">GPT-4o</span>
               </div>
-            ) : (
-              <div className="ptCompGrid">
-                <div className="ptCompCard">
-                  <div className="ptCompCardHeader">
-                    <span className="ptCompName">{beater}</span>
-                    <span className="ptCompRankBadge" style={{ background: TIER_FILL[RANK_TO_TIER[1] ?? 'authority'], color: TIER_TEXT[RANK_TO_TIER[1] ?? 'authority'] }}>
-                      #1 <span className="ptRankOut">/ 5</span>
-                    </span>
-                  </div>
-                  <div className="ptCompExcerpt">
-                    "{beater} appeared as the top recommendation for this query type."
-                  </div>
-                  <span className="ptCompLink">See {beater}&apos;s GEO profile →</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer actions */}
-          <div className="ptFooterActions" id="pt-footer-actions">
-            <span className="ptFooterActionsText">Prompt ID: run-1 · {item.category}</span>
-            <div className="ptFooterActionsButtons">
-              <button className="ptBtnTertiary">Export this prompt&apos;s data ↓</button>
               <button className="ptBtnSecondary">Run this prompt live →</button>
             </div>
+            <button className="ptFooterExport">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+              </svg>
+              Export prompt data
+            </button>
           </div>
         </div>
       </div>
@@ -541,14 +561,16 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             <div className="ptHeroStat">
               <div className="ptHeroStatValue">
                 {avgRank !== null ? avgRank.toFixed(1) : '—'}
-                <span className="ptHeroStatQual">/ 5</span>
               </div>
               <div className="ptHeroStatLabel">Avg rank when {brandName || 'your brand'} appeared</div>
             </div>
           </div>
           <div style={{ marginTop: 20, borderTop: '1px solid #E5E5E5', paddingTop: 14 }}>
             <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#6B00A8', cursor: 'pointer', borderBottom: '1px solid #E6C2FF' }}>
-              Download prompt set ↓
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+              </svg>
+              Download prompt set
             </span>
           </div>
         </div>
@@ -904,7 +926,12 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                   disabled={safePage >= totalPages}
                 >Next →</button>
               </div>
-              <span className="ptCtaLink">Export filtered ↓</span>
+              <span className="ptCtaLink">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'middle',marginRight:4}}>
+                  <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+                </svg>
+                Export filtered
+              </span>
             </div>
           </div>
         </div>
