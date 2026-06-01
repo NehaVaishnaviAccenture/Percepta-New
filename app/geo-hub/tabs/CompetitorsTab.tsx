@@ -205,7 +205,12 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
           </table>
         </div>
         <div className="cmpTableFooter">
-          <button className="cmpExportBtn">↓ Export CSV</button>
+          <button className="cmpExportBtn">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+            </svg>
+            Export CSV
+          </button>
         </div>
       </div>
     </div>

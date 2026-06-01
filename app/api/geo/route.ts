@@ -2091,10 +2091,15 @@ const ALL_KNOWN_BRANDS = [
 function getBrandPosition(text: string, brand: string): number {
   const bl = brand.toLowerCase();
   const tl = text.toLowerCase();
-  if (!tl.includes(bl)) return 0;
-  const firstIndex = tl.indexOf(bl);
-  const before = tl.slice(0, firstIndex);
-  const brandsBeforeCount = ALL_KNOWN_BRANDS.filter(b => b !== bl && before.includes(b)).length;
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const brandRe = new RegExp(`\\b${esc(bl)}\\b`);
+  const match = brandRe.exec(tl);
+  if (!match) return 0;
+  const before = tl.slice(0, match.index);
+  const brandsBeforeCount = ALL_KNOWN_BRANDS.filter(b => {
+    if (b === bl) return false;
+    return new RegExp(`\\b${esc(b)}\\b`).test(before);
+  }).length;
   return brandsBeforeCount + 1;
 }
 
