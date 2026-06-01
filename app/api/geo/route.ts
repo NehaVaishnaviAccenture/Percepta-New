@@ -2043,17 +2043,17 @@ What specific products or features is "${brand}" genuinely well-known for in ${i
 Only include areas where ${brand} has a strong real-world market reputation.
 
 Return exactly this JSON:
-{"knownFor":[{"product":"product name","queries":["specific consumer question without brand name","another question","one more"]}]}
-Maximum 5 products, 3 queries each.`;
+{"knownFor":[{"product":"product name","queries":["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10"]}]}
+Maximum 5 products, 10 queries each. Total must be exactly 50 queries.`;
 
-      const fameRaw = await callAI([{role:'user', content: brandFamePrompt}], 0.2, 600);
+      const fameRaw = await callAI([{role:'user', content: brandFamePrompt}], 0.2, 1200);
       const fameData = JSON.parse(fameRaw.replace(/```json|```/g,'').trim());
       const knownFor: {product: string; queries: string[]}[] = fameData.knownFor || [];
 
       if (knownFor.length > 0) {
         const allTargetedQA: {product:string;query:string;ans:string;mentioned:boolean;position:number}[] = [];
         const flatQ: {product:string;query:string}[] = [];
-        knownFor.forEach(k => k.queries.slice(0,3).forEach(q => flatQ.push({product:k.product, query:q})));
+        knownFor.forEach(k => k.queries.slice(0,10).forEach(q => flatQ.push({product:k.product, query:q})));
 
         const TBATCH = 10;
         const tbatches: {product:string;query:string}[][] = [];
@@ -2082,9 +2082,10 @@ Maximum 5 products, 3 queries each.`;
           const total=rows.length;
           const mentioned=rows.filter(r=>r.mentioned).length;
           const winRate=total>0?Math.round((mentioned/total)*100):0;
-          const posArr=rows.filter(r=>r.position>0).map(r=>r.position);
-          const avgPos=posArr.length?posArr.reduce((a,b)=>a+b,0)/posArr.length:0;
-          const prominence=avgPos>0?Math.round(Math.max(5,Math.min(95,100-(avgPos-1)*18))):0;
+          // Avg rank across ALL queries — unmentioned = position 5 (worst case, not excluded)
+          const posArr=rows.map(r=>r.position>0?r.position:5);
+          const avgPos=posArr.reduce((a,b)=>a+b,0)/posArr.length;
+          const prominence=Math.round(Math.max(5,Math.min(95,100-(avgPos-1)*18)));
           const cc: Record<string,number>={};
           rows.forEach(r=>{
             const t=(r.ans||'').toLowerCase();
@@ -2095,7 +2096,7 @@ Maximum 5 products, 3 queries each.`;
           });
           const topComp=Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
           return {
-            product, total, mentioned, winRate, prominence, topCompetitor: topComp,
+            product, total, mentioned, winRate, prominence, avgRank: posArr.length>0?`#${Math.round(avgPos)}`:"N/A", topCompetitor: topComp,
             responses: rows.map(r=>({query:r.query,mentioned:r.mentioned,position:r.position,response_preview:r.ans}))
           };
         }).sort((a,b)=>b.winRate-a.winRate);
