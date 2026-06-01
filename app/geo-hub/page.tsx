@@ -486,6 +486,288 @@ function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151'}}>{elements}</div>;
 }
 
+// ─── AIPerceptionPanel — calls Claude API to get real AI perception then cross-references with our data ───
+function AIPerceptionPanel({ result }: { result: any }) {
+  const brand   = result.brand_name || 'the brand';
+  const lob     = result.lob || 'credit cards';
+  const clusters = result.query_clusters || [];
+  const competitors = result.competitors || [];
+  const productDefs = getProductDefs(result.ind_key || 'gen', result.lob || '');
+  const productMentions = computeProductMentions(productDefs, result.responses_detail || []);
+
+  type PerceptionData = {
+    knownFor: string[];
+    topAttributes: string[];
+    unaided_rank: number;
+    unaided_brands: string[];
+    perception_summary: string;
+    gaps: Array<{topic: string; ai_knows: boolean; our_win_rate: number; leader: string; insight: string}>;
+  };
+
+  const [data, setData] = useState<PerceptionData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [ran, setRan] = useState(false);
+
+  const run = async () => {
+    if (ran) return;
+    setRan(true);
+    setLoading(true);
+    setError('');
+
+    try {
+      // Build context about our data to send to Claude
+      const ourWinRates = clusters.slice(0,10).map((c:any) => `${c.category}: ${c.winRate||0}%`).join(', ');
+      const ourProducts = productDefs.slice(0,8).map(p => {
+        const f = productMentions.find(m => m.label === p.label);
+        return `${p.label}: ${f ? Math.round(f.pct) : 0}%`;
+      }).join(', ');
+      const topComps = competitors.slice(0,5).map((c:any) => `${c.Brand}(GEO:${c.GEO||0})`).join(', ');
+
+      const prompt = `You are a brand intelligence analyst. Answer ONLY with valid JSON, no markdown, no explanation.
+
+I need to understand how AI perceives "${brand}" in the ${lob} market.
+
+Our live prompt data shows these win rates (how often ${brand} appears in AI responses per topic):
+${ourWinRates}
+
+Our product mention data: ${ourProducts}
+Competitors in our data: ${topComps}
+
+Answer these questions as a JSON object with EXACTLY these keys:
+{
+  "knownFor": ["top 5 things AI associates ${brand} with in ${lob} - be specific like product names, features"],
+  "topAttributes": ["top 5 adjectives/phrases AI uses when describing ${brand}"],
+  "unaided_rank": <number: where ${brand} ranks if you list top ${lob} brands unprompted, 1=first>,
+  "unaided_brands": ["top 5 ${lob} brands you would name first unprompted, ranked"],
+  "perception_summary": "2-sentence honest summary of how AI perceives ${brand} vs competitors",
+  "gaps": [
+    {
+      "topic": "specific topic name",
+      "ai_knows": <true/false: does AI know ${brand} has offerings here>,
+      "our_win_rate": <number: estimated win rate % for ${brand} on this topic based on your knowledge>,
+      "leader": "which brand owns this topic in AI responses",
+      "insight": "one sentence: why there is a gap and what would close it"
+    }
+  ]
+}
+
+For "gaps", identify 5 topics where there is a meaningful gap between what ${brand} OFFERS and how much AI RECOMMENDS them for it. Be specific and accurate.`;
+
+      const resp = await fetch('/api/prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system: 'You are a brand intelligence analyst. You always respond with valid JSON only — no markdown, no explanation, just the raw JSON object.',
+          prompt,
+        }),
+      });
+
+      const raw = await resp.json();
+      const text = (raw.response || '');
+      const clean = text.replace(/```json|```/g,'').trim();
+      const parsed: PerceptionData = JSON.parse(clean);
+      setData(parsed);
+    } catch(e) {
+      setError('Could not load AI perception data. Check API connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-run on mount
+  useState(() => { run(); });
+
+  // Cross-reference: match our cluster win rates against AI perception gaps
+  const crossRef = data ? data.gaps.map(g => {
+    const matched = clusters.find((c:any) =>
+      c.category.toLowerCase().includes(g.topic.toLowerCase().split(' ')[0]) ||
+      g.topic.toLowerCase().includes(c.category.toLowerCase().split(' ')[0])
+    );
+    return {
+      ...g,
+      our_actual_win_rate: matched ? (matched.winRate || 0) : null,
+      cluster_name: matched?.category || null,
+      discrepancy: matched ? Math.abs((matched.winRate||0) - g.our_win_rate) : null,
+    };
+  }) : [];
+
+  const brandGEO = result.overall_geo_score || result.visibility || 0;
+
+  return (
+    <div style={{background:'white',borderRadius:14,border:'2px solid #A100FF',padding:'24px 28px',marginBottom:20}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+        <div>
+          <div style={{fontSize:'0.65rem',fontWeight:800,color:'#A100FF',letterSpacing:'0.12em',textTransform:'uppercase' as const,marginBottom:4}}>
+            🤖 Live AI Perception Analysis
+          </div>
+          <h3 style={{fontSize:'1.1rem',fontWeight:800,color:'#111827',margin:0}}>
+            How does AI actually perceive {brand}? Cross-referenced with your live data.
+          </h3>
+          <p style={{fontSize:'0.75rem',color:'#6B7280',marginTop:4,marginBottom:0}}>
+            We asked Claude directly — then compared its answers against your {clusters.length} tracked prompts.
+          </p>
+        </div>
+        {!ran && (
+          <button onClick={run} style={{background:'#A100FF',color:'white',border:'none',borderRadius:10,padding:'10px 20px',fontWeight:700,fontSize:'0.82rem',cursor:'pointer',flexShrink:0}}>
+            Run Analysis
+          </button>
+        )}
+      </div>
+
+      {loading && (
+        <div style={{display:'flex',alignItems:'center',gap:12,padding:'24px',color:'#6B7280',fontSize:'0.85rem'}}>
+          <div style={{width:20,height:20,border:'2px solid #E9D5FF',borderTopColor:'#A100FF',borderRadius:'50%',animation:'spin 0.7s linear infinite',flexShrink:0}}/>
+          Querying Claude API for {brand} perception data...
+        </div>
+      )}
+
+      {error && (
+        <div style={{background:'#FEF2F2',border:'1px solid #FCA5A5',borderRadius:8,padding:'12px 16px',fontSize:'0.8rem',color:'#991B1B'}}>{error}</div>
+      )}
+
+      {data && !loading && (
+        <div>
+          {/* Row 1: Known For + Unaided Recall + Perception Summary */}
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1.2fr',gap:16,marginBottom:20}}>
+            {/* Known For */}
+            <div style={{background:'#F5F0FF',borderRadius:12,padding:'16px 18px'}}>
+              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#7C3AED',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
+                🏷 AI associates {brand} with
+              </div>
+              {data.knownFor.map((item,i) => (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
+                  <div style={{width:20,height:20,borderRadius:'50%',background:'#A100FF',color:'white',fontSize:'0.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</div>
+                  <span style={{fontSize:'0.8rem',color:'#374151',fontWeight:i===0?700:400}}>{item}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Unaided Brand Recall */}
+            <div style={{background:'#F0FDF4',borderRadius:12,padding:'16px 18px'}}>
+              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#065F46',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
+                🗣 Unaided brand recall ranking
+              </div>
+              <p style={{fontSize:'0.72rem',color:'#6B7280',marginBottom:10}}>When AI lists {lob.toLowerCase()} brands unprompted:</p>
+              {data.unaided_brands.map((b,i) => (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:6}}>
+                  <div style={{
+                    width:22,height:22,borderRadius:'50%',
+                    background:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?'#10B981':'#E5E7EB',
+                    color:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?'white':'#6B7280',
+                    fontSize:'0.65rem',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0
+                  }}>{i+1}</div>
+                  <span style={{fontSize:'0.82rem',color:'#374151',fontWeight:b.toLowerCase().includes(brand.toLowerCase().split(' ')[0])?700:400}}>{b}</span>
+                  {b.toLowerCase().includes(brand.toLowerCase().split(' ')[0]) && <span style={{fontSize:'0.65rem',color:'#10B981',fontWeight:700}}>← YOU</span>}
+                </div>
+              ))}
+              <div style={{marginTop:10,fontSize:'0.72rem',color:'#065F46',background:'#DCFCE7',borderRadius:6,padding:'6px 10px'}}>
+                Unaided rank: <strong>#{data.unaided_rank}</strong> · GEO Score: <strong>{brandGEO}</strong>
+              </div>
+            </div>
+
+            {/* Perception Summary + Attributes */}
+            <div style={{background:'#FFF7ED',borderRadius:12,padding:'16px 18px'}}>
+              <div style={{fontSize:'0.65rem',fontWeight:800,color:'#92400E',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>
+                💬 How AI describes {brand}
+              </div>
+              <p style={{fontSize:'0.8rem',color:'#374151',lineHeight:1.6,marginBottom:12}}>{data.perception_summary}</p>
+              <div style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
+                {data.topAttributes.map((attr,i) => (
+                  <span key={i} style={{background:'#FED7AA',color:'#7C2D12',borderRadius:20,padding:'3px 10px',fontSize:'0.72rem',fontWeight:600}}>{attr}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Gap Cross-Reference — the money insight */}
+          <div>
+            <div style={{fontSize:'0.7rem',fontWeight:800,color:'#374151',letterSpacing:'0.08em',textTransform:'uppercase' as const,marginBottom:12}}>
+              🎯 Perception vs Reality — Where AI knows {brand} but doesn't recommend it
+            </div>
+            <div style={{fontSize:'0.78rem',color:'#6B7280',marginBottom:14,lineHeight:1.5}}>
+              Claude confirmed {brand} operates in these areas — but our live prompt data shows it's not winning recommendations there.
+              <strong style={{color:'#374151'}}> This is the exact content gap to close.</strong>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))',gap:12}}>
+              {crossRef.map((g,i) => {
+                const hasData = g.our_actual_win_rate !== null;
+                const ourRate = hasData ? g.our_actual_win_rate! : g.our_win_rate;
+                const aiRate  = g.our_win_rate;
+                const gap     = Math.abs(ourRate - aiRate);
+                const severity = ourRate < 20 ? 'Critical' : ourRate < 40 ? 'Moderate' : 'Low';
+                const sevColor = ourRate < 20 ? '#EF4444' : ourRate < 40 ? '#F59E0B' : '#10B981';
+                return (
+                  <div key={i} style={{background:'white',border:`1px solid ${sevColor}40`,borderLeft:`4px solid ${sevColor}`,borderRadius:10,padding:'14px 16px'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                      <span style={{fontSize:'0.85rem',fontWeight:700,color:'#111827'}}>{g.topic}</span>
+                      <span style={{fontSize:'0.65rem',fontWeight:700,color:sevColor,background:`${sevColor}15`,borderRadius:4,padding:'2px 7px'}}>{severity}</span>
+                    </div>
+
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                      <div style={{background:'#F5F0FF',borderRadius:8,padding:'8px 10px',textAlign:'center' as const}}>
+                        <div style={{fontSize:'0.62rem',color:'#7C3AED',marginBottom:2}}>AI Perception Score</div>
+                        <div style={{fontSize:'1.4rem',fontWeight:900,color:'#A100FF'}}>{aiRate}%</div>
+                        <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>what Claude expects</div>
+                      </div>
+                      <div style={{background: hasData ? '#F0FDF4' : '#FFF7F7',borderRadius:8,padding:'8px 10px',textAlign:'center' as const}}>
+                        <div style={{fontSize:'0.62rem',color: hasData ? '#065F46' : '#991B1B',marginBottom:2}}>
+                          {hasData ? 'Our Live Data' : 'Estimated'}
+                        </div>
+                        <div style={{fontSize:'1.4rem',fontWeight:900,color: hasData ? '#10B981' : '#EF4444'}}>{ourRate}%</div>
+                        <div style={{fontSize:'0.6rem',color:'#9CA3AF'}}>{hasData ? 'actual win rate' : 'no data tracked'}</div>
+                      </div>
+                    </div>
+
+                    {/* Gap bar */}
+                    <div style={{marginBottom:8}}>
+                      <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.65rem',color:'#9CA3AF',marginBottom:3}}>
+                        <span>Win rate gap</span>
+                        <span style={{color:sevColor,fontWeight:700}}>{gap > 0 ? `-${gap}%` : 'On track'}</span>
+                      </div>
+                      <div style={{background:'#F3F4F6',borderRadius:4,height:6,overflow:'hidden'}}>
+                        <div style={{width:`${Math.min(ourRate,100)}%`,height:'100%',background:sevColor,borderRadius:4}}/>
+                      </div>
+                    </div>
+
+                    <div style={{fontSize:'0.7rem',color:'#374151',marginBottom:6}}>
+                      <strong>Leader:</strong> {g.leader}
+                    </div>
+                    <div style={{fontSize:'0.7rem',color:'#6B7280',lineHeight:1.4,background:'#F9FAFB',borderRadius:6,padding:'6px 8px'}}>
+                      💡 {g.insight}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom summary */}
+            <div style={{marginTop:16,background:'#F5F0FF',borderRadius:10,padding:'14px 18px',border:'1px solid #E9D5FF'}}>
+              <div style={{display:'flex',gap:16,flexWrap:'wrap' as const}}>
+                <div>
+                  <div style={{fontSize:'0.65rem',color:'#7C3AED',fontWeight:700,marginBottom:2}}>AI KNOWS {brand.toUpperCase()} FOR</div>
+                  <div style={{fontSize:'0.82rem',color:'#374151'}}>{data.knownFor.slice(0,3).join(' · ')}</div>
+                </div>
+                <div style={{width:1,background:'#E9D5FF'}}/>
+                <div>
+                  <div style={{fontSize:'0.65rem',color:'#EF4444',fontWeight:700,marginBottom:2}}>BUT AI DOESN'T RECOMMEND {brand.toUpperCase()} FOR</div>
+                  <div style={{fontSize:'0.82rem',color:'#374151'}}>{crossRef.filter(g=>(g.our_actual_win_rate||g.our_win_rate)<30).map(g=>g.topic).slice(0,3).join(' · ') || 'All tracked categories performing well'}</div>
+                </div>
+                <div style={{width:1,background:'#E9D5FF'}}/>
+                <div>
+                  <div style={{fontSize:'0.65rem',color:'#10B981',fontWeight:700,marginBottom:2}}>UNAIDED RANK IN AI</div>
+                  <div style={{fontSize:'0.82rem',color:'#374151'}}>#{data.unaided_rank} out of {data.unaided_brands.length} brands listed</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── RadarChart — final: warm glow gradient, score right-aligned, 50/50 ───
 function RadarChart({ result }: { result: any }) {
   const [hovRow, setHovRow] = useState<number|null>(null);
@@ -2121,6 +2403,9 @@ export default function GeoHub() {
 
               return (
                 <div style={{maxWidth:1100,margin:'0 auto',padding:'0 4px'}}>
+
+                  {/* ── SECTION 0: Live AI Perception (Claude API cross-reference) ── */}
+                  <AIPerceptionPanel result={result}/>
 
                   {/* ── SECTION 1: Health Snapshot (image 5 style) ── */}
                   <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'24px 28px',marginBottom:20}}>
