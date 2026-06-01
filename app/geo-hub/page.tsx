@@ -1369,12 +1369,7 @@ function SCurveImage7({ score, brand }: { score: number; brand: string }) {
 
 function PriorityActionsTable({ result, cachedActions, setCachedActions, actionsLoading, setActionsLoading }: { result:any; cachedActions:any[]|null; setCachedActions:(a:any[])=>void; actionsLoading:boolean; setActionsLoading:(b:boolean)=>void }) {
   const actions = cachedActions || [], loading = actionsLoading;
-  useEffect(()=>{
-    if(cachedActions!==null)return;
-    setActionsLoading(true);
-    const prompt=`You are a GEO strategist. Generate a JSON array of 5-7 specific implementable priority actions for this brand. Brand: ${result.brand_name}, Industry: ${result.ind_label}, GEO Score: ${result.overall_geo_score}. Do NOT suggest comparison pages against competitors. Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Owned Content Optimization"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 -- ARD"|"Workstream 02 -- AOP"|"Workstream 03 -- DT1"}`;
-    fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt})}).then(r=>r.json()).then(data=>{const raw2=(data.response||'').replace(/```json|```/g,'').trim();setCachedActions(JSON.parse(raw2));}).catch(()=>setCachedActions([])).finally(()=>setActionsLoading(false));
-  },[]);
+  // Recommendations are preloaded in runAnalysis — no fetch needed here
   const ps=(p:string)=>p==='High'?{color:'#EF4444',bg:'#FEE2E2'}:p==='Medium'?{color:'#92400E',bg:'#FEF3C7'}:{color:'#065F46',bg:'#D1FAE5'};
   return (
     <div style={{background:'white',borderRadius:14,border:'1px solid #E5E7EB',padding:'28px 28px 24px'}}>
@@ -1416,6 +1411,7 @@ export default function GeoHub() {
   const [promptCountErr,setPromptCountErr]=useState('');
   const [highlightedBubble,setHighlightedBubble]=useState<string|null>(null);
   const [visView, setVisView] = useState<'scatter'|'scurve'>('scatter');
+  const [targetedOpen, setTargetedOpen] = useState(false);
 
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url'),savedFame=sessionStorage.getItem('geo_fame');if(saved)setResult(JSON.parse(saved));if(savedUrl)setUrl(savedUrl);if(savedFame)setBrandFameData(JSON.parse(savedFame));}catch{}},[]);
 
@@ -1459,6 +1455,14 @@ Return exactly this JSON:
             }catch{ setBrandFameData(null); }
           })
           .catch(()=>setBrandFameData(null));
+
+        // Preload recommendations — fires immediately, no tab click needed
+        setActionsLoading(true);
+        const recPrompt=`You are a GEO strategist. Generate a JSON array of 5-7 specific implementable priority actions for this brand. Brand: ${data.brand_name}, Industry: ${data.ind_label}, GEO Score: ${data.overall_geo_score}. Do NOT suggest comparison pages against competitors. Return ONLY valid JSON array, no markdown. Each object: {"priority":"High"|"Medium"|"Low","segment":"audience segment","type":"Content Page"|"Owned Content Optimization"|"FAQ Build"|"Structured Content"|"Citation Push"|"PR / Earned Media","action":"specific 1-3 sentence action","deliverable":"Workstream 01 -- ARD"|"Workstream 02 -- AOP"|"Workstream 03 -- DT1"}`;
+        fetch('/api/prompt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:recPrompt})})
+          .then(r=>r.json())
+          .then(rd=>{const raw3=(rd.response||'').replace(/```json|```/g,'').trim();try{setCachedActions(JSON.parse(raw3));}catch{setCachedActions([]);}})
+          .catch(()=>setCachedActions([])).finally(()=>setActionsLoading(false));
       }
     }catch(e:any){timers.forEach(t=>clearTimeout(t));setError(e.message);}
     setLoading(false);
@@ -2709,7 +2713,7 @@ Return exactly this JSON:
 
                   {/* ── TARGETED QUERY TOGGLE ── */}
                   {(()=>{
-                    const [open, setOpen] = React.useState(false);
+                    const open = targetedOpen; const setOpen = setTargetedOpen;
                     const tc = result.targeted_clusters || [];
                     const generalWin = Math.round(vis);
                     const targetedWin = tc.length > 0
