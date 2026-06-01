@@ -2745,16 +2745,27 @@ Return exactly this JSON:
                       ? Math.round(Math.max(20, Math.min(90, 50 + ((tPos-tNeg)/Math.max(tPos+tNeg,1))*30 + tProm*0.10)))
                       : 30;
 
-                    // Citation: how often brand is the only/first brand mentioned (exclusivity proxy)
-                    const tExclusive = tMentionedResps.filter((r:any)=>r.position===1).length;
-                    const tCit = tAllResponses.length>0
-                      ? Math.round(Math.max(10, Math.min(85, (tExclusive/tAllResponses.length)*100*1.2 + tProm*0.10)))
-                      : 10;
+                    // Citation: based on win rate + how early brand appears in responses where mentioned
+                    // Mirrors main analysis — high win rate + early position = high citation authority
+                    const tMentionRate = totalTargetedQ>0 ? totalTargetedWon/totalTargetedQ : 0;
+                    const tPositionScore = tAllPos.length>0 ? Math.max(0, (5-tAvgPos)/4) : 0; // 0-1 scale, lower pos = higher score
+                    const tCit = Math.round(Math.max(10, Math.min(85, tMentionRate*60 + tPositionScore*25)));
 
-                    // Share of Voice: brand mentions vs total responses (all responses, not just where mentioned)
-                    const tSov = totalTargetedQ>0
-                      ? Math.round(Math.max(10, Math.min(85, (totalTargetedWon/totalTargetedQ)*85)))
-                      : 10;
+                    // Share of Voice: brand mentions vs ALL brand mentions in targeted responses
+                    // Count how many times brand appears vs how many times any competitor appears
+                    const brandMentions = totalTargetedWon;
+                    const compMentions = tAllResponses.reduce((total:number, r:any) => {
+                      const txt = (r.response_preview||'').toLowerCase();
+                      const compsFound = (competitors||[]).filter((c:any) => {
+                        const cl = (c.Brand||'').toLowerCase();
+                        return cl.length>2 && txt.includes(cl);
+                      }).length;
+                      return total + compsFound;
+                    }, 0);
+                    const totalBrandMentions = brandMentions + compMentions;
+                    const tSov = totalBrandMentions>0
+                      ? Math.round(Math.max(10, Math.min(85, (brandMentions/totalBrandMentions)*100)))
+                      : Math.round(Math.max(10, Math.min(85, (totalTargetedWon/Math.max(totalTargetedQ,1))*85)));
 
                     // T-GEO: same formula as main GEO score
                     const tGeo = targetedWin !== null
