@@ -2053,7 +2053,7 @@ Return exactly this JSON:
               const vis = result.visibility || 0;
               const sen = result.sentiment || 0;
               const prom = result.prominence || 0;
-              const cit = result.citation_score || 0;
+              const cit = result.citation_share || 0;
               const sov = result.share_of_voice || 0;
               const avgRank = result.avg_rank || 'N/A';
               const totalResponses = result.total_responses || 100;
@@ -2779,22 +2779,33 @@ Return exactly this JSON:
                               </div>
                             ) : (
                               <>
-                                {/* ── Scorecard row ── */}
-                                <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:0,borderBottom:'1px solid #F3F4F6'}}>
-                                  {[
-                                    {label:'Targeted GEO',val:tGeo??'—',sub:'Product-specific score',color:'#A100FF',big:true},
-                                    {label:'Win Rate',val:`${targetedWin??0}%`,sub:`${totalTargetedWon}/${totalTargetedQ} queries won`,color:targetedWin!==null&&targetedWin>=60?'#10B981':targetedWin!==null&&targetedWin>=30?'#F59E0B':'#EF4444',big:false},
-                                    {label:'Prominence',val:avgProm,sub:'Avg position score',color:'#8B5CF6',big:false},
-                                    {label:'Sentiment',val:sen,sub:'From main analysis',color:'#EC4899',big:false},
-                                    {label:'Citation',val:cit,sub:'From main analysis',color:'#F59E0B',big:false},
-                                    {label:'vs General',val:gap===0?'Even':gap>0?`-${gap}pts`:`+${Math.abs(gap)}pts`,sub:gap>0?'Below general score':gap<0?'Above general score':'Matches general',color:gap>5?'#EF4444':gap<0?'#10B981':'#6B7280',big:false},
-                                  ].map((m,i)=>(
-                                    <div key={i} style={{padding:'16px 18px',borderRight:i<5?'1px solid #F3F4F6':'none',textAlign:'center' as const}}>
-                                      <div style={{fontSize:'0.58rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:4}}>{m.label}</div>
-                                      <div style={{fontSize:m.big?'2rem':'1.6rem',fontWeight:900,color:m.color,lineHeight:1}}>{m.val}</div>
-                                      <div style={{fontSize:'0.62rem',color:'#9CA3AF',marginTop:4,lineHeight:1.3}}>{m.sub}</div>
+                                {/* ── Scorecard row — same style as main GEO Score page ── */}
+                                <div style={{padding:'16px 24px 4px',borderBottom:'1px solid #F3F4F6'}}>
+                                  <div style={{fontSize:'0.6rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:10}}>Targeted GEO Metrics — Product-Specific Queries Only</div>
+                                  <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:10,marginBottom:12}}>
+                                    {/* Targeted GEO — big hero card */}
+                                    <div style={{background:'linear-gradient(135deg,#F5F0FF,#EDE9FF)',borderRadius:14,border:'2px solid #A100FF40',padding:'14px 16px',textAlign:'center' as const,gridColumn:'span 1'}}>
+                                      <div style={{fontSize:'0.6rem',fontWeight:700,color:'#A100FF',letterSpacing:'0.1em',textTransform:'uppercase' as const,marginBottom:4}}>Targeted GEO</div>
+                                      <div style={{fontSize:'2.2rem',fontWeight:900,color:'#A100FF',lineHeight:1}}>{tGeo??'—'}</div>
+                                      <div style={{fontSize:'0.6rem',color:'#7C3AED',marginTop:4}}>{totalTargetedWon}/{totalTargetedQ} queries won</div>
                                     </div>
-                                  ))}
+                                    {/* Win Rate */}
+                                    <MetricCard label="win rate" val={`${targetedWin??0}%`}/>
+                                    {/* Avg Rank */}
+                                    <MetricCard label="avg rank" val={(()=>{const pos=tc.flatMap((c:any)=>(c.responses||[]).filter((r:any)=>r.position>0).map((r:any)=>r.position));return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})()}/>
+                                    {/* Sentiment — from main */}
+                                    <MetricCard label="sentiment score" val={sen}/>
+                                    {/* Citation — from main */}
+                                    <MetricCard label="citation score" val={cit}/>
+                                    {/* Share of Voice — from main */}
+                                    <MetricCard label="share of voice" val={sov}/>
+                                    {/* vs General gap */}
+                                    <div style={{background: gap>5?'#FFF1F2':gap<0?'#F0FDF4':'#F9FAFB', borderRadius:14, border:`1.5px solid ${gap>5?'#FCA5A5':gap<0?'#6EE7B7':'#E5E7EB'}`, padding:'14px 16px', textAlign:'center' as const}}>
+                                      <div style={{fontSize:'0.6rem',fontWeight:700,color:'#9CA3AF',letterSpacing:'0.08em',textTransform:'uppercase' as const,marginBottom:6}}>vs General</div>
+                                      <div style={{fontSize:'1.6rem',fontWeight:900,color:gap>5?'#EF4444':gap<0?'#10B981':'#6B7280',lineHeight:1}}>{gap===0?'Even':gap>0?`-${gap}`:gap<0?`+${Math.abs(gap)}`:''}<span style={{fontSize:'0.9rem'}}>{gap!==0?'pts':''}</span></div>
+                                      <div style={{fontSize:'0.6rem',color:'#9CA3AF',marginTop:4}}>{gap>5?'Below general':gap<0?'Above general':'Matches general'}</div>
+                                    </div>
+                                  </div>
                                 </div>
 
                                 {/* ── Gap insight banner ── */}
@@ -2836,7 +2847,7 @@ Return exactly this JSON:
                                           <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,marginBottom:10}}>
                                             {[
                                               {label:'Win Rate',val:`${c.winRate||0}%`,color},
-                                              {label:'Prominence',val:c.prominence||0,color:'#A100FF'},
+                                              {label:'Avg Rank',val:(()=>{const pos=(c.responses||[]).filter((r:any)=>r.position>0).map((r:any)=>r.position);return pos.length>0?`#${Math.round(pos.reduce((a:number,b:number)=>a+b,0)/pos.length)}`:'N/A';})(),color:'#A100FF'},
                                               {label:'Queries',val:`${c.mentioned||0}/${c.total||0}`,color:'#6B7280'},
                                             ].map((m,mi)=>(
                                               <div key={mi} style={{background:'white',borderRadius:7,padding:'7px 6px',textAlign:'center' as const,border:'1px solid #F3F4F6'}}>
