@@ -769,7 +769,7 @@ function PromptRadarChart({ result }: { result: any }) {
 
   const R    = n > 7 ? 140 : 155;
   const LR   = R + 62;
-  const LPAD = 20;
+  const LPAD = 48;  // extra padding so all labels fit, even long ones like 'Expert Recommendation'
   const VB   = (LR + LPAD) * 2;
   const CX   = VB / 2;
   const CY   = VB / 2;
@@ -1046,11 +1046,6 @@ function SentimentHeatmap({ result }: { result: any }) {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Hover hint */}
-      <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 14px', marginTop: 14, fontStyle: 'italic' as const, fontSize: '0.78rem', color: '#6B7280' }}>
-        Hover any cell to see detail.
       </div>
 
       {/* Legend */}
