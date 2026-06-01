@@ -2123,7 +2123,7 @@ export default function GeoHub() {
                 // Prominence
                 prom < 70 ? {
                   title: `${brand} ranked #${avgRank} on average — not first.`,
-                  body: `Being listed ${avgRank} instead of #1 cuts recall significantly. In ${clusterDetails.filter(c=>c.avgPos && parseFloat(c.avgPos)>2).length} prompt categories, ${brand} appeared after position 2${topComps.length ? ` — behind ${topComps[0]?.Brand||'competitors'}` : ''}.`,
+                  body: `Being listed ${avgRank} instead of #1 cuts recall significantly. In ${clusterDetails.filter((c: any)=>c.avgPos && parseFloat(c.avgPos)>2).length} prompt categories, ${brand} appeared after position 2${topComps.length ? ` — behind ${topComps[0]?.Brand||'competitors'}` : ''}.`,
                   signal: 'Prominence', weight: '20% of formula', color:'#F97316',
                 } : null,
                 // Citation
