@@ -241,12 +241,11 @@ function SankeyFlowChart({ result }: { result: any }) {
   // Use actual number of responses run, fall back to result field or rd length
   const totalRd = result.total_responses || rd.length || 100;
 
-  const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
+  const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#8B5CF6','#6366F1','#6B7280','#374151','#1E40AF','#0369A1','#047857','#92400E','#B45309','#7C2D12','#1F2937','#4B5563'];
 
   // Query topic nodes — use actual queries per category from clusters
   const topTopics = [...cl]
     .sort((a:any,b:any) => (b.total||0)-(a.total||0))
-    .slice(0, 5)
     .map((c:any, i:number) => ({
       label: c.category,
       val: Math.max(5, Math.min(95, c.winRate ?? 0)),
@@ -254,8 +253,6 @@ function SankeyFlowChart({ result }: { result: any }) {
       total: c.total || Math.round(totalRd / Math.max(cl.length, 1)), // actual queries in this category
     }));
   const leftItems = topTopics.length >= 1 ? topTopics : [{label:'General', val: vis || 30, color: TOPIC_COLORS[0], total: totalRd}];
-  // Total queries shown = sum of top 5 categories (may be less than totalRd if more categories exist)
-  const shownQueryTotal = leftItems.reduce((s:number,t:any)=>s+(t.total||0),0);
 
   const productDefs = getProductDefs(indKey, lob);
 
@@ -264,7 +261,7 @@ function SankeyFlowChart({ result }: { result: any }) {
   const scanPool = rd; // all responses
   const scanTotal = rd.length || totalRd;
 
-  const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#1E88E5','#0EA5E9','#6366F1','#A78BFA'];
+  const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#1E88E5','#0EA5E9','#6366F1','#A78BFA','#EC4899','#10B981','#F59E0B','#EF4444','#14B8A6','#F97316','#84CC16','#06B6D4'];
 
   const productMentions = productDefs.map(p => {
     // Count responses where product terms appear (in any brand's response, not just ours)
@@ -276,7 +273,7 @@ function SankeyFlowChart({ result }: { result: any }) {
     const pct = totalRd > 0 ? Math.round((count / totalRd) * 100) : 0;
     return { ...p, mentions: count, pct, val: Math.max(5, count) };
   })
-  .filter(p => p.pct >= 3 || (totalRd < 20 && p.mentions >= 1));
+  .filter(p => p.mentions >= 1); // show all products that appear at least once
 
   const sortedMentions = [...productMentions].sort((a:any,b:any) => b.mentions - a.mentions);
   const prodItems: any[] = sortedMentions.length >= 1
@@ -299,7 +296,9 @@ function SankeyFlowChart({ result }: { result: any }) {
 
   const geoScore = Math.round(signals.reduce((s,m) => s + m.val * m.weight / 100, 0)) || result.overall_geo_score || 0;
 
-  const W = 1040, H = 520, padT = 32, padB = 44;
+  // Dynamic height: enough rows for all nodes
+  const maxNodes = Math.max(topTopics.length, productDefs.length, signals.length, 5);
+  const W = 1040, H = Math.max(520, maxNodes * 52 + 80), padT = 32, padB = 44;
   const col1 = 130, col2 = 300, col3 = 510, col4 = 720, nW = 26;
   const plotH = H - padT - padB;
 
