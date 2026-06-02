@@ -243,42 +243,40 @@ function SankeyFlowChart({ result }: { result: any }) {
 
   const TOPIC_COLORS = ['#A100FF','#7500C0','#460073','#6B7280','#374151'];
 
-  // Query topic nodes: use real cluster.total (actual queries in that category across all prompts run)
+  // Query topic nodes — use actual queries per category from clusters
   const topTopics = [...cl]
-    .sort((a:any,b:any) => (b.total||b.mentioned||0)-(a.total||a.mentioned||0))
+    .sort((a:any,b:any) => (b.total||0)-(a.total||0))
     .slice(0, 5)
     .map((c:any, i:number) => ({
       label: c.category,
       val: Math.max(5, Math.min(95, c.winRate ?? 0)),
       color: TOPIC_COLORS[i % TOPIC_COLORS.length],
-      // Use c.total (total queries in category) if available, else c.mentioned, else estimate
-      total: c.total || c.mentioned || Math.round(totalRd / Math.max(cl.length, 1)),
+      total: c.total || Math.round(totalRd / Math.max(cl.length, 1)), // actual queries in this category
     }));
   const leftItems = topTopics.length >= 1 ? topTopics : [{label:'General', val: vis || 30, color: TOPIC_COLORS[0], total: totalRd}];
+  // Total queries shown = sum of top 5 categories (may be less than totalRd if more categories exist)
+  const shownQueryTotal = leftItems.reduce((s:number,t:any)=>s+(t.total||0),0);
 
   const productDefs = getProductDefs(indKey, lob);
 
-  // PRODUCT DETECTION — FIXED LOGIC:
-  // scanPool = only responses where this brand was actually mentioned
-  const brandMentionedRd = rd.filter((r:any) =>
-    r.mentioned === true || (r.position !== undefined && r.position > 0) || r.mentioned === 1
-  );
-  const scanPool = brandMentionedRd.length > 0 ? brandMentionedRd : rd;
-  const scanTotal = scanPool.length; // denominator = brand-mentioned responses
+  // PRODUCT DETECTION: scan ALL responses (not just brand-mentioned) for product keyword mentions
+  // This gives honest coverage — how often product is discussed across ALL queries run
+  const scanPool = rd; // all responses
+  const scanTotal = rd.length || totalRd;
 
   const PROD_COLORS_POOL = ['#A100FF','#7500C0','#460073','#8B5CF6','#1E88E5','#0EA5E9','#6366F1','#A78BFA'];
 
   const productMentions = productDefs.map(p => {
-    const count = scanPool.filter((r:any) => {
+    // Count responses where product terms appear (in any brand's response, not just ours)
+    const count = rd.filter((r:any) => {
       const txt = (r.response_preview || r.response || '').toLowerCase();
       return p.terms.some((t:string) => txt.includes(t));
     }).length;
-    // Use totalRd (total prompts run) as denominator — honest coverage rate
+    // Denominator = totalRd (all prompts run, e.g. 100)
     const pct = totalRd > 0 ? Math.round((count / totalRd) * 100) : 0;
     return { ...p, mentions: count, pct, val: Math.max(5, count) };
   })
-  // Remove noise: must appear in at least 3% of brand-mention responses to be meaningful
-  .filter(p => p.pct >= 3 || (scanTotal < 20 && p.mentions >= 1));
+  .filter(p => p.pct >= 3 || (totalRd < 20 && p.mentions >= 1));
 
   const sortedMentions = [...productMentions].sort((a:any,b:any) => b.mentions - a.mentions);
   const prodItems: any[] = sortedMentions.length >= 1
@@ -413,7 +411,7 @@ function SankeyFlowChart({ result }: { result: any }) {
             return (<g key={`ln${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovMetric(hovMetric===n.label?null:n.label);}}>
               <rect x={n.x} y={n.y} width={nW} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
               <text x={n.x-6} y={n.mid-6} textAnchor="end" dominantBaseline="middle" style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>17?n.label.slice(0,16)+'…':n.label}</text>
-              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win · {n.total}q</text>
+              <text x={n.x-6} y={n.mid+6} textAnchor="end" dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.val}% win · {n.total}/{totalRd}q</text>
             </g>);
           })}
           {pNodes.map((n:any,i:number)=>{
@@ -421,7 +419,7 @@ function SankeyFlowChart({ result }: { result: any }) {
             return (<g key={`pn${i}`} style={{cursor:'pointer'}} onClick={(e)=>{e.stopPropagation();setHovMetric(hovMetric===n.label?null:n.label);}}>
               <rect x={n.x} y={n.y} width={nW} height={n.h} fill={n.color} rx={3} opacity={dim?0.3:1}/>
               <text x={n.x+nW+5} y={n.mid-5} dominantBaseline="middle" style={{fontSize:8.5,fill:isHov(n.label)?n.color:'#374151',fontFamily:'Inter,sans-serif',fontWeight:isHov(n.label)?700:600}}>{n.label.length>18?n.label.slice(0,17)+'…':n.label}</text>
-              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{totalRd} responses ({Math.round((n.mentions/totalRd)*100)}%)</text>
+              <text x={n.x+nW+5} y={n.mid+6} dominantBaseline="middle" style={{fontSize:7.5,fill:n.color,fontFamily:'Inter,sans-serif',fontWeight:700}}>{n.mentions}/{totalRd} responses ({n.pct}%)</text>
             </g>);
           })}
           {sNodes.map((n,i)=>{
