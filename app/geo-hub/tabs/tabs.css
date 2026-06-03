@@ -173,19 +173,36 @@
   color: var(--color-ink);
 }
 
-.ovActionRow {
+/* ── Action cards (Option A v2) ─────────────────────────────── */
+.ovActionCards {
   display: grid;
-  /* gridTemplateColumns is conditional (rec.gain adds a 3rd col) — set inline */
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+}
+
+.ovActionCard {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  padding: 16px 18px 18px;
+  display: grid;
+  gap: 8px;
+  cursor: pointer;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+.ovActionCard:hover {
+  border-color: var(--color-brand-light, #D199FF);
+  box-shadow: 0 4px 12px rgba(161, 0, 255, 0.08);
+}
+
+.ovActionCardHead {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
+  gap: 10px;
 }
 
-.ovActionRowBorder {
-  border-top: 1px solid var(--color-card-border);
-}
-
-.ovActionBadge {
+.ovActionChip {
   font-family: var(--font-sans);
   font-size: 9px;
   font-weight: 700;
@@ -195,34 +212,63 @@
   color: white;
   /* background is dynamic (priority index) — applied inline */
   flex-shrink: 0;
+  line-height: 1;
 }
 
-.ovActionText {
+.ovActionTopic {
   font-family: var(--font-sans);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-ink);
-  line-height: 1.35;
-}
-
-.ovActionGain {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--color-brand-dark);
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
+  color: #2B2B2B;
+  border: 1px solid #D6D6D6;
+  padding: 3px 9px;
+  border-radius: 2px;
   white-space: nowrap;
-  text-align: right;
+  display: inline-block;
 }
 
-.ovActionGainLabel {
-  display: block;
+.ovActionCardTitle {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--color-ink);
+}
+
+.ovActionCardDesc {
   font-family: var(--font-sans);
-  font-size: 9px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.ovActionSignals {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-card-border);
+}
+
+.ovActionSignalsLabel {
+  font-family: var(--font-sans);
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-text-faint);
-  margin-bottom: 1px;
+  color: var(--color-text-muted);
+}
+
+.ovActionSignalTag {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-brand-dark, #6B00A8);
+  background: var(--color-purple-50, #F5E6FF);
+  padding: 2px 8px;
+  border-radius: 2px;
 }
 
 /* ── Teasers row ────────────────────────────────────────────── */
@@ -485,6 +531,13 @@
   gap: 14px;
 }
 
+.gsoCompHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .gsoCompEyebrow {
   font-size: 10px;
   font-weight: 600;
@@ -492,7 +545,11 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
   font-family: var(--font-sans);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+
 
 .gsoSignalBars {
   display: flex;
@@ -549,14 +606,15 @@
   margin-top: 4px;
 }
 
+
 .gsoWeaknessLabel {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   /* color is dynamic (weakColor) — applied inline */
-  margin-bottom: 4px;
   font-family: var(--font-sans);
+  margin-bottom: 5px;
 }
 
 .gsoWeaknessText {
@@ -746,10 +804,7 @@
   border-top: 1px dashed #D6D6D6;
 }
 
-.gsoVcmpColGridLineMid {
-  top: 50%;
-  border-top: 1px dashed #D6D6D6;
-}
+
 
 .gsoVcmpColBaseline {
   position: absolute;
@@ -5510,4 +5565,207 @@
   .pb-rail-fields { grid-template-columns: 1fr; gap: 14px; }
   .pb-rail-actions { flex-direction: column; align-items: stretch; }
   .pb-rail-actions .pb-avf-btn { width: 100%; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GEO EXPLAINER — "How the GEO Score is calculated" expandable
+   Sits directly below the vcmp chart card.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Tier tokens (fill / text-on-white / on-fill) */
+.geoExplainer {
+  --tier-fragmented-fill:  #E0003B; --tier-fragmented-text:  #B7002F;
+  --tier-emerging-fill:    #F48500; --tier-emerging-text:    #B15F00;
+  --tier-competitive-fill: #F3B10C; --tier-competitive-text: #996E00;
+  --tier-leader-fill:      #2F6DFF; --tier-leader-text:      #043BCC;
+  --tier-authority-fill:   #00AB7B; --tier-authority-text:   #007653;
+
+  font-family: var(--font-sans);
+  background: var(--color-card-bg, #fff);
+  color: var(--color-text-body, #0A0A0A);
+  border: 1px solid var(--color-card-border, #E5E5E5);
+  border-top: none;
+  margin-top: -1px;
+}
+
+/* Collapsed strip */
+.geoExplainerBar {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background 240ms ease;
+  /* border-left: 3px solid var(--color-brand); */
+}
+.geoExplainerBar:hover { background: var(--color-surface-sunken, #F2F2F2); }
+.geoExplainerBar:focus-visible { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-brand, #A100FF); }
+
+.geoExplainerLabel {
+  font-family: var(--font-display, var(--font-sans));
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
+  white-space: nowrap;
+}
+
+.geoExplainerHint {
+  font-size: 12px;
+  color: var(--color-text-muted, #8E8E8E);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.geoExplainerSpacer { flex: 1 1 auto; }
+
+.geoExplainerChev {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted, #8E8E8E);
+  transition: transform 240ms ease;
+}
+.geoExplainer--open .geoExplainerChev { transform: rotate(180deg); }
+
+/* Reveal: grid-template-rows 0fr → 1fr */
+.geoExplainerReveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 240ms ease;
+}
+.geoExplainer--open .geoExplainerReveal { grid-template-rows: 1fr; }
+.geoExplainerInner { overflow: hidden; }
+
+.geoExplainerPad {
+  padding: 24px 20px 32px;
+  border-top: 1px solid var(--color-card-border, #E5E5E5);
+}
+
+/* Eyebrow */
+.geoExplainerEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-brand, #A100FF);
+  margin: 0 0 12px;
+}
+
+/* Lede */
+.geoExplainerLede {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-body, #0A0A0A);
+  margin: 0 0 20px;
+  max-width: 64ch;
+}
+.geoExplainerLede strong { font-weight: 600; }
+
+/* Formula */
+.geoExplainerFormula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 0 32px;
+}
+.geoFmlTerm {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 8px 12px;
+  background: var(--color-surface-sunken, #F2F2F2);
+  border: 1px solid var(--color-card-border, #E5E5E5);
+  border-radius: 2px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.geoFmlName { font-weight: 500; color: var(--color-text-body, #0A0A0A); }
+.geoFmlOp   { font-family: var(--font-mono, monospace); color: var(--color-text-muted, #8E8E8E); }
+.geoFmlWt   { font-family: var(--font-mono, monospace); font-weight: 600; color: var(--color-brand, #A100FF); }
+.geoFmlPlus {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 14px;
+  color: var(--color-text-muted, #8E8E8E);
+  padding: 0 2px;
+}
+.geoFmlEq {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: var(--color-text-body, #0A0A0A);
+  color: #fff;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.geoFmlResult { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 13px; }
+
+/* Two-col grid */
+.geoExplainerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 40px;
+}
+.geoExplainerSection { }
+.geoExplainerSection .geoExplainerEyebrow { margin-bottom: 8px; }
+
+/* Signal rows */
+.geoSig {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 0 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-card-border, #E5E5E5);
+}
+.geoSig:first-of-type { border-top: none; }
+.geoSigName { font-family: var(--font-display, var(--font-sans)); font-weight: 500; font-size: 14px; color: var(--color-text-body, #0A0A0A); }
+.geoSigWt {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-brand, #A100FF);
+  background: var(--color-brand-soft, #F5E6FF);
+  padding: 2px 6px;
+  border-radius: 2px;
+  justify-self: end;
+}
+.geoSigDef { grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
+
+/* Tier rows */
+.geoTier {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-card-border, #E5E5E5);
+}
+.geoTier:first-of-type { border-top: none; }
+.geoTierMeta { display: flex; align-items: center; gap: 8px; }
+.geoTierDot  { width: 10px; height: 10px; flex: none; }
+.geoTierName { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 13px; }
+.geoTierRange { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--color-text-muted, #8E8E8E); justify-self: end; }
+.geoTierDef { grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
+
+.geoTier--fragmented  .geoTierDot { background: var(--tier-fragmented-fill);  } .geoTier--fragmented  .geoTierName { color: var(--tier-fragmented-text);  }
+.geoTier--emerging    .geoTierDot { background: var(--tier-emerging-fill);    } .geoTier--emerging    .geoTierName { color: var(--tier-emerging-text);    }
+.geoTier--competitive .geoTierDot { background: var(--tier-competitive-fill); } .geoTier--competitive .geoTierName { color: var(--tier-competitive-text); }
+.geoTier--leader      .geoTierDot { background: var(--tier-leader-fill);      } .geoTier--leader      .geoTierName { color: var(--tier-leader-text);      }
+.geoTier--authority   .geoTierDot { background: var(--tier-authority-fill);   } .geoTier--authority   .geoTierName { color: var(--tier-authority-text);   }
+
+@media (max-width: 760px) {
+  .geoExplainerGrid { grid-template-columns: 1fr; gap: 32px; }
+  .geoExplainerHint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .geoExplainerReveal, .geoExplainerChev, .geoExplainerBar { transition: none; }
 }

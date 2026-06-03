@@ -2,15 +2,17 @@
 
 import React from 'react';
 import { geoTier } from '../lib/tiers';
+import { GeoExplainer } from './GeoExplainer';
 
 interface TabProps {
   result: any;
   resultComps: any[];
   setActiveParent: (n: number) => void;
   setActiveSub: (n: number) => void;
+  playbookActions: any[];
 }
 
-export default function OverviewTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
+export default function OverviewTab({ result, resultComps, setActiveParent, setActiveSub, playbookActions }: TabProps) {
   const geo = result.overall_geo_score;
   const tier = geoTier(geo);
   const comps = resultComps;
@@ -21,7 +23,7 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
   const nextThreshold = geo<45?45:geo<56?56:geo<70?70:geo<80?80:100;
   const nextTierLabel = geo<45?'Emerging':geo<56?'Competitive':geo<70?'Leader':geo<80?'Authority':'Max';
   const missedPrompts = (result.responses_detail||[]).filter((r:any)=>!r.mentioned&&!r.brand_mentioned).length;
-  const recs = (result.recommendations||[]).slice(0,3);
+  const recs = (playbookActions||[]).slice(0,3);
   const ind = result.ind_label||'your industry';
   const interpText = tier.tier===1
     ?`AI assistants rarely surface ${result.brand_name} for ${ind} queries — ${topComp?.Brand||'competitors'}${topCompGap>0?` leads by ${topCompGap} pts and`:''}  is recommended instead. Reaching ${nextThreshold} (${nextTierLabel}) puts ${result.brand_name} in the consideration set for significantly more queries.`
@@ -73,28 +75,34 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
           </div>
         </div>
       </div>
-      {/* Actions block */}
+      {/* Actions block — Option A v2 cards (priority chip + title + data-grounded description) */}
       <div id="geo-overall-actions-block" className="ovActionsBlock">
         <div id="geo-overall-actions-header" className="ovActionsHeader">
           <div id="geo-overall-actions-title" className="ovActionsTitle">Top 3 priority actions</div>
           <button id="geo-overall-actions-cta" onClick={()=>setActiveParent(5)} className="ovLinkBtn" style={{whiteSpace:'nowrap'}}>Open Priorities ›</button>
         </div>
-        {(recs.length>0?recs:[
-          {title:'Build authoritative content in your lowest-scoring query segments'},
-          {title:'Expand FAQ coverage for the highest-volume prompt clusters'},
-          {title:'Increase citation presence in the top AI-referenced sources'},
-        ]).map((rec:any,i:number)=>(
-          <div key={i} id={`geo-overall-action-${i+1}`} className={['ovActionRow', i>0&&'ovActionRowBorder'].filter(Boolean).join(' ')}
-            style={{gridTemplateColumns:'auto 1fr'+(rec.gain?' auto':''),paddingTop:i===0?4:10}}>
-            <span className={`geo-overall-action-badge geo-overall-action-badge--p${i+1} ovActionBadge`}
-              style={{background:i===0?'#A100FF':i===1?'#0A0A0A':'#6B6B6B'}}>P{i+1}</span>
-            <div className="geo-overall-action-text ovActionText">{rec.action||rec.title||rec.recommendation||JSON.stringify(rec)}</div>
-            {rec.gain&&<div className="geo-overall-action-gain ovActionGain">
-              <span className="geo-overall-action-gain-label ovActionGainLabel">Est gain</span>
-              {rec.gain}
-            </div>}
-          </div>
-        ))}
+        <div className="ovActionCards">
+          {(recs.length>0?recs:[
+            {title:'Build authoritative content in your lowest-scoring query segments',why:'Targets the segments where your visibility score is weakest and the competitor gap is widest.',topics:[{name:'Travel Rewards'}],signals:['Visibility','Prominence']},
+            {title:'Expand FAQ coverage for the highest-volume prompt clusters',why:'Closes gaps in the prompts your brand does not currently appear in across your category.',topics:[{name:'Small Business'}],signals:['Visibility','Share of Voice']},
+            {title:'Increase citation presence in the top AI-referenced sources',why:'Strengthens grounding signals on the high-authority pages AI assistants cite most often.',topics:[{name:'Mortgage'}],signals:['Citation']},
+          ]).map((rec:any,i:number)=>(
+            <div key={i} id={`geo-overall-action-${i+1}`} className="ovActionCard" onClick={()=>setActiveParent(5)}>
+              <div className="ovActionCardHead">
+                <span className="ovActionChip" style={{background:i===0?'#A100FF':i===1?'#0A0A0A':'#6B6B6B'}}>P{i+1}</span>
+                {rec.topics?.[0]?.name&&<span className="ovActionTopic">{rec.topics[0].name}</span>}
+              </div>
+              <div className="ovActionCardTitle">{rec.title||rec.action||rec.recommendation||JSON.stringify(rec)}</div>
+              <div className="ovActionCardDesc">{(rec.why||rec.description||rec.detail||'').match(/<b>(.*?)<\/b>/)?.[1]||rec.why||rec.description||rec.detail||''}</div>
+              {rec.signals?.length>0&&(
+                <div className="ovActionSignals">
+                  <span className="ovActionSignalsLabel">Impacts</span>
+                  {rec.signals.map((s:string)=><span key={s} className="ovActionSignalTag">{s}</span>)}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
       {/* Teasers */}
       <div id="geo-overall-teasers" className="ovTeasers">
@@ -109,6 +117,7 @@ export default function OverviewTab({ result, resultComps, setActiveParent, setA
           </div>
         ))}
       </div>
+      <GeoExplainer onSignalsClick={()=>{setActiveParent(1);setActiveSub(0);}}/>
     </div>
   );
 }

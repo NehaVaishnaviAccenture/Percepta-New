@@ -258,10 +258,10 @@ export default function GeoScoreSentimentTab({ result, resultComps, setActivePar
         <div className="sentStrengthsCard">
           <div className="sentStrengthsTitle">Sentiment Strengths</div>
           <ul className="sentInsightList">
-            {(result.strengths_list||[]).slice(0,3).map((s:string,i:number)=>(
+            {(result.strengths_list||[]).slice(0,3).map((s:any,i:number)=>(
               <li key={i} className="sentInsightItem">
                 <span className="sentInsightPlus">+</span>
-                <span>{s}</span>
+                <span>{typeof s==='string'?s:<><strong>{s.bold}</strong>{s.detail?' '+s.detail:''}</>}</span>
               </li>
             ))}
           </ul>
@@ -269,10 +269,10 @@ export default function GeoScoreSentimentTab({ result, resultComps, setActivePar
         <div className="sentConcernsCard">
           <div className="sentConcernsTitle">(x) Areas of Concern</div>
           <ul className="sentInsightList">
-            {(result.improvements_list||[]).slice(0,3).map((w:string,i:number)=>(
+            {(result.improvements_list||[]).slice(0,3).map((w:any,i:number)=>(
               <li key={i} className="sentInsightItem">
                 <span className="sentInsightMinus">-</span>
-                <span>{w}</span>
+                <span>{typeof w==='string'?w:<><strong>{w.bold}</strong>{w.detail?' '+w.detail:''}</>}</span>
               </li>
             ))}
           </ul>

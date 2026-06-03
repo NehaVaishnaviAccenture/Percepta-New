@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useLayoutEffect } from 'react';
+import { GeoExplainer } from './GeoExplainer';
 
 // Shows the full label if it fits inside the bar, otherwise falls back to the short key.
 // Canvas measurement is used because DOM scrollWidth is unreliable in flex-basis:0 containers
@@ -61,8 +62,14 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
   const nextThreshold=geo>=80?100:geo>=70?80:geo>=56?70:geo>=45?56:45;
   const nextTierLabel=geo>=80?'Max':geo>=70?'Authority':geo>=56?'Leader':geo>=45?'Competitive':'Emerging';
   const ptsToNext=nextThreshold-geo;
-  const signals=[{key:'Vis',label:'Visibility',score:vis,weight:30,sub:1},{key:'Sent',label:'Sentiment',score:sent,weight:20,sub:2},{key:'Prom',label:'Prominence',score:prom,weight:20,sub:3},{key:'Cit',label:'Citation',score:cit,weight:15,sub:4},{key:'SoV',label:'Share of Voice',score:sov,weight:15,sub:5}];
-  const weakest=[...signals].sort((a,b)=>a.score-b.score)[0];
+  const signals=[
+    {key:'Vis', label:'Visibility',     score:vis,  weight:30, sub:1, lowMeaning:"AI models rarely surface your brand when people ask about your category — you're largely absent from the conversation"},
+    {key:'Sent',label:'Sentiment',      score:sent, weight:20, sub:2, lowMeaning:"when AI does mention you, it isn't framing your brand positively — the language around you is neutral at best"},
+    {key:'Prom',label:'Prominence',     score:prom, weight:20, sub:3, lowMeaning:"even when AI mentions you, it's not giving you a leading role — you're showing up late or in passing, not as a top recommendation"},
+    {key:'Cit', label:'Citation',       score:cit,  weight:15, sub:4, lowMeaning:"AI models aren't treating your brand as an authoritative source worth referencing — you're not being cited the way stronger brands are"},
+    {key:'SoV', label:'Share of Voice', score:sov,  weight:15, sub:5, lowMeaning:"competitors are dominating AI conversations in your space — your brand is getting a small slice of all brand mentions"},
+  ];
+  const weakest=[...signals].sort((a,b)=>((100-b.score)*b.weight)-((100-a.score)*a.weight))[0];
   const weakColor=sigBg(weakest.score);
   const topGeo=Math.max(geo,...comps.map((c:any)=>c.GEO||0));
   const topVis=Math.max(vis,...comps.map((c:any)=>c.Vis||c.visibility||0));
@@ -149,7 +156,10 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
 
         {/* Signal breakdown card */}
         <div id="geo-score-overall-comp" className="gsoCompCard">
-          <div id="gso-comp-eyebrow" className="gsoCompEyebrow">Your {geo} · broken down</div>
+          <div id="gso-comp-header" className="gsoCompHeader">
+            <div id="gso-comp-eyebrow" className="gsoCompEyebrow">Your {geo} · broken down</div>
+            <span id="gso-comp-weakness-cta" className="gsoWeaknessCta gsoLinkBtn" onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</span>
+          </div>
           <div id="gso-comp-signals" className="gsoSignalBars">
             {signals.map(sig=>(
               <div key={sig.key} className={`gso-signal-bar gso-signal-bar--${sig.key.toLowerCase()} gsoSignalBar`} style={{flex:`${sig.weight} 1 0`,background:sigBg(sig.score),color:sigFg(sig.score)}}>
@@ -160,10 +170,9 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
             ))}
           </div>
           <div id="gso-comp-weakness" className="gsoWeakness" style={{borderLeft:`2px solid ${weakColor}`}}>
-            <div id="gso-comp-weakness-label" className="gsoWeaknessLabel" style={{color:weakColor}}>Holding you back</div>
+            <div id="gso-comp-weakness-label" className="gsoWeaknessLabel" style={{color:weakColor}}>Your weakest signal</div>
             <div id="gso-comp-weakness-text" className="gsoWeaknessText">
-              {weakest.label} ({weakest.score}) is your weakest signal.{' '}
-              <span id="gso-comp-weakness-cta" className="gsoWeaknessCta" onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</span>
+              Your {weakest.label} scores {weakest.score}/100 and carries {weakest.weight}% of your GEO score, meaning {weakest.lowMeaning}.
             </div>
           </div>
         </div>
@@ -177,7 +186,7 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
         </div>
         <div id="gso-vcmp-legend" className="gsoVcmpLegend">
           <div className="gso-vcmp-legend-item gso-vcmp-legend-item--you gsoVcmpLegendItem"><span className="gso-vcmp-legend-swatch gso-vcmp-legend-swatch--you gsoVcmpSwatchYou"/><span className="gso-vcmp-legend-label gso-vcmp-legend-label--you">Your score</span></div>
-          <div className="gso-vcmp-legend-item gso-vcmp-legend-item--gap gsoVcmpLegendItem"><span className="gso-vcmp-legend-swatch gso-vcmp-legend-swatch--gap gsoVcmpSwatchGap"/><span className="gso-vcmp-legend-label gso-vcmp-legend-label--gap">Gap to top scorer per signal</span></div>
+          <div className="gso-vcmp-legend-item gso-vcmp-legend-item--gap gsoVcmpLegendItem"><span className="gso-vcmp-legend-swatch gso-vcmp-legend-swatch--gap gsoVcmpSwatchGap"/><span className="gso-vcmp-legend-label gso-vcmp-legend-label--gap">Top scorer per signal</span></div>
         </div>
         <div id="gso-vcmp-chart" className="gsoVcmpChart">
           <div id="gso-vcmp-y-axis" className="gsoVcmpYAxis">
@@ -198,7 +207,6 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
                 </div>
                 <div className="gso-vcmp-col-bar-wrap gsoVcmpColBarWrap">
                   <div className="gso-vcmp-col-grid-line gso-vcmp-col-grid-line--top gsoVcmpColGridLine gsoVcmpColGridLineTop"/>
-                  <div className="gso-vcmp-col-grid-line gso-vcmp-col-grid-line--mid gsoVcmpColGridLine gsoVcmpColGridLineMid"/>
                   <div className="gso-vcmp-col-baseline gsoVcmpColBaseline"/>
                   <div className="gso-vcmp-col-bar gsoVcmpColBar" style={{height:`${col.score}%`}}/>
                   {col.ref>col.score&&<div className="gso-vcmp-col-gap-bar gsoVcmpColGapBar" style={{bottom:`${col.score}%`,height:`${col.ref-col.score}%`}}/>}
@@ -212,6 +220,8 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
           </div>
         </div>
       </div>
+
+      <GeoExplainer onSignalsClick={()=>{setActiveParent(1);setActiveSub(0);}}/>
     </div>
   );
 }
