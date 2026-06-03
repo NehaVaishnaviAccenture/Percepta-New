@@ -1,4 +1,4 @@
-// v2.12.0: edited detailed tested prompts page
+// v2.13.0: fixed sentiment tab error
 
 'use client';
 
@@ -836,7 +836,7 @@ export default function GeoHub() {
               return null;
             })()}
 
-            {activeParent===0&&<OverviewTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===0&&<OverviewTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions||[]}/>}
             {activeParent===1&&activeSub===0&&<GeoScoreTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===1&&activeSub===1&&<GeoScoreVisibilityTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===1&&activeSub===2&&<GeoScoreSentimentTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}

@@ -19,6 +19,18 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
   const tOf=(s:number)=>s>=80?{l:'Authority',c:'#00AB7B'}:s>=70?{l:'Leader',c:'#2F6DFF'}:s>=56?{l:'Competitive',c:'#F3B10C'}:s>=45?{l:'Emerging',c:'#F48500'}:{l:'Fragmented',c:'#E0003B'};
   const cellBg=(s:number)=>s>=80?'rgba(0,171,123,0.50)':s>=70?'rgba(47,109,255,0.50)':s>=56?'rgba(243,177,12,0.50)':s>=45?'rgba(244,133,0,0.50)':'rgba(224,0,59,0.50)';
 
+  // TODO: TOPIC_DATA is hardcoded and too coarse.
+  // 1. The 'fin' bucket covers all fin_* ind_keys (credit cards, mortgage, retail bank, wealth,
+  //    auto loans, etc.) but the topics here are credit-card-specific — wrong for mortgages,
+  //    wealth management, auto loans, etc. Each vertical needs its own topic set, e.g.:
+  //      fin_cc_*     → Rewards, Cash Back, Travel, Fees & APR, Credit Building, Perks
+  //      fin_mortgage → Rate competitiveness, Closing costs, Application process, First-time buyer support, Refinance options, Lender trust
+  //      fin_retail_bank / fin_smb_* → Checking features, Savings rates, Digital banking, Fee transparency, Business tools, Customer service
+  //      fin_wealth / fin_retirement → Portfolio performance, Advisory quality, Fee structure, Planning tools, Trust & custody, Reporting
+  //      fin_auto_* → Rate competitiveness, Approval speed, Loan flexibility, Dealer network, Refinance options, Customer service
+  // 2. Brand scores are hardcoded for a fixed set of known brands — breaks for any unknown brand
+  //    or any industry not listed here. Long-term fix: derive topic scores from the API's
+  //    responses_detail (per-prompt mention data) so scores are real, dynamic, and brand-agnostic.
   type TD={topics:string[];data:Record<string,Record<string,number>>};
   const TOPIC_DATA:Record<string,TD>={
     fin:{
@@ -38,7 +50,8 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
     gen:{topics:['Awareness','Trust','Value','Innovation','Service','Reach'],data:{}}
   };
 
-  const td:TD=TOPIC_DATA[indKey]||TOPIC_DATA.gen;
+  const tdKey=Object.keys(TOPIC_DATA).find(k=>indKey===k||indKey.startsWith(k+'_'))||'gen';
+  const td:TD=TOPIC_DATA[tdKey];
   const topics=td.topics;
   const N=topics.length;
 

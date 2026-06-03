@@ -3445,7 +3445,8 @@ Each object must have exactly these fields:
 - "why": 2-3 sentences on why this is a priority. Use <b>bold</b> to highlight the key insight, especially at the end
 - "build": array of 3-5 build steps. Each starts with <b>bolded action verb + noun phrase</b> then detail text
 - "team": suggested owner, e.g. "Content / Marketing", "SEO / Web", "PR / Comms"
-- "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"`;
+- "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"
+- "signals": array of 1-3 GEO signal names this action most directly improves, chosen from: "Visibility" | "Sentiment" | "Prominence" | "Citation" | "Share of Voice"`;
 
     const knownForPrompt = `You are a brand analyst. Based on how AI models represent ${brandName} in the ${indLabel} space, list exactly 2 short noun phrases (3-5 words each) describing what this brand is best known for from a consumer perspective. Pick the two most distinctive things.
 Return ONLY a JSON array of 2 strings. No markdown, no explanation.
