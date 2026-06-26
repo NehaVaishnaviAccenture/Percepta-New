@@ -28,16 +28,16 @@ function preWinOpp(winRate: number): string {
 
 function buildLead(brand: string, gapN: number, conN: number, winN: number): string {
   const total = gapN + conN + winN;
-  if (total === 0) return `No segment data found for ${brand} yet.`;
-  if (winN > 0 && winN >= gapN && winN >= conN) return `${brand} leads across most audience segments.`;
+  if (total === 0) return `No product data found for ${brand} yet.`;
+  if (winN > 0 && winN >= gapN && winN >= conN) return `${brand}'s key products dominate AI recommendations.`;
   if (gapN > conN && gapN > winN) {
     if (conN > 0) {
-      return `Most of ${brand}'s audience segments are gap territory — only ${conN} ${conN === 1 ? 'is' : 'are'} contested.`;
+      return `Most of ${brand}'s products are underrepresented in AI — only ${conN} ${conN === 1 ? 'is' : 'are'} contested.`;
     }
-    return `Most of ${brand}'s audience segments are gap territory.`;
+    return `Most of ${brand}'s key products have low AI visibility.`;
   }
-  if (conN >= gapN && conN > winN) return `Coverage is mostly contested — winnable with effort.`;
-  return `Coverage is split across all three tiers.`;
+  if (conN >= gapN && conN > winN) return `Product visibility is mostly contested — winnable with content investment.`;
+  return `Product visibility is split across all three tiers.`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -165,14 +165,14 @@ function SegCard({ seg, isFirst, onViewPrompts }: {
           {/* Footer */}
           <div className="cov-card-foot">
             <span className="cov-queries-tested">
-              <b>{seg.queryCount}</b> {seg.queryCount === 1 ? 'query' : 'queries'} tested
+              <b>{seg.queryCount}</b> {seg.queryCount === 1 ? 'response' : 'responses'} mention this product
             </span>
           </div>
           <button
             className="cov-prompts-link"
             onClick={(e) => { e.stopPropagation(); onViewPrompts(); }}
           >
-            View prompts for this segment
+            View prompts mentioning this product
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M2 5.5h7M6 2.5l3 3-3 3" />
             </svg>
@@ -195,31 +195,26 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
 
   const brand    = result.brand_name || 'Your brand';
   const rd       = result.responses_detail || [];
-  const clusters = result.query_clusters   || [];
+  const clusters = result.product_clusters || [];
 
-  // Query count per cluster category
-  const queryCountForCat = (category: string): number =>
-    rd.filter((r: any) => (r.category || '').toLowerCase() === category.toLowerCase()).length;
-
-  // Build segments
+  // Build segments from product clusters
   const rawSegments: Segment[] = clusters.map((c: any) => {
     const winRate = c.winRate ?? 0;
     const tier: Segment['tier'] =
       winRate >= WIN_THRESHOLD ? 'winning'
       : winRate >= CONTESTED_THRESHOLD ? 'contested'
       : 'gap';
-    // Winning sub-state: without topCompetitorScore we can't detect Contender, default Defending
     const opp = tier === 'winning'
       ? (c.topCompetitorScore != null && c.topCompetitorScore > winRate ? 'Contender' : 'Defending')
       : preWinOpp(winRate);
     return {
-      name:               c.category,
+      name:               c.product,
       winRate,
       tier,
       opp,
       topCompetitor:      c.topCompetitor      ?? null,
       topCompetitorScore: c.topCompetitorScore ?? null,
-      queryCount:         queryCountForCat(c.category),
+      queryCount:         c.mentioned          ?? 0,
     };
   });
 
@@ -256,10 +251,10 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
     <div id="tab-priorities-coverage">
 
       {/* Lead */}
-      <div className="cov-eyebrow">Audience coverage</div>
+      <div className="cov-eyebrow">Product visibility</div>
       <h2 className="cov-lead">{lead}</h2>
       <div className="cov-lead-sub">
-        <b>{totalSegments}</b> segments analyzed
+        <b>{totalSegments}</b> products tracked
         <span className="cov-sep">·</span>
         <b>{totalPrompts}</b> prompts
       </div>
@@ -275,7 +270,7 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
           <option value="gap">Gap size (largest first)</option>
           <option value="coverage">Coverage % (highest first)</option>
           <option value="queries">Query volume</option>
-          <option value="alpha">Segment name (A–Z)</option>
+          <option value="alpha">Product name (A–Z)</option>
         </select>
 
         <span className="cov-filter-label">Filter</span>
@@ -351,8 +346,8 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
           <div className="cov-col-body">
             {gapSegs.length === 0 ? (
               <div className="cov-col-empty">
-                <div className="cov-col-empty-title">No gap segments</div>
-                <div className="cov-col-empty-sub">All segments are at 30% coverage or above.</div>
+                <div className="cov-col-empty-title">No gap products</div>
+                <div className="cov-col-empty-sub">All products are at 30% visibility or above.</div>
               </div>
             ) : gapSegs.map((seg, i) => (
               <SegCard
@@ -376,8 +371,8 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
           <div className="cov-col-body">
             {contestedSegs.length === 0 ? (
               <div className="cov-col-empty">
-                <div className="cov-col-empty-title">No contested segments</div>
-                <div className="cov-col-empty-sub">Segments at 30–59% coverage appear here.</div>
+                <div className="cov-col-empty-title">No contested products</div>
+                <div className="cov-col-empty-sub">Products at 30–59% visibility appear here.</div>
               </div>
             ) : contestedSegs.map((seg, i) => (
               <SegCard
@@ -401,8 +396,8 @@ export default function PrioritiesCoverageTab({ result, resultComps, setActivePa
           <div className="cov-col-body">
             {winningSegs.length === 0 ? (
               <div className="cov-col-empty">
-                <div className="cov-col-empty-title">No segments here yet</div>
-                <div className="cov-col-empty-sub">Reach 60% coverage in any segment to win the category.</div>
+                <div className="cov-col-empty-title">No products here yet</div>
+                <div className="cov-col-empty-sub">Reach 60% visibility in any product to win it.</div>
               </div>
             ) : winningSegs.map((seg, i) => (
               <SegCard

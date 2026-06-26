@@ -405,9 +405,14 @@ export default function PrioritiesPlaybookTab({
     setSelectedAction(null);
   };
 
-  /* ── No data (shouldn't happen — actions come back with the geo response) ── */
-  if (!playbookActions || playbookActions.length === 0) {
-    return <div id="tab-priorities-playbook" />;
+  if (!playbookActions) return <div id="tab-priorities-playbook" />;
+  if (playbookActions.length === 0) {
+    return (
+      <div id="tab-priorities-playbook" style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text-muted, #888)' }}>
+        <p style={{ fontSize: '1rem', marginBottom: '8px' }}>No playbook actions found.</p>
+        <p style={{ fontSize: '0.875rem' }}>Run a new analysis to generate your priority action plan.</p>
+      </div>
+    );
   }
 
   return (

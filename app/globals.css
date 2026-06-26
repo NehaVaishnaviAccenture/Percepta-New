@@ -115,7 +115,8 @@ body {
   margin: 0;
   padding: 0;
   background: white;
-  font-family: var(--font-sans);
+  font: 400 16px/1.5 var(--font-sans);
+  color: var(--color-text-body);
 }
 
 code,

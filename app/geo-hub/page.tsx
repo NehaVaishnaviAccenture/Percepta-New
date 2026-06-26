@@ -1,4 +1,4 @@
-// v2.13.0: fixed sentiment tab error
+// v2.15.0: redid signal tabs, reduced them to 2 (ai presence & reach)
 
 'use client';
 
@@ -14,11 +14,8 @@ function isValidUrl(u: string): boolean {
 import Link from 'next/link';
 import OverviewTab from './tabs/OverviewTab';
 import GeoScoreTab from './tabs/GeoScoreTab';
-import GeoScoreVisibilityTab from './tabs/GeoScoreVisibilityTab';
-import GeoScoreSentimentTab from './tabs/GeoScoreSentimentTab';
-import GeoScoreProminenceTab from './tabs/GeoScoreProminenceTab';
-import GeoScoreCitationTab from './tabs/GeoScoreCitationTab';
-import GeoScoreSovTab from './tabs/GeoScoreSovTab';
+import AiPresenceTab from './tabs/AiPresenceTab';
+import ReachTab from './tabs/ReachTab';
 import CompetitorsTab from './tabs/CompetitorsTab';
 import CompetitorsByTopicTab from './tabs/CompetitorsByTopicTab';
 import PromptsTestedTab from './tabs/PromptsTestedTab';
@@ -33,7 +30,7 @@ import PrioritiesPlaybookTab from './tabs/PrioritiesPlaybookTab';
 
 const TOP_TABS = [
   {label:'Overview',subs:[]},
-  {label:'GEO Score',subs:['Overall','Visibility','Sentiment','Prominence','Citation','Share of Voice']},
+  {label:'GEO Score',subs:['Overall','AI Presence','Reach']},
   {label:'Competitors',subs:['Overall','By Topic']},
   {label:'Prompts',subs:['Tested Prompts','Live Prompt','Response Map']},
   {label:'Trends',subs:[]},
@@ -74,7 +71,7 @@ export default function GeoHub() {
   const [playbookActions,setPlaybookActions]=useState<any[]|null>(null);
 
   // Restore report from session storage on mount — playbook_actions are stored with the result.
-  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved){const parsed=JSON.parse(saved);setResult(parsed);setPlaybookActions(parsed.playbook_actions||[]);}if(savedUrl)setUrl(savedUrl);}catch{}},[]);
+  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved){const parsed=JSON.parse(saved);setResult(parsed);setPlaybookActions(Array.isArray(parsed.playbook_actions)&&parsed.playbook_actions.length>0?parsed.playbook_actions:null);}if(savedUrl)setUrl(savedUrl);}catch{}},[]);
   useEffect(()=>{if(loading){setElapsedSec(0);const t=setInterval(()=>setElapsedSec(s=>s+1),1000);return()=>clearInterval(t);}}, [loading]);
 
   // Scope detection: fires when url becomes valid; debounced 700ms
@@ -838,11 +835,8 @@ export default function GeoHub() {
 
             {activeParent===0&&<OverviewTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions||[]}/>}
             {activeParent===1&&activeSub===0&&<GeoScoreTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===1&&<GeoScoreVisibilityTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===2&&<GeoScoreSentimentTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===3&&<GeoScoreProminenceTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===4&&<GeoScoreCitationTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===5&&<GeoScoreSovTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===1&&activeSub===1&&<AiPresenceTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===1&&activeSub===2&&<ReachTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===2&&activeSub===0&&<CompetitorsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===2&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===3&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
