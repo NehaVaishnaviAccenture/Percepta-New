@@ -108,7 +108,6 @@
 .topbarBreadcrumb {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.32);
-  font-family: var(--font-sans);
 }
 
 .topbarBreadcrumbActive {
@@ -199,12 +198,10 @@
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--color-tab-text);
-  font-weight: 400;
   font-size: 13px;
   padding: 13px 16px;
   cursor: pointer;
   white-space: nowrap;
-  font-family: var(--font-sans);
   transition: color 0.12s, background 0.12s;
 }
 
@@ -242,7 +239,6 @@
   padding: 5px 11px;
   cursor: pointer;
   white-space: nowrap;
-  font-family: var(--font-sans);
   transition: all 0.1s;
   border-radius: 2px;
 }
@@ -272,7 +268,6 @@
   padding: 5px 11px;
   cursor: pointer;
   white-space: nowrap;
-  font-family: var(--font-sans);
   transition: all 0.12s;
   border-radius: 2px;
 }

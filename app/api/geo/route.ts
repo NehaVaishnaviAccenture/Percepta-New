@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+export const maxDuration = 300;
+
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const MODEL = 'openai/gpt-5.4';
 
@@ -16,6 +18,11 @@ async function callAI(messages: { role: string; content: string }[], temperature
     body: JSON.stringify({ model: MODEL, messages, temperature, max_tokens }),
   });
   const data = await res.json();
+  if (!res.ok || !data.choices) {
+    const errMsg = data.error?.message || data.error || `HTTP ${res.status}`;
+    console.error('[callAI] error:', errMsg);
+    throw new Error(errMsg);
+  }
   return data.choices[0].message.content;
 }
 
@@ -2218,6 +2225,7 @@ export async function POST(req: NextRequest) {
 
     // ── DYNAMIC FALLBACK: if still 'gen', use AI to detect brand/industry/competitors/queries ──
     let dynamicCompetitors: string[] = [];
+    let detectedKeyProducts: string[] = [];
     let isDynamic = false;
     let detectedBrand = brand; // will be overridden for dynamic brands
 
@@ -2237,6 +2245,7 @@ export async function POST(req: NextRequest) {
   "industry_key": "short snake_case key e.g. beauty, apparel, food",
   "competitors": ["Competitor1","Competitor2","Competitor3","Competitor4","Competitor5","Competitor6","Competitor7","Competitor8","Competitor9","Competitor10"],
   "categories": ["Category1","Category2","Category3","Category4","Category5","Category6","Category7","Category8","Category9","Category10"],
+  "key_products": ["ProductName1","ProductName2","ProductName3","ProductName4","ProductName5","ProductName6","ProductName7","ProductName8"],
   "lob": "short product line label e.g. Skincare & Haircare"
 }
 
@@ -2245,6 +2254,7 @@ Webpage content: ${pageText}
 Rules:
 - competitors must be real US market competitors for this brand
 - categories must be specific product/service topics consumers search for
+- key_products must be the brand's actual specific product names, model names, or flagship offerings — NOT generic category names. These should be the real named products this brand sells (e.g. for Ferrari: "SF90 Stradale", "Roma", "Purosangue"; for Nike: "Air Max 270", "Air Force 1", "Pegasus"; for Chase: "Sapphire Preferred", "Freedom Unlimited", "Total Checking"). Include 6–8 of the most well-known products.
 - Return ONLY the JSON object, no markdown`;
 
       let detected: any = {};
@@ -2266,6 +2276,7 @@ Rules:
         .slice(0, 40)
         || brand;
       dynamicCompetitors = detected.competitors || [];
+      detectedKeyProducts = (detected.key_products || []).slice(0, 8).map((p: string) => String(p).trim()).filter(Boolean);
 
       // Generate 100 dynamic queries across the detected categories
       const cats: string[] = detected.categories || ['General','Product Quality','Value','Experience','Comparison','Expert Recommendation','Reviews','Features','Pricing','Availability'];
@@ -2661,8 +2672,8 @@ Score the brand on each dimension from 0-100. IMPORTANT CONSTRAINTS:
 Return ONLY valid JSON, no markdown. For strengths and improvements, "signal" must be one of: Visibility (30%), Sentiment (20%), Prominence (20%), Citation (15%), Share of Voice (15%). Each item needs a one-sentence bold opener and one-sentence detail:
 {"citation_share":0,"sentiment":0,"prominence":0,"share_of_voice":0,"strengths":[{"bold":"Bold opener sentence.","detail":"Supporting detail sentence.","signal":"Visibility","weight":"30%"},{"bold":"...","detail":"...","signal":"Sentiment","weight":"20%"},{"bold":"...","detail":"...","signal":"Prominence","weight":"20%"}],"improvements":[{"bold":"Bold opener sentence.","detail":"Supporting detail sentence.","signal":"Visibility","weight":"30%"},{"bold":"...","detail":"...","signal":"Prominence","weight":"20%"},{"bold":"...","detail":"...","signal":"Citation","weight":"15%"},{"bold":"...","detail":"...","signal":"Share of Voice","weight":"15%"},{"bold":"...","detail":"...","signal":"Sentiment","weight":"20%"}],"actions":[{"priority":"High","action":"..."},{"priority":"High","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Medium","action":"..."},{"priority":"Low","action":"..."}]}`;
 
-      const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1500);
       try {
+        const raw = await callAI([{ role: 'user', content: sp }], 0.0, 1500);
         sc = JSON.parse(raw.replace('```json','').replace('```','').trim());
         sc.citation_share = Math.min(sc.citation_share || 0, visibility + 10);
         for (const k of ['citation_share', 'sentiment', 'prominence', 'share_of_voice']) {
@@ -2994,9 +3005,42 @@ Return ONLY valid JSON, no markdown. For strengths and improvements, "signal" mu
       if (r.mentioned) rdMentionByCategory[r.category].mentioned++;
     });
 
-    // ── Run citation + trending in parallel for speed ──
+    // ── Run citation + trending + playbook in parallel for speed ──
     let citationSources: any[] = [];
     let trendingQueriesParallel: any[] = [];
+
+    const _pbBrandName = isDynamic ? detectedBrand : brand;
+    const _pbIndLabel  = ind.label;
+    const _pbCompCtx   = ind.comps && ind.comps.length > 0
+      ? `Competitors in this space: ${ind.comps.slice(0, 10).join(', ')}.`
+      : '';
+
+    const _pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions for this brand.
+Brand: ${_pbBrandName}, Industry: ${_pbIndLabel}, GEO Score: ${geo}. ${_pbCompCtx}
+IMPORTANT: Do NOT suggest comparison pages against competitors — they are never published.
+Return ONLY a valid JSON array with no markdown. Include at least 2-3 High, 1-2 Medium, 1 Low. Order: High first, then Medium, then Low.
+Each object must have exactly these fields:
+- "priority": "High" | "Medium" | "Low"
+- "topics": array like [{"name":"Topic"}] or [{"name":"Primary"},{"name":"Secondary","secondary":true}]
+- "title": punchy 5-10 word action title
+- "teaser": one-line 10-15 word opportunity summary
+- "who": array of 2-4 audience segment strings (e.g. "Everyday spenders", "First-time buyers")
+- "evidence": { "topic": string, "score": 0-100 integer (brand score for topic), "delta": integer (brand minus median, can be negative), "prompts": integer (prompts tested on this topic) }
+- "why": 2-3 sentences on why this is a priority. Use <b>bold</b> to highlight the key insight, especially at the end
+- "build": array of 3-5 build steps. Each starts with <b>bolded action verb + noun phrase</b> then detail text
+- "team": suggested owner, e.g. "Content / Marketing", "SEO / Web", "PR / Comms"
+- "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"
+- "signals": array of 1-3 GEO signal names this action most directly improves, chosen from: "Visibility" | "Sentiment" | "Prominence" | "Citation" | "Share of Voice"`;
+
+    const _knownForPrompt = `You are a brand analyst. Based on how AI models represent ${_pbBrandName} in the ${_pbIndLabel} space, list exactly 2 short noun phrases (3-5 words each) describing what this brand is best known for from a consumer perspective. Pick the two most distinctive things.
+Return ONLY a JSON array of 2 strings. No markdown, no explanation.
+Example: ["Rewards credit cards","High-yield savings"]`;
+
+    // Fire off early — will be awaited after the rest of the work is done
+    const _pbPromise = Promise.allSettled([
+      callAI([{ role: 'user', content: _pbPrompt }], 0.4, 2048),
+      callAI([{ role: 'user', content: _knownForPrompt }], 0.2, 300),
+    ]);
 
     const brandDomainForCit = inputHostname;
     const industryCtxForCit = isDynamic
@@ -3420,56 +3464,69 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       return { category: cat, total, mentioned, winRate, topCompetitor, dailySearches, related };
     });
 
-    // ── Playbook actions + brand_known_for — run in parallel ──
-    const brandName = isDynamic ? detectedBrand : brand;
-    const indLabel  = lobLabel || ind.label;
+    // ── Product clusters: brand's key named products ──────────────────────────
+    // For each key product, scan allQA responses for mentions of that product name.
+    // winRate = % of responses that mention the product (signals AI visibility for that product).
+    const productClusters: any[] = detectedKeyProducts.map(product => {
+      const productLower = product.toLowerCase();
+      const productRows = allQA.filter(Boolean).filter((p: any) => {
+        const text = (p.a || '').toLowerCase();
+        return text.includes(productLower);
+      });
+      const total = allQA.filter(Boolean).length;
+      const mentioned = productRows.length;
+      const winRate = total > 0 ? Math.round((mentioned / total) * 100) : 0;
+      // Find top competitor product mentioned alongside this product
+      const compCounts: Record<string, number> = {};
+      const allComps = [...(dynamicCompetitors.length ? dynamicCompetitors : competitors)];
+      productRows.forEach((p: any) => {
+        const text = (p.a || '').toLowerCase();
+        allComps.forEach(c => {
+          const cl = c.toLowerCase();
+          if (text.includes(cl)) compCounts[c] = (compCounts[c] || 0) + 1;
+        });
+      });
+      const sortedComps = Object.entries(compCounts).sort((a, b) => b[1] - a[1]);
+      const topCompetitor = sortedComps.length > 0 ? sortedComps[0][0] : null;
+      const topCompetitorScore = topCompetitor
+        ? Math.round((compCounts[topCompetitor] / Math.max(total, 1)) * 100)
+        : null;
+      return { product, winRate, mentioned, total, topCompetitor, topCompetitorScore };
+    });
 
+    // ── Playbook actions + brand_known_for — await the promise fired earlier ──
     let playbookActions: any[] = [];
     let brandKnownFor: string[] = [];
 
-    const compCtx = competitors.length > 0
-      ? `Competitors visible in GEO results: ${competitors.slice(0,10).map((c:any)=>c.Brand).join(', ')}.`
-      : '';
+    const [pbResult, knownForResult] = await _pbPromise;
 
-    const pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions for this brand.
-Brand: ${brandName}, Industry: ${indLabel}, GEO Score: ${geo}. ${compCtx}
-IMPORTANT: Do NOT suggest comparison pages against competitors — they are never published.
-Return ONLY a valid JSON array with no markdown. Include at least 2-3 High, 1-2 Medium, 1 Low. Order: High first, then Medium, then Low.
-Each object must have exactly these fields:
-- "priority": "High" | "Medium" | "Low"
-- "topics": array like [{"name":"Topic"}] or [{"name":"Primary"},{"name":"Secondary","secondary":true}]
-- "title": punchy 5-10 word action title
-- "teaser": one-line 10-15 word opportunity summary
-- "who": array of 2-4 audience segment strings (e.g. "Everyday spenders", "First-time buyers")
-- "evidence": { "topic": string, "score": 0-100 integer (brand score for topic), "delta": integer (brand minus median, can be negative), "prompts": integer (prompts tested on this topic) }
-- "why": 2-3 sentences on why this is a priority. Use <b>bold</b> to highlight the key insight, especially at the end
-- "build": array of 3-5 build steps. Each starts with <b>bolded action verb + noun phrase</b> then detail text
-- "team": suggested owner, e.g. "Content / Marketing", "SEO / Web", "PR / Comms"
-- "type": one of "Content page" | "Owned content optimization" | "FAQ build" | "Structured content" | "Citation push" | "PR / Earned media"
-- "signals": array of 1-3 GEO signal names this action most directly improves, chosen from: "Visibility" | "Sentiment" | "Prominence" | "Citation" | "Share of Voice"`;
-
-    const knownForPrompt = `You are a brand analyst. Based on how AI models represent ${brandName} in the ${indLabel} space, list exactly 2 short noun phrases (3-5 words each) describing what this brand is best known for from a consumer perspective. Pick the two most distinctive things.
-Return ONLY a JSON array of 2 strings. No markdown, no explanation.
-Example: ["Rewards credit cards","High-yield savings"]`;
-
-    const [pbResult, knownForResult] = await Promise.allSettled([
-      callAI([{ role: 'user', content: pbPrompt }], 0.4, 2048),
-      callAI([{ role: 'user', content: knownForPrompt }], 0.2, 300),
-    ]);
-
+    let _pbDebug = '';
     try {
-      if (pbResult.status === 'fulfilled') {
+      if (pbResult.status === 'rejected') {
+        _pbDebug = `rejected: ${(pbResult as any).reason?.message || pbResult.reason}`;
+      } else if (pbResult.status === 'fulfilled') {
         const pbRaw = pbResult.value;
-        console.log('[playbook] raw (first 300):', pbRaw?.slice(0, 300));
+        _pbDebug = `raw_start: ${pbRaw?.slice(0, 200)}`;
         const pbClean = pbRaw.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+        // Direct parse
         try { const p = JSON.parse(pbClean); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {}
+        // If direct parse failed or returned non-array, try bracket-balanced extraction
         if (!playbookActions.length) {
-          const m = pbClean.match(/\[[\s\S]*?\](?=\s*$)/) || pbClean.match(/\[[\s\S]*\]/);
-          if (m) { try { const p = JSON.parse(m[0]); if (Array.isArray(p) && p.length > 0) playbookActions = p; } catch {} }
+          let depth = 0, start = -1;
+          for (let i = 0; i < pbClean.length; i++) {
+            if (pbClean[i] === '[') { if (depth === 0) start = i; depth++; }
+            else if (pbClean[i] === ']') {
+              depth--;
+              if (depth === 0 && start !== -1) {
+                try { const p = JSON.parse(pbClean.slice(start, i + 1)); if (Array.isArray(p) && p.length > 0) { playbookActions = p; break; } } catch {}
+                start = -1;
+              }
+            }
+          }
         }
-        console.log('[playbook] parsed count:', playbookActions.length);
+        _pbDebug += ` | parsed: ${playbookActions.length}`;
       }
-    } catch (err) { console.error('[playbook] failed:', err); }
+    } catch (err: any) { _pbDebug = `exception: ${err?.message}`; }
 
     try {
       if (knownForResult.status === 'fulfilled') {
@@ -3505,8 +3562,11 @@ Example: ["Rewards credit cards","High-yield savings"]`;
       page_url: url,
       trending_queries: trendingQueries,
       query_clusters: queryClusters,
+      product_clusters: productClusters,
+      key_products: detectedKeyProducts,
       playbook_actions: playbookActions,
       brand_known_for: brandKnownFor,
+      _pb_debug: _pbDebug,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

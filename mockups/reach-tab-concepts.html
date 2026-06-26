@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reach Tab — Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand:      #A100FF;
+  --dark:       #0F0F11;
+  --canvas:     #F3F4F6;
+  --surface:    #FFFFFF;
+  --border:     #E5E5E5;
+  --border-mid: #D0D0DC;
+  --ink:        #0A0A0A;
+  --body:       #2B2B2B;
+  --muted:      #6B6B6B;
+  --faint:      #8E8E8E;
+  --dim:        #B8B8CC;
+
+  --t-authority-c: #007653;
+  --t-authority-b: #D1FAE5;
+  --t-leader-c:    #043BCC;
+  --t-leader-b:    #DBEAFE;
+  --t-compet-c:    #996E00;
+  --t-compet-b:    #FEF3C7;
+  --t-emerging-c:  #B15F00;
+  --t-emerging-b:  #FFF0E0;
+  --t-fragment-c:  #B7002F;
+  --t-fragment-b:  #FFE4EC;
+
+  /* Citation = Competitive (62), SoV = Fragmented (18) */
+  --cit-c: var(--t-compet-c);
+  --cit-b: var(--t-compet-b);
+  --sov-c: var(--t-fragment-c);
+  --sov-b: var(--t-fragment-b);
+}
+
+body {
+  background: var(--canvas);
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--body);
+  padding: 32px 24px 80px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ══ TAGLINE ══════════════════════════════════ */
+
+.reach-tagline {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 22ch;
+  margin-bottom: 20px;
+  color: var(--dark);
+}
+.reach-tagline .accent { color: var(--brand); }
+
+/* ══ SIGNAL CARDS ═════════════════════════════ */
+
+.reach-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sig-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.sig-card.c-cit  { border-top-color: var(--t-compet-c); }
+.sig-card.c-sov  { border-top-color: var(--t-fragment-c); }
+
+.sig-eyebrow {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sig-eyebrow .wt { color: var(--brand); font-weight: 700; }
+
+.sig-q {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+  margin-bottom: 16px;
+  flex: 1;
+}
+
+.sig-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.sig-num {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.chip.compet   { background: var(--t-compet-b);   color: var(--t-compet-c); }
+.chip.fragment { background: var(--t-fragment-b); color: var(--t-fragment-c); }
+
+.sig-rank {
+  font-size: 0.64rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ══ ACCORDION ════════════════════════════════ */
+
+.accordion {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.accordion-trigger {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+.accordion-trigger:hover { background: #FAFAFA; }
+.acc-text { font-size: 0.7rem; color: var(--faint); flex: 1; }
+.acc-text strong { color: var(--body); }
+.acc-learn { font-size: 0.7rem; font-weight: 600; color: var(--brand); margin-left: 6px; white-space: nowrap; }
+.acc-chev { margin-left: 10px; font-size: 0.7rem; color: var(--dim); transition: transform 0.18s; display: inline-block; }
+.acc-chev.open { transform: rotate(180deg); }
+.accordion-body { display: none; border-top: 1px solid var(--border); padding: 24px 24px 20px; }
+.accordion-body.open { display: block; }
+
+/* ══ SECTION LABEL ════════════════════════════ */
+
+.section-eyebrow {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+/* ══ SOV COLUMN CHART ═════════════════════════ */
+
+.sov-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px 20px 16px;
+  margin-bottom: 12px;
+}
+
+.sov-col-chart {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+  align-items: end;
+  height: 130px;
+  padding-bottom: 0;
+}
+
+.sov-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  height: 100%;
+}
+
+.sov-col-bar { width: 100%; }
+
+.sov-col-val {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.sov-col-val.you { color: var(--brand); }
+
+.sov-col-label {
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+}
+.sov-col-label.you { color: var(--brand); font-weight: 700; }
+
+/* ══ CITATION SOURCES LIST ════════════════════ */
+
+.cit-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+}
+
+.chip-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cf {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 4px 12px;
+  border: 1px solid var(--border-mid);
+  color: var(--muted);
+  cursor: pointer;
+  background: var(--surface);
+}
+.cf.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+.src-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.src-row:last-child { border-bottom: none; }
+.src-row.owned { border-left: 3px solid var(--t-compet-c); padding-left: 10px; margin-left: -3px; }
+
+.src-rank { font-size: 0.62rem; color: var(--dim); min-width: 16px; }
+.src-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.src-name { font-size: 0.73rem; color: var(--ink); font-weight: 600; }
+.src-cat-badge {
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+.src-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.src-bar { height: 4px; border-radius: 0; flex-shrink: 0; }
+.src-pct { font-size: 0.7rem; font-weight: 700; min-width: 32px; text-align: right; }
+.src-tog { font-size: 0.65rem; color: var(--dim); transition: transform 0.2s; display: inline-block; margin-left: 2px; }
+.src-tog.open { transform: rotate(180deg); }
+.src-expand { display: none; background: var(--surface); border-left: 3px solid var(--border); padding: 4px 16px 4px 48px; }
+.src-expand.open { display: block; }
+.src-expand-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.src-expand-row:last-child { border-bottom: none; }
+.src-expand-num { font-size: 0.65rem; color: var(--dim); min-width: 14px; text-align: right; flex-shrink: 0; }
+.src-expand-text { flex: 1; min-width: 0; }
+.src-expand-title { font-size: 0.72rem; font-weight: 600; color: var(--ink); }
+.src-expand-url { font-size: 0.62rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.src-expand-icon { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; font-weight: 700; }
+</style>
+</head>
+<body>
+
+<p class="reach-tagline">How much of the AI conversation <span class="accent">do you own?</span></p>
+
+<!-- Signal cards -->
+<div class="reach-cards">
+  <div class="sig-card c-cit">
+    <div class="sig-eyebrow">Citation <span class="wt">· 15%</span></div>
+    <div class="sig-q">Are your sources being cited?</div>
+    <div class="sig-score-row">
+      <span class="sig-num" style="color:var(--t-compet-c)">62</span>
+      <span class="chip compet">Competitive</span>
+    </div>
+    <div class="sig-rank">#3 of 9 brands · avg 54</div>
+  </div>
+  <div class="sig-card c-sov">
+    <div class="sig-eyebrow">Share of Voice <span class="wt">· 15%</span></div>
+    <div class="sig-q">How much of the conversation is yours?</div>
+    <div class="sig-score-row">
+      <span class="sig-num" style="color:var(--t-fragment-c)">18</span>
+      <span class="chip fragment">Fragmented</span>
+    </div>
+    <div class="sig-rank">#6 of 9 brands · avg 31%</div>
+  </div>
+</div>
+
+<!-- Accordion -->
+<div class="accordion">
+  <div class="accordion-trigger" onclick="toggleAcc()">
+    <span class="acc-text">Reach signals carry <strong>30%</strong> of your overall GEO Score</span>
+    <span class="acc-learn">· learn more</span>
+    <span class="acc-chev" id="chev">▾</span>
+  </div>
+  <div class="accordion-body" id="acc-body">
+    <p style="font-size:0.8rem;color:var(--muted)">Formula and tier breakdown — same pattern as AI Presence tab.</p>
+  </div>
+</div>
+
+<!-- SoV column chart -->
+<div class="section-eyebrow">Share of voice — who owns the conversation</div>
+<div class="sov-card">
+  <div class="sov-col-chart">
+    <div class="sov-col">
+      <span class="sov-col-val">24%</span>
+      <div class="sov-col-bar" style="height:100%;background:#D1D5DB"></div>
+      <span class="sov-col-label">Chase</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val you">18%</span>
+      <div class="sov-col-bar" style="height:75%;background:#A100FF"></div>
+      <span class="sov-col-label you">You</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">14%</span>
+      <div class="sov-col-bar" style="height:58%;background:#D1D5DB"></div>
+      <span class="sov-col-label">Amex</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">13%</span>
+      <div class="sov-col-bar" style="height:54%;background:#D1D5DB"></div>
+      <span class="sov-col-label">Citi</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">11%</span>
+      <div class="sov-col-bar" style="height:46%;background:#D1D5DB"></div>
+      <span class="sov-col-label">Disc.</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">8%</span>
+      <div class="sov-col-bar" style="height:33%;background:#D1D5DB"></div>
+      <span class="sov-col-label">WF</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">7%</span>
+      <div class="sov-col-bar" style="height:29%;background:#D1D5DB"></div>
+      <span class="sov-col-label">BoA</span>
+    </div>
+    <div class="sov-col">
+      <span class="sov-col-val">5%</span>
+      <div class="sov-col-bar" style="height:21%;background:#D1D5DB"></div>
+      <span class="sov-col-label">Others</span>
+    </div>
+  </div>
+</div>
+
+<!-- Citation sources list -->
+<div class="section-eyebrow">Citation sources — what's driving your presence</div>
+<div class="cit-card">
+  <p style="font-size:0.7rem;color:var(--muted);margin-bottom:12px">Top 10 domains influencing AI responses. Click a filter above to narrow by category.</p>
+  <div class="chip-filters">
+    <div class="cf active" onclick="filterSrc(this,'all')">All sources</div>
+    <div class="cf" onclick="filterSrc(this,'owned')">Owned media</div>
+    <div class="cf" onclick="filterSrc(this,'earned')">Earned media</div>
+    <div class="cf" onclick="filterSrc(this,'social')">Social media</div>
+    <div class="cf" onclick="filterSrc(this,'institution')">Institution</div>
+  </div>
+
+  <div id="src-list">
+
+    <div class="src-row owned" data-cat="owned" onclick="toggleSrc('s0')" style="cursor:pointer">
+      <span class="src-rank">—</span>
+      <div class="src-info"><div class="src-name" style="color:var(--t-compet-c)">capitalone.com</div><span class="src-cat-badge" style="background:var(--t-compet-b);color:var(--t-compet-c)">Owned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:64px;background:var(--t-compet-c)"></div><span class="src-pct" style="color:var(--t-compet-c)">15%</span><span class="src-tog" id="tog-s0">▾</span></div>
+    </div>
+    <div class="src-expand" id="s0">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Credit Cards Overview</div><div class="src-expand-url">https://www.capitalone.com/credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Venture Rewards Card</div><div class="src-expand-url">https://www.capitalone.com/credit-cards/venture/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Quicksilver Cash Rewards</div><div class="src-expand-url">https://www.capitalone.com/credit-cards/quicksilver/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Savor Cash Rewards</div><div class="src-expand-url">https://www.capitalone.com/credit-cards/savor/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Secured Credit Cards</div><div class="src-expand-url">https://www.capitalone.com/credit-cards/secured/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s1')" style="cursor:pointer">
+      <span class="src-rank">1</span>
+      <div class="src-info"><div class="src-name">nerdwallet.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:21px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">4.9%</span><span class="src-tog" id="tog-s1">▾</span></div>
+    </div>
+    <div class="src-expand" id="s1">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://www.nerdwallet.com/best/credit-cards</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Credit Cards</div><div class="src-expand-url">https://www.nerdwallet.com/best/credit-cards/cash-back</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Credit Cards</div><div class="src-expand-url">https://www.nerdwallet.com/best/credit-cards/travel</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">No Annual Fee Cards</div><div class="src-expand-url">https://www.nerdwallet.com/best/credit-cards/no-annual-fee</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Balance Transfer Cards</div><div class="src-expand-url">https://www.nerdwallet.com/best/credit-cards/balance-transfer</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s2')" style="cursor:pointer">
+      <span class="src-rank">2</span>
+      <div class="src-info"><div class="src-name">bankrate.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:16px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">3.8%</span><span class="src-tog" id="tog-s2">▾</span></div>
+    </div>
+    <div class="src-expand" id="s2">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://www.bankrate.com/credit-cards/best-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Cards</div><div class="src-expand-url">https://www.bankrate.com/credit-cards/cash-back/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Cards</div><div class="src-expand-url">https://www.bankrate.com/credit-cards/travel/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Card Reviews</div><div class="src-expand-url">https://www.bankrate.com/credit-cards/reviews/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Compare Credit Cards</div><div class="src-expand-url">https://www.bankrate.com/credit-cards/compare/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s3')" style="cursor:pointer">
+      <span class="src-rank">3</span>
+      <div class="src-info"><div class="src-name">thepointsguy.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:14px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">3.2%</span><span class="src-tog" id="tog-s3">▾</span></div>
+    </div>
+    <div class="src-expand" id="s3">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://thepointsguy.com/credit-cards/best/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Cards</div><div class="src-expand-url">https://thepointsguy.com/credit-cards/travel/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Cards</div><div class="src-expand-url">https://thepointsguy.com/credit-cards/cash-back/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Card Reviews</div><div class="src-expand-url">https://thepointsguy.com/reviews/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Compare Cards</div><div class="src-expand-url">https://thepointsguy.com/credit-cards/compare/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s4')" style="cursor:pointer">
+      <span class="src-rank">4</span>
+      <div class="src-info"><div class="src-name">creditkarma.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:12px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">2.7%</span><span class="src-tog" id="tog-s4">▾</span></div>
+    </div>
+    <div class="src-expand" id="s4">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Credit Cards</div><div class="src-expand-url">https://www.creditkarma.com/credit-cards</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Credit Cards</div><div class="src-expand-url">https://www.creditkarma.com/credit-cards/i/best-cash-back-credit-cards</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Credit Cards</div><div class="src-expand-url">https://www.creditkarma.com/credit-cards/i/best-travel-credit-cards</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Best Rewards Cards</div><div class="src-expand-url">https://www.creditkarma.com/credit-cards/i/best-rewards-credit-cards</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Card Reviews</div><div class="src-expand-url">https://www.creditkarma.com/reviews</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="social" onclick="toggleSrc('s5')" style="cursor:pointer">
+      <span class="src-rank">5</span>
+      <div class="src-info"><div class="src-name">reddit.com</div><span class="src-cat-badge" style="background:var(--t-emerging-b);color:var(--t-emerging-c)">Social media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:10px;background:var(--t-emerging-c)"></div><span class="src-pct" style="color:var(--t-emerging-c)">2.4%</span><span class="src-tog" id="tog-s5">▾</span></div>
+    </div>
+    <div class="src-expand" id="s5">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">r/personalfinance</div><div class="src-expand-url">https://www.reddit.com/r/personalfinance/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">r/CreditCards</div><div class="src-expand-url">https://www.reddit.com/r/CreditCards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">r/financialindependence</div><div class="src-expand-url">https://www.reddit.com/r/financialindependence/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">r/churning</div><div class="src-expand-url">https://www.reddit.com/r/churning/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">r/CreditCards Wiki</div><div class="src-expand-url">https://www.reddit.com/r/CreditCards/wiki/index</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="institution" onclick="toggleSrc('s6')" style="cursor:pointer">
+      <span class="src-rank">6</span>
+      <div class="src-info"><div class="src-name">consumerfinance.gov</div><span class="src-cat-badge" style="background:var(--t-leader-b);color:var(--t-leader-c)">Institution</span></div>
+      <div class="src-right"><div class="src-bar" style="width:9px;background:var(--t-leader-c)"></div><span class="src-pct" style="color:var(--t-leader-c)">2.1%</span><span class="src-tog" id="tog-s6">▾</span></div>
+    </div>
+    <div class="src-expand" id="s6">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Credit Card Tools</div><div class="src-expand-url">https://www.consumerfinance.gov/consumer-tools/credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">What Is a Credit Card?</div><div class="src-expand-url">https://www.consumerfinance.gov/ask-cfpb/what-is-a-credit-card/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Explore Cards</div><div class="src-expand-url">https://www.consumerfinance.gov/consumer-tools/credit-cards/explore-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Choosing the Right Card</div><div class="src-expand-url">https://www.consumerfinance.gov/about-us/blog/choosing-right-credit-card/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Consumer Tools</div><div class="src-expand-url">https://www.consumerfinance.gov/consumer-tools/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s7')" style="cursor:pointer">
+      <span class="src-rank">7</span>
+      <div class="src-info"><div class="src-name">forbes.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:12px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">2.9%</span><span class="src-tog" id="tog-s7">▾</span></div>
+    </div>
+    <div class="src-expand" id="s7">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://www.forbes.com/advisor/credit-cards/best/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Cards</div><div class="src-expand-url">https://www.forbes.com/advisor/credit-cards/best-cash-back-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Cards</div><div class="src-expand-url">https://www.forbes.com/advisor/credit-cards/best-travel-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Card Reviews</div><div class="src-expand-url">https://www.forbes.com/advisor/credit-cards/reviews/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Compare Cards</div><div class="src-expand-url">https://www.forbes.com/advisor/credit-cards/compare/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s8')" style="cursor:pointer">
+      <span class="src-rank">8</span>
+      <div class="src-info"><div class="src-name">investopedia.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:7px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">1.7%</span><span class="src-tog" id="tog-s8">▾</span></div>
+    </div>
+    <div class="src-expand" id="s8">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://www.investopedia.com/best-credit-cards-4801582</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Cards</div><div class="src-expand-url">https://www.investopedia.com/best-cash-back-credit-cards-4801556</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Cards</div><div class="src-expand-url">https://www.investopedia.com/best-travel-credit-cards-4800550</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">No Annual Fee Cards</div><div class="src-expand-url">https://www.investopedia.com/best-no-annual-fee-credit-cards-4767278</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Credit Cards Guide</div><div class="src-expand-url">https://www.investopedia.com/credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="earned" onclick="toggleSrc('s9')" style="cursor:pointer">
+      <span class="src-rank">9</span>
+      <div class="src-info"><div class="src-name">cnbc.com</div><span class="src-cat-badge" style="background:var(--t-authority-b);color:var(--t-authority-c)">Earned media</span></div>
+      <div class="src-right"><div class="src-bar" style="width:8px;background:var(--t-authority-c)"></div><span class="src-pct" style="color:var(--t-authority-c)">1.9%</span><span class="src-tog" id="tog-s9">▾</span></div>
+    </div>
+    <div class="src-expand" id="s9">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Best Credit Cards</div><div class="src-expand-url">https://www.cnbc.com/select/best-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Best Cash Back Cards</div><div class="src-expand-url">https://www.cnbc.com/select/best-cash-back-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Best Travel Cards</div><div class="src-expand-url">https://www.cnbc.com/select/best-travel-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">No Annual Fee Cards</div><div class="src-expand-url">https://www.cnbc.com/select/best-no-annual-fee-credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">All Credit Cards</div><div class="src-expand-url">https://www.cnbc.com/select/credit-cards/</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+    <div class="src-row" data-cat="institution" onclick="toggleSrc('s10')" style="cursor:pointer">
+      <span class="src-rank">10</span>
+      <div class="src-info"><div class="src-name">wikipedia.org</div><span class="src-cat-badge" style="background:var(--t-leader-b);color:var(--t-leader-c)">Institution</span></div>
+      <div class="src-right"><div class="src-bar" style="width:9px;background:var(--t-leader-c)"></div><span class="src-pct" style="color:var(--t-leader-c)">2.2%</span><span class="src-tog" id="tog-s10">▾</span></div>
+    </div>
+    <div class="src-expand" id="s10">
+      <div class="src-expand-row"><span class="src-expand-num">1</span><div class="src-expand-text"><div class="src-expand-title">Credit Card</div><div class="src-expand-url">https://en.wikipedia.org/wiki/Credit_card</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">2</span><div class="src-expand-text"><div class="src-expand-title">Cashback Reward Program</div><div class="src-expand-url">https://en.wikipedia.org/wiki/Cashback_reward_program</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">3</span><div class="src-expand-text"><div class="src-expand-title">Rewards Credit Card</div><div class="src-expand-url">https://en.wikipedia.org/wiki/Rewards_credit_card</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">4</span><div class="src-expand-text"><div class="src-expand-title">Travel Credit Card</div><div class="src-expand-url">https://en.wikipedia.org/wiki/Travel_credit_card</div></div><span class="src-expand-icon">↗</span></div>
+      <div class="src-expand-row"><span class="src-expand-num">5</span><div class="src-expand-text"><div class="src-expand-title">Secured Credit Card</div><div class="src-expand-url">https://en.wikipedia.org/wiki/Secured_credit_card</div></div><span class="src-expand-icon">↗</span></div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+/* ══ EXPAND OPTIONS ═══════════════════════════ */
+
+.expand-section { margin-top: 48px; border-top: 2px solid var(--border-mid); padding-top: 40px; }
+.expand-label {
+  font-size: 0.6rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--brand); margin-bottom: 6px;
+}
+.expand-desc { font-size: 0.72rem; color: var(--muted); margin-bottom: 20px; }
+
+/* shared row shell for demos */
+.demo-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+.demo-row-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; cursor: pointer;
+  border-left: 3px solid var(--t-compet-c);
+}
+.demo-row-header:hover { background: #FAFAFA; }
+.demo-domain { font-size: 0.78rem; font-weight: 600; color: var(--t-compet-c); flex: 1; }
+.demo-badge { font-size: 0.56rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; background: var(--t-compet-b); color: var(--t-compet-c); }
+.demo-pct { font-size: 0.78rem; font-weight: 700; color: var(--t-compet-c); }
+.demo-toggle { font-size: 0.65rem; color: var(--dim); margin-left: 8px; transition: transform .15s; }
+.demo-toggle.open { transform: rotate(180deg); }
+
+/* Option A — clean indent list */
+.expand-a {
+  border-top: 1px solid var(--border);
+  padding: 14px 16px 14px 32px;
+  background: #FAFAFA;
+  display: none;
+}
+.expand-a.open { display: block; }
+.expand-a-label { font-size: 0.6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.expand-a-list { display: flex; flex-direction: column; gap: 6px; }
+.expand-a-item { display: flex; align-items: baseline; gap: 8px; }
+.expand-a-num { font-size: 0.62rem; color: var(--dim); min-width: 12px; }
+.expand-a-url { font-size: 0.68rem; color: var(--t-compet-c); text-decoration: none; }
+.expand-a-url:hover { text-decoration: underline; }
+
+/* Option B — pill links */
+.expand-b {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  background: #FAFAFA;
+  display: none;
+}
+.expand-b.open { display: block; }
+.expand-b-label { font-size: 0.6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.expand-b-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.expand-b-pill {
+  font-size: 0.65rem; color: var(--t-compet-c);
+  border: 1px solid var(--t-compet-c);
+  padding: 4px 10px;
+  text-decoration: none;
+  max-width: 260px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: block;
+}
+.expand-b-pill:hover { background: var(--t-compet-b); }
+
+/* Option C — page title + url rows */
+.expand-c {
+  border-top: 1px solid var(--border);
+  display: none;
+}
+.expand-c.open { display: block; }
+.expand-c-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 9px 16px 9px 32px;
+  border-bottom: 1px solid var(--border);
+  background: #FAFAFA;
+}
+.expand-c-row:last-child { border-bottom: none; }
+.expand-c-num { font-size: 0.6rem; color: var(--dim); min-width: 12px; }
+.expand-c-text { flex: 1; min-width: 0; }
+.expand-c-title { font-size: 0.72rem; font-weight: 600; color: var(--ink); }
+.expand-c-url { font-size: 0.62rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.expand-c-icon { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; font-weight: 700; }
+</style>
+
+<script>
+function toggleAcc() {
+  const body = document.getElementById('acc-body');
+  const chev = document.getElementById('chev');
+  const open = body.classList.toggle('open');
+  chev.classList.toggle('open', open);
+}
+function filterSrc(el, cat) {
+  document.querySelectorAll('.chip-filters .cf').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#src-list .src-row').forEach(row => {
+    const show = (cat === 'all' || row.dataset.cat === cat);
+    row.style.display = show ? '' : 'none';
+    const expand = row.nextElementSibling;
+    if (expand && expand.classList.contains('src-expand')) {
+      if (!show) { expand.classList.remove('open'); expand.style.display = 'none'; }
+      else { expand.style.display = expand.classList.contains('open') ? 'block' : 'none'; }
+    }
+  });
+}
+function toggleSrc(id) {
+  const panel = document.getElementById(id);
+  const tog = document.getElementById('tog-' + id);
+  const open = panel.classList.toggle('open');
+  tog.classList.toggle('open', open);
+}
+function toggleExpand(id) {
+  const body = document.getElementById('expand-' + id);
+  const tog = document.getElementById('tog-' + id);
+  const open = body.classList.toggle('open');
+  tog.classList.toggle('open', open);
+}
+</script>
+
+<!-- ══════════════════════════════════════════
+     EXPAND OPTIONS
+══════════════════════════════════════════ -->
+<div class="expand-section">
+  <div class="expand-label">Expand options — how URL details appear</div>
+  <p class="expand-desc">All three use the same trigger: click a row to expand/collapse. Showing capitalone.com as the example.</p>
+
+  <!-- Option A: clean indented list -->
+  <div class="expand-label" style="color:var(--muted);margin-bottom:4px">Option A — numbered list, indented</div>
+  <p class="expand-desc">Minimal. URLs are plain links, indented under the row. Familiar pattern.</p>
+  <div class="demo-row">
+    <div class="demo-row-header" onclick="toggleExpand('a')">
+      <span class="demo-domain">capitalone.com</span>
+      <span class="demo-badge">Owned media</span>
+      <div style="flex:1"></div>
+      <span class="demo-pct">15%</span>
+      <span class="demo-toggle" id="tog-a">▾</span>
+    </div>
+    <div class="expand-a" id="expand-a">
+      <div class="expand-a-label">Top pages AI references</div>
+      <div class="expand-a-list">
+        <div class="expand-a-item"><span class="expand-a-num">1</span><a class="expand-a-url" href="#">https://www.capitalone.com/credit-cards/</a></div>
+        <div class="expand-a-item"><span class="expand-a-num">2</span><a class="expand-a-url" href="#">https://www.capitalone.com/credit-cards/venture/</a></div>
+        <div class="expand-a-item"><span class="expand-a-num">3</span><a class="expand-a-url" href="#">https://www.capitalone.com/credit-cards/quicksilver/</a></div>
+        <div class="expand-a-item"><span class="expand-a-num">4</span><a class="expand-a-url" href="#">https://www.capitalone.com/credit-cards/savor/</a></div>
+        <div class="expand-a-item"><span class="expand-a-num">5</span><a class="expand-a-url" href="#">https://www.capitalone.com/credit-cards/secured/</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option B: pill links -->
+  <div class="expand-label" style="color:var(--muted);margin-bottom:4px">Option B — pill links</div>
+  <p class="expand-desc">More visual. Each URL is a bordered pill. Scannable at a glance, good for short paths.</p>
+  <div class="demo-row">
+    <div class="demo-row-header" onclick="toggleExpand('b')">
+      <span class="demo-domain">capitalone.com</span>
+      <span class="demo-badge">Owned media</span>
+      <div style="flex:1"></div>
+      <span class="demo-pct">15%</span>
+      <span class="demo-toggle" id="tog-b">▾</span>
+    </div>
+    <div class="expand-b" id="expand-b">
+      <div class="expand-b-label">Top pages AI references</div>
+      <div class="expand-b-pills">
+        <a class="expand-b-pill" href="#">capitalone.com/credit-cards/</a>
+        <a class="expand-b-pill" href="#">capitalone.com/credit-cards/venture/</a>
+        <a class="expand-b-pill" href="#">capitalone.com/credit-cards/quicksilver/</a>
+        <a class="expand-b-pill" href="#">capitalone.com/credit-cards/savor/</a>
+        <a class="expand-b-pill" href="#">capitalone.com/credit-cards/secured/</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Option C: page title + url -->
+  <div class="expand-label" style="color:var(--muted);margin-bottom:4px">Option C — page title + URL</div>
+  <p class="expand-desc">Most context. Each entry shows a human-readable page name above the raw URL. Best for actionability.</p>
+  <div class="demo-row">
+    <div class="demo-row-header" onclick="toggleExpand('c')">
+      <span class="demo-domain">capitalone.com</span>
+      <span class="demo-badge">Owned media</span>
+      <div style="flex:1"></div>
+      <span class="demo-pct">15%</span>
+      <span class="demo-toggle" id="tog-c">▾</span>
+    </div>
+    <div class="expand-c" id="expand-c">
+      <div class="expand-c-row">
+        <span class="expand-c-num">1</span>
+        <div class="expand-c-text">
+          <div class="expand-c-title">Credit Cards Overview</div>
+          <div class="expand-c-url">https://www.capitalone.com/credit-cards/</div>
+        </div>
+        <span class="expand-c-icon">↗</span>
+      </div>
+      <div class="expand-c-row">
+        <span class="expand-c-num">2</span>
+        <div class="expand-c-text">
+          <div class="expand-c-title">Venture Rewards Card</div>
+          <div class="expand-c-url">https://www.capitalone.com/credit-cards/venture/</div>
+        </div>
+        <span class="expand-c-icon">↗</span>
+      </div>
+      <div class="expand-c-row">
+        <span class="expand-c-num">3</span>
+        <div class="expand-c-text">
+          <div class="expand-c-title">Quicksilver Cash Rewards</div>
+          <div class="expand-c-url">https://www.capitalone.com/credit-cards/quicksilver/</div>
+        </div>
+        <span class="expand-c-icon">↗</span>
+      </div>
+      <div class="expand-c-row">
+        <span class="expand-c-num">4</span>
+        <div class="expand-c-text">
+          <div class="expand-c-title">Savor Cash Rewards</div>
+          <div class="expand-c-url">https://www.capitalone.com/credit-cards/savor/</div>
+        </div>
+        <span class="expand-c-icon">↗</span>
+      </div>
+      <div class="expand-c-row">
+        <span class="expand-c-num">5</span>
+        <div class="expand-c-text">
+          <div class="expand-c-title">Secured Credit Cards</div>
+          <div class="expand-c-url">https://www.capitalone.com/credit-cards/secured/</div>
+        </div>
+        <span class="expand-c-icon">↗</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

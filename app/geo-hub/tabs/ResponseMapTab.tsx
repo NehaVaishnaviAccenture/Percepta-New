@@ -62,9 +62,10 @@ function labelMaxWidth(size: number): string {
 }
 
 function weightToWidth(weight: number): number {
-  const minW = 25, maxW = 75, minPx = 1, maxPx = 5;
+  const minW = 25, maxW = 75, minPx = 1, maxPx = 9;
   const t = (weight - minW) / (maxW - minW);
-  return minPx + (maxPx - minPx) * Math.max(0, Math.min(1, t));
+  // Quadratic curve so thin edges stay thin and thick edges are clearly thick
+  return minPx + (maxPx - minPx) * Math.pow(Math.max(0, Math.min(1, t)), 1.8);
 }
 
 function nameHash(s: string): number {
@@ -123,7 +124,7 @@ function deriveEdges(result: any, topics: RMTopic[]): RMEdge[] {
         const tgtId = slugify(rel.category || '');
         if (!tgtId || tgtId === srcId) return;
         const key = [srcId, tgtId].sort().join('||');
-        if (seen.has(key)) return;
+        if (seen.has(key)) return; // deduplicate pairs but keep first-seen direction
         seen.add(key);
         // similarity is 0–100; clamp to our weight range 25–75
         const weight = Math.min(75, Math.max(25, rel.similarity ?? 30));
@@ -205,21 +206,24 @@ const cyStyle: any[] = [
   {
     selector: 'edge',
     style: {
-      'line-color':          '#B8B8B8',
-      'width':               'data(width)',
-      'curve-style':         'straight',
-      'opacity':             0.7,
-      'transition-property': 'opacity, line-color, width',
-      'transition-duration': '160ms',
+      'line-color':            '#B8B8B8',
+      'width':                 'data(width)',
+      'curve-style':           'straight',
+      'target-arrow-shape':    'triangle',
+      'target-arrow-color':    '#B8B8B8',
+      'arrow-scale':           0.8,
+      'opacity':               0.7,
+      'transition-property':   'opacity, line-color, width',
+      'transition-duration':   '160ms',
     },
   },
-  { selector: 'node.dim',      style: { 'opacity': 0.12, 'text-opacity': 0.12 } },
-  { selector: 'edge.dim',      style: { 'opacity': 0.08 } },
-  { selector: 'node.focus',    style: { 'border-color': HL, 'border-width': 3, 'opacity': 1 } },
-  { selector: 'node.neighbor', style: { 'border-color': HL, 'opacity': 1 } },
+  { selector: 'node.dim',      style: { 'opacity': 0.12, 'text-opacity': 0.12, 'z-index': 0 } },
+  { selector: 'edge.dim',      style: { 'opacity': 0.08, 'z-index': 0 } },
+  { selector: 'node.focus',    style: { 'border-color': HL, 'border-width': 3, 'opacity': 1, 'z-index': 10 } },
+  { selector: 'node.neighbor', style: { 'border-color': HL, 'opacity': 1, 'z-index': 9 } },
   {
     selector: 'edge.highlight',
-    style: { 'line-color': HL, 'opacity': 1, 'width': 'mapData(weight, 25, 75, 2, 6)' },
+    style: { 'line-color': HL, 'target-arrow-color': HL, 'opacity': 1, 'z-index': 8 },
   },
 ];
 
@@ -262,11 +266,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
     .map(e => ({ a: topics.find(t => t.id === e.source)!, b: topics.find(t => t.id === e.target)!, weight: e.weight }))
     .filter(p => p.a && p.b);
 
-  // Pre-populate the sidebar with the hub topic so the panel is never
-  // completely empty on desktop. Resets whenever result changes.
-  useEffect(() => {
-    if (!isMobile() && hubId) setDetailNodeId(hubId);
-  }, [hubId]);
 
   function isMobile() {
     return typeof window !== 'undefined' && window.matchMedia('(max-width: 880px)').matches;
@@ -362,10 +361,9 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
     hoverIdRef.current  = null;
     userInteractedRef.current = false;
     clearHighlights();
-    // Reset sidebar to hub topic and re-open legend if it was collapsed
-    if (!isMobile() && hubId) setDetailNodeId(hubId);
+    setDetailNodeId(null);
     setLegendCollapsed(false);
-  }, [clearHighlights, hubId]);
+  }, [clearHighlights]);
 
   // Init Cytoscape
   useEffect(() => {
@@ -751,8 +749,11 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
         {/* Eyebrow + Headline */}
         <div id="rm-eyebrow" className="rmEyebrow">Response Map</div>
         <h1 id="rm-headline" className="rmHeadline">
-          How topics travel together in AI responses<span className="rmHeadlineMark">.</span>
+          Which topics does AI group you with — and <span className="rmHeadlineMark">which should you own?</span>
         </h1>
+        <p id="rm-intro" className="rmIntro">
+          When AI mentions your brand, it rarely does so in isolation — certain topics consistently appear together. This map shows which topic clusters co-occur most often, revealing the narrative contexts your brand is embedded in.
+        </p>
 
         {/* ── Stat Hero ── */}
         <div id="rm-stat-hero" className={`rmStatHero ${statStackClass}`} ref={statHeroRef}>
@@ -951,7 +952,21 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                   </button>
                 </>
               ) : (
-                'Click a node to see its details and connections.'
+                <div className="rmDetailEmpty">
+                  <div id="rmDetailEmptyUpper">
+                    <div className="rmDetailEmptyTagline">Follow the connections. <em className="rmDetailEmptyEm">Find the gaps. {/* OR See where they lead. */} </em></div>
+                    <p className="rmDetailEmptyBody">Co-occurring topics reveal the narrative context your brand gets placed in across AI responses.</p>
+                  </div>
+                  <div id="rmDetailEmptyLower">
+                    <div className="rmDetailEmptyDivider" />
+                    <div className="rmDetailEmptyHowTo">How to explore</div>
+                    <ol className="rmDetailEmptySteps">
+                      <li><span className="rmDetailEmptyNum">1</span>Click the graph to activate it</li>
+                      <li><span className="rmDetailEmptyNum">2</span>Hover a node to preview connections</li>
+                      <li><span className="rmDetailEmptyNum">3</span>Click to lock and see full detail</li>
+                    </ol>
+                  </div>
+                </div>
               )}
             </div>
           </div>
