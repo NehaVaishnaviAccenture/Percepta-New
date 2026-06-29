@@ -137,7 +137,6 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
 
       {/* Hero */}
       <div id="cbt-hero" className="cbtHero">
-        <div id="cbt-hero-eyebrow" className="cbtHeroEyebrow">Competitors · By Topic</div>
         <p id="cbt-hero-summary" className="cbtHeroSummary">
           {allSameTier
             ?<>{brand} is <span style={{fontWeight:600,color:bestTierColor}}>{bestTier}</span> on all {N} topics.</>

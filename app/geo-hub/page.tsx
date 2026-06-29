@@ -1,4 +1,4 @@
-// v2.15.0: redid signal tabs, reduced them to 2 (ai presence & reach)
+// v2.17.0: adjusted node colors, 10 instead of 11, adjusting headers & page widths, removed trends, redid geo score
 
 'use client';
 
@@ -21,9 +21,9 @@ import CompetitorsByTopicTab from './tabs/CompetitorsByTopicTab';
 import PromptsTestedTab from './tabs/PromptsTestedTab';
 import PromptsLiveTab from './tabs/PromptsLiveTab';
 import ResponseMapTab from './tabs/ResponseMapTab';
-import TrendsTab from './tabs/TrendsTab';
+
 import PrioritiesTab from './tabs/PrioritiesTab';
-import PrioritiesCoverageTab from './tabs/PrioritiesCoverageTab';
+
 import PrioritiesPlaybookTab from './tabs/PrioritiesPlaybookTab';
 
 
@@ -32,9 +32,8 @@ const TOP_TABS = [
   {label:'Overview',subs:[]},
   {label:'GEO Score',subs:['Overall','AI Presence','Reach']},
   {label:'Competitors',subs:['Overall','By Topic']},
-  {label:'Prompts',subs:['Tested Prompts','Live Prompt','Response Map']},
-  {label:'Trends',subs:[]},
-  {label:'Priorities',subs:['Overall','Coverage','Playbook']},
+  {label:'Prompts',subs:['Tested Prompts','Response Map','Live Prompt']},
+  {label:'Priorities',subs:['Overall','Playbook']},
 ];
 
 // CHANGE: Good band is now yellow #FDD835 everywhere
@@ -437,7 +436,7 @@ export default function GeoHub() {
             </div>
             {/* Greyed report nav */}
             <div id="error-nav" className="errorNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,pointerEvents:'none',opacity:0.3}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities','Trends'].map((t,i)=>(
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities'].map((t,i)=>(
                 <div id={`error-nav-item-${i}`} className="errorNavItem" key={t} style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:'0 14px',display:'flex',alignItems:'center',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif'}}>{t}</div>
               ))}
             </div>
@@ -611,7 +610,7 @@ export default function GeoHub() {
 
             {/* Report nav — greyed */}
             <div id="loading-nav" className="loadingNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities','Trends'].map((t,i)=>(
+              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities'].map((t,i)=>(
                 <div id={`loading-nav-item-${i}`} className="loadingNavItem" key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
               ))}
             </div>
@@ -840,12 +839,10 @@ export default function GeoHub() {
             {activeParent===2&&activeSub===0&&<CompetitorsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===2&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
             {activeParent===3&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===3&&activeSub===1&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===3&&activeSub===2&&<ResponseMapTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===4&&<TrendsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===5&&activeSub===0&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===5&&activeSub===1&&<PrioritiesCoverageTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===5&&activeSub===2&&<PrioritiesPlaybookTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
+            {activeParent===3&&activeSub===1&&<ResponseMapTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===3&&activeSub===2&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===4&&activeSub===0&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===4&&activeSub===1&&<PrioritiesPlaybookTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
 
 
           </div>

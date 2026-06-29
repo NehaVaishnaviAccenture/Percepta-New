@@ -1,45 +1,7 @@
 'use client';
 
-import React, { useRef, useState, useLayoutEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { GeoExplainer } from './GeoExplainer';
-
-// Shows the full label if it fits inside the bar, otherwise falls back to the short key.
-// Canvas measurement is used because DOM scrollWidth is unreliable in flex-basis:0 containers
-// and useLayoutEffect is suppressed during SSR, causing hydration mismatches.
-function measureText(text: string, font: string): number {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return 0;
-  ctx.font = font;
-  return ctx.measureText(text).width;
-}
-
-function SignalKey({ full, short }: { full: string; short: string }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [showShort, setShowShort] = useState(false);
-  useLayoutEffect(() => {
-    // Capture bar reference synchronously — inside .then() the ref may be stale
-    // if React 18 strict mode unmounts/remounts the component between effect and callback
-    const bar = ref.current?.parentElement;
-    if (!bar) return;
-    const measure = () => {
-      const available = bar.clientWidth - 20; // 10px padding each side
-      const fullWidth = measureText(full, '11px "Space Grotesk", sans-serif');
-      setShowShort(fullWidth > available);
-    };
-    measure(); // immediate call (uses fallback font if Space Grotesk not loaded yet)
-    document.fonts.ready.then(measure); // re-check once fonts settle
-    const ro = new ResizeObserver(measure);
-    ro.observe(bar);
-    window.addEventListener('resize', measure);
-    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, [full]);
-  return (
-    <span ref={ref} id={`gso-signal-key-${full.toLowerCase().replace(/\s+/g,'-')}`} className="gsoSignalKeySpan">
-      {showShort ? (short === 'SoV' ? short : `${short}.`) : full}
-    </span>
-  );
-}
 
 interface TabProps {
   result: any;
@@ -48,180 +10,197 @@ interface TabProps {
   setActiveSub: (n: number) => void;
 }
 
+function sigTier(s: number) {
+  if (s >= 80) return { label: 'Authority',   text: '#007653', bg: '#D1FAE5', dot: '#00AB7B' };
+  if (s >= 70) return { label: 'Leader',       text: '#043BCC', bg: '#DBEAFE', dot: '#4F90FF' };
+  if (s >= 56) return { label: 'Competitive',  text: '#996E00', bg: '#FEF3C7', dot: '#F3B10C' };
+  if (s >= 45) return { label: 'Emerging',     text: '#B15F00', bg: '#FFF0E0', dot: '#F48500' };
+  return               { label: 'Fragmented',  text: '#B7002F', bg: '#FFE4EC', dot: '#E0003B' };
+}
+
+const TIER_COLORS = [
+  { min: 0,  max: 44,  color: '#E0003B', textColor: '#B7002F', name: 'Fragmented' },
+  { min: 45, max: 55,  color: '#F48500', textColor: '#B15F00', name: 'Emerging'   },
+  { min: 56, max: 69,  color: '#F3B10C', textColor: '#996E00', name: 'Competitive'},
+  { min: 70, max: 79,  color: '#2F6DFF', textColor: '#043BCC', name: 'Leader'     },
+  { min: 80, max: 100, color: '#00AB7B', textColor: '#007653', name: 'Authority'  },
+];
+
+const TIER_DEFS: Record<string, string> = {
+  Fragmented:  'AI assistants rarely surface your brand — you\'re largely absent from category conversations.',
+  Emerging:    'You appear occasionally but inconsistently. Competitors are cited more often and more favourably.',
+  Competitive: 'You\'re a regular part of the AI conversation, holding your ground across most signals.',
+  Leader:      'AI assistants surface you frequently, with strong and favourable framing.',
+  Authority:   'You\'re the default reference — cited first, consistently, and on-message.',
+};
+
+function tierForScore(s: number) {
+  return TIER_COLORS.find(t => s >= t.min && s <= t.max) || TIER_COLORS[0];
+}
+
+// ── Arch SVG (Option B from mockup) ───────────────────────────
+const AW = 340, CX = 170, CY = 170, R_OUTER = 150, R_INNER = 104;
+const MARKER_COLOR = '#0F0F11';
+
+function scoreToAngle(s: number) { return Math.PI - (s / 100) * Math.PI; }
+function polar(r: number, a: number) { return { x: CX + r * Math.cos(a), y: CY - r * Math.sin(a) }; }
+function arcPath(a0: number, a1: number) {
+  const o0 = polar(R_OUTER, a0), o1 = polar(R_OUTER, a1);
+  const i1 = polar(R_INNER, a1), i0 = polar(R_INNER, a0);
+  const lg = Math.abs(a1 - a0) > Math.PI ? 1 : 0;
+  return `M${o0.x} ${o0.y} A${R_OUTER} ${R_OUTER} 0 ${lg} 1 ${o1.x} ${o1.y} L${i1.x} ${i1.y} A${R_INNER} ${R_INNER} 0 ${lg} 0 ${i0.x} ${i0.y}Z`;
+}
+
+function ArchSVG({ score }: { score: number }) {
+  const tier = tierForScore(score);
+  const angle = scoreToAngle(score);
+  const tip  = polar(R_OUTER + 6, angle);
+  const base = polar(R_INNER - 12, angle);
+
+  return (
+    <svg viewBox={`0 0 ${AW} ${CY}`} style={{ width: '100%', maxWidth: 400, display: 'block', overflow: 'visible' }}>
+      {TIER_COLORS.map(t => {
+        const a0 = scoreToAngle(t.min);
+        const a1 = scoreToAngle(Math.min(t.max + 1, 100));
+        return <path key={t.name} d={arcPath(a0, a1)} fill={t.color} />;
+      })}
+      {TIER_COLORS.slice(0, -1).map(t => {
+        const ad = scoreToAngle(t.max + 1);
+        const o = polar(R_OUTER + 1, ad), i = polar(R_INNER - 1, ad);
+        return <line key={t.name} x1={o.x} y1={o.y} x2={i.x} y2={i.y} stroke="#fff" strokeWidth="2" />;
+      })}
+      {/* Tick marks */}
+      {[0, 20, 40, 60, 80, 100].map(val => {
+        const a = scoreToAngle(val);
+        const tickOuter = polar(R_OUTER + 3, a);
+        const tickInner = polar(R_OUTER - 1, a);
+        const lp = polar(R_OUTER + 17, a);
+        const anchor = val === 0 ? 'start' : val === 100 ? 'end' : 'middle';
+        return (
+          <g key={val}>
+            <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} stroke="#fff" strokeWidth="1.5" />
+            <text x={lp.x} y={lp.y + 4} textAnchor={anchor} fontFamily="'JetBrains Mono', monospace" fontSize="10" fill="#8E8E8E">{val}</text>
+          </g>
+        );
+      })}
+      {/* Needle */}
+      <line x1={base.x} y1={base.y} x2={tip.x} y2={tip.y} stroke={MARKER_COLOR} strokeWidth="2.5" strokeLinecap="round" />
+      {/* Score inside arch */}
+      <text x={CX} y={CY - 28} textAnchor="middle" fontFamily="'Space Grotesk', sans-serif" fontSize="44" fontWeight="700" fill={tier.color}>{score}</text>
+      <text x={CX} y={CY - 10} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.08em" fill="#8E8E8E">{tier.name.toUpperCase()}</text>
+    </svg>
+  );
+}
+
+// ── Signal card (shared structure for all 5 signals) ──────────
+function SignalCard({ label, q, score, rankVal, avgVal, total, setActiveParent, setActiveSub, sub }: {
+  label: string; q: string; score: number;
+  rankVal: number; avgVal: number; total: number;
+  setActiveParent: (n: number) => void; setActiveSub: (n: number) => void; sub: number;
+}) {
+  const tier = sigTier(score);
+  return (
+    <div className="aiPresCard" style={{ borderLeftColor: tier.text, cursor: 'pointer' }} onClick={() => { setActiveParent(1); setActiveSub(sub); }}>
+      <div className="aiPresCardEyebrow">{label}</div>
+      <div className="aiPresCardQ">{q}</div>
+      <div className="aiPresCardScoreRow">
+        <span className="aiPresCardNum" style={{ color: tier.text }}>{score}</span>
+        <span className="aiPresChip" style={{ background: tier.bg, color: tier.text }}>{tier.label}</span>
+      </div>
+      <div className="aiPresCardRank">#{rankVal} of {total} brands · avg {avgVal}</div>
+    </div>
+  );
+}
+
 export default function GeoScoreTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
-  const geo = result.overall_geo_score??0;
-  const vis = result.visibility??0,sent = result.sentiment??0,prom = result.prominence??0,cit = result.citation_share??0,sov = result.share_of_voice??0;
+  const geo  = result.overall_geo_score ?? 0;
+  const vis  = result.visibility  ?? 0;
+  const sent = result.sentiment   ?? 0;
+  const prom = result.prominence  ?? 0;
+  const cit  = result.citation_share ?? 0;
+  const sov  = result.share_of_voice ?? 0;
   const comps = resultComps;
-  const tierOf=(s:number)=>s>=80?{label:'Authority',color:'#007653',textColor:'#007653'}:s>=70?{label:'Leader',color:'#043BCC',textColor:'#043BCC'}:s>=56?{label:'Competitive',color:'#F3B10C',textColor:'#996E00'}:s>=45?{label:'Emerging',color:'#F48500',textColor:'#B15F00'}:{label:'Fragmented',color:'#B7002F',textColor:'#B7002F'};
-  const sigBg=(s:number)=>s>=80?'#00AB7B':s>=70?'#2F6DFF':s>=56?'#F3B10C':s>=45?'#F48500':'#E0003B';
-  const sigFg=(s:number)=>(s>=56&&s<70)?'#2A1500':'white';
-  const allBrands=[{GEO:geo,Brand:result.brand_name,isYou:true},...comps].sort((a:any,b:any)=>(b.GEO||0)-(a.GEO||0));
-  const myRank=allBrands.findIndex((b:any)=>b.isYou)+1;
-  const topComp=allBrands.find((b:any)=>!b.isYou);
-  const topGap=topComp?Math.max(0,(topComp.GEO||0)-geo):0;
-  const nextThreshold=geo>=80?100:geo>=70?80:geo>=56?70:geo>=45?56:45;
-  const nextTierLabel=geo>=80?'Max':geo>=70?'Authority':geo>=56?'Leader':geo>=45?'Competitive':'Emerging';
-  const ptsToNext=nextThreshold-geo;
-  const signals=[
-    {key:'Vis', label:'Visibility',     score:vis,  weight:30, sub:1, lowMeaning:"AI models rarely surface your brand when people ask about your category — you're largely absent from the conversation"},
-    {key:'Sent',label:'Sentiment',      score:sent, weight:20, sub:2, lowMeaning:"when AI does mention you, it isn't framing your brand positively — the language around you is neutral at best"},
-    {key:'Prom',label:'Prominence',     score:prom, weight:20, sub:3, lowMeaning:"even when AI mentions you, it's not giving you a leading role — you're showing up late or in passing, not as a top recommendation"},
-    {key:'Cit', label:'Citation',       score:cit,  weight:15, sub:4, lowMeaning:"AI models aren't treating your brand as an authoritative source worth referencing — you're not being cited the way stronger brands are"},
-    {key:'SoV', label:'Share of Voice', score:sov,  weight:15, sub:5, lowMeaning:"competitors are dominating AI conversations in your space — your brand is getting a small slice of all brand mentions"},
+
+  const allBrands = [{ GEO: geo, Brand: result.brand_name, isYou: true }, ...comps].sort((a: any, b: any) => (b.GEO || 0) - (a.GEO || 0));
+  const myRank   = allBrands.findIndex((b: any) => b.isYou) + 1;
+  const topComp  = allBrands.find((b: any) => !b.isYou);
+  const topGap   = topComp ? Math.max(0, (topComp.GEO || 0) - geo) : 0;
+  const tier     = tierForScore(geo);
+
+  const ind = result.ind_label || 'your industry';
+  const brand = result.brand_name || 'Your brand';
+
+  const ptsToNext = (geo >= 80 ? 100 : geo >= 70 ? 80 : geo >= 56 ? 70 : geo >= 45 ? 56 : 45) - geo;
+  const nextTierLabel = geo >= 80 ? null : geo >= 70 ? 'Authority' : geo >= 56 ? 'Leader' : geo >= 45 ? 'Competitive' : 'Emerging';
+
+  const headline: [string, string] =
+    tier.name === 'Fragmented'  ? ["You're largely invisible,",        "and being skipped over"]          :
+    tier.name === 'Emerging'    ? ["You're occasionally mentioned,",   "but rarely leading"]              :
+    tier.name === 'Competitive' ? ["You're part of the conversation,", "but not the first choice"]        :
+    tier.name === 'Leader'      ? ["You're frequently recommended,",   "but not yet dominant"]            :
+                                  ["You're the default recommendation,","and setting the standard"];
+
+  const interpText =
+    tier.name === 'Fragmented'
+      ? `At ${geo}, ${brand} is considered fragmented — AI assistants rarely surface you and ${topComp?.Brand || 'competitors'}${topGap > 0 ? ` leads by ${topGap} points` : ' is recommended instead'}. ${brand} is #${myRank} of ${allBrands.length} brands in ${ind}${nextTierLabel ? ` and ${ptsToNext} points from Emerging, where you enter the consideration set for significantly more queries` : ''}.`
+    : tier.name === 'Emerging'
+      ? `At ${geo}, ${brand} is considered emerging — you appear occasionally but inconsistently. Competitors above 56 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier — you're ${ptsToNext} points away. ${brand} is also #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
+    : tier.name === 'Competitive'
+      ? `At ${geo}, ${brand} is considered competitive — a regular part of the AI conversation, but not yet a first-choice recommendation. Competitors above 70 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier — you're ${ptsToNext} points away. ${brand} is #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
+    : tier.name === 'Leader'
+      ? `At ${geo}, ${brand} is considered a leader — AI assistants surface you frequently with strong, favourable framing. You're ${ptsToNext} points from Authority and consistent first-position recommendations. ${brand} is #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
+      : `At ${geo}, ${brand} is in the Authority tier — the default reference across ${ind}, cited first and consistently. ${brand} is #${myRank} of ${allBrands.length} brands. The focus is on maintaining dominance and monitoring for competitor movements.`;
+
+  const rank = (myVal: number, all: number[]) => [...all].sort((a, b) => b - a).indexOf(myVal) + 1;
+  const avg  = (all: number[]) => Math.round(all.reduce((s, v) => s + v, 0) / all.length);
+
+  const allVis  = [vis,  ...comps.map((c: any) => c.Vis  ?? 0)];
+  const allSent = [sent, ...comps.map((c: any) => c.Sen  ?? 0)];
+  const allProm = [prom, ...comps.map((c: any) => c.Prom ?? 0)];
+  const allCit  = [cit,  ...comps.map((c: any) => c.Cit  ?? 0)];
+  const allSov  = [sov,  ...comps.map((c: any) => c.Sov  ?? 0)];
+
+  const signals = [
+    { key: 'vis',  label: 'Visibility',     q: 'Are you in the answer?',                  score: vis,  rankVal: rank(vis,  allVis),  avgVal: avg(allVis),  total: allVis.length - 1,  sub: 1 },
+    { key: 'sent', label: 'Sentiment',      q: 'Are you framed well?',                    score: sent, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1, sub: 1 },
+    { key: 'prom', label: 'Prominence',     q: 'Are you front and center?',               score: prom, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1, sub: 1 },
+    { key: 'cit',  label: 'Citation',       q: 'Are your sources being cited?',           score: cit,  rankVal: rank(cit,  allCit),  avgVal: avg(allCit),  total: allCit.length - 1,  sub: 2 },
+    { key: 'sov',  label: 'Share of Voice', q: 'How much of the conversation is yours?',  score: sov,  rankVal: rank(sov,  allSov),  avgVal: avg(allSov),  total: allSov.length - 1,  sub: 2 },
   ];
-  const weakest=[...signals].sort((a,b)=>((100-b.score)*b.weight)-((100-a.score)*a.weight))[0];
-  const weakColor=sigBg(weakest.score);
-  const topGeo=Math.max(geo,...comps.map((c:any)=>c.GEO||0));
-  const topVis=Math.max(vis,...comps.map((c:any)=>c.Vis||c.visibility||0));
-  const topSent=Math.max(sent,...comps.map((c:any)=>c.Sen||c.sentiment||0));
-  const topProm=Math.max(prom,...comps.map((c:any)=>c.Prom||c.prominence||0));
-  const topCit=Math.max(cit,...comps.map((c:any)=>c.Cit||c.citation_share||0));
-  const topSov=Math.max(sov,...comps.map((c:any)=>c.Sov||c.share_of_voice||0));
-  const vcmpCols=[
-    {label:'GEO Score',sub:'composite',score:geo,ref:topGeo,headline:true},
-    {label:'Visibility',sub:'30% weight',score:vis,ref:topVis},
-    {label:'Sentiment',sub:'20% weight',score:sent,ref:topSent},
-    {label:'Prominence',sub:'20% weight',score:prom,ref:topProm},
-    {label:'Citation',sub:'15% weight',score:cit,ref:topCit},
-    {label:'Share of Voice',sub:'15% weight',score:sov,ref:topSov},
-  ];
-  const tierSegs=[
-    {label:'Fragmented',range:'0–44',isCurrent:geo<45,color:'#E0003B',textColor:'#B7002F'},
-    {label:'Emerging',range:'45–55',isCurrent:geo>=45&&geo<56,color:'#F48500',textColor:'#B15F00'},
-    {label:'Competitive',range:'56–69',isCurrent:geo>=56&&geo<70,color:'#F3B10C',textColor:'#996E00'},
-    {label:'Leader',range:'70–79',isCurrent:geo>=70&&geo<80,color:'#2F6DFF',textColor:'#043BCC'},
-    {label:'Authority',range:'80–100',isCurrent:geo>=80,color:'#00AB7B',textColor:'#007653'},
-  ];
-  const barFrs=[44,11,14,10,21];
-  const markerPct=`${Math.min(geo,100)}%`;
-  const bracketFrom=`${Math.min(geo,100)}%`;
-  const bracketTo=`${Math.min(nextThreshold,100)}%`;
-  const bracketMid=`${(Math.min(geo,100)+Math.min(nextThreshold,100))/2}%`;
 
   return (
     <div id="geo-score-overall-wrapper" className="gsoWrapper">
 
-      {/* ── Top row: hero + breakdown ── */}
-      <div id="gso-header-row" className="gsoHeaderRow">
+      {/* ── Hero card ── */}
+      <div id="geo-score-overall-hero" className="gsoHeroCard gsoHeroCardNew">
+        <div id="gso-hero-body" className="gsoHeroBody">
 
-        {/* Hero score card — spans 2 cols */}
-        <div id="geo-score-overall-hero" className="gsoHeroCard">
-          <div id="gso-hero-eyebrow" className="gsoHeroEyebrow">GEO Score · Run 1</div>
-          <div id="gso-hero-content" className="gsoHeroContent">
-
-            {/* Score pillar: big number + tier name */}
-            <div id="gso-score-pillar" className="gsoScorePillar">
-              <div id="gso-score-number" className="gsoScoreNumber">{geo}</div>
-              <div id="gso-score-tier-label" className="gsoScoreTierLabel" style={{color:tierOf(geo).textColor}}>{tierOf(geo).label}</div>
-            </div>
-
-            {/* Rank text + tier ladder */}
-            <div id="gso-rank-section" className="gsoRankSection">
-              <div id="gso-rank-text" className="gsoRankText">
-                <span className="gso-rank-num gsoRankMono">#{myRank}</span> of <span className="gso-rank-total gsoRankMono">{allBrands.length}</span> brands{topComp&&topGap>0&&<> and <span className="gso-rank-gap gsoRankMono">{topGap}</span> points behind <span className="gso-rank-leader gsoRankMono">#1</span></>} in {result.ind_label||'your industry'}.
-              </div>
-
-              {/* Tier ladder */}
-              <div id="gso-tier-ladder" className={['gsoTierLadder', ptsToNext<100&&'gsoTierLadderWithBracket'].filter(Boolean).join(' ')}>
-                {ptsToNext<100&&<>
-                  {/* Bracket: shows gap to next tier */}
-                  <div id="gso-tier-bracket" className="gsoTierBracket" style={{left:bracketFrom,width:`calc(${bracketTo} - ${bracketFrom})`}}>
-                    <div id="gso-tier-bracket-line" className="gsoTierBracketLine"/>
-                    <div id="gso-tier-bracket-left" className="gsoTierBracketTickLeft"/>
-                    <div id="gso-tier-bracket-right" className="gsoTierBracketTickRight"/>
-                  </div>
-                  <div id="gso-tier-bracket-label" className="gsoTierBracketLabel" style={{left:bracketMid}}>+{ptsToNext} to {nextTierLabel}</div>
-                </>}
-
-                {/* Coloured tier bar */}
-                <div id="gso-tier-bar" className="gsoTierBar" style={{gridTemplateColumns:`${barFrs.join('fr ')}fr`}}>
-                  {tierSegs.map(seg=>(
-                    <div key={seg.label} className={`gso-tier-seg gso-tier-seg--${seg.label.toLowerCase()}${seg.isCurrent?' gso-tier-seg--current':''} gsoTierSeg`} style={{background:seg.color,opacity:seg.isCurrent?1:0.25}}/>
-                  ))}
-                  <div id="gso-tier-bar-marker" className="gsoTierBarMarker" style={{left:markerPct}}/>
-                </div>
-
-                {/* Tier label row */}
-                <div id="gso-tier-labels" className="gsoTierLabels" style={{gridTemplateColumns:`${barFrs.join('fr ')}fr`}}>
-                  {tierSegs.map(seg=>(
-                    <div key={seg.label} className={`gso-tier-label gso-tier-label--${seg.label.toLowerCase()}${seg.isCurrent?' gso-tier-label--current':''} gsoTierLabelCell`} style={{color:seg.isCurrent?seg.textColor:'#6B6B6B',fontWeight:seg.isCurrent?600:400}}>
-                      {seg.label}<span className="gso-tier-label-range gsoTierLabelRange">{seg.range}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+          {/* Left: arch */}
+          <div id="gso-arch-wrap" className="gsoArchWrap">
+            <ArchSVG score={geo} />
           </div>
-        </div>
 
-        {/* Signal breakdown card */}
-        <div id="geo-score-overall-comp" className="gsoCompCard">
-          <div id="gso-comp-header" className="gsoCompHeader">
-            <div id="gso-comp-eyebrow" className="gsoCompEyebrow">Your {geo} · broken down</div>
-            <span id="gso-comp-weakness-cta" className="gsoWeaknessCta gsoLinkBtn" onClick={()=>{setActiveParent(1);setActiveSub(weakest.sub);}}>See {weakest.label} →</span>
-          </div>
-          <div id="gso-comp-signals" className="gsoSignalBars">
-            {signals.map(sig=>(
-              <div key={sig.key} className={`gso-signal-bar gso-signal-bar--${sig.key.toLowerCase()} gsoSignalBar`} style={{flex:`${sig.weight} 1 0`,background:sigBg(sig.score),color:sigFg(sig.score)}}>
-                <span className="gso-signal-weight gsoSignalWeight">{sig.weight}%</span>
-                <SignalKey full={sig.label} short={sig.key} />
-                <span className="gso-signal-score gsoSignalScore">{sig.score}</span>
-              </div>
-            ))}
-          </div>
-          <div id="gso-comp-weakness" className="gsoWeakness" style={{borderLeft:`2px solid ${weakColor}`}}>
-            <div id="gso-comp-weakness-label" className="gsoWeaknessLabel" style={{color:weakColor}}>Your weakest signal</div>
-            <div id="gso-comp-weakness-text" className="gsoWeaknessText">
-              Your {weakest.label} scores {weakest.score}/100 and carries {weakest.weight}% of your GEO score, meaning {weakest.lowMeaning}.
-            </div>
+          {/* Right: text */}
+          <div id="gso-hero-text" className="gsoHeroText">
+            <h2 className="gsoHeroHeadline">
+              {headline[0]}{' '}
+              <span className="gsoHeroHeadlineAccent">{headline[1]}</span>
+            </h2>
+            <p className="gsoInterpText">{interpText}</p>
           </div>
         </div>
       </div>
 
-      {/* ── vcmp chart: how you rank across signals ── */}
-      <div id="geo-score-overall-vcmp" className="gsoVcmpCard">
-        <div id="gso-vcmp-header" className="gsoVcmpHeader">
-          <div id="gso-vcmp-eyebrow" className="gsoVcmpEyebrow">How you rank in {result.ind_label||'your industry'}</div>
-          <button id="gso-vcmp-cta" onClick={()=>{setActiveParent(2);setActiveSub(0);}} className="gsoLinkBtn">See competitors →</button>
-        </div>
-        <div id="gso-vcmp-legend" className="gsoVcmpLegend">
-          <div className="gso-vcmp-legend-item gso-vcmp-legend-item--you gsoVcmpLegendItem"><span className="gso-vcmp-legend-swatch gso-vcmp-legend-swatch--you gsoVcmpSwatchYou"/><span className="gso-vcmp-legend-label gso-vcmp-legend-label--you">Your score</span></div>
-          <div className="gso-vcmp-legend-item gso-vcmp-legend-item--gap gsoVcmpLegendItem"><span className="gso-vcmp-legend-swatch gso-vcmp-legend-swatch--gap gsoVcmpSwatchGap"/><span className="gso-vcmp-legend-label gso-vcmp-legend-label--gap">Top scorer per signal</span></div>
-        </div>
-        <div id="gso-vcmp-chart" className="gsoVcmpChart">
-          <div id="gso-vcmp-y-axis" className="gsoVcmpYAxis">
-            <div className="gso-vcmp-y-spacer gso-vcmp-y-spacer--top gsoVcmpYSpacer gsoVcmpYSpacerTop"/>
-            <div id="gso-vcmp-y-labels" className="gsoVcmpYLabels">
-              <span className="gso-vcmp-y-label gso-vcmp-y-label--100 gsoVcmpYLabel gsoVcmpYLabel100">100</span>
-              <span className="gso-vcmp-y-label gso-vcmp-y-label--50 gsoVcmpYLabel gsoVcmpYLabel50">50</span>
-              <span className="gso-vcmp-y-label gso-vcmp-y-label--0 gsoVcmpYLabel gsoVcmpYLabel0">0</span>
-            </div>
-            <div className="gso-vcmp-y-spacer gso-vcmp-y-spacer--bottom gsoVcmpYSpacer gsoVcmpYSpacerBottom"/>
-          </div>
-          <div id="gso-vcmp-cols" className="gsoVcmpCols">
-            {vcmpCols.map((col,i)=>(
-              <div key={col.label} id={`gso-vcmp-col-${col.label.toLowerCase().replace(/\s+/g,'-')}`} className={['gso-vcmp-col', col.headline&&'gso-vcmp-col--headline', 'gsoVcmpCol', col.headline&&'gsoVcmpColHeadline'].filter(Boolean).join(' ')}>
-                <div className="gso-vcmp-col-score-row gsoVcmpColScoreRow">
-                  <span className="gso-vcmp-col-score gsoVcmpColScore">{col.score}</span>
-                  {col.ref>col.score&&<span className="gso-vcmp-col-ref gsoVcmpColRef">({col.ref})</span>}
-                </div>
-                <div className="gso-vcmp-col-bar-wrap gsoVcmpColBarWrap">
-                  <div className="gso-vcmp-col-grid-line gso-vcmp-col-grid-line--top gsoVcmpColGridLine gsoVcmpColGridLineTop"/>
-                  <div className="gso-vcmp-col-baseline gsoVcmpColBaseline"/>
-                  <div className="gso-vcmp-col-bar gsoVcmpColBar" style={{height:`${col.score}%`}}/>
-                  {col.ref>col.score&&<div className="gso-vcmp-col-gap-bar gsoVcmpColGapBar" style={{bottom:`${col.score}%`,height:`${col.ref-col.score}%`}}/>}
-                </div>
-                <div className="gso-vcmp-col-label-wrap gsoVcmpColLabelWrap" style={{fontWeight:col.headline?600:500,color:col.headline?'#0A0A0A':'#4A4A4A'}}>
-                  <span className="gso-vcmp-col-label gsoVcmpColLabel">{col.label}</span>
-                  <span className="gso-vcmp-col-sub gsoVcmpColSub">{col.sub}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── GEO Explainer ── */}
+      <GeoExplainer onSignalsClick={() => { setActiveParent(1); setActiveSub(0); }} />
+
+      {/* ── Signal cards: 5 columns ── */}
+      <div id="gso-signal-cards" className="gsoSignalCards gsoSignalCards--5">
+        {signals.map(sig => (
+          <SignalCard key={sig.key} label={sig.label} q={sig.q} score={sig.score} rankVal={sig.rankVal} avgVal={sig.avgVal} total={sig.total} sub={sig.sub} setActiveParent={setActiveParent} setActiveSub={setActiveSub} />
+        ))}
       </div>
 
-      <GeoExplainer onSignalsClick={()=>{setActiveParent(1);setActiveSub(0);}}/>
     </div>
   );
 }

@@ -3,25 +3,6 @@
    All classes prefixed rm* to avoid collision with tabs.css
    Dynamic values (tier colors, sizes) stay as inline style={{}}
    ================================================================ */
-
-/* ── Wrapper ─────────────────────────────────────────────────── */
-.rmWrapper {
-  padding: 32px 32px 40px;
-}
-@media (max-width: 640px) {
-  .rmWrapper { padding: 20px 16px 28px; }
-}
-
-/* ── Eyebrow ─────────────────────────────────────────────────── */
-.rmEyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-brand, #A100FF);
-  margin: 0 0 12px;
-}
-
 /* ── Headline ─────────────────────────────────────────────────── */
 .rmHeadline {
   font-family: var(--font-display, 'Space Grotesk', sans-serif);
@@ -544,14 +525,6 @@
   color: var(--color-text-primary, #0A0A0A);
   margin: 0;
 }
-.rmTierPill {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 3px 8px;
-  flex-shrink: 0;
-}
 .rmDetailConns { display: flex; flex-direction: column; gap: 4px; }
 .rmDetailConnsLabel {
   font-size: 10px;
@@ -577,13 +550,7 @@
   align-items: center;
   gap: 6px;
 }
-.rmTdot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
+
 .rmPct {
   font-family: var(--font-mono, monospace);
   font-weight: 600;
@@ -758,12 +725,7 @@
   gap: 2px;
 }
 .rmTopnSep { color: var(--color-border-mid, #D6D6D6); margin: 0 4px; }
-.rmTopnPair .rmTdot {
-  margin-right: 4px;
-  position: relative;
-  top: 0;
-  vertical-align: middle;
-}
+
 .rmTopnBar {
   height: 4px;
   background: var(--color-card-border, #E4E4EC);
