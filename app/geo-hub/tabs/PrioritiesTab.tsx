@@ -425,7 +425,6 @@ export default function PrioritiesTab({ result, setActiveParent }: TabProps) {
 
   return (
     <div id="tab-priorities-overall">
-      <div className="ov-eyebrow">Health snapshot</div>
       <h2 className="ov-lead">{buildLead(brand, visibility)}</h2>
       <div className="ov-lead-sub">
         <b>{totalQA}</b> responses analyzed

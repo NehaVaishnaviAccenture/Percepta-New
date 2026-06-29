@@ -129,11 +129,7 @@ function ScatterChart({ brand, vis, sent, prom, competitors, topCompBrand, visib
   const sx = (v: number) => pL + (v / 100) * (W - pL - pR);
   const sy = (v: number) => pT + ((100 - v) / 100) * (H - pT - pB);
 
-  const sortedX = [...raw.map(a => a.x)].sort((a, b) => a - b);
-  const sortedY = [...raw.map(a => a.y)].sort((a, b) => a - b);
-  const medX = sortedX[Math.floor(sortedX.length / 2)];
-  const medY = sortedY[Math.floor(sortedY.length / 2)];
-  const midX = sx(medX), midY = sy(medY);
+  const midX = sx(50), midY = sy(50);
 
   const szVals = all.map(a => a.sz);
   const szMin = Math.min(...szVals), szMax = Math.max(...szVals, 1);
@@ -145,17 +141,6 @@ function ScatterChart({ brand, vis, sent, prom, competitors, topCompBrand, visib
     const above = i % 2 === 0;
     return { cx, cy, r, ly: Math.max(pT + 5, Math.min(H - pB - 5, cy + (above ? -(r + 8 + zb * 8) : (r + 8 + zb * 8)))), above };
   });
-
-  // OLS trendline
-  const n = raw.length;
-  const sumX = raw.reduce((s, p) => s + p.x, 0);
-  const sumY2 = raw.reduce((s, p) => s + p.y, 0);
-  const sumXY = raw.reduce((s, p) => s + p.x * p.y, 0);
-  const sumXX = raw.reduce((s, p) => s + p.x * p.x, 0);
-  const denom = n * sumXX - sumX * sumX;
-  const slope = denom !== 0 ? (n * sumXY - sumX * sumY2) / denom : 0;
-  const intercept = (sumY2 - slope * sumX) / n;
-  const tAt = (x: number) => Math.max(0, Math.min(100, slope * x + intercept));
 
   const handleHover = (label: string | null) => {
     setHovLabel(label);
@@ -228,9 +213,6 @@ function ScatterChart({ brand, vis, sent, prom, competitors, topCompBrand, visib
       <text x={W - pR - 7}  y={pT + 12}    textAnchor="end" style={{ ...qls, fill: '#A100FF', opacity: 0.45 }}>AUTHORITY ZONE</text>
       <text x={pL + 7}      y={H - pB - 7} style={{ ...qls, fill: '#9CA3AF'             }}>OFF THE RADAR</text>
       <text x={W - pR - 7}  y={H - pB - 7} textAnchor="end" style={{ ...qls, fill: '#9CA3AF'             }}>AT RISK</text>
-
-      {/* Trendline — solid */}
-      <line x1={sx(0)} y1={sy(tAt(0))} x2={sx(100)} y2={sy(tAt(100))} stroke="#C4B5FD" strokeWidth="1.5" />
 
       {/* Nodes in render order (active last = on top) */}
       {renderOrder.map(i => {
@@ -332,24 +314,6 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
     try { sessionStorage.setItem(filterKey, JSON.stringify([...next])); } catch {}
   };
 
-  // R² (OLS, same data as ScatterChart)
-  const rawForR2 = [
-    { x: vis, y: sent },
-    ...comps.filter((c: any) => selectedComps.has(c.Brand)).map((c: any) => ({ x: c.Vis || 0, y: c.Sen ?? 0 })),
-  ];
-  const nr = rawForR2.length;
-  const sxr = rawForR2.reduce((s, p) => s + p.x, 0);
-  const syr = rawForR2.reduce((s, p) => s + p.y, 0);
-  const sxyr = rawForR2.reduce((s, p) => s + p.x * p.y, 0);
-  const sxxr = rawForR2.reduce((s, p) => s + p.x * p.x, 0);
-  const dr = nr * sxxr - sxr * sxr;
-  const slr = dr !== 0 ? (nr * sxyr - sxr * syr) / dr : 0;
-  const ir = (syr - slr * sxr) / nr;
-  const yMr = syr / nr;
-  const ssTot = rawForR2.reduce((s, p) => s + (p.y - yMr) ** 2, 0);
-  const ssRes = rawForR2.reduce((s, p) => s + (p.y - (slr * p.x + ir)) ** 2, 0);
-  const r2 = ssTot === 0 ? 0 : Math.max(0, Math.min(1, 1 - ssRes / ssTot));
-
   const allVis  = [vis,  ...comps.map((c: any) => c.Vis  ?? 0)];
   const allSent = [sent, ...comps.map((c: any) => c.Sen  ?? 0)];
   const allProm = [prom, ...comps.map((c: any) => c.Prom ?? 0)];
@@ -362,9 +326,9 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
   const topCompBrand = result._topCompBrand || (comps.length > 0 ? comps[0].Brand : '');
 
   const signals = [
-    { key: 'vis',  label: 'Visibility',  weight: 30, q: 'Are you in the answer?',       score: vis,  tier: visTier,  rankVal: rank(vis, allVis),   avgVal: avg(allVis),  total: allVis.length },
-    { key: 'sent', label: 'Sentiment',   weight: 20, q: 'Are you framed well?',          score: sent, tier: sentTier, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length },
-    { key: 'prom', label: 'Prominence',  weight: 20, q: 'Are you front and center?',     score: prom, tier: promTier, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length },
+    { key: 'vis',  label: 'Visibility',  weight: 30, q: 'Are you in the answer?',       score: vis,  tier: visTier,  rankVal: rank(vis, allVis),   avgVal: avg(allVis),  total: allVis.length - 1 },
+    { key: 'sent', label: 'Sentiment',   weight: 20, q: 'Are you framed well?',          score: sent, tier: sentTier, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1 },
+    { key: 'prom', label: 'Prominence',  weight: 20, q: 'Are you front and center?',     score: prom, tier: promTier, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1 },
   ];
 
   const tierRows = [
@@ -384,11 +348,10 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
         <span className="aiPresAccent">and where to go next.</span>
       </p>
 
-      <div className="aiPresHeadline">How does AI see you?</div>
       <div className="aiPresCards">
         {signals.map(sig => (
           <div key={sig.key} className={`aiPresCard aiPresCard--${sig.key}`} style={{ borderLeftColor: sig.tier.text }}>
-            <div className="aiPresCardEyebrow">{sig.label} <span className="aiPresCardWt">· {sig.weight}%</span></div>
+            <div className="aiPresCardEyebrow">{sig.label}</div>
             <div className="aiPresCardQ">{sig.q}</div>
             <div className="aiPresCardScoreRow">
               <span className="aiPresCardNum" style={{ color: sig.tier.text }}>{sig.score}</span>
@@ -486,10 +449,7 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
                 <span className="aiPresLegendDot" style={{ background: '#D1D5DB', border: '1px solid #9CA3AF' }} />
                 Competitor
               </span>
-              <span className="aiPresLegendItem">
-                <span className="aiPresLegendLine" />
-                Trendline (R²={r2.toFixed(2)})
-              </span>
+
               <span className="aiPresLegendItem aiPresLegendItemMuted">
                 Click a brand to lock · click again to release
               </span>

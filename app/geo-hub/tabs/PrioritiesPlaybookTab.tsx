@@ -158,7 +158,6 @@ function BoardView({
 
   return (
     <div>
-      <div className="pb-eyebrow">Priority actions · implementable</div>
       <h2 className="pb-lead">
         {totalWord} moves, sorted by opportunity — not just where the gap is biggest,
         but where it's biggest <i>and</i> winnable.

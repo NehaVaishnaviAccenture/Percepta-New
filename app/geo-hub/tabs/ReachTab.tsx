@@ -72,25 +72,28 @@ function SovChart({ brand, sovScore, competitors }: { brand: string; sovScore: n
 
   return (
     <div className="reachSovChart">
-      {bars.map((b, i) => (
-        <div key={i} className="reachSovBar">
-          <div className="reachSovBarTrack">
-            <div
-              className="reachSovBarFill"
-              style={{
-                height: `${Math.round((b.value / maxVal) * 100)}%`,
-                background: b.isYou ? '#A100FF' : '#D1D5DB',
-              }}
-            />
+      <div className="reachSovEyebrow">SHARE OF VOICE — WHO OWNS THE CONVERSATION</div>
+      <div className="reachSovBars">
+        {bars.map((b, i) => (
+          <div key={i} className="reachSovBar">
+            <div className="reachSovBarTrack">
+              <div
+                className="reachSovBarFill"
+                style={{
+                  height: `${Math.round((b.value / maxVal) * 100)}%`,
+                  background: b.isYou ? '#A100FF' : '#D1D5DB',
+                }}
+              />
+            </div>
+            <span className="reachSovBarPct" style={{ color: b.isYou ? '#A100FF' : '#6B7280' }}>
+              {b.value}%
+            </span>
+            <div className="reachSovBarLabel" style={{ fontWeight: b.isYou ? 700 : 400, color: b.isYou ? '#A100FF' : '#6B7280' }}>
+              {b.label}
+            </div>
           </div>
-          <span className="reachSovBarPct" style={{ color: b.isYou ? '#A100FF' : '#6B7280' }}>
-            {b.value}%
-          </span>
-          <div className="reachSovBarLabel" style={{ fontWeight: b.isYou ? 700 : 400, color: b.isYou ? '#A100FF' : '#6B7280' }}>
-            {b.label}
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -175,8 +178,8 @@ export default function ReachTab({ result, resultComps }: TabProps) {
     : displaySources.filter(s => getCat(s) === activeCat);
 
   const signals = [
-    { key: 'cit', label: 'Citation', weight: 15, q: 'Are your sources being cited?', score: cit, tier: citTier, rankVal: citRank, avgVal: avg(allCit), total: allCit.length },
-    { key: 'sov', label: 'Share of Voice', weight: 15, q: 'How much of the conversation is yours?', score: sov, tier: sovTier, rankVal: sovRank, avgVal: avg(allSov), total: allSov.length },
+    { key: 'cit', label: 'Citation', weight: 15, q: 'Are your sources being cited?', score: cit, tier: citTier, rankVal: citRank, avgVal: avg(allCit), total: allCit.length - 1 },
+    { key: 'sov', label: 'Share of Voice', weight: 15, q: 'How much of the conversation is yours?', score: sov, tier: sovTier, rankVal: sovRank, avgVal: avg(allSov), total: allSov.length - 1 },
   ];
 
   return (
@@ -186,12 +189,11 @@ export default function ReachTab({ result, resultComps }: TabProps) {
         <span className="reachAccent">do you own?</span>
       </p>
 
-      <div className="reachHeadline">Reach signals</div>
       <div className="reachCards">
         {signals.map(sig => (
           <div key={sig.key} className="reachCard" style={{ borderLeftColor: sig.tier.text }}>
             <div className="reachCardEyebrow">
-              {sig.label} <span className="reachCardWt">· {sig.weight}%</span>
+              {sig.label}
             </div>
             <div className="reachCardQ">{sig.q}</div>
             <div className="reachCardScoreRow">
@@ -241,13 +243,12 @@ export default function ReachTab({ result, resultComps }: TabProps) {
       </div>
 
       <div className="reachSection">
-        <div className="reachSectionLabel">SHARE OF VOICE — WHO OWNS THE CONVERSATION</div>
         <SovChart brand={result.brand_name} sovScore={sov} competitors={resultComps} />
       </div>
 
       <div className="reachSection">
-        <div className="reachSectionLabel">CITATION SOURCES — WHAT&apos;S DRIVING YOUR PRESENCE</div>
         <div className="reachSourcesCard">
+          <div className="reachSourcesEyebrow">CITATION SOURCES — WHAT&apos;S DRIVING YOUR PRESENCE</div>
           <p className="reachSourcesSub">
             Top 10 domains influencing AI responses. Click a filter above to narrow by category.
           </p>

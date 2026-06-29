@@ -7,33 +7,9 @@ import './response-map.css';
 /* ── Constants ─────────────────────────────────────────────────── */
 const HL = '#00A89F';
 
-const TIER_FILL: Record<string, string> = {
-  authority:   '#00AB7B',
-  leader:      '#2F6DFF',
-  competitive: '#F3B10C',
-  emerging:    '#F48500',
-  fragmented:  '#E0003B',
-};
-
-function tierFill(tier: string): string {
-  return TIER_FILL[tier] || TIER_FILL.emerging;
-}
-
-const TIER_BORDER: Record<string, string> = {
-  authority:   '#007653',
-  leader:      '#043BCC',
-  competitive: '#996E00',
-  emerging:    '#B15F00',
-  fragmented:  '#B7002F',
-};
-
-function tierBorder(tier: string): string {
-  return TIER_BORDER[tier] || TIER_BORDER.emerging;
-}
-
-function tierTextColor(tier: string): string {
-  return ['emerging', 'competitive'].includes(tier) ? '#412402' : '#FFFFFF';
-}
+function tierFill(_tier: string): string   { return '#A100FF'; }
+function tierBorder(_tier: string): string  { return '#A100FF'; }
+function tierTextColor(_tier: string): string { return '#FFFFFF'; }
 
 function volumeToSize(volume: number): number {
   // Nodes are bigger now because labels live inside them
@@ -667,12 +643,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
           <div id="rm-sheet-header" className="rmSheetHeader">
             <div id="rm-sheet-eyebrow" className="rmSheetEyebrow">
               <span>Selected topic</span>
-              {sheetData && (
-                <span
-                  className="rmTierPill"
-                  style={{ background: tierFill(sheetData.topic.tier), color: tierTextColor(sheetData.topic.tier) }}
-                >{sheetData.tierLabel}</span>
-              )}
             </div>
             <button
               id="rm-sheet-close"
@@ -721,7 +691,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                   {sheetData.conns.length > 0 ? sheetData.conns.map((c, i) => (
                     <div key={i} className="rmSheetConnRow">
                       <div className="rmConnName">
-                        <span className="rmTdot" style={{ background: tierFill(c.other.tier) }} />
                         {c.other.label}
                       </div>
                       <div className="rmPct">{c.weight}%</div>
@@ -747,7 +716,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
       <div id="rm-wrapper" className="rmWrapper">
 
         {/* Eyebrow + Headline */}
-        <div id="rm-eyebrow" className="rmEyebrow">Response Map</div>
         <h1 id="rm-headline" className="rmHeadline">
           Which topics does AI group you with — and <span className="rmHeadlineMark">which should you own?</span>
         </h1>
@@ -839,18 +807,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                   </div>
                   {!legendCollapsed && (
                     <div id="rm-legend-body" className="rmLegendBody">
-                      {/* Tier colors */}
-                      <div className="rmLegendSection">
-                        <div className="rmLegendSectionLabel">Color · tier</div>
-                        <div className="rmLegendTiers">
-                          {(['authority','leader','competitive','emerging','fragmented'] as const).map(tier => (
-                            <div key={tier} className="rmLegendTier">
-                              <span className="rmLegendSwatch" style={{ background: tierFill(tier) }} />
-                              {tier.charAt(0).toUpperCase() + tier.slice(1)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
                       {/* Size */}
                       <div className="rmLegendSection">
                         <div className="rmLegendSectionLabel">Size · prompt volume</div>
@@ -888,10 +844,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                 <>
                   <div id="rm-detail-eyebrow" className="rmDetailEyebrow">
                     <span>{!userInteractedRef.current && detailNodeId === hubId ? 'Hub topic' : 'Selected topic'}</span>
-                    <span
-                      className="rmTierPill"
-                      style={{ background: tierFill(detailData.topic.tier), color: tierTextColor(detailData.topic.tier) }}
-                    >{detailData.tierLabel}</span>
                   </div>
                   <h3 id="rm-detail-topic" className="rmDetailTopic">
                     {detailData.topic.label}
@@ -933,7 +885,6 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                     {detailData.conns.length > 0 ? detailData.conns.map((c, i) => (
                       <div key={i} className="rmDetailConnRow">
                         <div className="rmConnName">
-                          <span className="rmTdot" style={{ background: tierFill(c.other.tier) }} />
                           {c.other.label}
                         </div>
                         <div className="rmPct">{c.weight}%</div>
@@ -1022,10 +973,8 @@ export default function ResponseMapTab({ result, setActiveSub }: TabProps) {
                 <div className="rmTopnRank">{String(i + 1).padStart(2, '0')}</div>
                 <div className="rmTopnPairWrap">
                   <div className="rmTopnPair">
-                    <span className="rmTdot" style={{ background: tierFill(p.a.tier) }} />
                     {p.a.label}
                     <span className="rmTopnSep">×</span>
-                    <span className="rmTdot" style={{ background: tierFill(p.b.tier) }} />
                     {p.b.label}
                   </div>
                   <div className="rmTopnBar">

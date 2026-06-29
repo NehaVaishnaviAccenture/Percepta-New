@@ -314,8 +314,92 @@
 
 /* ── Root grid ─────────────────────────────────────────────── */
 .gsoWrapper {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+}
+
+/* ── Redesigned hero card ──────────────────────────────────── */
+.gsoHeroCardNew {
+  grid-column: 1 / -1;
+}
+
+.gsoHeroBody {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.gsoArchWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.gsoHeroText {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gsoHeroHeadline {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-ink, #0F0F11);
+  letter-spacing: -0.01em;
+}
+
+.gsoHeroHeadlineAccent {
+  color: var(--color-brand, #A100FF);
+}
+
+.gsoInterpText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-body, #3A3A3A);
+}
+
+.gsoTierDef {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-muted, #6B6B6B);
+}
+
+.gsoTierProgressWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 4px;
+  position: relative;
+}
+
+.gsoNextTierHint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6B6B6B);
+  margin-top: 6px;
+}
+
+/* ── Signal card rows ─────────────────────────────────────── */
+.gsoSignalCards {
+  display: grid;
+  gap: 12px;
+}
+.gsoSignalCards--3 { grid-template-columns: repeat(3, 1fr); }
+.gsoSignalCards--2 { grid-template-columns: repeat(2, 1fr); }
+.gsoSignalCards--5 { grid-template-columns: repeat(5, 1fr); }
+
+.gsoSignalCards--5 .aiPresCard {
+  padding: 28px 20px;
 }
 
 /* ── Top row: hero + breakdown ─────────────────────────────── */
@@ -336,9 +420,9 @@
   gap: 14px;
 }
 
-.gsoHeroEyebrow {
-  font-size: 10px;
-  font-weight: 600;
+.gsoHeroTagline {
+  font-size: 17px;
+  font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-brand);
@@ -2073,15 +2157,6 @@
   border-bottom: 1px solid var(--color-card-border);
 }
 
-.cbtHeroEyebrow {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-brand);
-  margin-bottom: 12px;
-}
-
 .cbtHeroSummary {
   font-family: var(--font-display);
   font-size: clamp(20px, 2.4vw, 34px);
@@ -3740,14 +3815,6 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Lead ───────────────────────────────────────────────────────── */
-.ov-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-brand);
-  margin-bottom: 14px;
-}
 .ov-lead {
   font-family: var(--font-display);
   font-weight: 700;
@@ -3755,7 +3822,7 @@
   line-height: 1.25;
   letter-spacing: -0.01em;
   color: #0A0A0A;
-  margin: 0 0 8px;
+  margin: 0 0 14px;
 }
 .ov-lead-sub {
   font-family: var(--font-display);
@@ -4743,14 +4810,6 @@
 .pb-tier-authority   { color: #007653; }
 
 /* ── Page header ────────────────────────────────────────────── */
-.pb-eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-brand);
-  margin-bottom: 14px;
-}
 .pb-lead {
   font-family: var(--font-display);
   font-weight: 700;
@@ -4758,7 +4817,7 @@
   line-height: 1.25;
   letter-spacing: -0.01em;
   color: #0A0A0A;
-  margin: 0 0 8px;
+  margin: 0 0 14px;
   max-width: 40ch;
 }
 .pb-lead i { font-style: italic; }
@@ -5403,6 +5462,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 /* Tier tokens (fill / text-on-white / on-fill) */
+.geoExplainer { grid-column: 1 / -1; }
 .geoExplainer {
   --tier-fragmented-fill:  #E0003B; --tier-fragmented-text:  #B7002F;
   --tier-emerging-fill:    #F48500; --tier-emerging-text:    #B15F00;
@@ -5602,6 +5662,7 @@
 ══════════════════════════════════════════ */
 
 .aiPresTagline {
+  font-family: var(--font-display);
   font-size: 34px;
   font-weight: 700;
   line-height: 1.25;
@@ -5637,25 +5698,27 @@
 }
 
 .aiPresCardEyebrow {
-  font-size: 10px;
+  font-size: 16px;
   font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-text-muted, #6B6B6B);
+  letter-spacing: 0;
+  text-transform: none;
+  color: #0F0F11;
   margin-bottom: 2px;
   display: flex;
   align-items: center;
   gap: 5px;
+  font-family: var(--font-display);
 }
-.aiPresCardWt { color: #A100FF; font-weight: 700; }
+
 
 .aiPresCardQ {
-  font-weight: 700;
-  color: var(--color-text-primary, #0A0A0A);
+  font-weight: 500;
+  color: #6B7280;
   line-height: 1.35;
+  font-size: 12px;
   margin-bottom: 16px;
   flex: 1;
-  font-family: var(--font-display);
+  font-family: var(--font-sans);
 }
 
 .aiPresCardScoreRow {
@@ -5667,8 +5730,9 @@
 
 .aiPresCardNum {
   font-size: 2.4rem;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
+  font-family: var(--font-display);
 }
 
 .aiPresChip {
@@ -5835,11 +5899,11 @@
 .reachHeadline {  font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin: 16px 0 10px; }
 .reachCards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
 .reachCard { background: #fff; border: 1px solid #E5E7EB; border-left: 3px solid #9CA3AF; padding: 16px 18px; display: grid; grid-template-rows: auto auto auto auto; gap: 6px; }
-.reachCardEyebrow {  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; }
-.reachCardWt  { color: #9CA3AF; font-weight: 500; }
-.reachCardQ   { font-weight: 700; color: #0F0F11; line-height: 1.25; font-family: 'Space Grotesk', sans-serif; }
+.reachCardEyebrow { font-size: 16px; font-weight: 700; letter-spacing: 0; text-transform: none; color: #0F0F11; }
+
+.reachCardQ   { font-weight: 500; color: #6B7280; font-size: 12px; line-height: 1.35; font-family: var(--font-sans); }
 .reachCardScoreRow { display: flex; align-items: center; gap: 10px; }
-.reachCardNum { font-family: 'Space Grotesk', sans-serif; font-size: 2.4rem; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.reachCardNum { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
 .reachChip    { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 8px; border-radius: 0; }
 .reachCardRank { font-size: 12px; color: #9CA3AF; }
 
@@ -5863,7 +5927,9 @@
 .reachSectionLabel { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px; }
 
 /* SoV chart */
-.reachSovChart { display: flex; align-items: flex-end; gap: 10px; height: 180px; padding: 0 8px 0; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
+.reachSovChart { display: flex; flex-direction: column; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
+.reachSovEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
+.reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; }
 .reachSovBar { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; gap: 4px; height: 100%; }
 .reachSovBarTrack { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-height: 0; }
 .reachSovBarFill { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.3s; }
@@ -5871,7 +5937,8 @@
 .reachSovBarLabel { font-size: 0.62rem; color: #6B7280; padding: 6px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: center; }
 
 /* Citation sources */
-.reachSourcesCard { background: #fff; border: 1px solid #E5E7EB; }
+.reachSourcesCard { background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
+.reachSourcesEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
 .reachSourcesSub  { font-size: 0.72rem; color: #6B7280; margin: 0; padding: 12px 14px 8px; border-bottom: 1px solid #F3F4F6; }
 .reachChipFilters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid #E5E7EB; }
 .reachCF { font-size: 0.7rem; font-weight: 500; padding: 4px 12px; border: 1px solid #E5E7EB; background: #fff; color: #374151; cursor: pointer; font-family: inherit; transition: background 0.15s, border-color 0.15s, color 0.15s; }
