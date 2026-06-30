@@ -135,21 +135,23 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
 
   const headline: [string, string] =
     tier.name === 'Fragmented'  ? ["You're largely invisible,",        "and being skipped over"]          :
-    tier.name === 'Emerging'    ? ["You're occasionally mentioned,",   "but rarely leading"]              :
+    tier.name === 'Emerging'    ? ["Occasionally surfaced,",            "rarely prioritized"]              :
     tier.name === 'Competitive' ? ["You're part of the conversation,", "but not the first choice"]        :
     tier.name === 'Leader'      ? ["You're frequently recommended,",   "but not yet dominant"]            :
                                   ["You're the default recommendation,","and setting the standard"];
 
-  const interpText =
+  const tierSpan = <strong style={{ color: tier.textColor }}>{tier.name.toLowerCase()}</strong>;
+
+  const interpText: React.ReactNode =
     tier.name === 'Fragmented'
-      ? `At ${geo}, ${brand} is considered fragmented — AI assistants rarely surface you and ${topComp?.Brand || 'competitors'}${topGap > 0 ? ` leads by ${topGap} points` : ' is recommended instead'}. ${brand} is #${myRank} of ${allBrands.length} brands in ${ind}${nextTierLabel ? ` and ${ptsToNext} points from Emerging, where you enter the consideration set for significantly more queries` : ''}.`
+      ? <>At {geo}, {brand} scores as {tierSpan}; AI assistants rarely surface you and {topComp?.Brand || 'competitors'}{topGap > 0 ? ` leads by ${topGap} points` : ' is recommended instead'}. {brand} is #{myRank} of {allBrands.length} brands in {ind}{nextTierLabel ? ` and ${ptsToNext} points from Emerging, where you enter the consideration set for significantly more queries` : ''}.</>
     : tier.name === 'Emerging'
-      ? `At ${geo}, ${brand} is considered emerging — you appear occasionally but inconsistently. Competitors above 56 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier — you're ${ptsToNext} points away. ${brand} is also #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
+      ? <>At {geo}, {brand} scores as {tierSpan}; you appear periodically but inconsistently. Competitors above 56 are being prioritized. Growing authority signals in key segments could move you into the Competitive tier — you're {ptsToNext} points away. {brand} is also #{myRank} of {allBrands.length} brands{topGap > 0 ? ` and ${topGap} points behind #1` : ''} in {ind}.</>
     : tier.name === 'Competitive'
-      ? `At ${geo}, ${brand} is considered competitive — a regular part of the AI conversation, but not yet a first-choice recommendation. Competitors above 70 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier — you're ${ptsToNext} points away. ${brand} is #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
+      ? <>At {geo}, {brand} scores as {tierSpan}; you're a regular part of the AI conversation but not yet a first-choice recommendation. Competitors above 70 are consistently prioritized. Strengthening citation authority is the clearest path to the Leader tier — you're {ptsToNext} points away. {brand} is #{myRank} of {allBrands.length} brands{topGap > 0 ? ` and ${topGap} points behind #1` : ''} in {ind}.</>
     : tier.name === 'Leader'
-      ? `At ${geo}, ${brand} is considered a leader — AI assistants surface you frequently with strong, favourable framing. You're ${ptsToNext} points from Authority and consistent first-position recommendations. ${brand} is #${myRank} of ${allBrands.length} brands${topGap > 0 ? ` and ${topGap} points behind #1` : ''} in ${ind}.`
-      : `At ${geo}, ${brand} is in the Authority tier — the default reference across ${ind}, cited first and consistently. ${brand} is #${myRank} of ${allBrands.length} brands. The focus is on maintaining dominance and monitoring for competitor movements.`;
+      ? <>At {geo}, {brand} scores as a {tierSpan}; AI assistants surface you frequently with strong, favourable framing. You're {ptsToNext} points from Authority and consistent first-position recommendations. {brand} is #{myRank} of {allBrands.length} brands{topGap > 0 ? ` and ${topGap} points behind #1` : ''} in {ind}.</>
+      : <>At {geo}, {brand} scores as {tierSpan}; you're the default reference across {ind}, cited first and consistently. {brand} is #{myRank} of {allBrands.length} brands. The focus is on maintaining dominance and monitoring for competitor movements.</>;
 
   const rank = (myVal: number, all: number[]) => [...all].sort((a, b) => b - a).indexOf(myVal) + 1;
   const avg  = (all: number[]) => Math.round(all.reduce((s, v) => s + v, 0) / all.length);

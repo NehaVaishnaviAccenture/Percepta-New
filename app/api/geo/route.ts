@@ -3038,7 +3038,7 @@ Example: ["Rewards credit cards","High-yield savings"]`;
 
     // Fire off early — will be awaited after the rest of the work is done
     const _pbPromise = Promise.allSettled([
-      callAI([{ role: 'user', content: _pbPrompt }], 0.4, 2048),
+      callAI([{ role: 'user', content: _pbPrompt }], 0.4, 4096),
       callAI([{ role: 'user', content: _knownForPrompt }], 0.2, 300),
     ]);
 
@@ -3527,6 +3527,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
         _pbDebug += ` | parsed: ${playbookActions.length}`;
       }
     } catch (err: any) { _pbDebug = `exception: ${err?.message}`; }
+    console.log('[playbook debug]', _pbDebug);
 
     try {
       if (knownForResult.status === 'fulfilled') {
