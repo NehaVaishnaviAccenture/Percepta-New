@@ -113,7 +113,7 @@ function Finding({ item }: { item: any }) {
   const isObj  = item && typeof item === 'object';
   const lead   = isObj ? item.bold   : splitBoldFirst(item).bold;
   const detail = isObj ? item.detail : splitBoldFirst(item).rest;
-  const meta   = isObj && item.signal ? `${item.signal} · ${item.weight} of formula` : null;
+  const meta   = isObj && item.signal ? `${item.signal}` : null;
 
   return (
     <div className={`ov-finding${open ? ' ov-finding--open' : ''}`}>

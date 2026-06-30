@@ -253,7 +253,7 @@ function buildInfoSentence(
   node: NodeData | null,
   brand: string, vis: number, sent: number,
   competitors: any[], visibleComps: Set<string>
-): string {
+): React.ReactNode {
   if (!node) return 'Hover or click a brand to explore its position.';
 
   const field = [
@@ -272,14 +272,11 @@ function buildInfoSentence(
     const visNote  = visLeader.label !== brand  ? ` ${visLeader.label} leads you on visibility by ${visLeader.x - node.x} pts` : ' You lead the field on visibility';
     const sentNote = sentLeader.label !== brand ? ` and sentiment by ${sentLeader.y - node.y} pts` : '';
     const closer   = visLeader.label !== brand  ? ' — closing this gap is your biggest AI Presence lever.' : '.';
-    return `${brand} · Visibility ${node.x} · Sentiment ${node.y} · Prominence ${node.sz} — #${visRank} of ${n} on visibility, #${sentRank} on sentiment.${visNote}${sentNote}${closer}`;
+    return <><strong>{brand}</strong>: Visibility {node.x} · Sentiment {node.y} · Prominence {node.sz} — #{visRank} of {n} on visibility, #{sentRank} on sentiment.{visNote}{sentNote}{closer}</>;
   }
 
-  const vsYouVis  = node.x - vis;
-  const vsYouSent = node.y - sent;
-  const vsYou = `${vsYouVis >= 0 ? '+' : ''}${vsYouVis} vs you on visibility, ${vsYouSent >= 0 ? '+' : ''}${vsYouSent} on sentiment`;
-  const rankNote = visRank === 1 ? 'leads the field on visibility' : `#${visRank} of ${n} on visibility, #${sentRank} on sentiment`;
-  return `${node.label} · Visibility ${node.x} · Sentiment ${node.y} · Prominence ${node.sz} — ${rankNote}. ${vsYou}.`;
+  const rankNote = visRank === 1 ? 'leads the field on visibility' : `#${visRank} of ${n} on visibility and #${sentRank} on sentiment`;
+  return <><strong>{node.label}</strong>: Visibility {node.x} · Sentiment {node.y} · Prominence {node.sz} — {rankNote}</>;
 }
 
 // ── Main component ─────────────────────────────────────────────
