@@ -317,11 +317,13 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  container-type: inline-size;
 }
 
 /* ── Redesigned hero card ──────────────────────────────────── */
 .gsoHeroCardNew {
   grid-column: 1 / -1;
+  container-type: inline-size;
 }
 
 .gsoHeroBody {
@@ -329,6 +331,18 @@
   grid-template-columns: auto 1fr;
   gap: 40px;
   align-items: center;
+}
+
+@container (max-width: 628px) {
+  .gsoHeroBody {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .gsoArchWrap {
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+  }
 }
 
 .gsoArchWrap {
@@ -402,6 +416,27 @@
   padding: 28px 20px;
 }
 
+@container (max-width: 800px) {
+  .gsoSignalCards--5 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .gsoSignalCards--5 > :nth-child(-n+3) {
+    grid-column: span 2;
+  }
+  .gsoSignalCards--5 > :nth-child(n+4) {
+    grid-column: span 3;
+  }
+}
+
+@container (max-width: 480px) {
+  .gsoSignalCards--5 {
+    grid-template-columns: 1fr;
+  }
+  .gsoSignalCards--5 > :nth-child(n) {
+    grid-column: auto;
+  }
+}
+
 /* ── Top row: hero + breakdown ─────────────────────────────── */
 .gsoHeaderRow {
   display: grid;
@@ -414,7 +449,7 @@
   grid-column: span 2;
   background: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
-  padding: 24px 28px;
+  padding: 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -5489,7 +5524,7 @@
 .geoExplainerLabel {
   font-family: var(--font-display, var(--font-sans));
   font-weight: 500;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: -0.01em;
   color: #0A0A0A;
   white-space: nowrap;
@@ -5504,6 +5539,14 @@
 }
 
 .geoExplainerSpacer { flex: 1 1 auto; }
+
+.geoExplainerLearnMore {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-brand);
+  margin-right: 6px;
+  white-space: nowrap;
+}
 
 .geoExplainerChev {
   flex: none;
@@ -5540,9 +5583,9 @@
 
 /* Lede */
 .geoExplainerLede {
-  font-size: 13px;
+  font-size: 16px;
   margin: 0 0 20px;
-  max-width: 64ch;
+  max-width: 80ch;
 }
 .geoExplainerLede strong { font-weight: 600; }
 
@@ -5562,7 +5605,7 @@
   background: var(--color-surface-sunken, #F2F2F2);
   border: 1px solid var(--color-card-border, #E5E5E5);
   border-radius: 2px;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -5586,7 +5629,7 @@
   border-radius: 2px;
   white-space: nowrap;
 }
-.geoFmlResult { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 13px; }
+.geoFmlResult { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 16px; }
 
 /* Two-col grid */
 .geoExplainerGrid {
@@ -5607,10 +5650,10 @@
   border-top: 1px solid var(--color-card-border, #E5E5E5);
 }
 .geoSig:first-of-type { border-top: none; }
-.geoSigName { font-family: var(--font-display, var(--font-sans)); font-weight: 500; font-size: 14px; color: var(--color-text-body, #0A0A0A); }
+.geoSigName { font-family: var(--font-display, var(--font-sans)); font-weight: 700; font-size: 16px; color: var(--color-text-body, #0A0A0A); }
 .geoSigWt {
   font-family: var(--font-mono, monospace);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-brand, #A100FF);
   background: var(--color-brand-soft, #F5E6FF);
@@ -5618,7 +5661,7 @@
   border-radius: 2px;
   justify-self: end;
 }
-.geoSigDef { grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
+.geoSigDef { grid-column: 1 / -1; font-size: 14px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
 
 /* Tier rows */
 .geoTier {
@@ -5631,10 +5674,10 @@
 }
 .geoTier:first-of-type { border-top: none; }
 .geoTierMeta { display: flex; align-items: center; gap: 8px; }
-.geoTierDot  { width: 10px; height: 10px; flex: none; }
-.geoTierName { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 13px; }
-.geoTierRange { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--color-text-muted, #8E8E8E); justify-self: end; }
-.geoTierDef { grid-column: 1 / -1; font-size: 12px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
+.geoTierDot  { width: 12px; height: 12px; flex: none; }
+.geoTierName { font-family: var(--font-display, var(--font-sans)); font-weight: 600; font-size: 16px; }
+.geoTierRange { font-family: var(--font-mono, monospace); font-size: 14px; color: var(--color-text-muted, #8E8E8E); justify-self: end; }
+.geoTierDef { grid-column: 1 / -1; font-size: 14px; line-height: 1.5; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
 
 .geoTier--fragmented  .geoTierDot { background: var(--tier-fragmented-fill);  } .geoTier--fragmented  .geoTierName { color: var(--tier-fragmented-text);  }
 .geoTier--emerging    .geoTierDot { background: var(--tier-emerging-fill);    } .geoTier--emerging    .geoTierName { color: var(--tier-emerging-text);    }
@@ -5679,7 +5722,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .aiPresCard {
@@ -5745,119 +5787,6 @@
 }
 
 /* Accordion */
-.aiPresAccordion {
-  background: #fff;
-  border: 1px solid var(--color-card-border, #E5E5E5);
-  margin-bottom: 12px;
-}
-
-.aiPresAccordionTrigger {
-  display: flex;
-  align-items: center;
-  padding: 10px 20px;
-  cursor: pointer;
-  user-select: none;
-}
-.aiPresAccordionTrigger:hover { background: #FAFAFA; }
-
-.aiPresStripText {
-  font-size: 12px;
-  color: #8E8E8E;
-  flex: 1;
-}
-.aiPresStripText strong { color: var(--color-text-primary, #2B2B2B); }
-
-.aiPresLearnMore {
-  font-size: 12px;
-  font-weight: 600;
-  color: #A100FF;
-  margin-left: 6px;
-  white-space: nowrap;
-}
-
-.aiPresChevron {
-  margin-left: 10px;
-  font-size: 0.7rem;
-  color: #B8B8CC;
-  transition: transform 0.18s;
-  display: inline-block;
-}
-
-.aiPresAccordionBody {
-  border-top: 1px solid var(--color-card-border, #E5E5E5);
-  padding: 24px 24px 20px;
-}
-
-.aiPresBodyLabel {
-  font-size: 0.6rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #A100FF;
-  margin-bottom: 10px;
-}
-
-.aiPresFormulaText {
-  font-size: 0.82rem;
-  color: var(--color-text-body, #2B2B2B);
-  line-height: 1.6;
-  margin-bottom: 16px;
-}
-
-.aiPresFormulaRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-
-.aiPresFormulaSignal {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--color-card-border, #E5E5E5);
-  font-size: 0.72rem;
-  font-weight: 500;
-  color: var(--color-text-body, #2B2B2B);
-  padding: 5px 10px;
-}
-.aiPresFormulaWt { color: #A100FF; font-weight: 700; margin-left: 4px; }
-.aiPresFormulaOp { font-size: 0.75rem; color: #B8B8CC; font-weight: 600; }
-.aiPresFormulaEq { font-size: 0.72rem; color: #B8B8CC; font-weight: 600; margin: 0 2px; }
-.aiPresFormulaResult { background: #0F0F11; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 5px 12px; }
-
-.aiPresBodyCols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-
-.aiPresSignalList { display: flex; flex-direction: column; }
-.aiPresSignalRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--color-card-border, #E5E5E5);
-  gap: 12px;
-}
-.aiPresSignalRow:first-child { border-top: 1px solid var(--color-card-border, #E5E5E5); }
-.aiPresSignalName { font-size: 0.78rem; font-weight: 600; color: var(--color-text-primary, #0A0A0A); }
-.aiPresSignalDef  { font-size: 0.68rem; color: var(--color-text-muted, #6B6B6B); margin-top: 1px; }
-.aiPresSignalWt   { font-size: 0.68rem; font-weight: 700; color: #A100FF; background: #F5EAFF; padding: 2px 7px; white-space: nowrap; flex: none; }
-
-.aiPresTierList { display: flex; flex-direction: column; }
-.aiPresTierRow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--color-card-border, #E5E5E5);
-  gap: 12px;
-}
-.aiPresTierRow:first-child { border-top: 1px solid var(--color-card-border, #E5E5E5); }
-.aiPresTierDotName { display: flex; align-items: center; gap: 8px; }
-.aiPresTierDot  { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.aiPresTierName { font-size: 0.78rem; font-weight: 700; }
-.aiPresTierDef  { font-size: 0.64rem; color: var(--color-text-muted, #6B6B6B); margin-top: 2px; }
-.aiPresTierRange {  color: #B8B8CC; white-space: nowrap; flex: none; }
-
 /* Chart card */
 .aiPresChartCard {
   background: #fff;
@@ -5900,22 +5829,6 @@
 .reachCardNum { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
 .reachChip    { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 8px; border-radius: 0; }
 .reachCardRank { font-size: 12px; color: #9CA3AF; }
-
-.reachAccordion { border: 1px solid #E5E7EB; margin-bottom: 14px; background: #FFF }
-.reachAccordionTrigger { display: flex; align-items: center; gap: 6px; padding: 10px 14px; cursor: pointer; font-size: 0.78rem; color: #374151; }
-.reachAccordionTrigger:hover { background: #FAFAFA; }
-.reachStripText { flex: 1; }
-.reachLearnMore { color: #A100FF; font-weight: 600; font-size: 0.72rem; }
-.reachChevron { font-size: 0.7rem; color: #9CA3AF; display: inline-block; transition: transform 0.2s; }
-.reachAccordionBody { padding: 16px 18px; border-top: 1px solid #E5E7EB; background: #fff; }
-.reachBodyLabel { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 8px; }
-.reachBodyText { font-size: 0.8rem; color: #374151; line-height: 1.6; margin: 0 0 4px; }
-.reachSignalList { display: flex; flex-direction: column; gap: 8px; }
-.reachSignalRow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F3F4F6; }
-.reachSignalRow:last-child { border-bottom: none; }
-.reachSignalName { font-size: 0.78rem; font-weight: 700; margin-bottom: 2px; }
-.reachSignalDef  { font-size: 0.72rem; color: #6B7280; line-height: 1.5; }
-.reachSignalWt   { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; padding: 3px 8px; flex-shrink: 0; }
 
 .reachSection { margin-bottom: 16px; }
 .reachSectionLabel { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px; }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { GeoExplainer } from './GeoExplainer';
 
 interface TabProps {
   result: any;
@@ -281,7 +282,6 @@ function buildInfoSentence(
 
 // ── Main component ─────────────────────────────────────────────
 export default function AiPresenceTab({ result, resultComps }: TabProps) {
-  const [accordionOpen, setAccordionOpen] = useState(false);
   const [activeNode, setActiveNode] = useState<NodeData | null>(null);
 
   const vis  = result.visibility  ?? 0;
@@ -328,18 +328,11 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
     { key: 'prom', label: 'Prominence',  weight: 20, q: 'Are you front and center?',     score: prom, tier: promTier, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1 },
   ];
 
-  const tierRows = [
-    { label: 'Fragmented',  range: '0–44',   dot: '#E0003B', text: '#B7002F', def: 'AI assistants rarely surface you, and rivals dominate the answer when they do.' },
-    { label: 'Emerging',    range: '45–55',  dot: '#F48500', text: '#B15F00', def: 'You show up occasionally but inconsistently; competitors are cited more favourably.' },
-    { label: 'Competitive', range: '56–69',  dot: '#F3B10C', text: '#996E00', def: "You're a regular part of the AI conversation, holding your ground on most signals." },
-    { label: 'Leader',      range: '70–79',  dot: '#4F90FF', text: '#043BCC', def: 'AI assistants surface you often, with strong, favourable framing.' },
-    { label: 'Authority',   range: '80–100', dot: '#00AB7B', text: '#007653', def: "You're the default reference — cited first, consistently, and on-message." },
-  ];
 
   const infoSentence = buildInfoSentence(activeNode, result.brand_name, vis, sent, comps, selectedComps);
 
   return (
-    <div id="tab-ai-presence">
+    <div id="tab-ai-presence" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <p className="aiPresTagline">
         Understand where you stand —{' '}
         <span className="aiPresAccent">and where to go next.</span>
@@ -359,78 +352,16 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
         ))}
       </div>
 
-      <div className="aiPresAccordion">
-        <div className="aiPresAccordionTrigger" onClick={() => setAccordionOpen(o => !o)}>
-          <span className="aiPresStripText">AI Presence signals carry <strong>70%</strong> of your overall GEO Score</span>
-          <span className="aiPresLearnMore">Learn more</span>
-          <span className="aiPresChevron" style={{ transform: accordionOpen ? 'rotate(180deg)' : undefined }}>▾</span>
-        </div>
-        {accordionOpen && (
-          <div className="aiPresAccordionBody">
-            <div className="aiPresBodyLabel">The Formula</div>
-            <div className="aiPresFormulaText">
-              Your GEO Score is a <strong>weighted average of five AI-driven signals</strong>, each scored 0–100.
-            </div>
-            <div className="aiPresFormulaRow">
-              {[
-                { label: 'Visibility', wt: '30%', tier: visTier },
-                { label: 'Sentiment',  wt: '20%', tier: sentTier },
-                { label: 'Prominence', wt: '20%', tier: promTier },
-                { label: 'Citation',   wt: '15%', tier: null },
-                { label: 'Share of Voice', wt: '15%', tier: null },
-              ].map((s, i, arr) => (
-                <React.Fragment key={s.label}>
-                  <div className="aiPresFormulaSignal" style={s.tier ? { borderColor: s.tier.text, background: s.tier.bg, color: s.tier.text } : undefined}>
-                    {s.label} <span className="aiPresFormulaWt" style={s.tier ? { color: s.tier.text } : undefined}>× {s.wt}</span>
-                  </div>
-                  {i < arr.length - 1 && <span className="aiPresFormulaOp">+</span>}
-                </React.Fragment>
-              ))}
-              <span className="aiPresFormulaEq">=</span>
-              <div className="aiPresFormulaResult">GEO Score</div>
-            </div>
-            <div className="aiPresBodyCols">
-              <div>
-                <div className="aiPresBodyLabel">The Five Signals</div>
-                <div className="aiPresSignalList">
-                  {[
-                    { label: 'Visibility',     wt: '30%', def: 'How often AI assistants mention you when answering questions in your category.',        tier: visTier  },
-                    { label: 'Sentiment',      wt: '20%', def: 'Whether AI assistants describe you positively, neutrally, or negatively.',               tier: sentTier },
-                    { label: 'Prominence',     wt: '20%', def: 'How central you are to an answer — featured up top, or a passing footnote.',             tier: promTier },
-                    { label: 'Citation',       wt: '15%', def: 'How often AI assistants link to or attribute your owned sources.',                       tier: null },
-                    { label: 'Share of Voice', wt: '15%', def: 'Your slice of all brand mentions in the category, versus competitors.',                  tier: null },
-                  ].map(sig => (
-                    <div key={sig.label} className="aiPresSignalRow" style={sig.tier ? { background: sig.tier.bg, margin: '0 -8px', padding: '9px 8px' } : undefined}>
-                      <div>
-                        <div className="aiPresSignalName" style={sig.tier ? { color: sig.tier.text } : undefined}>{sig.label}</div>
-                        <div className="aiPresSignalDef">{sig.def}</div>
-                      </div>
-                      <span className="aiPresSignalWt" style={sig.tier ? { color: sig.tier.text, background: sig.tier.bg } : undefined}>{sig.wt}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="aiPresBodyLabel">Score Tiers</div>
-                <div className="aiPresTierList">
-                  {tierRows.map(t => (
-                    <div key={t.label} className="aiPresTierRow">
-                      <div>
-                        <div className="aiPresTierDotName">
-                          <div className="aiPresTierDot" style={{ background: t.dot }} />
-                          <span className="aiPresTierName" style={{ color: t.text }}>{t.label}</span>
-                        </div>
-                        <div className="aiPresTierDef">{t.def}</div>
-                      </div>
-                      <span className="aiPresTierRange">{t.range}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <GeoExplainer
+        onSignalsClick={() => {}}
+        label={<>AI Presence signals carry <strong>70%</strong> of your overall GEO Score</>}
+        hint=""
+        signalTiers={{
+          visibility: { text: visTier.text, bg: visTier.bg },
+          sentiment:  { text: sentTier.text, bg: sentTier.bg },
+          prominence: { text: promTier.text, bg: promTier.bg },
+        }}
+      />
 
       {/* Chart card */}
       <div className="aiPresChartCard">

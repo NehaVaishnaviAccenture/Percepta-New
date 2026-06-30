@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { classifyDomain } from '../lib/tiers';
+import { GeoExplainer } from './GeoExplainer';
 
 interface TabProps {
   result: any;
@@ -99,7 +100,6 @@ function SovChart({ brand, sovScore, competitors }: { brand: string; sovScore: n
 }
 
 export default function ReachTab({ result, resultComps }: TabProps) {
-  const [accordionOpen, setAccordionOpen] = useState(false);
   const [activeCat, setActiveCat] = useState<string>('all');
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
 
@@ -205,42 +205,15 @@ export default function ReachTab({ result, resultComps }: TabProps) {
         ))}
       </div>
 
-      <div className="reachAccordion">
-        <div className="reachAccordionTrigger" onClick={() => setAccordionOpen(o => !o)}>
-          <span className="reachStripText">
-            Reach signals carry <strong>30%</strong> of your overall GEO Score
-          </span>
-          <span className="reachLearnMore">Learn more</span>
-          <span className="reachChevron" style={{ transform: accordionOpen ? 'rotate(180deg)' : undefined }}>▾</span>
-        </div>
-        {accordionOpen && (
-          <div className="reachAccordionBody">
-            <div className="reachBodyLabel">How Reach is scored</div>
-            <p className="reachBodyText">
-              Citation and Share of Voice each carry <strong>15%</strong> of your GEO Score.
-              Together they measure how much of the AI conversation your brand owns —
-              both through sources AI pulls from and the raw volume of mentions.
-            </p>
-            <div className="reachBodyLabel" style={{ marginTop: 16 }}>Signal definitions</div>
-            <div className="reachSignalList">
-              <div className="reachSignalRow">
-                <div>
-                  <div className="reachSignalName" style={{ color: citTier.text }}>Citation</div>
-                  <div className="reachSignalDef">How often AI assistants link to or attribute your owned sources when answering category questions.</div>
-                </div>
-                <span className="reachSignalWt" style={{ color: citTier.text, background: citTier.bg }}>15%</span>
-              </div>
-              <div className="reachSignalRow">
-                <div>
-                  <div className="reachSignalName" style={{ color: sovTier.text }}>Share of Voice</div>
-                  <div className="reachSignalDef">Your slice of all brand mentions in the category across AI responses, versus the competition.</div>
-                </div>
-                <span className="reachSignalWt" style={{ color: sovTier.text, background: sovTier.bg }}>15%</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <GeoExplainer
+        onSignalsClick={() => {}}
+        label={<>Reach signals carry <strong>30%</strong> of your overall GEO Score</>}
+        hint=""
+        signalTiers={{
+          citation: { text: citTier.text, bg: citTier.bg },
+          sov:      { text: sovTier.text, bg: sovTier.bg },
+        }}
+      />
 
       <div className="reachSection">
         <SovChart brand={result.brand_name} sovScore={sov} competitors={resultComps} />

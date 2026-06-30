@@ -74,17 +74,17 @@ function ArchSVG({ score }: { score: number }) {
         const a = scoreToAngle(val);
         const tickOuter = polar(R_OUTER + 3, a);
         const tickInner = polar(R_OUTER - 1, a);
-        const lp = polar(R_OUTER + 17, a);
+        const lp = val === 100 ? polar(R_OUTER + 24, a) : polar(R_OUTER + 17, a);
         const anchor = val === 0 ? 'start' : val === 100 ? 'end' : 'middle';
         return (
           <g key={val}>
             <line x1={tickInner.x} y1={tickInner.y} x2={tickOuter.x} y2={tickOuter.y} stroke="#fff" strokeWidth="1.5" />
-            <text x={lp.x} y={lp.y + 4} textAnchor={anchor} fontFamily="'JetBrains Mono', monospace" fontSize="10" fill="#8E8E8E">{val}</text>
+            <text x={lp.x} y={lp.y + 4} textAnchor={anchor} fontFamily="'Space Grotesk', monospace" fontSize="12" fill="#8E8E8E">{val}</text>
           </g>
         );
       })}
       {/* Needle */}
-      <line x1={base.x} y1={base.y} x2={tip.x} y2={tip.y} stroke={MARKER_COLOR} strokeWidth="2.5" strokeLinecap="round" />
+      <line x1={base.x} y1={base.y} x2={tip.x} y2={tip.y} stroke={MARKER_COLOR} strokeWidth="3.5" strokeLinecap="round" />
       {/* Score inside arch */}
       <text x={CX} y={CY - 28} textAnchor="middle" fontFamily="'Space Grotesk', sans-serif" fontSize="44" fontWeight="700" fill={tier.color}>{score}</text>
       <text x={CX} y={CY - 10} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.08em" fill="#8E8E8E">{tier.name.toUpperCase()}</text>
