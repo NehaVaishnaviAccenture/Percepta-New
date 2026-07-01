@@ -1,65 +1,26 @@
 'use client';
-import Link from 'next/link';
-
-const navItems = [
-  { label: 'About', href: '/' },
-  { label: 'GEO Hub', href: '/geo-hub' },
-  { label: 'Get Support', href: '/get-support' },
-];
-
-function TopNav() {
-  return (
-    <nav style={{
-      background: 'white',
-      borderBottom: 'none',
-      padding: '14px 40px',
-      position: 'sticky',
-      top: 0,
-      zIndex: 999,
-      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '8px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1 }}>
-        <div style={{ width: 30, height: 30, borderRadius: 7, background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
-            <circle cx="9.5" cy="9.5" r="5.5" stroke="white" strokeWidth="1.8" fill="none"/>
-            <line x1="13.5" y1="13.5" x2="18" y2="18" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-            <path d="M7 9.5 Q8.5 7 9.5 9.5 Q10.5 12 12 9.5" stroke="white" strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.9"/>
-          </svg>
-        </div>
-        <span style={{ fontSize: '1rem', fontWeight: 800, color: '#111827', letterSpacing: '-0.3px' }}>Percepta</span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-        {navItems.map(({ label, href }) => (
-          <Link key={href} href={href} style={{ color: '#6B7280', borderRadius: 8, fontWeight: 500, fontSize: '0.88rem', padding: '8px 48px', textDecoration: 'none' }}>
-            {label}
-          </Link>
-        ))}
-      </div>
-    </nav>
-  );
-}
+import React from 'react';
+import { AppShell } from '../components/AppShell';
+import './get-support.css';
 
 const deliver = [
   {
-    title: 'Agent Ranking Diagnostic (ARD)', bg: '#1E1B5E',
+    title: 'Agent Ranking Diagnostic (ARD)', bg: '#350052',
     activities: ['Develop representative prompts','Execute multi-run stability testing','Extract agent-generated rankings','Perform power distribution modeling','Build competitor adjacency maps'],
     deliverables: ['AXO Baseline Report','Brand & Product Ranking Index','Power Curve Analysis','Competitor Adjacency Analysis','AXO Baseline Score (v1.0)'],
   },
   {
-    title: 'Agent Optimization Plan (AOP)', bg: '#2D2A70',
+    title: 'Agent Optimization Plan (AOP)', bg: '#50007D',
     activities: ['Develop LLM-ready content assets','Strengthen product-attribute associations','Optimize content for agent ingestion','Create Content Influence Blueprint'],
     deliverables: ['Agent Optimization Plan','LLM-Ready Content Package','Attribute Reinforcement Strategy','Content Influence Blueprint'],
   },
   {
-    title: 'Distribution & Technical Influence (DTI)', bg: '#3D3A8A',
+    title: 'Distribution & Technical Influence (DTI)', bg: '#6B00A8',
     activities: ['Audit tagging and metadata','Identify missing structured data','Improve backlink structure','Identify dormant URLs','Audit schema markup'],
     deliverables: ['Distribution & Technical Influence Report','Metadata Remediation Plan','Backlink & Redirect Strategy','Schema Optimization Guide'],
   },
   {
-    title: 'Impact Measurement (Re-Diagnostic)', bg: '#5B21B6',
+    title: 'Impact Measurement (Re-Diagnostic)', bg: '#A100FF',
     activities: ['Re-test all prompts','Measure semantic drift and ranking changes','Recompute AXO Score'],
     deliverables: ['AXO Impact Report','Before/After Ranking Comparison','Updated AXO Score (v2.0)','Recommendations for ongoing improvement'],
   },
@@ -90,163 +51,174 @@ const options = [
 
 export default function GetSupport() {
   return (
-    <>
-    <TopNav />
-    <main>
+    <AppShell breadcrumb="Get Support">
+    <main id="gs-main" className="gsMain">
+
       {/* HERO */}
-      <div style={{ background: '#7C3AED', padding: '56px 40px', textAlign: 'center' }}>
-        <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.12em', color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', marginBottom: 10 }}>Accenture GEO Services</div>
-        <h1 style={{ fontSize: '2.8rem', fontWeight: 900, color: 'white', margin: '0 0 14px', letterSpacing: '-1px' }}>We&apos;ve Got You Covered</h1>
-        <p style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.82)', maxWidth: 500, margin: '0 auto', lineHeight: 1.8 }}>From GEO diagnostic to full optimization. Accenture&apos;s team handles everything, end to end.</p>
-      </div>
+      <section id="gs-hero" className="gsHero">
+        <span id="gs-hero-eyebrow" className="gsEyebrow gsHeroEyebrow">GEO Services</span>
+        <h1 id="gs-hero-title" className="gsHeroTitle">
+          We&apos;ve Got You Covered
+        </h1>
+        <p id="gs-hero-body" className="gsHeroBody">From GEO diagnostic to full optimization. Our team handles everything, end to end.</p>
+      </section>
 
       {/* OUR APPROACH */}
-      <div style={{ background: 'white', padding: '56px 40px 0', textAlign: 'center' }}>
-        <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Our Approach</div>
-        <h2 style={{ fontSize: '2.4rem', fontWeight: 900, color: '#111827', margin: '10px 0 10px' }}>GEO is No Longer Optional</h2>
-        <p style={{ fontSize: '0.92rem', color: '#6B7280', margin: '0 auto 40px', maxWidth: 680, lineHeight: 1.7 }}>While search spend rises, its impact is fading as AI agents increasingly shape the decisions search used to influence.</p>
-      </div>
+      <section id="gs-approach" className="gsApproach">
+        <span id="gs-approach-eyebrow" className="gsEyebrow gsApproachEyebrow">Our Approach</span>
+        <h2 id="gs-approach-title" className="gsApproachTitle">GEO is No Longer Optional</h2>
+        <p id="gs-approach-body" className="gsApproachBody">While search spend rises, its impact is fading as AI agents increasingly shape the decisions search used to influence.</p>
+      </section>
 
-      {/* INFINITY + WORKSTREAMS — fixed with <img> tag instead of next/image */}
-      <div style={{ background: 'white', padding: '0 40px 40px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr 1fr', gap: 40, alignItems: 'center' }}>
-          <div>
+      {/* WORKSTREAMS */}
+      <section id="gs-workstreams" className="gsWorkstreams">
+        <div id="gs-workstreams-grid" className="gsWorkstreamsGrid">
+
+          <div id="gs-workstreams-left" className="gsWorkstreamsLeft">
             {WS_LEFT.map((w, i) => (
-              <div key={i} style={{ padding: '0 20px 0 0', marginBottom: 36 }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827', marginBottom: 3 }}><strong>{w.ws}:</strong></div>
-                <div style={{ fontSize: '0.88rem', fontStyle: 'italic', color: '#374151', marginBottom: 10 }}>{w.title}</div>
-                <p style={{ fontSize: '0.82rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }} dangerouslySetInnerHTML={{ __html: w.desc }} />
+              <div key={i} id={`gs-ws-left-${i}`} className="gsWsItem gsWsItemLeft">
+                <div className="gsWsLabel"><strong>{w.ws}:</strong></div>
+                <div className="gsWsTitle">{w.title}</div>
+                <p className="gsWsDesc" dangerouslySetInnerHTML={{ __html: w.desc }} />
               </div>
             ))}
           </div>
+
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <div id="gs-workstreams-diagram" className="gsWorkstreamsDiagram">
             <img
+              id="gs-infinity-img"
+              className="gsInfinityImg"
               src="/infinity.png"
               alt="Infinity diagram showing the four workstreams"
-              style={{ width: '100%', maxWidth: 400, height: 'auto', display: 'block' }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
           </div>
-          <div>
+
+          <div id="gs-workstreams-right" className="gsWorkstreamsRight">
             {WS_RIGHT.map((w, i) => (
-              <div key={i} style={{ padding: '0 0 0 20px', marginBottom: 36 }}>
-                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#111827', marginBottom: 3 }}><strong>{w.ws}:</strong></div>
-                <div style={{ fontSize: '0.88rem', fontStyle: 'italic', color: '#374151', marginBottom: 10 }}>{w.title}</div>
-                <p style={{ fontSize: '0.82rem', color: '#6B7280', lineHeight: 1.7, margin: 0 }} dangerouslySetInnerHTML={{ __html: w.desc }} />
+              <div key={i} id={`gs-ws-right-${i}`} className="gsWsItem gsWsItemRight">
+                <div className="gsWsLabel"><strong>{w.ws}:</strong></div>
+                <div className="gsWsTitle">{w.title}</div>
+                <p className="gsWsDesc" dangerouslySetInnerHTML={{ __html: w.desc }} />
               </div>
             ))}
           </div>
+
         </div>
-      </div>
+      </section>
 
       {/* STATS */}
-      <div style={{ background: 'white', padding: '32px 40px 40px', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr 1px 1fr', gap: 0, borderTop: '1px dashed #D1D5DB', paddingTop: 32 }}>
-          <div style={{ textAlign: 'center', padding: '0 20px' }}>
-            <div style={{ fontSize: '3.2rem', fontWeight: 900, color: '#111827', lineHeight: 1 }}>6</div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginTop: 6 }}>Week Engagement</div>
-            <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: 3 }}>Phase 1</div>
+      <section id="gs-stats" className="gsStats">
+        <div id="gs-stats-grid" className="gsStatsGrid">
+          <div id="gs-stat-weeks" className="gsStatItem">
+            <div className="gsStatNum">6</div>
+            <div className="gsStatLabel">Week Engagement</div>
+            <div className="gsStatSub">Phase 1</div>
           </div>
-          <div style={{ background: '#E5E7EB' }} />
-          <div style={{ textAlign: 'center', padding: '0 20px' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Pilot Phase 1</div>
-            <div style={{ fontSize: '3.2rem', fontWeight: 900, color: '#111827', lineHeight: 1 }}>2</div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginTop: 6 }}>AI Agents</div>
-            <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: 3 }}>ChatGPT &amp; Gemini</div>
+          <div className="gsStatDivider" />
+          <div id="gs-stat-agents" className="gsStatItem">
+            <div className="gsStatPre">Pilot Phase 1</div>
+            <div className="gsStatNum">2</div>
+            <div className="gsStatLabel">AI Agents</div>
+            <div className="gsStatSub">ChatGPT &amp; Gemini</div>
           </div>
-          <div style={{ background: '#E5E7EB' }} />
-          <div style={{ textAlign: 'center', padding: '0 20px' }}>
-            <div style={{ fontSize: '3.2rem', fontWeight: 900, color: '#111827', lineHeight: 1 }}>4</div>
-            <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginTop: 6 }}>Workstreams</div>
-            <div style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: 3 }}>End to end coverage</div>
+          <div className="gsStatDivider" />
+          <div id="gs-stat-workstreams" className="gsStatItem">
+            <div className="gsStatNum">4</div>
+            <div className="gsStatLabel">Workstreams</div>
+            <div className="gsStatSub">End to end coverage</div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* DELIVERABLES */}
-      <div style={{ background: '#F9F9FC', padding: '48px 40px', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Deliverables</div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#111827', margin: '8px 0 0' }}>Activities and What We Deliver</h2>
+      <section id="gs-deliverables" className="gsDeliverables">
+        <div id="gs-deliverables-header" className="gsDeliverablesHeader">
+          <span id="gs-deliverables-eyebrow" className="gsEyebrow gsDeliverablesEyebrow">Deliverables</span>
+          <h2 id="gs-deliverables-title" className="gsDeliverablesTitle">Activities and What We Deliver</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 3, marginBottom: 12 }}>
+
+        <div id="gs-deliver-headers" className="gsDeliverHeaders">
           {deliver.map((d, i) => (
-            <div key={i} style={{ background: d.bg, padding: '18px 20px', borderRadius: i===0?'8px 0 0 0':i===3?'0 8px 0 0':0 }}>
-              <div style={{ fontSize: '0.7rem', fontWeight: 600, color: 'rgba(255,255,255,0.65)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.07em' }}>Workstream 0{i+1}</div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'white', lineHeight: 1.35 }}>{d.title}</div>
+            <div key={i} id={`gs-deliver-header-${i}`} className="gsDeliverHeader" style={{ background: d.bg }}>
+              <div className="gsDeliverWsLabel">Workstream 0{i+1}</div>
+              <div className="gsDeliverWsTitle">{d.title}</div>
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+
+        <div id="gs-deliver-activities" className="gsDeliverActivities">
           {deliver.map((d, i) => (
-            <div key={i} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, padding: 18 }}>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827', borderBottom: '1px solid #F3F4F6', paddingBottom: 8, marginBottom: 12, textAlign: 'center' }}>Activities</div>
-              <ul style={{ listStyleType: 'disc', paddingLeft: 16, margin: 0, fontSize: '0.78rem', color: '#374151', lineHeight: 1.75 }}>
-                {d.activities.map((a, j) => <li key={j}>{a}</li>)}
+            <div key={i} id={`gs-activities-${i}`} className="gsActivitiesCard">
+              <div className="gsActivitiesCardTitle">Activities</div>
+              <ul className="gsActivitiesList">
+                {d.activities.map((a, j) => <li key={j} className="gsActivitiesItem">{a}</li>)}
               </ul>
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+
+        <div id="gs-deliver-outputs" className="gsDeliverOutputs">
           {deliver.map((d, i) => (
-            <div key={i} style={{ background: '#EEEAF8', border: '1px solid #DDD6FE', borderRadius: 8, padding: 18 }}>
-              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827', borderBottom: '1px solid #DDD6FE', paddingBottom: 8, marginBottom: 12, textAlign: 'center' }}>Deliverables</div>
-              <ul style={{ listStyleType: 'disc', paddingLeft: 16, margin: 0, fontSize: '0.78rem', color: '#374151', lineHeight: 1.75 }}>
-                {d.deliverables.map((dl, j) => <li key={j}>{dl}</li>)}
+            <div key={i} id={`gs-outputs-${i}`} className="gsOutputsCard">
+              <div className="gsOutputsCardTitle">Deliverables</div>
+              <ul className="gsOutputsList">
+                {d.deliverables.map((dl, j) => <li key={j} className="gsOutputsItem">{dl}</li>)}
               </ul>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* PILOT OPTIONS */}
-      <div style={{ background: 'white', padding: '48px 40px', borderBottom: '1px solid #E5E7EB' }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{ display: 'inline-block', background: '#EDE9FE', color: '#7C3AED', borderRadius: 50, padding: '4px 14px', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 12 }}>Explore Offers</div>
-          <h2 style={{ fontSize: '1.8rem', fontWeight: 800, color: '#111827', margin: '8px 0 6px' }}>Choose Your Pilot Program</h2>
+      <section id="gs-pilots" className="gsPilots">
+        <div id="gs-pilots-header" className="gsPilotsHeader">
+          <span id="gs-pilots-eyebrow" className="gsEyebrow gsPilotsEyebrow">Explore Offers</span>
+          <h2 id="gs-pilots-title" className="gsPilotsTitle">Choose Your Pilot Program</h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 28 }}>
+        <div id="gs-pilots-grid" className="gsPilotsGrid">
           {options.map((opt, i) => (
-            <div key={i} style={{ border: opt.recommended?'2px solid #7C3AED':'1px solid #E5E7EB', borderRadius: 16, padding: '36px 32px', position: 'relative', background: opt.recommended?'#FAFBFF':'white' }}>
+            <div key={i} id={`gs-pilot-${i}`} className={`gsPilotCard${opt.recommended ? ' gsPilotCard--recommended' : ''}`}>
               {opt.recommended && (
-                <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: '#7C3AED', color: 'white', borderRadius: 50, padding: '3px 16px', fontSize: '0.72rem', fontWeight: 700, whiteSpace: 'nowrap' }}>Recommended</div>
+                <div className="gsPilotRecommendedBadge">Recommended</div>
               )}
-              <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: opt.recommended?'#7C3AED':'#9CA3AF', marginBottom: 10 }}>{opt.num}</div>
-              <div style={{ fontSize: '3rem', fontWeight: 900, color: '#111827', lineHeight: 1, marginBottom: 2 }}>{opt.weeks}</div>
-              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#374151', marginBottom: 28 }}>Week Engagement</div>
-              <div style={{ height: 1, background: opt.recommended?'#E5E7EB':'#F3F4F6', marginBottom: 24 }} />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="gsPilotNum">{opt.num}</div>
+              <div className="gsPilotWeeks">{opt.weeks}</div>
+              <div className="gsPilotWeeksLabel">Week Engagement</div>
+              <div className="gsPilotDivider" />
+              <div className="gsPilotItems">
                 {opt.items.map((item, j) => (
-                  <div key={j} style={{ display: 'flex', gap: 10, fontSize: '0.86rem', color: '#374151' }}>
-                    <span style={{ color: '#7C3AED', fontWeight: 700 }}>+</span>{item}
+                  <div key={j} className="gsPilotItem">
+                    <span className="gsPilotItemMark">+</span>{item}
                   </div>
                 ))}
               </div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* PROVEN RESULTS */}
-      <div style={{ background: '#7C3AED', padding: '56px 40px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 80, alignItems: 'center' }}>
-          <div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.12em', color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', marginBottom: 10 }}>Proven Results</div>
-            <h2 style={{ fontSize: '2rem', fontWeight: 800, color: 'white', margin: '0 0 14px', lineHeight: 1.25 }}>Validated Impact Across<br />10+ Client Engagements</h2>
-            <p style={{ fontSize: '0.92rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.8, margin: 0 }}>Across retail, travel, financial services, and hospitality, Percepta has consistently delivered measurable improvements.</p>
+      <section id="gs-results" className="gsResults">
+        <div id="gs-results-grid" className="gsResultsGrid">
+          <div id="gs-results-copy" className="gsResultsCopy">
+            <span id="gs-results-eyebrow" className="gsEyebrow gsResultsEyebrow">Proven Results</span>
+            <h2 id="gs-results-title" className="gsResultsTitle">Validated Impact Across<br />10+ Client Engagements</h2>
+            <p id="gs-results-body" className="gsResultsBody">Across retail, travel, financial services, and hospitality, Percepta has consistently delivered measurable improvements.</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+          <div id="gs-stats-cards" className="gsStatsCards">
             {stats.map((s, i) => (
-              <div key={i} style={{ border: '1px solid rgba(255,255,255,0.2)', borderRadius: 12, padding: 24 }}>
-                <div style={{ fontSize: '2.4rem', fontWeight: 900, color: 'white' }}>{s.val}</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginTop: 5 }}>{s.label}</div>
+              <div key={i} id={`gs-stat-card-${i}`} className="gsStatCard">
+                <div className="gsStatCardVal">{s.val}</div>
+                <div className="gsStatCardLabel">{s.label}</div>
               </div>
             ))}
           </div>
         </div>
-      </div>
+      </section>
+
     </main>
-    </>
+    </AppShell>
   );
 }

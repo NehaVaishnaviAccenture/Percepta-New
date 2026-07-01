@@ -191,16 +191,16 @@ export default function ReachTab({ result, resultComps }: TabProps) {
 
       <div className="reachCards">
         {signals.map(sig => (
-          <div key={sig.key} className="reachCard" style={{ borderLeftColor: sig.tier.text }}>
-            <div className="reachCardEyebrow">
+          <div key={sig.key} id="reachCard" className="aiPresCard" style={{ borderLeftColor: sig.tier.text }}>
+            <div id="reachCardEyebrow" className="aiPresCardEyebrow">
               {sig.label}
             </div>
-            <div className="reachCardQ">{sig.q}</div>
-            <div className="reachCardScoreRow">
-              <span className="reachCardNum" style={{ color: sig.tier.text }}>{sig.score}</span>
-              <span className="reachChip" style={{ background: sig.tier.bg, color: sig.tier.text }}>{sig.tier.label}</span>
+            <div id="reachCardQ" className="aiPresCardQ">{sig.q}</div>
+            <div id="reachCardScoreRow" className="aiPresCardScoreRow">
+              <span id="reachCardNum" className="aiPresCardNum" style={{ color: sig.tier.text }}>{sig.score}</span>
+              <span id="reachChip" className="aiPresChip" style={{ background: sig.tier.bg, color: sig.tier.text }}>{sig.tier.label}</span>
             </div>
-            <div className="reachCardRank">#{sig.rankVal} of {sig.total} brands · avg {sig.avgVal}</div>
+            <div id="reachCardRank" className="aiPresCardRank">#{sig.rankVal} of {sig.total} brands · avg {sig.avgVal}</div>
           </div>
         ))}
       </div>

@@ -426,9 +426,12 @@
   .gsoSignalCards--5 > :nth-child(n+4) {
     grid-column: span 3;
   }
+  .gsoSignalCards--5 .aiPresChip {
+    padding: 3px 5px;
+  }
 }
 
-@container (max-width: 480px) {
+@container (max-width: 628px) {
   .gsoSignalCards--5 {
     grid-template-columns: 1fr;
   }
