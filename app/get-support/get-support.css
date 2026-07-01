@@ -1,0 +1,455 @@
+/* ==========================================================================
+   GET SUPPORT PAGE
+   ========================================================================== */
+
+/* ── Main ── */
+.gsMain {
+  font-family: Inter, sans-serif;
+  background: #f3f4f6;
+}
+
+/* ── Shared eyebrow ── */
+.gsEyebrow {
+  display: block;
+  font-family: Inter, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #A100FF;
+  margin-bottom: 12px;
+}
+
+/* ── Hero ── */
+.gsHero {
+  background: #A100FF;
+  padding: 56px 40px;
+  text-align: center;
+}
+
+.gsHeroEyebrow {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gsHeroTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.8rem;
+  font-weight: 500;
+  color: white;
+  margin: 0 0 14px;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.gsAccentMark {
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 600;
+}
+
+.gsHeroBody {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.82);
+  max-width: 500px;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+/* ── Our Approach ── */
+.gsApproach {
+  padding: 56px 40px 0;
+  text-align: center;
+}
+
+.gsApproachTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: #0A0A0A;
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.gsApproachBody {
+  font-size: 0.92rem;
+  color: #6B6B6B;
+  margin: 0 auto 40px;
+  max-width: 680px;
+  line-height: 1.65;
+}
+
+/* ── Workstreams ── */
+.gsWorkstreams {
+  padding: 0 40px 40px;
+}
+
+.gsWorkstreamsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.gsWsItem {
+  margin-bottom: 36px;
+}
+
+.gsWsItemLeft {
+  padding: 0 20px 0 0;
+}
+
+.gsWsItemRight {
+  padding: 0 0 0 20px;
+}
+
+.gsWsLabel {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0A0A0A;
+  margin-bottom: 3px;
+}
+
+.gsWsTitle {
+  font-size: 0.88rem;
+  font-style: italic;
+  color: #2B2B2B;
+  margin-bottom: 10px;
+}
+
+.gsWsDesc {
+  font-size: 0.82rem;
+  color: #6B6B6B;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.gsWorkstreamsDiagram {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.gsInfinityImg {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  display: block;
+}
+
+/* ── Stats bar ── */
+.gsStats {
+  padding: 32px 40px 40px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.gsStatsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr 1px 1fr;
+  border-top: 1px dashed #D1D1D1;
+  padding-top: 32px;
+}
+
+.gsStatItem {
+  text-align: center;
+  padding: 0 20px;
+}
+
+.gsStatPre {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #0A0A0A;
+  margin-bottom: 4px;
+}
+
+.gsStatNum {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 3.2rem;
+  font-weight: 700;
+  color: #0A0A0A;
+  line-height: 1;
+}
+
+.gsStatLabel {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0A0A0A;
+  margin-top: 6px;
+}
+
+.gsStatSub {
+  font-size: 0.8rem;
+  color: #8E8E8E;
+  margin-top: 3px;
+}
+
+/* ── Deliverables ── */
+.gsDeliverables {
+  padding: 48px 40px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.gsDeliverablesHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.gsDeliverablesTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: #0A0A0A;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.gsDeliverHeaders {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.gsDeliverHeader {
+  padding: 18px 20px;
+}
+
+.gsDeliverWsLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.gsDeliverWsTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+  line-height: 1.35;
+}
+
+.gsDeliverActivities,
+.gsDeliverOutputs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.gsDeliverActivities {
+  margin-bottom: 12px;
+}
+
+.gsActivitiesCard {
+  background: white;
+  border: 1px solid #E5E5E5;
+  padding: 18px;
+}
+
+.gsActivitiesCardTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0A0A0A;
+  border-bottom: 1px solid #F2F2F2;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.gsActivitiesList,
+.gsOutputsList {
+  list-style-type: disc;
+  padding-left: 16px;
+  margin: 0;
+  font-size: 0.78rem;
+  color: #2B2B2B;
+  line-height: 1.75;
+}
+
+.gsOutputsCard {
+  background: white;
+  border: 1px solid #E6C2FF;
+  padding: 18px;
+}
+
+.gsOutputsCardTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0A0A0A;
+  border-bottom: 1px solid #E6C2FF;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+/* ── Pilot Options ── */
+.gsPilots {
+  padding: 48px 40px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.gsPilotsHeader {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.gsPilotsTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  color: #0A0A0A;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.gsPilotsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.gsPilotCard {
+  border: 1px solid #E5E5E5;
+  padding: 36px 32px;
+  position: relative;
+  background: white;
+}
+
+.gsPilotCard--recommended {
+  border: 2px solid #A100FF;
+  background: #F5E6FF;
+}
+
+.gsPilotRecommendedBadge {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #A100FF;
+  color: white;
+  border-radius: 999px;
+  padding: 3px 16px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gsPilotNum {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8E8E8E;
+  margin-bottom: 10px;
+}
+
+.gsPilotCard--recommended .gsPilotNum {
+  color: #A100FF;
+}
+
+.gsPilotWeeks {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #0A0A0A;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.gsPilotWeeksLabel {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #2B2B2B;
+  margin-bottom: 28px;
+}
+
+.gsPilotDivider {
+  height: 1px;
+  background: #E5E5E5;
+  margin-bottom: 24px;
+}
+
+.gsPilotItems {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gsPilotItem {
+  display: flex;
+  gap: 10px;
+  font-size: 0.86rem;
+  color: #2B2B2B;
+}
+
+.gsPilotItemMark {
+  color: #A100FF;
+  font-weight: 700;
+}
+
+/* ── Proven Results ── */
+.gsResults {
+  background: #A100FF;
+  padding: 56px 40px;
+}
+
+.gsResultsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+}
+
+.gsResultsEyebrow {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gsResultsTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin: 0 0 14px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.gsResultsBody {
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.gsStatsCards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.gsStatCard {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 24px;
+}
+
+.gsStatCardVal {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: white;
+}
+
+.gsStatCardLabel {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 5px;
+}

@@ -1,0 +1,549 @@
+/* ==========================================================================
+   HOME PAGE
+   ========================================================================== */
+
+/* ── Main ── */
+.main {
+  font-family: Inter, sans-serif;
+}
+
+/* ── Nav ── */
+.topNav {
+  background: white;
+  padding: 14px 40px;
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navLogo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.navLogoIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: #7C3AED;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.navBrandName {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.3px;
+}
+
+.navLinks {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.navLink {
+  color: #6B7280;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.88rem;
+  padding: 8px 48px;
+  text-decoration: none;
+}
+
+/* ── Hero ── */
+.hero {
+  background: linear-gradient(170deg, #fff 55%, #F3EEFF 100%);
+  padding: 52px 40px 40px;
+  text-align: center;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #DDD6FE;
+  border-radius: 50px;
+  padding: 8px 22px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #7C3AED;
+  text-transform: uppercase;
+  margin-bottom: 44px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.heroHeadline {
+  font-size: 4.6rem;
+  font-weight: 900;
+  line-height: 1.0;
+  letter-spacing: -3px;
+  margin-bottom: 20px;
+}
+
+.heroHeadlinePrefix,
+.heroHeadlineSuffix {
+  color: #111827;
+}
+
+.heroHeadlineKeyword {
+  color: #7C3AED;
+}
+
+.heroSubtext {
+  font-size: 1.1rem;
+  color: #9CA3AF;
+  max-width: 620px;
+  margin: 0 auto 36px;
+  line-height: 1.75;
+  font-weight: 400;
+}
+
+.heroCta {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.heroCtaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #7C3AED;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 18px 36px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.heroCtaSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  color: #111827;
+  border: 1.5px solid #D1D5DB;
+  border-radius: 50px;
+  padding: 18px 36px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ── How It Works ── */
+.howSection {
+  background: #F9F9FC;
+  padding: 80px 40px;
+  border-top: 1px solid #E5E7EB;
+}
+
+.howHeader {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.howBadge {
+  display: inline-block;
+  background: #EDE9FE;
+  color: #7C3AED;
+  border-radius: 50px;
+  padding: 4px 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.howTitle {
+  font-size: 2.2rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 10px 0;
+}
+
+.howDesc {
+  font-size: 1rem;
+  color: #9CA3AF;
+  max-width: 560px;
+  margin: 0 auto;
+  line-height: 1.7;
+}
+
+.howSteps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 40px;
+  position: relative;
+}
+
+.howStep {
+  position: relative;
+  z-index: 1;
+}
+
+.howStepNumber {
+  font-size: 3.2rem;
+  font-weight: 900;
+  color: #EDE9FE;
+  line-height: 1;
+  margin-bottom: 24px;
+}
+
+.howStepTitle {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.howStepDesc {
+  font-size: 0.84rem;
+  color: #6B7280;
+  line-height: 1.7;
+}
+
+/* ── GEO Score ── */
+.geoScoreSection {
+  background: white;
+  padding: 80px 40px;
+  border-top: 1px solid #E5E7EB;
+}
+
+.geoScoreGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  margin-bottom: 56px;
+}
+
+.geoScoreEyebrow {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: #7C3AED;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+.geoScoreTitle {
+  font-size: 2.6rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 16px;
+  line-height: 1.1;
+}
+
+.geoScoreDesc {
+  font-size: 1rem;
+  color: #9CA3AF;
+  line-height: 1.8;
+  margin: 0 0 12px;
+  font-weight: 400;
+}
+
+.geoScoreCard {
+  background: white;
+  border-radius: 20px;
+  padding: 44px 40px;
+  box-shadow: 0 8px 40px rgba(124, 58, 237, 0.13);
+  border: 1px solid #F0EBFF;
+  text-align: center;
+}
+
+.geoScoreCardLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.geoScoreNumber {
+  font-size: 5.5rem;
+  font-weight: 900;
+  color: #7C3AED;
+  line-height: 1;
+  margin-bottom: 20px;
+}
+
+.geoScoreBar {
+  background: #F3F4F6;
+  border-radius: 50px;
+  height: 6px;
+  width: 100%;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.geoScoreBarFill {
+  background: #7C3AED;
+  height: 6px;
+  border-radius: 50px;
+  width: 78%;
+}
+
+.geoScoreOutOf {
+  font-size: 0.82rem;
+  color: #9CA3AF;
+  margin-bottom: 20px;
+}
+
+.geoScoreBandChip {
+  background: #EDE9FE;
+  color: #7C3AED;
+  border-radius: 50px;
+  padding: 6px 22px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+/* ── Score Bands ── */
+.scoreBands {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 64px;
+}
+
+.scoreBandCard {
+  border-radius: 14px;
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.scoreBandRange {
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.scoreBandLabel {
+  font-size: 1.3rem;
+  font-weight: 900;
+  margin-bottom: 4px;
+}
+
+.scoreBandDesc {
+  font-size: 0.78rem;
+}
+
+/* ── Comparison ── */
+.comparison {
+  border-top: 1px solid #E5E7EB;
+  padding-top: 40px;
+}
+
+.comparisonHeader {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.comparisonBadge {
+  display: inline-block;
+  background: #EDE9FE;
+  color: #7C3AED;
+  border-radius: 50px;
+  padding: 4px 14px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.comparisonTitle {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 16px;
+  line-height: 1.15;
+}
+
+.comparisonDesc {
+  font-size: 1rem;
+  color: #9CA3AF;
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+.comparisonGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.comparisonCard--competitors {
+  background: #F9FAFB;
+  border-radius: 16px;
+  border: 1px solid #E5E7EB;
+  padding: 36px 32px;
+}
+
+.comparisonCard--percepta {
+  background: white;
+  border-radius: 16px;
+  border: 2px solid #7C3AED;
+  padding: 36px 32px;
+  position: relative;
+}
+
+.comparisonPerceptaBadge {
+  position: absolute;
+  top: -14px;
+  left: 24px;
+  background: #7C3AED;
+  color: white;
+  border-radius: 50px;
+  padding: 4px 18px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.comparisonCardLabel {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.comparisonCard--competitors .comparisonCardLabel {
+  color: #9CA3AF;
+}
+
+.comparisonCard--percepta .comparisonCardLabel {
+  color: #7C3AED;
+  margin-top: 8px;
+}
+
+.comparisonList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comparisonCard--percepta .comparisonList {
+  gap: 14px;
+}
+
+.comparisonItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comparisonCard--percepta .comparisonItem {
+  align-items: flex-start;
+}
+
+.comparisonItemIcon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.comparisonCard--competitors .comparisonItemIcon {
+  color: #9CA3AF;
+}
+
+.comparisonCard--percepta .comparisonItemIcon {
+  color: #7C3AED;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.comparisonItemText {
+  font-size: 0.88rem;
+}
+
+.comparisonCard--competitors .comparisonItemText {
+  color: #9CA3AF;
+}
+
+.comparisonCard--percepta .comparisonItemText {
+  color: #111827;
+  line-height: 1.5;
+}
+
+.comparisonItemText--bold {
+  font-weight: 700;
+}
+
+/* ── CTA ── */
+.ctaSection {
+  background: white;
+  padding: 40px;
+  border-top: 1px solid #E5E7EB;
+}
+
+.ctaCard {
+  background: linear-gradient(135deg, #F8F5FF 0%, #EDE9FE 45%, #F3EEFF 100%);
+  border: 1.5px solid #C4B5FD;
+  border-radius: 28px;
+  padding: 36px 60px;
+  text-align: center;
+}
+
+.ctaTitle {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 4px;
+  line-height: 1.1;
+}
+
+.ctaTitleAccent {
+  font-size: 3rem;
+  font-weight: 900;
+  color: #7C3AED;
+  margin: 0 0 20px;
+  line-height: 1.1;
+}
+
+.ctaDesc {
+  font-size: 1rem;
+  color: #9CA3AF;
+  max-width: 480px;
+  margin: 0 auto 4px;
+  line-height: 1.7;
+  font-weight: 400;
+}
+
+.ctaActions {
+  margin-top: 24px;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #7C3AED;
+  color: white;
+  border: none;
+  border-radius: 50px;
+  padding: 18px 44px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-decoration: none;
+  margin-top: 16px;
+}
