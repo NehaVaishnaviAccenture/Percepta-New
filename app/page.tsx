@@ -86,7 +86,7 @@ export default function Overview() {
         <div id="hero-headline" className="heroHeadline">
           <span id="hero-headline-prefix" className="heroHeadlinePrefix">How does AI </span>
           <span id="hero-headline-keyword" className="heroHeadlineKeyword">see</span>
-          <span id="hero-headline-suffix" className="heroHeadlineSuffix"> your brand?</span>
+          <span id="hero-headline-suffix" className="heroHeadlineSuffix"> your brand</span>
         </div>
         <p id="hero-subtext" className="heroSubtext">
           Enter any brand URL and get a full GEO analysis — frequency, prominence, sentiment, competitor gaps, and exactly what to fix.
