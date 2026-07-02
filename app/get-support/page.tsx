@@ -199,8 +199,19 @@ export default function GetSupport() {
         </div>
       </section>
 
+      {/* GET IN CONTACT */}
+      <section id="gs-contact" className="gsResults">
+        <div id="gs-results-grid" className="gsResultsGrid">
+          <div id="gs-results-copy" className="gsResultsCopy">
+            <span id="gs-results-eyebrow" className="gsEyebrow gsResultsEyebrow">Get In Contact</span>
+            <h2 id="gs-results-title" className="gsResultsTitle">Want to Know More?</h2>
+            <p id="gs-results-body" className="gsResultsBody">We've got you covered.</p>
+          </div>
+        </div>
+      </section>
+
       {/* PROVEN RESULTS */}
-      <section id="gs-results" className="gsResults">
+      {/* <section id="gs-results" className="gsResults">
         <div id="gs-results-grid" className="gsResultsGrid">
           <div id="gs-results-copy" className="gsResultsCopy">
             <span id="gs-results-eyebrow" className="gsEyebrow gsResultsEyebrow">Proven Results</span>
@@ -216,7 +227,7 @@ export default function GetSupport() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
     </main>
     </AppShell>
