@@ -323,9 +323,9 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
   const topCompBrand = result._topCompBrand || (comps.length > 0 ? comps[0].Brand : '');
 
   const signals = [
-    { key: 'vis',  label: 'Visibility',  weight: 30, q: 'Are you in the answer?',       score: vis,  tier: visTier,  rankVal: rank(vis, allVis),   avgVal: avg(allVis),  total: allVis.length - 1 },
-    { key: 'sent', label: 'Sentiment',   weight: 20, q: 'Are you framed well?',          score: sent, tier: sentTier, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1 },
-    { key: 'prom', label: 'Prominence',  weight: 20, q: 'Are you front and center?',     score: prom, tier: promTier, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1 },
+    { key: 'vis',  label: 'Visibility',  weight: 30, q: 'How often your brand appears in AI answers.',                                        score: vis,  tier: visTier,  rankVal: rank(vis, allVis),   avgVal: avg(allVis),  total: allVis.length - 1 },
+    { key: 'sent', label: 'Sentiment',   weight: 20, q: 'Whether AI talks about your brand in a positive, neutral, or negative way.',        score: sent, tier: sentTier, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1 },
+    { key: 'prom', label: 'Prominence',  weight: 20, q: 'Where your brand appears in the answer, the higher up the more prominent.',        score: prom, tier: promTier, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1 },
   ];
 
 

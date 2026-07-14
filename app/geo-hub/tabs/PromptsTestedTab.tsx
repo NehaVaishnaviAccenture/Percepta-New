@@ -21,6 +21,7 @@ interface TabProps {
   resultComps: any[];
   setActiveParent: (n: number) => void;
   setActiveSub: (n: number) => void;
+  setLivePromptQuery?: (q: string) => void;
 }
 
 // ── Deterministic name-hash (for demo-mode rank spread) ───────────────────────
@@ -155,7 +156,38 @@ function Eyebrow({ children, className = '', style }: { children: React.ReactNod
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
-export default function PromptsTestedTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
+const STOP_WORDS = new Set(['a','an','the','and','or','but','in','on','at','to','for','of','with','by','from','is','are','was','were','be','been','being','have','has','had','do','does','did','will','would','could','should','may','might','shall','can','i','my','your','their','our','its','this','that','these','those','what','which','who','how','when','where','why','me','we','us','you','he','she','it','they','not','no','so','if','as','up','out','about','into','than','then','there','here','just','very','get','got']);
+
+function promptSlug(query: string): string {
+  const words = query.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w && !STOP_WORDS.has(w));
+  const tail = words.slice(-5);
+  return tail.length >= 3 ? tail.join('-') : words.slice(-3).join('-');
+}
+
+function exportPromptsCsv(rows: any[], brandName: string, topic?: string | null, appearedOnly?: boolean) {
+  const headers = ['Prompt','Category','Mentioned','Position','Winner Brand','Response'];
+  const data = rows.map((r: any) => [
+    r.query || r.prompt || '',
+    r.category || '',
+    (r.mentioned || r.brand_mentioned) ? 'Yes' : 'No',
+    r.position ?? '',
+    r.winner_brand || '',
+    (r.response_preview || r.response || r.response_text || '').replace(/\n/g, ' '),
+  ]);
+  const csv = [headers, ...data].map(row => row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const slug = brandName.trim().replace(/\s+/g, '-').toLowerCase();
+  const topicSlug = topic ? `-${topic.trim().replace(/\s+/g, '-').toLowerCase()}` : '-all';
+  const appearedSlug = appearedOnly ? '-appeared' : '';
+  a.download = `${slug}-tested-prompts${topicSlug}${appearedSlug}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function PromptsTestedTab({ result, resultComps, setActiveParent, setActiveSub, setLivePromptQuery }: TabProps) {
   // ── Derived data ──────────────────────────────────────────────
   const rd: any[] = result.responses_detail || [];
   const clusters: any[] = result.query_clusters || [];
@@ -516,13 +548,10 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                 {item.category && <span className="ptFooterChipDot"/>}
                 <span className="ptFooterChip">GPT-4o</span>
               </div>
-              <button className="ptBtnSecondary">Run this prompt live →</button>
+              <button className="ptBtnSecondary" onClick={() => { if (setLivePromptQuery) setLivePromptQuery(item.query || item.prompt || ''); setActiveParent(2); setActiveSub(1); }}>Run this prompt live →</button>
             </div>
-            <button className="ptFooterExport">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
-              </svg>
-              Export prompt data
+            <button className="ptFooterExport" onClick={() => exportPromptsCsv([item], brandName, `detail-${promptSlug(item.query || item.prompt || '')}`, false)}>
+              <span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/></svg>Export prompt data</span>
             </button>
           </div>
         </div>
@@ -564,14 +593,6 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               </div>
               <div className="ptHeroStatLabel">Avg rank when {brandName || 'your brand'} appeared</div>
             </div>
-          </div>
-          <div style={{ marginTop: 20, borderTop: '1px solid #E5E5E5', paddingTop: 14 }}>
-            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: '#6B00A8', cursor: 'pointer', borderBottom: '1px solid #E6C2FF' }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
-              </svg>
-              Download prompt set
-            </span>
           </div>
         </div>
 
@@ -926,11 +947,11 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                   disabled={safePage >= totalPages}
                 >Next →</button>
               </div>
-              <span className="ptCtaLink">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{display:'inline-block',verticalAlign:'middle',marginRight:4}}>
+              <span className="ptCtaLink" onClick={() => exportPromptsCsv(filteredRows, brandName, selectedTopicId, showAppeared)}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
                 </svg>
-                Export filtered
+                Export filtered to CSV
               </span>
             </div>
           </div>
@@ -949,7 +970,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             </div>
             <button
               className="ptTeaserCta"
-              onClick={() => setActiveParent(5)}
+              onClick={() => setActiveParent(3)}
             >
               See in Priorities →
             </button>

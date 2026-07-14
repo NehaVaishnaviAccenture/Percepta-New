@@ -8,6 +8,7 @@ interface TabProps {
   resultComps: any[];
   setActiveParent: (n: number) => void;
   setActiveSub: (n: number) => void;
+  playbookActions?: Action[] | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -22,11 +23,26 @@ const SIGNALS = [
   { label: 'Share of Voice', key: 'share_of_voice', weight: '15%' },
 ];
 
-const TREND_COLS = [
-  { key: 'Peak',   label: 'Trending', colClass: 'ov-col--trending' },
-  { key: 'Rising', label: 'Growing',  colClass: 'ov-col--growing'  },
-  { key: 'Stable', label: 'Steady',   colClass: 'ov-col--steady'   },
-];
+// ─────────────────────────────────────────────────────────────────────────────
+// Playbook types
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ActionTopic { name: string; secondary?: boolean; }
+interface ActionEvidence { topic: string; score: number; delta: number; prompts: number; }
+interface Action {
+  priority: 'High' | 'Medium' | 'Low';
+  topics: ActionTopic[];
+  title: string;
+  teaser: string;
+  who: string[];
+  evidence: ActionEvidence;
+  why: string;
+  build: string[];
+  team: string;
+  type: string;
+}
+
+const NUM_WORDS = ['Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -45,43 +61,12 @@ function buildLead(brand: string, visibility: number): string {
   return `${brand} has limited presence in AI responses — appearing in only ${visibility}% of answers so far.`;
 }
 
-function buildInsight(
-  q: any, brand: string, leader: string | null, winRate: number | null
-): { contextBold: string; context: string; outlook: string } {
-  const cat = q.category || 'this category';
-  const opp = (q.opportunity || 'Medium') as string;
-
-  if (opp === 'High') {
-    if (leader) return {
-      contextBold: `${leader} currently leads AI responses in ${cat}.`,
-      context:     'High opportunity — this is an actively contested query type.',
-      outlook:     `${brand} has a realistic path to citation here with targeted content.`,
-    };
-    return {
-      contextBold: `High opportunity in ${cat}.`,
-      context:     'No dominant competitor has locked this down yet.',
-      outlook:     'The landscape is more open than usual — worth testing as a priority.',
-    };
-  }
-
-  if (opp === 'Medium') {
-    if (leader) return {
-      contextBold: `${leader} leads in ${cat} but the space isn't locked down.`,
-      context:     winRate !== null ? `${brand} appears in ${winRate}% of responses here.` : 'Moderate opportunity for growth.',
-      outlook:     `Targeted content could meaningfully improve ${brand}'s citation rate here.`,
-    };
-    return {
-      contextBold: `Moderate opportunity in ${cat}.`,
-      context:     winRate !== null ? `${brand} currently appears in ${winRate}% of responses.` : '',
-      outlook:     `Testing will show where ${brand} stands and what's needed to improve.`,
-    };
-  }
-
-  return {
-    contextBold: `Lower priority ${cat} query.`,
-    context:     'AI typically treats this as a factual explainer rather than a brand recommendation.',
-    outlook:     'Limited citation upside — deprioritize in favor of higher-opportunity queries.',
-  };
+function tierOf(score: number): string {
+  if (score <= 44) return 'fragmented';
+  if (score <= 55) return 'emerging';
+  if (score <= 69) return 'competitive';
+  if (score <= 79) return 'leader';
+  return 'authority';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -269,146 +254,346 @@ function HealthSummaryCard({ result }: { result: any }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Query Card
+// Playbook components
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QueryCard({ q, brand, leader, winRate, onTestQuery }: {
-  q: any; brand: string; leader: string | null; winRate: number | null; onTestQuery: () => void;
+function StatLine({ ev }: { ev: ActionEvidence }) {
+  const median = ev.score - ev.delta;
+  const d = ev.delta >= 0 ? `+${ev.delta}` : `−${Math.abs(ev.delta)}`;
+  return (
+    <>
+      {ev.topic} · <span className={`pb-tier-${tierOf(ev.score)}`}>{ev.score}</span> · {d} vs median ({median})
+    </>
+  );
+}
+
+function PriorityBars({ priority }: { priority: string }) {
+  const onCount = priority === 'High' ? 3 : priority === 'Medium' ? 2 : 1;
+  return (
+    <span className="pb-col-bars">
+      {[1, 2, 3].map(i => (
+        <i key={i} className={`pb-pbar pb-pbar--h${i}${i <= onCount ? ' pb-pbar--on' : ''}`} />
+      ))}
+    </span>
+  );
+}
+
+function WhoLine({ who }: { who: string[] }) {
+  const head = who.slice(0, 2).join(' · ');
+  const extra = who.length > 2 ? who.length - 2 : 0;
+  return (
+    <>
+      <span className="pb-who-lead">For</span> {head}
+      {extra > 0 && <> <span className="pb-who-lead">+{extra} more</span></>}
+    </>
+  );
+}
+
+const LANES = [
+  { key: 'low',    label: 'Low',    onCount: 1 },
+  { key: 'medium', label: 'Medium', onCount: 2 },
+  { key: 'high',   label: 'High',   onCount: 3 },
+];
+
+function ActionCard({
+  action, index, expanded, topicFilter, onToggle, onOpen,
+}: {
+  action: Action; index: number; expanded: boolean; topicFilter: string;
+  onToggle: (i: number) => void; onOpen: (i: number) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const tested = winRate !== null;
-  const { contextBold, context, outlook } = buildInsight(q, brand, leader, winRate);
-  const toggle = () => setExpanded(v => !v);
+  const topics = action.topics.map(t => t.name);
+  const hidden = topicFilter !== 'all' && !topics.includes(topicFilter);
 
   return (
-    <div className={`ov-card${expanded ? ' ov-card--expanded' : ''}${!tested ? ' ov-card--untested' : ''}`}>
-      <div className="ov-card-head" onClick={toggle}>
-        <span className="ov-card-cat">{q.category}</span>
-        <ChevronSVG className="ov-card-chev" />
+    <div
+      className={[
+        'pb-card',
+        expanded ? 'pb-card--expanded' : '',
+        hidden ? 'pb-card--hidden' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <div className="pb-card-top" onClick={() => onToggle(index)}>
+        <div className="pb-card-topics">
+          <span className="pb-topic-chip">{action.topics[0].name}</span>
+        </div>
+        <span className="pb-card-chev">⌄</span>
       </div>
-      <div className="ov-card-query" onClick={toggle}>{q.query}</div>
-      <div className="ov-card-foot" onClick={toggle}>
-        {tested && leader
-          ? <span className="ov-foot-leader">{leader} leads</span>
-          : <span className="ov-foot-leader" />}
-        {tested
-          ? <span className="ov-foot-win">{winRate}% citation</span>
-          : <span className="ov-foot-untested">Not yet tested</span>}
+
+      <div className="pb-card-title" onClick={() => onToggle(index)}>
+        {action.title}
       </div>
-      {expanded && (
-        <div className="ov-card-drawer">
-          <div className="ov-drawer-insight">
-            {contextBold && <b>{contextBold}</b>}
-            {context && ` ${context}`}
+      <div className="pb-card-teaser">{action.teaser}</div>
+      <div className="pb-card-who" onClick={() => onToggle(index)}>
+        <WhoLine who={action.who} />
+      </div>
+
+      <div className="pb-card-drawer">
+        <div className="pb-card-drawer-pad">
+          <div className="pb-evidence">
+            <div className="pb-ev-label">Why {action.priority.toLowerCase()} priority</div>
+            <span className="pb-ev-stat"><StatLine ev={action.evidence} /></span>
+            <p className="pb-why" dangerouslySetInnerHTML={{ __html: action.why }} />
           </div>
-          {outlook && <div className="ov-outlook">{outlook}</div>}
-          <button
-            className="ov-drawer-link"
-            onClick={(e) => { e.stopPropagation(); onTestQuery(); }}
-          >
-            {tested ? 'View prompt results' : 'Test this query'}
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M2 5.5h7M6 2.5l3 3-3 3" />
-            </svg>
+          <button className="pb-open-action" onClick={() => onOpen(index)}>
+            Open the full action <span>→</span>
           </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Market Queries Board
-// ─────────────────────────────────────────────────────────────────────────────
+function exportActionsCsv(actions: Action[], brandName: string, topicFilter: string) {
+  const slug = brandName.toLowerCase().replace(/\s+/g, '-');
+  const topicSlug = topicFilter === 'all' ? '-all' : '-' + topicFilter.toLowerCase().replace(/\s+/g, '-');
+  const filename = `${slug}-priority-actions${topicSlug}.csv`;
+  const rows = actions.filter(a =>
+    topicFilter === 'all' || a.topics.some(t => t.name === topicFilter)
+  );
+  const headers = ['Priority', 'Title', 'Topics', 'Who', 'Why', 'Evidence Topic', 'Evidence Score', 'Evidence Delta'];
+  const escape = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    headers.join(','),
+    ...rows.map(a => [
+      escape(a.priority),
+      escape(a.title),
+      escape(a.topics.map(t => t.name).join('; ')),
+      escape(a.who.join('; ')),
+      escape(a.why),
+      escape(a.evidence?.topic ?? ''),
+      String(a.evidence?.score ?? ''),
+      String(a.evidence?.delta ?? ''),
+    ].join(',')),
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url; anchor.download = filename; anchor.click();
+  URL.revokeObjectURL(url);
+}
 
-function MarketQueriesBoard({ result, setActiveParent }: {
-  result: any; setActiveParent: (n: number) => void;
+function BoardView({
+  actions, brandName, onOpenAction,
+}: {
+  actions: Action[]; brandName: string; onOpenAction: (i: number) => void;
 }) {
-  const [activeLane, setActiveLane] = useState<string>('Peak');
+  const [activeLane, setActiveLane] = useState('high');
+  const [topicFilter, setTopicFilter] = useState('all');
+  const [expandedCards, setExpandedCards] = useState<Set<number>>(new Set());
 
-  const queries: any[]  = result.trending_queries || [];
-  const clusters: any[] = result.query_clusters   || [];
-  const brand           = result.brand_name        || 'Your brand';
+  const toggleCard = (i: number) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
 
-  if (!queries.length) return null;
+  const allTopics = [...new Set(actions.flatMap(a => a.topics.map(t => t.name)))].sort();
 
-  const getClusterData = (category: string): { leader: string | null; winRate: number | null } => {
-    const cat = (category || '').toLowerCase();
-    const match = clusters.find((c: any) =>
-      (c.category || '').toLowerCase() === cat ||
-      (c.category || '').toLowerCase().includes(cat) ||
-      cat.includes((c.category || '').toLowerCase())
-    );
-    if (!match) return { leader: null, winRate: null };
-    return {
-      leader:  match.topCompetitor ?? null,
-      winRate: match.winRate       !== undefined ? match.winRate : null,
-    };
+  const visibleCountForLane = (laneKey: string) => {
+    const laneItems = actions.filter(a => a.priority.toLowerCase() === laneKey);
+    if (topicFilter === 'all') return laneItems.length;
+    return laneItems.filter(a => a.topics.some(t => t.name === topicFilter)).length;
   };
 
   return (
-    <div className="ov-board-card">
-      <div className="ov-block-head">
-        <span className="ov-block-title">What the market is asking right now</span>
-        <span className="ov-block-meta">
-          AI-assessed trend signals · {queries.length} queries
-        </span>
-      </div>
-
-      {/* Lane toggle — revealed at tablet/mobile by CSS */}
-      <div className="ov-board-toggle">
-        {TREND_COLS.map(col => {
-          const count = queries.filter((q: any) => q.trend === col.key).length;
-          return (
-            <button
-              key={col.key}
-              className={`ov-lt-btn${activeLane === col.key ? ' ov-lt-btn--active' : ''}`}
-              onClick={() => setActiveLane(col.key)}
-            >
-              {col.label} <span className="ov-lt-count">{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="ov-board">
-        {TREND_COLS.map(col => {
-          const colQueries = queries.filter((q: any) => q.trend === col.key);
-          return (
-            <div
-              key={col.key}
-              className={`ov-col ${col.colClass}${activeLane === col.key ? ' ov-col--active' : ''}`}
-            >
-              <div className="ov-col-header-row">
-                <span className="ov-col-label">{col.label}</span>
-                <span className="ov-col-count">{colQueries.length}</span>
-              </div>
-              <div className="ov-col-underline" />
-              <div className="ov-col-body">
-                {colQueries.length === 0 ? (
-                  <div style={{ padding: '20px 0', fontSize: 12, color: '#B8B8B8' }}>No queries here</div>
-                ) : colQueries.map((q: any, i: number) => {
-                  const { leader, winRate } = getClusterData(q.category);
-                  return (
-                    <QueryCard
-                      key={i}
-                      q={q}
-                      brand={brand}
-                      leader={leader}
-                      winRate={winRate}
-                      onTestQuery={() => setActiveParent(3)}
-                    />
-                  );
-                })}
-              </div>
+    <div>
+      <div className="pb-board-card">
+        <div className="pb-block-head">
+          <div className="pb-bh-left">
+            <span className="pb-block-title">Priority actions</span>
+            <span className="pb-block-meta">
+              AI-generated from your topic gaps · click a card to peek, open for the full play
+            </span>
+          </div>
+          {allTopics.length > 0 && (
+            <div className="pb-topic-filter">
+              <span className="pb-tf-label">Topic</span>
+              <select
+                className="pb-tf-select"
+                value={topicFilter}
+                onChange={e => setTopicFilter(e.target.value)}
+              >
+                <option value="all">All topics</option>
+                {allTopics.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </div>
-          );
-        })}
+          )}
+        </div>
+
+        <div className="pb-board-toggle">
+          {LANES.map(lane => (
+            <button
+              key={lane.key}
+              className={`pb-lt-btn${activeLane === lane.key ? ' pb-lt-btn--active' : ''}`}
+              onClick={() => setActiveLane(lane.key)}
+            >
+              {lane.label}
+              <span className="pb-lt-count">{visibleCountForLane(lane.key)}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="pb-board">
+          {LANES.map(lane => {
+            const laneItems = actions
+              .map((a, i) => ({ a, i }))
+              .filter(({ a }) => a.priority.toLowerCase() === lane.key);
+            const isActive = activeLane === lane.key;
+            const visibleCount = visibleCountForLane(lane.key);
+
+            return (
+              <div
+                key={lane.key}
+                className={[
+                  'pb-column',
+                  `pb-column--${lane.key}`,
+                  isActive ? 'pb-column--active' : '',
+                ].filter(Boolean).join(' ')}
+              >
+                <div className="pb-col-header-row">
+                  <PriorityBars priority={lane.label} />
+                  <span className="pb-col-label">{lane.label}</span>
+                  <span className="pb-col-count">{visibleCount}</span>
+                </div>
+                <div className="pb-col-underline" />
+                <div className="pb-col-body">
+                  {laneItems.length === 0 ? (
+                    <div className="pb-col-empty">No actions yet</div>
+                  ) : (
+                    laneItems.map(({ a, i }) => (
+                      <ActionCard
+                        key={i}
+                        action={a}
+                        index={i}
+                        expanded={expandedCards.has(i)}
+                        topicFilter={topicFilter}
+                        onToggle={toggleCard}
+                        onOpen={onOpenAction}
+                      />
+                    ))
+                  )}
+                  {laneItems.length > 0 && visibleCount === 0 && (
+                    <div className="pb-col-empty">No actions for this topic</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="pb-board-footer">
+          <p className="pb-board-note">
+            Actions are AI-generated from {brandName}'s topic-level coverage and sorted by
+            opportunity — gap size weighed against how winnable it is. Lane = priority; it does
+            not reflect delivery effort. Team owners are AI-suggested.
+          </p>
+          <button
+            className="pb-export-btn"
+            onClick={() => exportActionsCsv(actions, brandName, topicFilter)}
+          ><span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/></svg>Export CSV</span></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionView({ action, onBack }: { action: Action; onBack: () => void }) {
+  const prioCls = action.priority.toLowerCase() as 'high' | 'medium' | 'low';
+
+  return (
+    <div>
+      <div className="pb-av-crumb">
+        <button className="pb-av-back" onClick={onBack}>‹ Priorities</button>
+        <span className="pb-av-crumb-sep">/</span>
+        <span className="pb-av-crumb-cur">{action.title}</span>
       </div>
 
-      <p className="ov-board-note">
-        Trend labels (Trending, Growing, Steady) are assigned by the AI from its read of consumer query patterns — not pulled from live search volume. Treat as directional signal, not market fact.
-      </p>
+      <div className="pb-av-card">
+        <span className={`pb-av-prio-strip pb-av-prio--${prioCls} pb-av-prio-strip--pinned`}>
+          <PriorityBars priority={action.priority} />
+          <span className="pb-av-prio-label">{action.priority} priority</span>
+        </span>
+        <div className="pb-av-eyebrow">{action.topics[0].name}</div>
+        <h2 className="pb-av-title" style={{ paddingRight: '160px' }}>{action.title}</h2>
+        <div className="pb-av-teaser">{action.teaser}</div>
+      </div>
+
+      <div className="pb-spec-grid">
+        <div className="pb-spec-main">
+          <div className="pb-av-card">
+            <div className="pb-av-label">Why this is a priority</div>
+            <div className="pb-av-evidence-stat"><StatLine ev={action.evidence} /></div>
+            <div className="pb-av-why" dangerouslySetInnerHTML={{ __html: action.why }} />
+            <button className="pb-av-evidence-link">
+              See the {action.evidence.prompts} prompts →
+            </button>
+          </div>
+
+          <div className="pb-av-card">
+            <div className="pb-av-label">What to build</div>
+            <ul className="pb-checklist">
+              {action.build.map((item, i) => (
+                <li key={i} className="pb-check-item">
+                  <span className="pb-cbox" />
+                  <span className="pb-check-text" dangerouslySetInnerHTML={{ __html: item }} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <aside className="pb-spec-rail">
+          <div className="pb-rail-head">At a glance</div>
+          <div className="pb-rail-fields">
+            <div className="pb-rail-row">
+              <span className="pb-rail-k">Priority</span>
+              <span className={`pb-rail-v pb-rail-prio pb-rail-prio--${prioCls}`}>
+                <PriorityBars priority={action.priority} />
+                {action.priority}
+              </span>
+            </div>
+            <div className="pb-rail-row">
+              <span className="pb-rail-k">Likely owner</span>
+              <span className="pb-rail-v">
+                {action.team} <span className="pb-ai-hint">· AI-suggested</span>
+              </span>
+            </div>
+            <div className="pb-rail-row">
+              <span className="pb-rail-k">Action type</span>
+              <span className="pb-rail-v">{action.type}</span>
+            </div>
+            <div className="pb-rail-row">
+              <span className="pb-rail-k">Topics</span>
+              <span className="pb-rail-v">
+                {action.topics.map(t => (
+                  <span key={t.name} className="pb-topic-chip">{t.name}</span>
+                ))}
+              </span>
+            </div>
+            <div className="pb-rail-row">
+              <span className="pb-rail-k">Audiences</span>
+              <span className="pb-rail-v">
+                <ul className="pb-avd-list">
+                  {action.who.map(w => <li key={w}>{w}</li>)}
+                </ul>
+              </span>
+            </div>
+          </div>
+
+          <div className="pb-rail-actions">
+            <button className="pb-avf-btn">See supporting prompts →</button>
+            <button className="pb-avd-link">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
+              </svg>
+              Export this action
+            </button>
+            <button className="pb-avd-link">See these segments in Coverage →</button>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -417,22 +602,64 @@ function MarketQueriesBoard({ result, setActiveParent }: {
 // Export
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function PrioritiesTab({ result, setActiveParent }: TabProps) {
-  const brand      = result.brand_name        || 'Your brand';
-  const visibility = result.visibility        ?? 0;
+export default function PrioritiesTab({ result, playbookActions }: TabProps) {
+  const [viewState, setViewState] = useState<'board' | 'action'>('board');
+  const [selectedAction, setSelectedAction] = useState<number | null>(null);
+
+  const brand      = result.brand_name || 'Your brand';
+  const visibility = result.visibility ?? 0;
   const totalQA    = (result.responses_detail || []).length;
-  const totalQC    = (result.trending_queries || []).length;
+
+  const pbTotal     = playbookActions?.length ?? 0;
+  const pbHigh      = playbookActions?.filter(a => a.priority === 'High').length ?? 0;
+  const pbTotalWord = NUM_WORDS[pbTotal] ?? String(pbTotal);
+  const hasActions  = playbookActions && playbookActions.length > 0;
+
+  const openAction = (index: number) => {
+    setSelectedAction(index);
+    setViewState('action');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const closeAction = () => {
+    setViewState('board');
+    setSelectedAction(null);
+  };
 
   return (
     <div id="tab-priorities-overall">
-      <h2 className="ov-lead">{buildLead(brand, visibility)}</h2>
-      <div className="ov-lead-sub">
-        <b>{totalQA}</b> responses analyzed
-        <span className="ov-sep">·</span>
-        <b>{totalQC}</b> market queries tracked
-      </div>
-      <HealthSummaryCard result={result} />
-      <MarketQueriesBoard result={result} setActiveParent={setActiveParent} />
+      {viewState === 'board' && (
+        <>
+          <h2 className="ov-lead">
+            {buildLead(brand, visibility)}{hasActions && <> {pbTotalWord} moves, sorted by opportunity — not just where the gap is biggest, but where it's biggest <i>and</i> winnable.</>}
+          </h2>
+          <div className="ov-lead-sub">
+            <b>{totalQA}</b> responses analyzed
+            {hasActions && (
+              <>
+                <span className="ov-sep">·</span>
+                <b>{pbTotal}</b> actions
+                <span className="ov-sep">·</span>
+                <b>{pbHigh}</b> high priority
+              </>
+            )}
+          </div>
+          <HealthSummaryCard result={result} />
+          {hasActions && (
+            <BoardView
+              actions={playbookActions!}
+              brandName={brand}
+              onOpenAction={openAction}
+            />
+          )}
+        </>
+      )}
+      {viewState === 'action' && selectedAction !== null && playbookActions && (
+        <ActionView
+          action={playbookActions[selectedAction]}
+          onBack={closeAction}
+        />
+      )}
     </div>
   );
 }

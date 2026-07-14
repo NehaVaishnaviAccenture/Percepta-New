@@ -278,7 +278,7 @@
 }
 
 .ovTeaserFrom {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2173,14 +2173,23 @@
 .cmpExportBtn {
   background: none;
   border: none;
-  font-size: 11px;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 500;
-  color: var(--color-text-muted);
+  color: var(--color-brand-dark);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
+  white-space: nowrap;
 }
+.cmpExportBtn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-brand-chip-border);
+  padding-bottom: 1px;
+}
+.cmpExportBtn:hover { color: var(--color-brand); }
+.cmpExportBtn:hover span { border-bottom-color: var(--color-brand); }
 /* ── CompetitorsByTopicTab ── */
 
 /* ── Hero ───────────────────────────────────────────────────── */
@@ -3068,7 +3077,7 @@
 .ptListBlockTopic { color:var(--color-brand-dark); font-weight:600; }
 
 /* CTA link — brand underline style used in block headers and footers */
-.ptCtaLink { font-family:var(--font-sans); font-size:12px; font-weight:500; color:var(--color-brand-dark); text-decoration:none; border-bottom:1px solid var(--color-brand-chip-border); padding-bottom:1px; cursor:pointer; white-space:nowrap; }
+.ptCtaLink { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-sans); font-size:12px; font-weight:500; color:var(--color-brand-dark); text-decoration:none; border-bottom:1px solid var(--color-brand-chip-border); padding-bottom:1px; cursor:pointer; white-space:nowrap; }
 .ptCtaLink:hover { color:var(--color-brand); border-bottom-color:var(--color-brand); }
 
 .ptFilterDropdownWrap { display:flex; align-items:center; flex-shrink:0; }
@@ -3280,8 +3289,9 @@
 .ptFooterActionsButtons { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
 .ptFooterChip { font-family:var(--font-sans); font-size:10px; color:#8080A0; padding:3px 8px; border:1px solid #E4E4EC; }
 .ptFooterChipDot { width:3px; height:3px; border-radius:50%; background:#D0D0DC; flex-shrink:0; display:inline-block; }
-.ptFooterExport { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:10px 24px; border-top:1px solid #F0F0F4; font-family:var(--font-sans); font-size:12px; font-weight:500; color:var(--color-brand); background:none; border-left:none; border-right:none; border-bottom:none; cursor:pointer; transition:background 120ms; }
-.ptFooterExport:hover { background:rgba(161,0,255,0.04); }
+.ptFooterExport { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; padding:10px 24px; border-top:1px solid #F0F0F4; border-left:none; border-right:none; border-bottom:none; background:none; font-family:var(--font-sans); font-size:12px; font-weight:500; cursor:pointer; }
+.ptFooterExport span { display:inline-flex; align-items:center; gap:4px; color:var(--color-brand-dark); border-bottom:1px solid var(--color-brand-chip-border); padding-bottom:1px; }
+.ptFooterExport:hover span { color:var(--color-brand); border-bottom-color:var(--color-brand); }
 .ptBtnSecondary { font-family:var(--font-sans); font-size:13px; font-weight:500; color:var(--color-ink); background:#fff; border:1px solid var(--color-ink); padding:8px 16px; cursor:pointer; text-decoration:none; transition:background 80ms, color 80ms; }
 .ptBtnSecondary:hover { background:var(--color-ink); color:#fff; }
 .ptBtnTertiary { font-family:var(--font-sans); font-size:12px; font-weight:500; color:var(--color-brand-dark); background:none; border:none; padding:8px 4px; cursor:pointer; text-decoration:none; border-bottom:1px solid var(--color-brand-chip-border); }
@@ -5144,14 +5154,42 @@
 }
 .pb-open-action:hover { color: var(--color-brand); }
 
+.pb-board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid #E5E5E5;
+  padding: 16px 22px 18px;
+}
 .pb-board-note {
   margin: 0;
-  padding: 16px 22px 18px;
-  border-top: 1px solid #E5E5E5;
+  padding: 0;
   font-size: 11px;
   color: #8E8E8E;
   line-height: 1.6;
 }
+.pb-export-btn {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-brand-dark);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pb-export-btn span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-brand-chip-border);
+  padding-bottom: 1px;
+}
+.pb-export-btn:hover { color: var(--color-brand); }
+.pb-export-btn:hover span { border-bottom-color: var(--color-brand); }
 
 /* ── Mobile board toggle ────────────────────────────────────── */
 .pb-board-toggle {
@@ -5837,7 +5875,7 @@
 .reachSectionLabel { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px; }
 
 /* SoV chart */
-.reachSovChart { display: flex; flex-direction: column; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
+.reachSovChart { display: flex; flex-direction: column; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; margin-top: 12px; }
 .reachSovEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
 .reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; }
 .reachSovBar { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; gap: 4px; height: 100%; }

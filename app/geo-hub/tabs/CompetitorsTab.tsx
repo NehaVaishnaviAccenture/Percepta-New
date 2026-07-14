@@ -9,6 +9,30 @@ interface TabProps {
   setActiveSub: (n: number) => void;
 }
 
+function exportCsv(allBrands: any[], myRank: number, brandName: string) {
+  const headers = ['Rank','Brand','URL','GEO Score','Visibility','Sentiment','Prominence','Citation','Share of Voice'];
+  const rows = allBrands.map((b, i) => [
+    i + 1,
+    b.Brand,
+    b.URL,
+    b.GEO,
+    b.Vis,
+    b.Sen,
+    b.Prom,
+    b.Cit,
+    b.Sov,
+  ]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const slug = brandName.trim().replace(/\s+/g, '-').toLowerCase();
+  a.download = `${slug}-competitors.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function CompetitorsTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
   const [cmpLens, setCmpLens] = useState('GEO');
   const [cmpRef, setCmpRef] = useState(true);
@@ -75,7 +99,7 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
         <div id="competitors-ladder" className="cmpCard">
           <div className="cmpCardHeader">
             <div className="cmpCardLabel">The ladder</div>
-            <button onClick={()=>setActiveParent(5)} className="cmpCardLinkBtn">Open Priorities ›</button>
+            <button onClick={()=>setActiveParent(3)} className="cmpCardLinkBtn">Open Priorities ›</button>
           </div>
           <div className="cmpLadderList">
             {/* TODO: consider removing the border-left on badges entirely — the tier color
@@ -111,7 +135,7 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
             <div className="cmpCardLabel">The field</div>
             <div className="cmpChartSubLabel">Where every brand sits on the selected lens. Your brand highlighted.</div>
           </div>
-          <button onClick={()=>setActiveParent(5)} className="cmpCardLinkBtn">Open Priorities ›</button>
+          <button onClick={()=>setActiveParent(3)} className="cmpCardLinkBtn">Open Priorities ›</button>
         </div>
         <div className="cmpChartControls">
           <div className="cmpLensButtons">
@@ -205,11 +229,8 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
           </table>
         </div>
         <div className="cmpTableFooter">
-          <button className="cmpExportBtn">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
-            </svg>
-            Export CSV
+          <button className="cmpExportBtn" onClick={() => exportCsv(allBrands, myRank, result.brand_name || 'brand')}>
+            <span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/></svg>Export CSV</span>
           </button>
         </div>
       </div>
