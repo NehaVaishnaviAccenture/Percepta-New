@@ -255,13 +255,13 @@ async function generateQueries(
 ): Promise<{ category: string; query: string; stage: string; persona: string }[]> {
 
   // Step 1: Divide total across stages by weight, fix rounding
-  const stageCounts = STAGES.map(s => ({ ...s, count: Math.round(total * s.pct) }));
+  const stageCounts = STAGES.map((s: any) => ({ ...s, count: Math.round(total * s.pct) }));
   const roundDiff   = total - stageCounts.reduce((s, x) => s + x.count, 0);
   stageCounts[1].count += roundDiff; // Consideration absorbs rounding
 
   // Step 2: Split each stage into chunks of ≤ QUERY_BATCH
   const jobs: { stage: typeof STAGES[0]; count: number }[] = [];
-  stageCounts.forEach(s => {
+  stageCounts.forEach((s: any) => {
     let rem = s.count;
     while (rem > 0) {
       jobs.push({ stage: s, count: Math.min(rem, QUERY_BATCH) });
@@ -271,7 +271,7 @@ async function generateQueries(
 
   // Step 3: Fire ALL chunks in parallel
   const results = await Promise.all(
-    jobs.map(j => generateChunk(lob, industry, cats, personas, j.stage, j.count))
+    jobs.map((j: any) => generateChunk(lob, industry, cats, personas, j.stage, j.count))
   );
 
   const all = results.flat();
@@ -309,8 +309,8 @@ function buildAliases(brand: string): string[] {
     bl.replace(/[^a-z0-9]/gi, ''),
   ]);
   // Add individual meaningful words (e.g. "Bank of America" → "america", "bank")
-  bl.split(/[\s'\-\.&]+/).filter(w => w.length > 2).forEach(w => set.add(w));
-  return [...set].filter(a => a.length > 2);
+  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length > 2).forEach((w: string) => set.add(w));
+  return [...set].filter((a: string) => a.length > 2);
 }
 
 // ─── POSITION DETECTION — where in the response does the brand appear ──────
@@ -335,7 +335,7 @@ function getBrandPosition(text: string, aliases: string[]): number {
     'By','From','An','If','It','Its','Are','Is','Be','Was','Were','Has','Have','Had',
     'Here','Some','Many','Most','More','Such','Each','Both','Also','Very','Just']);
   const properNouns = (before.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [])
-    .filter(w => !stopWords.has(w));
+    .filter((w: string) => !stopWords.has(w));
 
   return properNouns.length + 1;
 }
@@ -356,7 +356,7 @@ function parseAnswers(raw: string, count: number): string[] {
   }
 
   // If most answers are empty, try line-split fallback
-  const filled = answers.filter(a => a.length > 10).length;
+  const filled = answers.filter((a: string) => a.length > 10).length;
   if (filled < count * 0.5) {
     const lines = raw.split('\n').map(l => l.replace(/^A\d+:\s*/, '').trim()).filter(l => l.length > 10);
     for (let j = 0; j < count && j < lines.length; j++) {
@@ -378,20 +378,20 @@ function parseAnswers(raw: string, count: number): string[] {
 //
 function computeScores(brand: string, aliases: string[], qa: any[], competitors: string[]) {
   // Only score responses that have real content (>20 chars)
-  const answered  = qa.filter(r => r && (r.a || '').trim().length > 20);
+  const answered  = qa.filter((r: any) => r && (r.a || '').trim().length > 20);
   const total     = answered.length || 1;
 
   // VISIBILITY
-  const mentioned = answered.filter(r =>
-    aliases.some(a => (r.a || '').toLowerCase().includes(a))
+  const mentioned = answered.filter((r: any) =>
+    aliases.some((a: string) => (r.a || '').toLowerCase().includes(a))
   );
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
   // PROMINENCE — position scale: pos1=100, pos2=82, pos3=64, pos4=46, pos5=28, pos6+=10
   const positions = mentioned
-    .map(r => getBrandPosition(r.a || '', aliases))
-    .filter(p => p > 0);
+    .map((r: any) => getBrandPosition(r.a || '', aliases))
+    .filter((p: number) => p > 0);
   const avgPos = positions.length > 0
     ? positions.reduce((a, b) => a + b, 0) / positions.length
     : 0;
@@ -407,12 +407,12 @@ function computeScores(brand: string, aliases: string[], qa: any[], competitors:
     'disappointing','inferior','mediocre','unreliable','overpriced','problematic',
     'lacking','outdated','complicated','confusing','frustrating','hidden fees'];
   let pos = 0, neg = 0;
-  mentioned.forEach(r => {
+  mentioned.forEach((r: any) => {
     (r.a || '').toLowerCase().split(/[.!?]/)
-      .filter((s: string) => aliases.some(a => s.includes(a)))
+      .filter((s: string) => aliases.some((a: string) => s.includes(a)))
       .forEach((s: string) => {
-        POS.forEach(w => { if (s.includes(w)) pos++; });
-        NEG.forEach(w => { if (s.includes(w)) neg++; });
+        POS.forEach((w: string) => { if (s.includes(w)) pos++; });
+        NEG.forEach((w: string) => { if (s.includes(w)) neg++; });
       });
   });
   const sentimentBase = mentionCount > 0 ? 50 : 0;
@@ -434,7 +434,7 @@ function computeScores(brand: string, aliases: string[], qa: any[], competitors:
   const compCounts = competitors.map(comp => {
     const cl    = comp.toLowerCase();
     const words = cl.split(/[\s'\-\.&]+/).filter((w: string) => w.length > 3);
-    return answered.filter(r => {
+    return answered.filter((r: any) => {
       const t = (r.a || '').toLowerCase();
       return words.some((w: string) => t.includes(w)) || t.includes(cl);
     }).length;
@@ -480,19 +480,19 @@ function scoreCompetitor(name: string, url: string, qa: any[], allComps: string[
 
 // ─── QUERY CLUSTERS — per-category win rate + stage breakdown ─────────────
 function buildClusters(qa: any[], aliases: string[], competitors: string[]) {
-  const cats = [...new Set(qa.filter(Boolean).map(r => r.category).filter(Boolean))];
+  const cats = [...new Set(qa.filter(Boolean).map((r: any) => r.category).filter(Boolean))];
 
   return cats.map(cat => {
-    const rows     = qa.filter(r => r && r.category === cat);
-    const answered = rows.filter(r => (r.a || '').trim().length > 20);
-    const hits     = answered.filter(r => aliases.some(a => (r.a || '').toLowerCase().includes(a)));
+    const rows     = qa.filter((r: any) => r && r.category === cat);
+    const answered = rows.filter((r: any) => (r.a || '').trim().length > 20);
+    const hits     = answered.filter((r: any) => aliases.some((a: string) => (r.a || '').toLowerCase().includes(a)));
     const winRate  = answered.length > 0 ? Math.round((hits.length / answered.length) * 100) : 0;
 
     // Top competitor in this category
     const compCounts: Record<string, number> = {};
-    answered.forEach(r => {
+    answered.forEach((r: any) => {
       const t = (r.a || '').toLowerCase();
-      competitors.forEach(c => {
+      competitors.forEach((c: string) => {
         if (t.includes(c.toLowerCase()) && !aliases.some(a => c.toLowerCase().includes(a)))
           compCounts[c] = (compCounts[c] || 0) + 1;
       });
@@ -501,11 +501,11 @@ function buildClusters(qa: any[], aliases: string[], competitors: string[]) {
 
     // Stage breakdown
     const stageBreakdown: Record<string, { total: number; mentioned: number }> = {};
-    rows.forEach(r => {
+    rows.forEach((r: any) => {
       const s = r.stage || 'Consideration';
       if (!stageBreakdown[s]) stageBreakdown[s] = { total: 0, mentioned: 0 };
       stageBreakdown[s].total++;
-      if (aliases.some(a => (r.a || '').toLowerCase().includes(a)))
+      if (aliases.some((a: string) => (r.a || '').toLowerCase().includes(a)))
         stageBreakdown[s].mentioned++;
     });
 
@@ -524,7 +524,7 @@ function extractCitations(qa: any[], brandDomain: string) {
     'businessinsider','motleyfool','wsj','marketwatch','bloomberg','cnet',
     'edmunds','caranddriver','motortrend','tripadvisor','experian','lendingtree'];
 
-  qa.filter(Boolean).forEach(r => {
+  qa.filter(Boolean).forEach((r: any) => {
     const t = (r.a || '').toLowerCase();
     knownSources.forEach(src => {
       if (t.includes(src)) counts[src + '.com'] = (counts[src + '.com'] || 0) + 1;
@@ -656,18 +656,18 @@ ${labels}`;
       .sort((a, b) => b.GEO - a.GEO);
 
     // ── 7. Response detail ──────────────────────────────────────────────────
-    const responsesDetail = allQA.filter(Boolean).map(r => ({
+    const responsesDetail = allQA.filter(Boolean).map((r: any) => ({
       category        : r.category,
       stage           : r.stage,
       persona         : r.persona,
       query           : r.q,
-      mentioned       : aliases.some(a => (r.a || '').toLowerCase().includes(a)),
+      mentioned       : aliases.some((a: string) => (r.a || '').toLowerCase().includes(a)),
       response_preview: r.a || '',
       position        : getBrandPosition(r.a || '', aliases),
       winner_brand    : (() => {
         let winner = '', winPos = Infinity;
         const brandPos = getBrandPosition(r.a || '', aliases);
-        competitors.slice(0, 15).forEach(c => {
+        competitors.slice(0, 15).forEach((c: string) => {
           const ca  = buildAliases(c);
           const pos = getBrandPosition(r.a || '', ca);
           if (pos > 0 && pos < winPos && (brandPos === 0 || pos < brandPos)) {
@@ -682,10 +682,10 @@ ${labels}`;
     const queryClusters = buildClusters(allQA, aliases, competitors);
 
     // ── 9. Stage win rates ─────────────────────────────────────────────────
-    const stageWinRates = STAGES.map(s => {
-      const rows     = allQA.filter(r => r && r.stage === s.name);
-      const answered = rows.filter(r => (r.a || '').trim().length > 20);
-      const hits     = answered.filter(r => aliases.some(a => (r.a || '').toLowerCase().includes(a)));
+    const stageWinRates = STAGES.map((s: any) => {
+      const rows     = allQA.filter((r: any) => r && r.stage === s.name);
+      const answered = rows.filter((r: any) => (r.a || '').trim().length > 20);
+      const hits     = answered.filter((r: any) => aliases.some((a: string) => (r.a || '').toLowerCase().includes(a)));
       return {
         stage  : s.name,
         winRate: answered.length > 0 ? Math.round((hits.length / answered.length) * 100) : 0,
@@ -760,7 +760,7 @@ Max 4 products, 10 queries each. Zero brand names in any query.` }],
         };
 
         const flat: { product: string; query: string }[] = [];
-        knownFor.forEach(k => k.queries.slice(0, 10).filter(safe).forEach(q =>
+        knownFor.forEach((k: any) => k.queries.slice(0, 10).filter(safe).forEach(q =>
           flat.push({ product: k.product, query: q })
         ));
 
@@ -777,24 +777,24 @@ Max 4 products, 10 queries each. Zero brand names in any query.` }],
           const answers = parseAnswers(raw2, batch.length);
           batch.forEach((item, j) => {
             const ans      = answers[j] || '';
-            const mentioned = aliases.some(a => ans.toLowerCase().includes(a));
+            const mentioned = aliases.some((a: string) => ans.toLowerCase().includes(a));
             tAllQA.push({ product: item.product, query: item.query, ans, mentioned,
               position: getBrandPosition(ans, aliases) });
           });
         }));
 
         const pMap: Record<string, any[]> = {};
-        tAllQA.forEach(r => { (pMap[r.product] = pMap[r.product] || []).push(r); });
+        tAllQA.forEach((r: any) => { (pMap[r.product] = pMap[r.product] || []).push(r); });
 
         targetedClusters = Object.entries(pMap).map(([product, rows]) => {
           const total2 = rows.length;
-          const hits2  = rows.filter(r => r.mentioned).length;
-          const posArr = rows.map(r => r.position > 0 ? r.position : 5);
+          const hits2  = rows.filter((r: any) => r.mentioned).length;
+          const posArr = rows.map((r: any) => r.position > 0 ? r.position : 5);
           const avgP2  = posArr.reduce((a, b) => a + b, 0) / posArr.length;
           const cc: Record<string, number> = {};
-          rows.forEach(r => {
+          rows.forEach((r: any) => {
             const t = (r.ans || '').toLowerCase();
-            competitors.forEach(c => {
+            competitors.forEach((c: string) => {
               if (t.includes(c.toLowerCase()) && c.toLowerCase() !== bl)
                 cc[c] = (cc[c] || 0) + 1;
             });
@@ -805,7 +805,7 @@ Max 4 products, 10 queries each. Zero brand names in any query.` }],
             prominence: Math.round(Math.max(5, Math.min(95, 100 - (avgP2 - 1) * 18))),
             avgRank   : `#${Math.round(avgP2)}`,
             topCompetitor: Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || '',
-            responses : rows.map(r => ({ query: r.query, mentioned: r.mentioned,
+            responses : rows.map((r: any) => ({ query: r.query, mentioned: r.mentioned,
               position: r.position, response_preview: r.ans })),
           };
         }).sort((a, b) => b.winRate - a.winRate);
