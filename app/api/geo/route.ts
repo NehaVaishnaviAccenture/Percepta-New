@@ -464,7 +464,7 @@ function computeScores(brand: string, aliases: string[], qa: any[], competitors:
 // ─── COMPETITOR SCORING — same function, same response pool ───────────────
 function scoreCompetitor(name: string, url: string, qa: any[], allComps: string[]) {
   const aliases = buildAliases(name);
-  const s = computeScores(name, aliases, qa, allComps.filter(c => c !== name));
+  const s = computeScores(name, aliases, qa, (allComps as string[]).filter((c: string) => c !== name));
   return {
     Brand: name,
     URL  : url || `${name.toLowerCase().replace(/\s+/g, '')}.com`,
@@ -650,9 +650,9 @@ ${labels}`;
     const scores = computeScores(brand, aliases, allQA, competitors);
 
     // ── 6. Score every competitor — same function, same responses ──────────
-    const competitorScores = competitors
-      .filter(c => c.toLowerCase() !== brand.toLowerCase())
-      .map(c => scoreCompetitor(c, competitorUrls[c] || '', allQA, competitors))
+    const competitorScores = (competitors as string[])
+      .filter((c: string) => c.toLowerCase() !== brand.toLowerCase())
+      .map((c: string) => scoreCompetitor(c, competitorUrls[c] || '', allQA, competitors))
       .sort((a, b) => b.GEO - a.GEO);
 
     // ── 7. Response detail ──────────────────────────────────────────────────
@@ -706,8 +706,8 @@ ${labels}`;
     })();
 
     // ── 12. AI insights — fed with real computed data ──────────────────────
-    const topCats     = [...queryClusters].sort((a, b) => b.winRate - a.winRate).slice(0, 3).map(c => c.category);
-    const missingCats = queryClusters.filter(c => c.winRate === 0).slice(0, 3).map(c => c.category);
+    const topCats     = [...queryClusters].sort((a, b) => b.winRate - a.winRate).slice(0, 3).map((c: any) => c.category);
+    const missingCats = queryClusters.filter((c: any) => c.winRate === 0).slice(0, 3).map((c: any) => c.category);
     const topComp     = competitorScores[0]?.Brand || 'competitors';
     const bestStage   = [...stageWinRates].sort((a, b) => b.winRate - a.winRate)[0];
     const worstStage  = [...stageWinRates].sort((a, b) => a.winRate - b.winRate)[0];
