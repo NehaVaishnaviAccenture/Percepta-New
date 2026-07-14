@@ -35,8 +35,9 @@ function extractTag(html: string, tag: string): string {
 }
 
 function extractMeta(html: string, name: string): string {
-  const m = html.match(new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']*)["']`, 'i'))
-    || html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+name=["']${name}["']`, 'i'));
+  const m =
+    html.match(new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']*)["']`, 'i')) ||
+    html.match(new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+name=["']${name}["']`, 'i'));
   return m ? m[1].trim() : '';
 }
 
@@ -48,8 +49,7 @@ function extractHeadings(html: string, max = 20): string[] {
     .filter(Boolean);
 }
 
-function extractBodyText(html: string, maxChars = 3000): string {
-  // Remove scripts, styles, nav, footer
+function extractBodyText(html: string, maxChars = 4000): string {
   const stripped = html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -61,7 +61,7 @@ function extractBodyText(html: string, maxChars = 3000): string {
   return stripped.slice(0, maxChars);
 }
 
-function extractInternalLinks(html: string, baseUrl: string, max = 10): { url: string; path: string; label: string }[] {
+function extractInternalLinks(html: string, baseUrl: string, max = 15): { url: string; path: string; label: string }[] {
   const matches = [...html.matchAll(/href=["'](\/?[a-zA-Z0-9/_\-\.]+)["']/g)];
   const seen = new Set<string>();
   const links: { url: string; path: string; label: string }[] = [];
@@ -70,11 +70,12 @@ function extractInternalLinks(html: string, baseUrl: string, max = 10): { url: s
     const href = m[1];
     if (href.startsWith('/') && href.length > 1 && !seen.has(href)) {
       seen.add(href);
-      const label = href
-        .replace(/^\//, '')
-        .replace(/-/g, ' ')
-        .replace(/\//g, ' ')
-        .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Page';
+      const label =
+        href
+          .replace(/^\//, '')
+          .replace(/-/g, ' ')
+          .replace(/\//g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase()) || 'Page';
       try {
         links.push({ url: new URL(href, baseUrl).toString(), path: href, label });
       } catch {}
@@ -99,11 +100,13 @@ async function fetchPageContent(url: string) {
     const hasAuthor = /class=["'][^"']*(?:author|byline)[^"']*["']/i.test(html);
     const wordCount = bodyText.split(/\s+/).length;
     const domain = new URL(url).hostname.replace('www.', '');
+    const urlPath = new URL(url).pathname; // CRITICAL — captures /credit-cards, /savings etc
     const internalLinks = extractInternalLinks(html, url);
     return {
       ok: true,
       url,
       domain,
+      urlPath,
       title,
       metaDesc,
       headings,
@@ -118,53 +121,68 @@ async function fetchPageContent(url: string) {
   }
 }
 
-// ─── BRAND DISCOVERY (AI-powered, no hardcoding) ──────────────────────────
+// ─── BRAND DISCOVERY — URL-PATH AWARE, no hardcoding ─────────────────────
 async function discoverBrand(pageData: any, url: string): Promise<{
   brand: string;
   industry: string;
   industryKey: string;
   lob: string;
+  personas: string[];
   competitors: string[];
   competitorUrls: Record<string, string>;
   categories: string[];
 }> {
+  const urlPath = (pageData.urlPath || '/').replace(/\//g, ' ').trim();
   const pageText = [
-    pageData.title || '',
-    pageData.metaDesc || '',
-    ...(pageData.headings || []).slice(0, 10),
-    (pageData.bodyText || '').slice(0, 1500),
+    `URL path: ${pageData.urlPath || '/'}`,
+    `Page title: ${pageData.title || ''}`,
+    `Meta description: ${pageData.metaDesc || ''}`,
+    ...(pageData.headings || []).slice(0, 12),
+    (pageData.bodyText || '').slice(0, 2000),
   ]
-    .join(' ')
+    .join('\n')
     .trim();
 
-  const prompt = `You are a brand intelligence analyst. Analyze this webpage and return ONLY valid JSON, no markdown:
+  // KEY FIX: We pass the URL path explicitly so citi.com vs citi.com/credit-cards are different
+  const prompt = `You are a brand intelligence analyst. Analyze this SPECIFIC webpage URL and content.
+The URL path is critical — it tells you exactly which product/service to analyze.
+
+Full URL: ${url}
+URL path: "${pageData.urlPath || '/'}"
+
+Page content:
+${pageText.slice(0, 2500)}
+
+Return ONLY valid JSON, no markdown:
 {
-  "brand_name": "exact short brand name only (e.g. Chase, Ally, Nike)",
-  "industry": "one-line industry description e.g. Credit Cards, Retail Banking, Athletic Apparel",
-  "industry_key": "short snake_case key e.g. credit_cards, retail_banking, apparel",
-  "lob": "specific product line label e.g. Cash Back Credit Cards, Savings Accounts",
-  "competitors": ["10 real direct US market competitors for this exact product/service"],
+  "brand_name": "parent company brand only (e.g. Citi, Chase, Nike — never a product name)",
+  "industry": "precise industry for THIS URL path (e.g. if path=/credit-cards return 'Consumer Credit Cards', if path=/ for a bank return 'Retail Banking', if path=/savings return 'Savings Accounts')",
+  "industry_key": "snake_case e.g. credit_cards, retail_banking, savings_accounts, auto_loans",
+  "lob": "exact product line shown on THIS page (e.g. 'Citi Credit Cards', 'Chase Savings Account', 'Nike Running Shoes') — be very specific to the URL",
+  "personas": [
+    "5 distinct buyer personas who would visit THIS specific URL. Format: 'Age/situation — specific need'. E.g. '28yo recent grad with no credit — wants to build credit score'"
+  ],
+  "competitors": ["12 direct competitors for THIS specific product — same product category, same target consumer"],
   "competitor_urls": {"BrandName": "domain.com"},
-  "categories": ["10 specific consumer intent categories for this product e.g. Cash Back, Travel Rewards, Balance Transfer"]
+  "categories": ["12 specific consumer intent categories for THIS product. E.g. for credit cards: Cash Back, Travel Rewards, Balance Transfer, No Annual Fee, Student Cards, Business Cards, Secured Cards, Dining Rewards, Gas Rewards, Hotel Cards, Luxury Cards, Retail Co-Brand"]
 }
 
-URL: ${url}
-Page content: ${pageText.slice(0, 2000)}
-
-Rules:
-- brand_name must be the actual company brand, not a product name
-- competitors must be genuine alternatives a consumer would consider
-- categories must match what consumers actually search for in this space
-- Return ONLY the JSON object`;
+CRITICAL RULES:
+- brand_name = parent brand (Citi, Chase, Bank of America) NOT product (Citi Double Cash)
+- lob = specific product shown on this PAGE, very specific
+- industry and categories must match the URL path, not the homepage
+- If URL is just the homepage with no path, analyze the brand's PRIMARY known product
+- competitors must be direct alternatives for THIS product specifically`;
 
   try {
-    const raw = await callAI([{ role: 'user', content: prompt }], 0.2, 800);
+    const raw = await callAI([{ role: 'user', content: prompt }], 0.1, 1000);
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
     return {
       brand: parsed.brand_name || new URL(url).hostname.replace('www.', '').split('.')[0],
       industry: parsed.industry || 'Consumer Products',
       industryKey: parsed.industry_key || 'general',
       lob: parsed.lob || '',
+      personas: parsed.personas || [],
       competitors: parsed.competitors || [],
       competitorUrls: parsed.competitor_urls || {},
       categories: parsed.categories || ['General', 'Features', 'Pricing', 'Comparison', 'Reviews'],
@@ -176,6 +194,7 @@ Rules:
       industry: 'Consumer Products',
       industryKey: 'general',
       lob: '',
+      personas: [],
       competitors: [],
       competitorUrls: {},
       categories: ['General', 'Features', 'Pricing', 'Comparison', 'Reviews'],
@@ -183,55 +202,152 @@ Rules:
   }
 }
 
-// ─── QUERY GENERATION (AI-powered, no hardcoding) ─────────────────────────
-async function generateQueries(
+// ─── QUERY GENERATION — PERSONA × STAGE × INTENT MATRIX ──────────────────
+// This is the core engine. We generate queries in batches of 25 per AI call
+// so the AI never gets overwhelmed and always returns the exact count asked.
+// Total = sum of all batch returns = exactly MAX_QUERIES.
+
+const JOURNEY_STAGES = [
+  { stage: 'Awareness', desc: 'just learning this product exists, broad questions', weight: 0.15 },
+  { stage: 'Consideration', desc: 'comparing options, narrowing down', weight: 0.30 },
+  { stage: 'Decision', desc: 'ready to choose, specific feature questions', weight: 0.30 },
+  { stage: 'Validation', desc: 'double-checking their choice, reviews, is it worth it', weight: 0.15 },
+  { stage: 'Usage/Advocacy', desc: 'already have it or helping others choose', weight: 0.10 },
+];
+
+const INTENT_TEMPLATES = [
+  'best [product] for [persona_need]',
+  'how to choose [product] when [situation]',
+  'is [product type] worth it for [persona_need]',
+  '[feature A] vs [feature B] — which matters more',
+  'what do financial experts recommend for [persona_need]',
+  'I [problem/situation], what [product] should I get',
+  'which [product] is best for [budget/constraint]',
+  'pros and cons of [product type] for [use case]',
+  'what to look for in [product] as a [persona descriptor]',
+  'how does [product] work and is it right for me',
+];
+
+async function generateQueriesForBatch(
   industry: string,
   lob: string,
   categories: string[],
-  totalCount: number
-): Promise<{ category: string; query: string }[]> {
-  const perCategory = Math.ceil(totalCount / categories.length);
+  personas: string[],
+  stage: { stage: string; desc: string },
+  count: number,
+  batchIndex: number
+): Promise<{ category: string; query: string; stage: string; persona: string }[]> {
+  // Pick personas for this batch (rotate through them)
+  const personaCount = personas.length || 3;
+  const batchPersonas = personas.length > 0
+    ? personas.slice(batchIndex % personaCount, (batchIndex % personaCount) + 3).concat(personas.slice(0, Math.max(0, 3 - (personas.length - batchIndex % personaCount))))
+    : ['everyday consumer looking for the best option', 'budget-conscious shopper comparing options', 'experienced user wanting the most value'];
 
-  const prompt = `Generate exactly ${totalCount} realistic consumer questions someone asks an AI when researching ${lob || industry} in the USA.
+  // Pick categories for this batch (rotate)
+  const batchCats = categories.length > 0
+    ? [...categories].sort(() => (batchIndex * 7 + 3) % 5 - 2).slice(0, Math.min(6, categories.length))
+    : categories;
 
-Rules:
-- ZERO brand names or company names in any query
-- Distribute evenly: ${perCategory} questions per category
-- Categories: ${categories.join(', ')}
-- Mix intent types per category:
-  * "best X for Y" (superlative)
-  * "X vs Y" comparisons (no brand names, feature comparisons)
-  * "is X worth it" (validation)
-  * "how to choose X" (guidance)
-  * "what do experts recommend for X" (authority)
-  * "I have [problem], what should I get" (problem-first)
-- Be specific: include budget ranges, use cases, demographics
-- Return ONLY valid JSON array, no markdown:
-[{"category":"CategoryName","query":"question text"}]
-Exactly ${totalCount} items total.`;
+  const prompt = `You are a consumer research expert generating AI search queries for scoring brand visibility.
+
+Product being analyzed: ${lob || industry}
+Journey stage: ${stage.stage} — ${stage.desc}
+
+Personas for this batch:
+${batchPersonas.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+Categories to cover: ${batchCats.join(', ')}
+
+Generate EXACTLY ${count} realistic questions a real consumer would type into an AI assistant (ChatGPT, Perplexity, Claude) during the ${stage.stage} stage of researching ${lob || industry}.
+
+Intent patterns to use (mix them):
+${INTENT_TEMPLATES.slice(0, 7).map((t, i) => `${i + 1}. ${t}`).join('\n')}
+
+STRICT RULES:
+- ZERO brand names or company names in ANY query (no "Chase", no "Citi", no "Apple", nothing)
+- Each query must sound like a real human typed it — natural language, not formal
+- Include specific details: dollar amounts, time constraints, life situations, demographics
+- Different personas should produce different vocabulary and concerns
+- Spread across the ${batchCats.length} categories
+
+Return ONLY a valid JSON array, no markdown, no explanation:
+[{"category":"CategoryName","query":"the full question text","stage":"${stage.stage}","persona":"brief persona descriptor"}]
+EXACTLY ${count} items. No more, no less.`;
 
   try {
-    const raw = await callAI([{ role: 'user', content: prompt }], 0.3, 4000);
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-    return parsed.slice(0, totalCount);
+    const raw = await callAI([{ role: 'user', content: prompt }], 0.4, 2000);
+    const cleaned = raw.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(0, count);
   } catch {
-    // Fallback: generate basic queries per category
-    const fallback: { category: string; query: string }[] = [];
-    const templates = [
-      (c: string) => `What is the best ${c.toLowerCase()} available right now?`,
-      (c: string) => `Which ${c.toLowerCase()} is most recommended by experts?`,
-      (c: string) => `How do I choose the right ${c.toLowerCase()}?`,
-      (c: string) => `What should I look for when comparing ${c.toLowerCase()} options?`,
-      (c: string) => `Is a premium ${c.toLowerCase()} worth the extra cost?`,
-    ];
-    categories.forEach((cat) => {
-      templates.forEach((t) => fallback.push({ category: cat, query: t(cat) }));
-    });
-    return fallback.slice(0, totalCount);
+    return [];
   }
 }
 
-// ─── BUILD BRAND ALIASES (no hardcoding) ──────────────────────────────────
+async function generateAllQueries(
+  industry: string,
+  lob: string,
+  categories: string[],
+  personas: string[],
+  totalCount: number
+): Promise<{ category: string; query: string; stage: string; persona: string }[]> {
+  // Split total queries across journey stages by their weights
+  const stageCounts = JOURNEY_STAGES.map((s) => ({
+    ...s,
+    count: Math.round(totalCount * s.weight),
+  }));
+
+  // Fix rounding so total = exactly totalCount
+  const roundedTotal = stageCounts.reduce((sum, s) => sum + s.count, 0);
+  const diff = totalCount - roundedTotal;
+  stageCounts[1].count += diff; // add remainder to Consideration (highest weight stage)
+
+  // Each stage gets broken into sub-batches of max 25 to guarantee AI returns exact count
+  const SUB_BATCH = 25;
+  const allBatchJobs: { stage: typeof JOURNEY_STAGES[0]; count: number; batchIndex: number }[] = [];
+
+  stageCounts.forEach((stage) => {
+    let remaining = stage.count;
+    let bi = 0;
+    while (remaining > 0) {
+      const chunk = Math.min(remaining, SUB_BATCH);
+      allBatchJobs.push({ stage, count: chunk, batchIndex: bi++ });
+      remaining -= chunk;
+    }
+  });
+
+  // Fire ALL sub-batches in parallel
+  const results = await Promise.all(
+    allBatchJobs.map((job) =>
+      generateQueriesForBatch(industry, lob, categories, personas, job.stage, job.count, job.batchIndex)
+    )
+  );
+
+  const allQueries = results.flat();
+
+  // If AI returned fewer than expected (rare), top up with fallback
+  if (allQueries.length < totalCount) {
+    const fallbackTemplates = [
+      (c: string, i: number) => ({ category: c, query: `What is the best ${c.toLowerCase()} option for someone on a budget?`, stage: 'Consideration', persona: 'budget shopper' }),
+      (c: string, i: number) => ({ category: c, query: `How do I choose the right ${c.toLowerCase()} for my situation?`, stage: 'Decision', persona: 'first-time buyer' }),
+      (c: string, i: number) => ({ category: c, query: `Is a ${c.toLowerCase()} worth it for an average person?`, stage: 'Validation', persona: 'skeptical consumer' }),
+      (c: string, i: number) => ({ category: c, query: `What do experts recommend when picking ${c.toLowerCase()}?`, stage: 'Awareness', persona: 'research-driven shopper' }),
+      (c: string, i: number) => ({ category: c, query: `What are the most important features in ${c.toLowerCase()}?`, stage: 'Consideration', persona: 'detail-oriented buyer' }),
+    ];
+    let fi = 0;
+    while (allQueries.length < totalCount) {
+      const cat = categories[fi % categories.length];
+      const templateIdx = Math.floor(fi / categories.length) % fallbackTemplates.length;
+      allQueries.push(fallbackTemplates[templateIdx](cat, fi));
+      fi++;
+    }
+  }
+
+  return allQueries.slice(0, totalCount);
+}
+
+// ─── BUILD BRAND ALIASES ───────────────────────────────────────────────────
 function buildAliases(brand: string): string[] {
   const bl = brand.toLowerCase();
   const aliases = new Set<string>();
@@ -239,9 +355,8 @@ function buildAliases(brand: string): string[] {
   aliases.add(bl.replace(/\s+/g, ''));
   aliases.add(bl.replace(/\s+/g, '-'));
   aliases.add(bl.replace(/[^a-z0-9]/gi, '').toLowerCase());
-  // Add each significant word (>3 chars) as an alias
   bl.split(/[\s'\-\.&]+/)
-    .filter((w) => w.length > 3)
+    .filter((w) => w.length > 2)
     .forEach((w) => aliases.add(w));
   return Array.from(aliases).filter((a) => a.length > 2);
 }
@@ -249,7 +364,6 @@ function buildAliases(brand: string): string[] {
 // ─── BRAND POSITION IN RESPONSE ───────────────────────────────────────────
 function getBrandPosition(text: string, aliases: string[]): number {
   const tl = text.toLowerCase();
-  // Find the earliest mention of any alias
   let firstIndex = Infinity;
   aliases.forEach((a) => {
     const idx = tl.indexOf(a.toLowerCase());
@@ -257,17 +371,14 @@ function getBrandPosition(text: string, aliases: string[]): number {
   });
   if (firstIndex === Infinity) return 0;
 
-  // Count how many other brand-like proper nouns appear before this brand
-  // We detect brands as Title Case words appearing before our brand
   const before = text.slice(0, firstIndex);
   const titleCaseMatches = before.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
-  // Filter out common non-brand words
-  const stopWords = new Set(['The', 'This', 'That', 'These', 'Those', 'When', 'Where', 'What', 'Which', 'How', 'Why', 'For', 'And', 'But', 'Or', 'In', 'On', 'At', 'To', 'Of', 'With', 'As', 'By', 'From', 'An', 'If', 'It', 'Its', 'Are', 'Is', 'Be', 'Was', 'Were', 'Has', 'Have', 'Had']);
+  const stopWords = new Set(['The', 'This', 'That', 'These', 'Those', 'When', 'Where', 'What', 'Which', 'How', 'Why', 'For', 'And', 'But', 'Or', 'In', 'On', 'At', 'To', 'Of', 'With', 'As', 'By', 'From', 'An', 'If', 'It', 'Its', 'Are', 'Is', 'Be', 'Was', 'Were', 'Has', 'Have', 'Had', 'Here', 'Some', 'Many', 'Most', 'More', 'Such', 'Each']);
   const brandsBefore = titleCaseMatches.filter((w) => !stopWords.has(w)).length;
   return brandsBefore + 1;
 }
 
-// ─── CORE SCORE COMPUTATION (pure math, no hardcoding) ────────────────────
+// ─── CORE SCORE COMPUTATION — pure math, no hardcoding ────────────────────
 function computeScores(
   brand: string,
   aliases: string[],
@@ -287,30 +398,27 @@ function computeScores(
   const validQA = allQA.filter(Boolean);
   const total = validQA.length || 1;
 
-  // VISIBILITY — straight mention rate
+  // VISIBILITY — mention rate
   const mentionedQA = validQA.filter((qa) =>
     aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase()))
   );
   const mentionCount = mentionedQA.length;
   const visibility = Math.round((mentionCount / total) * 100);
 
-  // PROMINENCE — average position when mentioned, scaled 0-100
+  // PROMINENCE — average position, scaled to 0-100
   const positions = mentionedQA
     .map((qa) => getBrandPosition(qa.a || '', aliases))
     .filter((p) => p > 0);
   const avgPos =
-    positions.length > 0
-      ? positions.reduce((a, b) => a + b, 0) / positions.length
-      : 0;
-  // Position 1 = 100, position 2 = 80, position 3 = 65, position 5 = 40, not mentioned = 0
+    positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const prominence =
     mentionCount > 0
       ? Math.round(Math.max(5, Math.min(95, 100 - (avgPos - 1) * 18)))
       : 0;
 
-  // SENTIMENT — positive vs negative word ratio in brand-containing sentences
-  const posWords = ['best', 'top', 'recommended', 'leading', 'excellent', 'great', 'trusted', 'popular', 'ideal', 'perfect', 'outstanding', 'superior', 'preferred', 'reliable', 'strong'];
-  const negWords = ['worst', 'poor', 'bad', 'avoid', 'expensive', 'weak', 'limited', 'disappointing', 'inferior', 'mediocre', 'unreliable', 'overpriced', 'problematic'];
+  // SENTIMENT — positive/negative word ratio in brand-containing sentences
+  const posWords = ['best', 'top', 'recommended', 'leading', 'excellent', 'great', 'trusted', 'popular', 'ideal', 'perfect', 'outstanding', 'superior', 'preferred', 'reliable', 'strong', 'impressive', 'generous', 'competitive', 'solid', 'standout'];
+  const negWords = ['worst', 'poor', 'bad', 'avoid', 'expensive', 'weak', 'limited', 'disappointing', 'inferior', 'mediocre', 'unreliable', 'overpriced', 'problematic', 'lacking', 'outdated', 'complicated', 'confusing'];
   let posCount = 0;
   let negCount = 0;
 
@@ -334,12 +442,12 @@ function computeScores(
     Math.max(0, Math.min(100, sentimentBase + sentimentAdj + prominence * 0.08))
   );
 
-  // CITATION SHARE — weighted by position (position 1 = full credit, later = fractional)
+  // CITATION SHARE — weighted by position
   const citationWeight = positions.reduce((sum, p) => sum + 1 / p, 0);
-  const maxPossibleWeight = total * 1; // if brand was #1 in every response
+  const maxPossibleWeight = total;
   const citationShare = Math.round(Math.min(95, (citationWeight / maxPossibleWeight) * 100 * 2.5));
 
-  // SHARE OF VOICE — brand mentions vs all competitor mentions
+  // SHARE OF VOICE — brand vs all competitors
   const brandCount = mentionCount;
   const competitorCounts = competitors.map((comp) => {
     const cl = comp.toLowerCase();
@@ -349,12 +457,9 @@ function computeScores(
       return compWords.some((w: string) => t.includes(w)) || t.includes(cl);
     }).length;
   });
-  const totalAllMentions =
-    brandCount + competitorCounts.reduce((a, b) => a + b, 0);
+  const totalAllMentions = brandCount + competitorCounts.reduce((a, b) => a + b, 0);
   const shareOfVoice =
-    totalAllMentions > 0
-      ? Math.round((brandCount / totalAllMentions) * 100)
-      : 0;
+    totalAllMentions > 0 ? Math.round((brandCount / totalAllMentions) * 100) : 0;
 
   // GEO SCORE — weighted composite
   const geo = Math.round(
@@ -365,30 +470,13 @@ function computeScores(
     shareOfVoice * 0.15
   );
 
-  // AVG RANK
-  const avgRank =
-    positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
+  const avgRank = positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A';
 
-  return {
-    visibility,
-    prominence,
-    sentiment,
-    citationShare,
-    shareOfVoice,
-    geo,
-    avgRank,
-    mentionCount,
-    totalCount: total,
-  };
+  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgRank, mentionCount, totalCount: total };
 }
 
-// ─── COMPETITOR SCORING (same logic applied to each competitor) ────────────
-function scoreCompetitor(
-  compName: string,
-  compUrl: string,
-  allQA: any[],
-  allCompetitors: string[]
-): any {
+// ─── COMPETITOR SCORING — same logic, same responses ──────────────────────
+function scoreCompetitor(compName: string, compUrl: string, allQA: any[], allCompetitors: string[]): any {
   const aliases = buildAliases(compName);
   const scores = computeScores(compName, aliases, allQA, allCompetitors.filter((c) => c !== compName));
   return {
@@ -405,11 +493,7 @@ function scoreCompetitor(
 }
 
 // ─── QUERY CLUSTER ANALYSIS ───────────────────────────────────────────────
-function buildQueryClusters(
-  allQA: any[],
-  aliases: string[],
-  competitors: string[]
-): any[] {
+function buildQueryClusters(allQA: any[], aliases: string[], competitors: string[]): any[] {
   const categories = [...new Set(allQA.filter(Boolean).map((qa) => qa.category).filter(Boolean))];
 
   return categories.map((cat) => {
@@ -419,7 +503,6 @@ function buildQueryClusters(
     ).length;
     const winRate = catRows.length > 0 ? Math.round((mentioned / catRows.length) * 100) : 0;
 
-    // Find top competitor in this category
     const compCounts: Record<string, number> = {};
     catRows.forEach((qa) => {
       const t = (qa.a || '').toLowerCase();
@@ -430,8 +513,18 @@ function buildQueryClusters(
         }
       });
     });
-    const topCompetitor =
-      Object.entries(compCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    const topCompetitor = Object.entries(compCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+
+    // Stage breakdown
+    const stageBreakdown: Record<string, { total: number; mentioned: number }> = {};
+    catRows.forEach((qa) => {
+      const s = qa.stage || 'Consideration';
+      if (!stageBreakdown[s]) stageBreakdown[s] = { total: 0, mentioned: 0 };
+      stageBreakdown[s].total++;
+      if (aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase()))) {
+        stageBreakdown[s].mentioned++;
+      }
+    });
 
     return {
       category: cat,
@@ -439,8 +532,9 @@ function buildQueryClusters(
       mentioned,
       winRate,
       topCompetitor,
-      dailySearches: 0, // not hardcoded — removed fake estimates
+      dailySearches: 0,
       related: [],
+      stageBreakdown,
     };
   });
 }
@@ -449,11 +543,11 @@ function buildQueryClusters(
 function extractCitedDomains(allQA: any[], brandDomain: string): any[] {
   const domainCounts: Record<string, number> = {};
   const knownSources = [
-    'nerdwallet', 'bankrate', 'reddit', 'wikipedia', 'forbes',
-    'cnbc', 'investopedia', 'creditkarma', 'thepointsguy', 'wallethub',
-    'thebalance', 'money', 'consumerreports', 'businessinsider', 'motleyfool',
-    'wsj', 'marketwatch', 'bloomberg', 'cnet', 'pcmag', 'techradar',
-    'edmunds', 'caranddriver', 'motortrend', 'tripadvisor', 'yelp',
+    'nerdwallet', 'bankrate', 'reddit', 'wikipedia', 'forbes', 'cnbc', 'investopedia',
+    'creditkarma', 'thepointsguy', 'wallethub', 'thebalance', 'money', 'consumerreports',
+    'businessinsider', 'motleyfool', 'wsj', 'marketwatch', 'bloomberg', 'cnet', 'pcmag',
+    'techradar', 'edmunds', 'caranddriver', 'motortrend', 'tripadvisor', 'yelp', 'experian',
+    'equifax', 'transunion', 'lendingtree', 'nerdwallet', 'magnifymoney',
   ];
 
   allQA.filter(Boolean).forEach((qa) => {
@@ -464,7 +558,6 @@ function extractCitedDomains(allQA: any[], brandDomain: string): any[] {
         domainCounts[domain] = (domainCounts[domain] || 0) + 1;
       }
     });
-    // Also scan for explicit URL mentions
     const urlMatches = text.matchAll(/(?:https?:\/\/)?(?:www\.)?([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/g);
     for (const match of urlMatches) {
       const d = match[1].toLowerCase();
@@ -474,11 +567,8 @@ function extractCitedDomains(allQA: any[], brandDomain: string): any[] {
     }
   });
 
-  // Add brand's own domain
   const brandDomainClean = brandDomain.replace('www.', '');
-  if (!domainCounts[brandDomainClean]) {
-    domainCounts[brandDomainClean] = 1;
-  }
+  if (!domainCounts[brandDomainClean]) domainCounts[brandDomainClean] = 1;
 
   const total = Object.values(domainCounts).reduce((a, b) => a + b, 1);
 
@@ -493,13 +583,9 @@ function extractCitedDomains(allQA: any[], brandDomain: string): any[] {
       category:
         entry[0] === brandDomainClean
           ? 'Owned Media'
-          : ['reddit', 'twitter', 'youtube', 'facebook', 'linkedin'].some((s) =>
-              entry[0].includes(s)
-            )
+          : ['reddit', 'twitter', 'youtube', 'facebook', 'linkedin'].some((s) => entry[0].includes(s))
           ? 'Social'
-          : ['wikipedia', 'gov', 'edu', 'consumerreports', 'fdic'].some((s) =>
-              entry[0].includes(s)
-            )
+          : ['wikipedia', 'gov', 'edu', 'consumerreports', 'fdic', 'ftc'].some((s) => entry[0].includes(s))
           ? 'Institution'
           : 'Earned Media',
     }));
@@ -517,18 +603,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: (pageData as any).error }, { status: 400 });
     }
 
-    // STEP 2: Discover brand + industry via AI (no hardcoding)
+    // STEP 2: Discover brand + industry — URL-path aware
     const discovery = await discoverBrand(pageData, url);
-    const { brand, industry, industryKey, lob, competitors, competitorUrls, categories } = discovery;
+    const { brand, industry, industryKey, lob, personas, competitors, competitorUrls, categories } = discovery;
     const aliases = buildAliases(brand);
 
-    // STEP 3: Generate queries + fetch citations + fetch trending — ALL PARALLEL
-    const [queriesRaw, citationsPromptRaw, trendingRaw] = await Promise.all([
-      generateQueries(industry, lob, categories, MAX_QUERIES),
+    // STEP 3: Generate ALL queries using persona×stage×intent matrix + citations + trending IN PARALLEL
+    // Query generation is now batched internally — never asks AI for more than 25 at once
+    const [queries, citationsPromptRaw, trendingRaw] = await Promise.all([
+      generateAllQueries(industry, lob, categories, personas, MAX_QUERIES),
       callAI(
         [{
           role: 'user',
-          content: `List 10 real domains that AI models cite when answering questions about ${industry} in the USA.
+          content: `List 10 real domains that AI models (ChatGPT, Perplexity, Claude) cite when answering questions about ${lob || industry} in the USA.
 The brand being analyzed is ${brand} (domain: ${(pageData as any).domain}).
 Return ONLY valid JSON array, no markdown:
 [{"rank":1,"domain":"example.com","category":"Earned Media","citation_share":4.2,"top_pages":["/best-cards"]}]
@@ -536,28 +623,25 @@ Categories: Social, Institution, Earned Media, Owned Media, Other.
 First item must be ${(pageData as any).domain} as Owned Media.
 Exactly 10 items. Be realistic with citation_share (owned 5-15%, earned 2-5%, others 1-3%).`,
         }],
-        0.1,
-        800
+        0.1, 800
       ),
       callAI(
         [{
           role: 'user',
-          content: `List 10 high-intent questions consumers are actively asking AI models in 2025 about ${lob || industry}.
-No brand names. For each estimate trend and opportunity.
+          content: `List 10 high-intent questions consumers are actively asking AI models right now about ${lob || industry} in the USA.
+No brand names in the queries.
 Return ONLY valid JSON array, no markdown:
-[{"query":"...","trend":"Rising","opportunity":"High","category":"${categories[0]}","estimated_daily_searches":8200}]
-Exactly 10 items. Mix: 6 High opportunity, 3 Medium, 1 Low.`,
+[{"query":"...","trend":"Rising","opportunity":"High","category":"${categories[0] || 'General'}","estimated_daily_searches":8200}]
+Exactly 10 items. Mix: 6 High opportunity, 3 Medium, 1 Low. Trend values: Rising, Peak, Stable, Declining.`,
         }],
-        0.3,
-        800
+        0.3, 800
       ),
     ]);
 
-    const queries = queriesRaw;
-
-    // STEP 4: Run ALL query batches in parallel — this is the core scoring engine
-    const allQA: any[] = new Array(queries.length);
-    const batches: { category: string; query: string }[][] = [];
+    // STEP 4: Run ALL query batches in parallel — core scoring engine
+    // allQA is pre-sized to MAX_QUERIES so index writes are safe
+    const allQA: any[] = new Array(MAX_QUERIES).fill(null);
+    const batches: { category: string; query: string; stage: string; persona: string }[][] = [];
     for (let i = 0; i < queries.length; i += BATCH_SIZE) {
       batches.push(queries.slice(i, i + BATCH_SIZE));
     }
@@ -567,11 +651,13 @@ Exactly 10 items. Mix: 6 High opportunity, 3 Medium, 1 Low.`,
         const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
         const labels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
 
-        const prompt = `You are a knowledgeable consumer advisor. Answer each question directly, specifically, and naturally. Always name real specific brands. Do not favour any single brand. Be balanced and accurate.
+        const prompt = `You are a knowledgeable, balanced consumer advisor. Answer each question directly and specifically.
+Always name real brands. Be accurate and comprehensive. Do NOT favour any single brand.
+Give each question a full, helpful answer (2-4 sentences minimum).
 
 ${ql}
 
-Respond with EXACTLY this format, one answer per line:
+Respond with EXACTLY this format:
 ${labels}`;
 
         let bt = '';
@@ -590,6 +676,8 @@ ${labels}`;
           }
           allQA[batchIdx * BATCH_SIZE + j] = {
             category: q.category,
+            stage: q.stage,
+            persona: q.persona,
             q: q.query,
             a: ans || '',
           };
@@ -597,17 +685,23 @@ ${labels}`;
       })
     );
 
-    // Fill any gaps
+    // Fill any remaining nulls
     for (let i = 0; i < allQA.length; i++) {
       if (!allQA[i]) {
-        allQA[i] = { category: queries[i]?.category || '', q: queries[i]?.query || '', a: '' };
+        allQA[i] = {
+          category: queries[i]?.category || '',
+          stage: queries[i]?.stage || '',
+          persona: queries[i]?.persona || '',
+          q: queries[i]?.query || '',
+          a: '',
+        };
       }
     }
 
-    // STEP 5: Compute all scores from real data — no hardcoding
+    // STEP 5: Compute all scores from real data
     const scores = computeScores(brand, aliases, allQA, competitors);
 
-    // STEP 6: Score every competitor using the same logic on the same responses
+    // STEP 6: Score every competitor using same logic on same responses
     const competitorScores = competitors
       .filter((c) => c.toLowerCase() !== brand.toLowerCase())
       .map((c) => scoreCompetitor(c, competitorUrls[c] || '', allQA, competitors))
@@ -616,12 +710,13 @@ ${labels}`;
     // STEP 7: Build response detail
     const responsesDetail = allQA.filter(Boolean).map((qa: any) => ({
       category: qa.category,
+      stage: qa.stage,
+      persona: qa.persona,
       query: qa.q,
       mentioned: aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase())),
       response_preview: qa.a || '',
       position: getBrandPosition(qa.a || '', aliases),
       winner_brand: (() => {
-        // Who appears first if not our brand?
         let winnerBrand = '';
         let winnerPos = Infinity;
         const brandPos = getBrandPosition(qa.a || '', aliases);
@@ -637,10 +732,10 @@ ${labels}`;
       })(),
     }));
 
-    // STEP 8: Build query clusters
+    // STEP 8: Build query clusters (now includes stage breakdown)
     const queryClusters = buildQueryClusters(allQA, aliases, competitors);
 
-    // STEP 9: Extract real citation domains from responses
+    // STEP 9: Citation sources
     const citationSources = (() => {
       try {
         const fromAI = JSON.parse(citationsPromptRaw.replace(/```json|```/g, '').trim());
@@ -659,13 +754,7 @@ ${labels}`;
       }
     })();
 
-    // STEP 11: AI-powered insights from real data
-    const mentionedQA = allQA.filter(
-      (qa) => qa && aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase()))
-    );
-    const missedQA = allQA.filter(
-      (qa) => qa && !aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase()))
-    );
+    // STEP 11: AI insights from real computed data
     const topCats = queryClusters
       .filter((c) => c.winRate > 0)
       .sort((a, b) => b.winRate - a.winRate)
@@ -675,62 +764,76 @@ ${labels}`;
       .filter((c) => c.winRate === 0)
       .slice(0, 3)
       .map((c) => c.category);
-    const topComp =
-      competitorScores.length > 0 ? competitorScores[0].Brand : 'competitors';
+    const topComp = competitorScores.length > 0 ? competitorScores[0].Brand : 'competitors';
+
+    // Stage win rates for insights
+    const stageWinRates = JOURNEY_STAGES.map((s) => {
+      const stageQA = allQA.filter((qa) => qa && qa.stage === s.stage);
+      const stageMentioned = stageQA.filter((qa) =>
+        aliases.some((a) => (qa.a || '').toLowerCase().includes(a.toLowerCase()))
+      ).length;
+      return {
+        stage: s.stage,
+        winRate: stageQA.length > 0 ? Math.round((stageMentioned / stageQA.length) * 100) : 0,
+        total: stageQA.length,
+      };
+    });
 
     const insightsPrompt = `You are a GEO strategist. Analyze this brand's AI visibility data and return ONLY valid JSON, no markdown.
 
 Brand: ${brand}
-Industry: ${lob || industry}
+Product: ${lob || industry}
 GEO Score: ${scores.geo}/100
-Queries run: ${scores.totalCount}
-Brand appeared in: ${scores.mentionCount} responses (${scores.visibility}%)
+Total queries: ${scores.totalCount} (across ${JOURNEY_STAGES.length} journey stages)
+Brand appeared in: ${scores.mentionCount} responses (${scores.visibility}% visibility)
 Avg position when mentioned: ${scores.avgRank}
 Sentiment score: ${scores.sentiment}/100
+Prominence score: ${scores.prominence}/100
+Share of Voice: ${scores.shareOfVoice}%
+
+Journey stage performance:
+${stageWinRates.map((s) => `- ${s.stage}: ${s.winRate}% win rate (${s.total} queries)`).join('\n')}
+
 Top performing categories: ${topCats.join(', ') || 'none'}
-Missing categories: ${missingCats.join(', ') || 'none'}
-Top competitor by mentions: ${topComp}
+Missing categories (0% win): ${missingCats.join(', ') || 'none'}
+Top competitor by GEO score: ${topComp}
 
 Return:
 {
-  "strengths": ["specific strength 1", "specific strength 2", "specific strength 3"],
-  "improvements": ["specific gap 1", "specific gap 2", "specific gap 3", "specific gap 4", "specific gap 5"],
+  "strengths": ["3 specific data-backed strengths referencing actual scores and stages"],
+  "improvements": ["5 specific gaps referencing actual scores, stages, and categories"],
   "actions": [
-    {"priority":"High","action":"specific implementable action"},
-    {"priority":"High","action":"specific implementable action"},
+    {"priority":"High","action":"specific implementable action tied to real gap"},
+    {"priority":"High","action":"specific implementable action tied to real gap"},
     {"priority":"Medium","action":"specific implementable action"},
     {"priority":"Medium","action":"specific implementable action"},
     {"priority":"Low","action":"specific implementable action"}
   ]
 }`;
 
-    let insights = {
-      strengths: [] as string[],
-      improvements: [] as string[],
-      actions: [] as any[],
-    };
+    let insights = { strengths: [] as string[], improvements: [] as string[], actions: [] as any[] };
     try {
-      const insightsRaw = await callAI([{ role: 'user', content: insightsPrompt }], 0.2, 1000);
+      const insightsRaw = await callAI([{ role: 'user', content: insightsPrompt }], 0.2, 1200);
       insights = JSON.parse(insightsRaw.replace(/```json|```/g, '').trim());
     } catch {}
 
-    // STEP 12: Targeted clusters (brand-specific product queries)
+    // STEP 12: Targeted clusters (brand-specific product deep-dive)
     let targetedClusters: any[] = [];
     try {
       const brandFamePrompt = `You are a brand research expert. Return ONLY valid JSON, no markdown.
 
-What specific products or features is "${brand}" genuinely well-known for in ${industry}?
-Only include areas where ${brand} has real market reputation.
+What specific products or features is "${brand}" genuinely well-known for in ${lob || industry}?
+Only include areas where ${brand} has real established market reputation.
 
 Return exactly:
-{"knownFor":[{"product":"product name","queries":["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10"]}]}
+{"knownFor":[{"product":"product name","queries":["10 consumer questions"]}]}
 
 Rules:
-- Maximum 5 products, 10 queries each
-- ZERO brand names in any query — no "${brand}", no competitor names
-- Queries must be generic consumer questions
-- Good: "which credit card has the best balance transfer intro offer"
-- Bad: "which Chase card has balance transfer" — REJECTED`;
+- Maximum 4 products, 10 queries each
+- ZERO brand names in any query — absolutely no "${brand}", no competitor names
+- Queries must be generic consumer questions a real person would type into an AI
+- Good: "which credit card gives the best cash back on groceries"
+- Bad: "which Citi card is best for cash back" — REJECTED`;
 
       const fameRaw = await callAI([{ role: 'user', content: brandFamePrompt }], 0.2, 1200);
       const fameData = JSON.parse(fameRaw.replace(/```json|```/g, '').trim());
@@ -748,10 +851,9 @@ Rules:
 
         const flatQ: { product: string; query: string }[] = [];
         knownFor.forEach((k) =>
-          k.queries
-            .slice(0, 10)
-            .filter(isClean)
-            .forEach((q) => flatQ.push({ product: k.product, query: q }))
+          k.queries.slice(0, 10).filter(isClean).forEach((q) =>
+            flatQ.push({ product: k.product, query: q })
+          )
         );
 
         const TBATCH = 10;
@@ -765,11 +867,9 @@ Rules:
           tbatches.map(async (batch) => {
             const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
             const labels = batch.map((_, j) => `A${j + 1}: [answer]`).join('\n');
-            const p = `Answer each question directly. Name real specific brands. Do not favour any brand.\n\n${ql}\n\nRespond EXACTLY:\n${labels}`;
+            const p = `Answer each question directly. Name real specific brands. Be balanced and accurate.\n\n${ql}\n\nRespond EXACTLY:\n${labels}`;
             let bt = '';
-            try {
-              bt = await callAI([{ role: 'user', content: p }], 0.1, 1200);
-            } catch {}
+            try { bt = await callAI([{ role: 'user', content: p }], 0.1, 1200); } catch {}
             batch.forEach((item, j) => {
               const mk = `A${j + 1}:`;
               const nm = `A${j + 2}:`;
@@ -779,9 +879,7 @@ Rules:
                 const e = bt.includes(nm) ? bt.indexOf(nm) : bt.length;
                 ans = bt.slice(s, e).trim();
               }
-              const mentioned = aliases.some((a) =>
-                (ans || '').toLowerCase().includes(a.toLowerCase())
-              );
+              const mentioned = aliases.some((a) => (ans || '').toLowerCase().includes(a.toLowerCase()));
               const position = getBrandPosition(ans || '', aliases);
               allTargetedQA.push({ product: item.product, query: item.query, ans, mentioned, position });
             });
@@ -831,7 +929,7 @@ Rules:
       }
     } catch {}
 
-    // ─── RETURN EVERYTHING — no hardcoded overrides anywhere ─────────────
+    // ─── RETURN — no hardcoded overrides anywhere ─────────────────────────
     return NextResponse.json({
       brand_name: brand,
       industry,
@@ -839,7 +937,6 @@ Rules:
       lob,
       ind_label: industry,
 
-      // All scores computed from real AI responses
       visibility: scores.visibility,
       sentiment: scores.sentiment,
       prominence: scores.prominence,
@@ -850,6 +947,9 @@ Rules:
 
       responses_with_brand: scores.mentionCount,
       total_responses: scores.totalCount,
+
+      personas,
+      stage_win_rates: stageWinRates,
 
       responses_detail: responsesDetail,
       query_clusters: queryClusters,
