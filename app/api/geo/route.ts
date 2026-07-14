@@ -760,7 +760,7 @@ Max 4 products, 10 queries each. Zero brand names in any query.` }],
         };
 
         const flat: { product: string; query: string }[] = [];
-        knownFor.forEach((k: any) => k.queries.slice(0, 10).filter(safe).forEach(q =>
+        knownFor.forEach((k: any) => k.queries.slice(0, 10).filter(safe).forEach((q: string) =>
           flat.push({ product: k.product, query: q })
         ));
 
