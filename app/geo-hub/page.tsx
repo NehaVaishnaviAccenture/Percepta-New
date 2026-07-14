@@ -11,8 +11,17 @@ function isValidUrl(u: string): boolean {
     return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname.includes('.');
   } catch { return false; }
 }
+
+const BANK_KEYWORDS = ['bank','credit','savings','financial','finance','fcu','cu','federal','lending','loan','mortgage','wealth','invest','capital','citi','chase','wellsfargo','bofa','usaa','penfed','navy'];
+function isBankUrl(u: string): boolean {
+  if (!u) return false;
+  try {
+    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, '');
+    return BANK_KEYWORDS.some(k => host.includes(k));
+  } catch { return false; }
+}
+const BANK_SCOPES = ['Credit Cards', 'Savings Accounts'];
 import Link from 'next/link';
-import OverviewTab from './tabs/OverviewTab';
 import GeoScoreTab from './tabs/GeoScoreTab';
 import AiPresenceTab from './tabs/AiPresenceTab';
 import ReachTab from './tabs/ReachTab';
@@ -20,20 +29,16 @@ import CompetitorsTab from './tabs/CompetitorsTab';
 import CompetitorsByTopicTab from './tabs/CompetitorsByTopicTab';
 import PromptsTestedTab from './tabs/PromptsTestedTab';
 import PromptsLiveTab from './tabs/PromptsLiveTab';
-import ResponseMapTab from './tabs/ResponseMapTab';
 
 import PrioritiesTab from './tabs/PrioritiesTab';
-
-import PrioritiesPlaybookTab from './tabs/PrioritiesPlaybookTab';
 
 
 
 const TOP_TABS = [
-  {label:'Overview',subs:[]},
-  {label:'GEO Score',subs:['Overall','AI Presence','Reach']},
+  {label:'Overview',subs:['GEO Score','AI Presence','Reach']},
   {label:'Competitors',subs:['Overall','By Topic']},
-  {label:'Prompts',subs:['Tested Prompts','Response Map','Live Prompt']},
-  {label:'Priorities',subs:['Overall','Playbook']},
+  {label:'Prompts',subs:['Tested Prompts','Live Prompt']},
+  {label:'Priorities',subs:[]},
 ];
 
 // CHANGE: Good band is now yellow #FDD835 everywhere
@@ -68,6 +73,8 @@ export default function GeoHub() {
   const [elapsedSec,setElapsedSec]=useState(0);
   const [analysisError,setAnalysisError]=useState<{title:string;code:string;message:string;reduceDesc:string}|null>(null);
   const [playbookActions,setPlaybookActions]=useState<any[]|null>(null);
+  const [livePromptQuery,setLivePromptQuery]=useState('');
+  const [livePromptHistory,setLivePromptHistory]=useState<{q:string;a:string}[]>([]);
 
   // Restore report from session storage on mount — playbook_actions are stored with the result.
   useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved){const parsed=JSON.parse(saved);setResult(parsed);setPlaybookActions(Array.isArray(parsed.playbook_actions)&&parsed.playbook_actions.length>0?parsed.playbook_actions:null);}if(savedUrl)setUrl(savedUrl);}catch{}},[]);
@@ -140,7 +147,7 @@ export default function GeoHub() {
         }
       } else{
         // playbook_actions come back in the same response — no second fetch needed.
-        setResult(data);setActiveParent(0);setActiveSub(0);setPlaybookActions(data.playbook_actions||[]);
+        setResult(data);setActiveParent(0);setActiveSub(0);setPlaybookActions(data.playbook_actions||[]);setLivePromptHistory([]);setLivePromptQuery('');
         try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}
       }
     }catch(e:any){
@@ -165,7 +172,7 @@ export default function GeoHub() {
     const effectiveScope = d3ScopeSelected === '+ Custom' ? d3CustomScope.trim() : d3ScopeSelected;
     const canRun = urlValid && effectiveScope !== '' && !loading;
 
-    const SCOPE_PILLS = ['General', ...detectedScopes];
+    const SCOPE_PILLS = isBankUrl(url) ? ['General', ...BANK_SCOPES] : ['General', ...detectedScopes];
     const PROMPT_OPTS = [
       {count:50,  name:'Quick',    time:'~30 sec', rec:false},
       {count:100, name:'Standard', time:'~1 min',  rec:true},
@@ -704,7 +711,7 @@ export default function GeoHub() {
   const gBadge = scoreBadge(geo);
   // Single cap — all tabs show the same 10-competitor field.
   // Every industry's comps array is 10; fin was trimmed from 20 to match.
-  const resultComps = (result?.competitors || []).slice(0, 10);
+  const resultComps = (result?.competitors || []).slice(0, 9);
 
   return (
     <div id="percepta-shell" className="shell">
@@ -832,17 +839,14 @@ export default function GeoHub() {
               return null;
             })()}
 
-            {activeParent===0&&<OverviewTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions||[]}/>}
-            {activeParent===1&&activeSub===0&&<GeoScoreTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===1&&<AiPresenceTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===2&&<ReachTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===2&&activeSub===0&&<CompetitorsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===2&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===3&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===3&&activeSub===1&&<ResponseMapTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===3&&activeSub===2&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===4&&activeSub===0&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===4&&activeSub===1&&<PrioritiesPlaybookTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
+            {activeParent===0&&activeSub===0&&<GeoScoreTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions||[]}/>}
+            {activeParent===0&&activeSub===1&&<AiPresenceTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===0&&activeSub===2&&<ReachTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===1&&activeSub===0&&<CompetitorsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===1&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
+            {activeParent===2&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} setLivePromptQuery={setLivePromptQuery}/>}
+            {activeParent===2&&activeSub===1&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} initialQuery={livePromptQuery} onQueryConsumed={()=>setLivePromptQuery('')} promptHistory={livePromptHistory} setPromptHistory={setLivePromptHistory}/>}
+            {activeParent===3&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
 
 
           </div>

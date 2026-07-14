@@ -305,7 +305,7 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
       <div id="cbt-focus-block" className="cbtFocusCard">
         <div id="cbt-focus-head" className="cbtFocusHead">
           <div id="cbt-focus-eyebrow" className="cbtFocusEyebrow">Where to focus</div>
-          <button id="cbt-focus-action-plan-btn" onClick={()=>{setActiveParent(5);setActiveSub(0);}} className="cbtFocusActionBtn">Open Priorities ›</button>
+          <button id="cbt-focus-action-plan-btn" onClick={()=>{setActiveParent(3);setActiveSub(0);}} className="cbtFocusActionBtn">Open Priorities ›</button>
         </div>
         <p id="cbt-focus-content" className="cbtFocusContent">
           <span id="cbt-focus-gap-name" style={{color:'#E0003B',fontWeight:600}}>{gapTopic}</span> is your largest opportunity — a {Math.abs(gapDelta)}-point gap below the competitor median{tlBrand?`, with ${tlBrand} leading at ${tlScore}`:''}.

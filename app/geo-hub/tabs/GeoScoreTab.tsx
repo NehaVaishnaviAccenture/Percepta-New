@@ -8,6 +8,7 @@ interface TabProps {
   resultComps: any[];
   setActiveParent: (n: number) => void;
   setActiveSub: (n: number) => void;
+  playbookActions?: any[];
 }
 
 function sigTier(s: number) {
@@ -86,6 +87,7 @@ function ArchSVG({ score }: { score: number }) {
       {/* Needle */}
       <line x1={base.x} y1={base.y} x2={tip.x} y2={tip.y} stroke={MARKER_COLOR} strokeWidth="3.5" strokeLinecap="round" />
       {/* Score inside arch */}
+      <text x={CX} y={CY - 72} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="700" letterSpacing="0.06em" fill="#8E8E8E">GEO Score</text>
       <text x={CX} y={CY - 28} textAnchor="middle" fontFamily="'Space Grotesk', sans-serif" fontSize="44" fontWeight="700" fill={tier.color}>{score}</text>
       <text x={CX} y={CY - 10} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.08em" fill="#8E8E8E">{tier.name.toUpperCase()}</text>
     </svg>
@@ -100,7 +102,7 @@ function SignalCard({ label, q, score, rankVal, avgVal, total, setActiveParent, 
 }) {
   const tier = sigTier(score);
   return (
-    <div className="aiPresCard" style={{ borderLeftColor: tier.text, cursor: 'pointer' }} onClick={() => { setActiveParent(1); setActiveSub(sub); }}>
+    <div className="aiPresCard" style={{ borderLeftColor: tier.text, cursor: 'pointer' }} onClick={() => { setActiveParent(0); setActiveSub(sub); }}>
       <div className="aiPresCardEyebrow">{label}</div>
       <div className="aiPresCardQ">{q}</div>
       <div className="aiPresCardScoreRow">
@@ -112,7 +114,7 @@ function SignalCard({ label, q, score, rankVal, avgVal, total, setActiveParent, 
   );
 }
 
-export default function GeoScoreTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
+export default function GeoScoreTab({ result, resultComps, setActiveParent, setActiveSub, playbookActions }: TabProps) {
   const geo  = result.overall_geo_score ?? 0;
   const vis  = result.visibility  ?? 0;
   const sent = result.sentiment   ?? 0;
@@ -163,11 +165,11 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
   const allSov  = [sov,  ...comps.map((c: any) => c.Sov  ?? 0)];
 
   const signals = [
-    { key: 'vis',  label: 'Visibility',     q: 'Are you in the answer?',                  score: vis,  rankVal: rank(vis,  allVis),  avgVal: avg(allVis),  total: allVis.length - 1,  sub: 1 },
-    { key: 'sent', label: 'Sentiment',      q: 'Are you framed well?',                    score: sent, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1, sub: 1 },
-    { key: 'prom', label: 'Prominence',     q: 'Are you front and center?',               score: prom, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1, sub: 1 },
-    { key: 'cit',  label: 'Citation',       q: 'Are your sources being cited?',           score: cit,  rankVal: rank(cit,  allCit),  avgVal: avg(allCit),  total: allCit.length - 1,  sub: 2 },
-    { key: 'sov',  label: 'Share of Voice', q: 'How much of the conversation is yours?',  score: sov,  rankVal: rank(sov,  allSov),  avgVal: avg(allSov),  total: allSov.length - 1,  sub: 2 },
+    { key: 'vis',  label: 'Visibility',     q: 'How often your brand appears in AI answers.',                                              score: vis,  rankVal: rank(vis,  allVis),  avgVal: avg(allVis),  total: allVis.length - 1,  sub: 1 },
+    { key: 'sent', label: 'Sentiment',      q: 'Whether AI talks about your brand in a positive, neutral, or negative way.',              score: sent, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1, sub: 1 },
+    { key: 'prom', label: 'Prominence',     q: 'Where your brand appears in the answer, the higher up the more prominent.',              score: prom, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1, sub: 1 },
+    { key: 'cit',  label: 'Citation',       q: 'How often AI uses your website or content as a source.',                                  score: cit,  rankVal: rank(cit,  allCit),  avgVal: avg(allCit),  total: allCit.length - 1,  sub: 2 },
+    { key: 'sov',  label: 'Share of Voice', q: 'How much your brand is mentioned compared to competitors.',                               score: sov,  rankVal: rank(sov,  allSov),  avgVal: avg(allSov),  total: allSov.length - 1,  sub: 2 },
   ];
 
   return (
@@ -194,7 +196,7 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
       </div>
 
       {/* ── GEO Explainer ── */}
-      <GeoExplainer onSignalsClick={() => { setActiveParent(1); setActiveSub(0); }} />
+      <GeoExplainer onSignalsClick={() => { setActiveParent(0); setActiveSub(0); }} />
 
       {/* ── Signal cards: 5 columns ── */}
       <div id="gso-signal-cards" className="gsoSignalCards gsoSignalCards--5">
@@ -202,6 +204,28 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
           <SignalCard key={sig.key} label={sig.label} q={sig.q} score={sig.score} rankVal={sig.rankVal} avgVal={sig.avgVal} total={sig.total} sub={sig.sub} setActiveParent={setActiveParent} setActiveSub={setActiveSub} />
         ))}
       </div>
+
+      {/* ── Priority actions teasers ── */}
+      {(() => {
+        const recs = (playbookActions || []).slice(0, 3);
+        const fallback = [
+          {title:'Build authoritative content in your lowest-scoring query segments'},
+          {title:'Expand FAQ coverage for the highest-volume prompt clusters'},
+          {title:'Increase citation presence in the top AI-referenced sources'},
+        ];
+        const items = recs.length > 0 ? recs : fallback;
+        return (
+          <div id="gso-actions-teasers" className="ovTeasers">
+            {items.map((rec: any, i: number) => (
+              <div key={i} className="geo-teaser-card ovTeaserCard" onClick={() => setActiveParent(3)}>
+                <div className="geo-teaser-from ovTeaserFrom">Priority #{i + 1}</div>
+                <div className="geo-teaser-headline ovTeaserHeadline">{rec.title||rec.action||rec.recommendation||''}</div>
+                <span className="geo-teaser-arrow ovTeaserArrow">›</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
     </div>
   );

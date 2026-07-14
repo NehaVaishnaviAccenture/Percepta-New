@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MarkdownText } from '../lib/tiers';
 
 interface TabProps {
@@ -8,19 +8,33 @@ interface TabProps {
   resultComps: any[];
   setActiveParent: (n: number) => void;
   setActiveSub: (n: number) => void;
+  initialQuery?: string;
+  onQueryConsumed?: () => void;
+  promptHistory: {q:string;a:string}[];
+  setPromptHistory: (h: {q:string;a:string}[] | ((prev: {q:string;a:string}[]) => {q:string;a:string}[])) => void;
 }
 
 type ExamplePrompt = { intent: string; text: string };
 
-export default function PromptsLiveTab({ result, resultComps, setActiveParent, setActiveSub }: TabProps) {
+export default function PromptsLiveTab({ result, resultComps, setActiveParent, setActiveSub, initialQuery, onQueryConsumed, promptHistory, setPromptHistory }: TabProps) {
   const [promptInput, setPromptInput] = useState('');
-  const [promptHistory, setPromptHistory] = useState<{q:string;a:string}[]>([]);
   const [promptLoading, setPromptLoading] = useState(false);
+  const [pendingQuery, setPendingQuery] = useState('');
+
+  useEffect(() => {
+    if (initialQuery && initialQuery.trim()) {
+      setPromptInput(initialQuery);
+      onQueryConsumed?.();
+      runPrompt(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   async function runPrompt(q?: string) {
     const query = q || promptInput;
     if (!query.trim()) return;
     setPromptLoading(true);
+    setPendingQuery(query);
     if (!q) setPromptInput('');
     try {
       const res = await fetch('/api/prompt', {
@@ -38,6 +52,7 @@ export default function PromptsLiveTab({ result, resultComps, setActiveParent, s
       setPromptHistory(h => [{ q: query, a: answer }, ...h]);
     } catch {}
     setPromptLoading(false);
+    setPendingQuery('');
   }
 
   const examplePrompts: ExamplePrompt[] = result?.ind_key === 'fin' ? [
@@ -142,10 +157,16 @@ export default function PromptsLiveTab({ result, resultComps, setActiveParent, s
       {/* ── Response area ── */}
       {(!isEmpty || promptLoading) && (
         <div id="lp-response-area" className="lpResponseArea">
-          {promptLoading && (
-            <div id="lp-loading" className="lpLoadingRow">
-              <div className="lpSpinner" />
-              Querying AI model…
+          {promptLoading && pendingQuery && (
+            <div id="lp-pending-card" className="lpResponseCard">
+              <div className="lp-response-q lpResponseQ">
+                <span className="lpResponseQLabel">Q</span>
+                <span className="lpResponseQText">{pendingQuery}</span>
+              </div>
+              <div id="lp-loading" className="lpLoadingRow">
+                <div className="lpSpinner" />
+                Querying AI model…
+              </div>
             </div>
           )}
           {promptHistory.map((h, i) => (

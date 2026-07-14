@@ -18,12 +18,18 @@
   border-bottom: 1px solid #0A0A0A;
   padding: 0 40px;
   height: 52px;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 200;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.main {
+  padding-top: 52px;
 }
 
 .navLogo {
@@ -68,12 +74,12 @@
 }
 
 .navLink:hover {
-  color: #0A0A0A;
+  color: #FFF;
 }
 
 /* ── Hero ── */
 .hero {
-  background: #FFFFFF;
+  background: #000;
   padding: 72px 40px 64px;
   text-align: center;
 }
@@ -105,7 +111,7 @@
 
 .heroHeadlinePrefix,
 .heroHeadlineSuffix {
-  color: #0A0A0A;
+  color: #FFF;
 }
 
 .heroHeadlineKeyword {
@@ -158,8 +164,8 @@
   align-items: center;
   gap: 8px;
   background: transparent;
-  color: #0A0A0A;
-  border: 1.5px solid #0A0A0A;
+  color: #fff;
+  border: 1.5px solid #fff;
   padding: 16px 36px;
   font-family: 'Inter', sans-serif;
   font-size: 0.95rem;
@@ -169,7 +175,7 @@
 }
 
 .heroCtaSecondary:hover {
-  background: #F2F2F2;
+  background: var(--color-dark-strip);
 }
 
 /* ── How It Works ── */
@@ -591,4 +597,117 @@
 
 .ctaPrimary:hover {
   background: #8600D4;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .howSteps {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+
+  .geoScoreGrid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .scoreBands {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .comparisonGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .topNav {
+    padding: 0 20px;
+  }
+
+  .navLink {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .hero {
+    padding: 48px 20px 48px;
+  }
+
+  .heroBadge {
+    font-size: 0.625rem;
+    padding: 5px 14px;
+    margin-bottom: 28px;
+  }
+
+  .heroSubtext {
+    font-size: 1rem;
+  }
+
+  .heroCtaPrimary,
+  .heroCtaSecondary {
+    padding: 14px 24px;
+    font-size: 0.875rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .howSection {
+    padding: 56px 20px;
+  }
+
+  .howHeader {
+    margin-bottom: 40px;
+  }
+
+  .howSteps {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .geoScoreSection {
+    padding: 56px 20px;
+  }
+
+  .geoScoreGrid {
+    gap: 32px;
+    margin-bottom: 36px;
+  }
+
+  .geoScoreCard {
+    padding: 32px 24px;
+  }
+
+  .scoreBands {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+
+  .scoreBandCard {
+    padding: 20px 16px;
+  }
+
+  .comparison {
+    padding-top: 40px;
+  }
+
+  .comparisonCard--competitors,
+  .comparisonCard--percepta {
+    padding: 28px 24px;
+  }
+
+  .ctaSection {
+    padding: 56px 20px;
+  }
+
+  .ctaActions {
+    margin-top: 28px;
+  }
+
+  .ctaPrimary {
+    padding: 16px 32px;
+    width: 100%;
+    justify-content: center;
+  }
 }

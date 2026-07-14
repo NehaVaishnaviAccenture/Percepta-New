@@ -2,7 +2,6 @@ import Link from 'next/link';
 import './home.css';
 
 const navItems = [
-  { label: 'About', href: '/' },
   { label: 'GEO Hub', href: '/geo-hub' },
   { label: 'Get Support', href: '/get-support' },
 ];
