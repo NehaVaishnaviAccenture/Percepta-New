@@ -255,15 +255,31 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  // PROMINENCE — now uses competitor aliases for accurate position detection
+  // PROMINENCE — fraction of ALL queries where brand was mentioned AND named early
+  // pos1 = full credit, pos2 = 0.75, pos3 = 0.5, pos4+ = 0.25
+  // Divided by total queries so it's on same scale as visibility
   const compAliasList = comps.map(c => aliases(c));
-  const positions = mentioned.map(r => position(r.a || '', als, compAliasList)).filter(p => p > 0);
-  const avgPos    = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const prominence = mentionCount > 0 ? Math.round(Math.max(10, Math.min(95, 100 - (avgPos - 1) * 18))) : 0;
+  const positions = mentioned
+    .map(r => position(r.a || '', als, compAliasList))
+    .filter(p => p > 0);
+  const avgPos = positions.length > 0
+    ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
+  const posScore = positions.reduce((sum, p) => {
+    if (p === 1) return sum + 1.0;
+    if (p === 2) return sum + 0.75;
+    if (p === 3) return sum + 0.50;
+    return sum + 0.25;
+  }, 0);
+  // prominence = (weighted position score / total queries) × 100
+  const prominence = Math.round(Math.min(95, (posScore / total) * 100));
 
-  // SENTIMENT — pure pos/neg ratio, not contaminated by prominence
-  const POS = ['best','top','recommended','leading','excellent','great','trusted','popular','ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive','generous','competitive','solid','standout','exceptional','renowned'];
-  const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing','inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated','complicated','confusing','frustrating','hidden fees','complaints'];
+  // SENTIMENT
+  const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
+    'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
+    'generous','competitive','solid','standout','exceptional','renowned'];
+  const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
+    'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
+    'complicated','confusing','frustrating','hidden fees','complaints'];
   let posW = 0, negW = 0;
   mentioned.forEach(r => {
     (r.a || '').toLowerCase().split(/[.!?]+/)
@@ -274,12 +290,15 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
       });
   });
   const sentiment = Math.round(Math.max(0, Math.min(100,
-    (mentionCount > 0 ? 50 : 0) + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 40) : 0)
+    (mentionCount > 0 ? 50 : 0) +
+    ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 40) : 0)
   )));
 
-  // CITATION SHARE — position quality, independent of visibility
+  // CITATION SHARE — sum(1/pos) across ALL queries (not just mentions), ×100
+  // If brand never mentioned: citWeight=0, citationShare=0
+  // If mentioned at pos1 in every query: citWeight=total, citationShare=100
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round(Math.min(95, (citWeight / Math.max(mentionCount, 1)) * 100));
+  const citationShare = Math.round(Math.min(95, (citWeight / total) * 100));
 
   // SHARE OF VOICE — Set prevents one response with 5 brands counting 5× in denominator
   const top8     = comps.slice(0, 8);
@@ -292,9 +311,19 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
   // GEO
-  const geo = Math.round(visibility * 0.30 + sentiment * 0.20 + prominence * 0.20 + citationShare * 0.15 + shareOfVoice * 0.15);
+  const geo = Math.round(
+    visibility    * 0.30 +
+    sentiment     * 0.20 +
+    prominence    * 0.20 +
+    citationShare * 0.15 +
+    shareOfVoice  * 0.15
+  );
 
-  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgRank: positions.length > 0 ? `#${Math.round(avgPos)}` : 'N/A', mentionCount, totalCount: answered.length };
+  // avgRank = average position within AI responses when mentioned
+  // e.g. #2 means brand is typically the 2nd brand named in responses where it appears
+  const avgRank = avgPos > 0 ? `#${Math.round(avgPos)}` : 'N/A';
+
+  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgRank, mentionCount, totalCount: answered.length };
 }
 
 // ─── COMPETITOR SCORING ───────────────────────────────────────────────────────
