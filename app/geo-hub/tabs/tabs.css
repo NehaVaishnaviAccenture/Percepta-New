@@ -1608,12 +1608,14 @@
 .cmpTabRoot {
   display: grid;
   gap: 14px;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 /* ── Hero row (rank pillar + ladder) ────────────────────────── */
 .cmpHeroRow {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   align-items: stretch;
 }
@@ -1625,6 +1627,7 @@
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .cmpCardSpan2 {
@@ -1646,6 +1649,10 @@
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-brand);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cmpCardLinkBtn {
@@ -1801,6 +1808,7 @@
   background: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
   padding: 24px 28px;
+  min-width: 0;
 }
 
 .cmpChartHeaderRow {
@@ -2066,6 +2074,7 @@
   background: var(--color-card-bg);
   border: 1px solid var(--color-card-border);
   padding: 24px 28px;
+  min-width: 0;
 }
 
 .cmpTableHeaderBlock {
@@ -3034,8 +3043,8 @@
 .ptXAxisLabel  { margin-left:60px; text-align:center; font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-text-faint); margin-top:4px; margin-bottom:8px; }
 
 /* Quadrant gradient tints */
-.ptQGradTopLeft  { position:absolute; top:0; left:0; width:50%; height:50%; pointer-events:none; background:radial-gradient(ellipse at top left, rgba(224,0,59,0.08) 0%, rgba(224,0,59,0.02) 60%, transparent 100%); }
-.ptQGradTopRight { position:absolute; top:0; right:0; width:50%; height:50%; pointer-events:none; background:radial-gradient(ellipse at top right, rgba(0,171,123,0.08) 0%, rgba(0,171,123,0.02) 60%, transparent 100%); }
+/* .ptQGradTopLeft  { position:absolute; top:0; left:0; width:50%; height:50%; pointer-events:none; background:radial-gradient(ellipse at top left, rgba(224,0,59,0.08) 0%, rgba(224,0,59,0.02) 60%, transparent 100%); }
+.ptQGradTopRight { position:absolute; top:0; right:0; width:50%; height:50%; pointer-events:none; background:radial-gradient(ellipse at top right, rgba(0,171,123,0.08) 0%, rgba(0,171,123,0.02) 60%, transparent 100%); } */
 
 /* Y-axis ticks, labels, gridlines */
 .ptYGridline { position:absolute; left:0; right:0; height:1px; border-top:1px dashed var(--color-card-border); pointer-events:none; }
@@ -3046,8 +3055,8 @@
 
 .ptMidlineV { position:absolute; left:50%; top:0; bottom:0; border-left:1px dashed #D6D6D6; pointer-events:none; }
 .ptMidlineH { position:absolute; top:50%; left:0; right:0; border-top:1px dashed #D6D6D6; pointer-events:none; }
-.ptQLabel { position:absolute; font-family:var(--font-sans); font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; line-height:1; white-space:nowrap; pointer-events:none; z-index:3; }
-.ptBubble { position:absolute; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:600; text-align:center; line-height:1.1; padding:4px; transition:transform 160ms, box-shadow 160ms; }
+.ptQLabel { position:absolute; font-family:var(--font-sans); font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; line-height:1; white-space:nowrap; pointer-events:none; z-index:3; background:#fafafa; padding:3px 6px; border-radius:4px; }
+.ptBubble { position:absolute; border-radius:50%; cursor:pointer; transition:transform 160ms, box-shadow 160ms; }
 .ptBubble:hover { transform:scale(1.06); box-shadow:0 4px 14px rgba(0,0,0,0.18); }
 .ptBubble--selected { outline:2px solid var(--color-ink); outline-offset:3px; }
 .ptBubbleName { font-size:11px; pointer-events:none; }
@@ -3224,16 +3233,6 @@
 .ptPagerBtnNew { font-family:var(--font-mono); font-size:11px; color:var(--color-text-body); padding:4px 10px; border:1px solid #D6D6D6; background:#fff; cursor:pointer; }
 .ptPagerBtnNew:hover { border-color:var(--color-text-faint); }
 .ptPagerBtnNew:disabled { color:#B8B8B8; border-color:var(--color-card-border); cursor:default; }
-
-/* Teaser strip */
-.ptTeaserStrip { background:#fff; border:1px solid var(--color-card-border); border-left:3px solid var(--color-brand); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
-.ptTeaserContent { flex:1; min-width:200px; }
-.ptTeaserEyebrow { font-family:var(--font-sans); font-size:10px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-brand); margin-bottom:6px; }
-.ptTeaserHeadline { font-family:var(--font-sans); font-size:14px; font-weight:500; color:var(--color-ink); line-height:1.4; }
-.ptTeaserCount { font-family:var(--font-display); color:var(--color-brand-dark); font-weight:600; }
-.ptTeaserSub { font-family:var(--font-sans); font-size:12px; color:var(--color-text-muted); margin-top:4px; }
-.ptTeaserCta { font-family:var(--font-sans); font-size:13px; font-weight:500; color:#fff; background:var(--color-ink); padding:9px 16px; white-space:nowrap; flex-shrink:0; cursor:pointer; border:none; transition:background 160ms; }
-.ptTeaserCta:hover { background:var(--color-brand); }
 
 /* List + detail screens — both need flex+gap so their block children inherit the spacing */
 .ptListScreen  { display:flex; flex-direction:column; gap:16px; }
@@ -3520,7 +3519,7 @@
 }
 
 .lpResponseQLabel {
-  font-size: 0.7rem;
+  font-size: 16px;
   font-weight: 700;
   color: var(--color-brand);
   background: #E6C2FF;
@@ -3529,9 +3528,10 @@
 }
 
 .lpResponseQText {
-  font-size: 0.84rem;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-brand-dark);
+  font-family: var(--font-display);
 }
 
 .lpResponseA {
@@ -5974,3 +5974,61 @@
 .compFilterItem:hover { background: #F9F9FB; }
 .compFilterItem input[type="checkbox"] { accent-color: #A100FF; width: 13px; height: 13px; flex-shrink: 0; cursor: pointer; }
 .compFilterName { flex: 1; }
+
+/* ── Competitors tab — responsive ───────────────────────────── */
+@media (max-width: 900px) {
+  .cmpHeroRow {
+    grid-template-columns: 1fr;
+  }
+  .cmpCardSpan2 {
+    grid-column: auto;
+  }
+  .cmpRankNumber {
+    font-size: 64px;
+  }
+  .cmpRankOrdinal {
+    font-size: 40px;
+  }
+  .cmpRankOf {
+    white-space: normal;
+  }
+  .cmpChartColHeader,
+  .cmpChartRow,
+  .cmpChartAxis {
+    grid-template-columns: 110px 1fr 64px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .cmpCard,
+  .cmpChartCard,
+  .cmpTableCard {
+    padding: 18px 16px;
+  }
+  .cmpRankNumber {
+    font-size: 48px;
+  }
+  .cmpRankOrdinal {
+    font-size: 32px;
+  }
+  .cmpRankRow {
+    gap: 10px;
+  }
+  .cmpChartColHeader,
+  .cmpChartRow,
+  .cmpChartAxis {
+    grid-template-columns: 80px 1fr 48px;
+    gap: 8px;
+  }
+  .cmpChartBrandName {
+    font-size: 11px;
+  }
+  .cmpChartScore {
+    font-size: 13px;
+  }
+  .cmpChartControls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

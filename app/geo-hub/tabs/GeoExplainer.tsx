@@ -20,11 +20,11 @@ interface GeoExplainerProps {
 }
 
 const SIGNALS: { key: keyof SignalTiers; name: string; wt: string; def: string }[] = [
-  { key: 'visibility', name: 'Visibility',     wt: '30%', def: 'How often AI assistants mention you when answering questions in your category.' },
-  { key: 'sentiment',  name: 'Sentiment',      wt: '20%', def: 'Whether AI assistants describe you positively, neutrally, or negatively.' },
-  { key: 'prominence', name: 'Prominence',     wt: '20%', def: 'How central you are to an answer — featured up top, or a passing footnote.' },
-  { key: 'citation',   name: 'Citation',       wt: '15%', def: 'How often AI assistants link to or attribute your owned sources.' },
-  { key: 'sov',        name: 'Share of Voice', wt: '15%', def: 'Your slice of all brand mentions in the category, versus competitors.' },
+  { key: 'visibility', name: 'Visibility',     wt: '30%', def: 'How often your brand appears in AI answers.' },
+  { key: 'sentiment',  name: 'Sentiment',      wt: '20%', def: 'Whether AI talks about your brand in a positive, neutral, or negative way.' },
+  { key: 'prominence', name: 'Prominence',     wt: '20%', def: 'Where your brand appears in the answer, higher up the more prominent.' },
+  { key: 'citation',   name: 'Citation',       wt: '15%', def: 'How often AI uses your website or content as a source.' },
+  { key: 'sov',        name: 'Share of Voice', wt: '15%', def: 'How much your brand is mentioned compared to competitors.' },
 ];
 
 export function GeoExplainer({ onSignalsClick, label, hint, signalTiers }: GeoExplainerProps) {

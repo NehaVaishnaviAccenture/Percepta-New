@@ -631,7 +631,7 @@ export default function PrioritiesTab({ result, playbookActions }: TabProps) {
       {viewState === 'board' && (
         <>
           <h2 className="ov-lead">
-            {buildLead(brand, visibility)}{hasActions && <> {pbTotalWord} moves, sorted by opportunity — not just where the gap is biggest, but where it's biggest <i>and</i> winnable.</>}
+            Here&rsquo;s where to focus first.
           </h2>
           <div className="ov-lead-sub">
             <b>{totalQA}</b> responses analyzed
