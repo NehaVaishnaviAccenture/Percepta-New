@@ -77,20 +77,16 @@ export default function PromptsLiveTab({ result, resultComps, setActiveParent, s
   return (
     <div id="tab-live-prompt" className="lpTab">
 
-      {/* ── Empty state only: headline + meta + divider ── */}
-      {isEmpty && (
-        <>
-          <h1 id="lp-headline" className="lpHeadline">
-            Test how AI <span id="lp-headline-accent" className="lpHeadlineAccent">ranks you</span>, right now.
-          </h1>
-          <div id="lp-meta" className="lpMeta">
-            Sent to ChatGPT, Claude, Gemini
-            <span id="lp-meta-sep" className="lpMetaSep">·</span>
-            ~8–12s response
-          </div>
-          <div id="lp-meta-divider" className="lpMetaDivider" />
-        </>
-      )}
+      {/* ── Headline + meta + divider — always visible ── */}
+      <h1 id="lp-headline" className="lpHeadline">
+        Test how AI <span id="lp-headline-accent" className="lpHeadlineAccent">ranks you</span>, right now.
+      </h1>
+      <div id="lp-meta" className="lpMeta">
+        Sent to ChatGPT, Claude, Gemini
+        <span id="lp-meta-sep" className="lpMetaSep">·</span>
+        ~8–12s response
+      </div>
+      <div id="lp-meta-divider" className="lpMetaDivider" />
 
       {/* ── Search block ── */}
       <div id="lp-blk" className="lpSearchCard" style={{ marginBottom: isEmpty ? 0 : 16 }}>

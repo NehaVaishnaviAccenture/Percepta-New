@@ -86,25 +86,13 @@ const TIER_STROKE: Record<string, string> = {
   authority:  'rgba(0,118,83,0.4)',
 };
 
-// Y-axis helpers — mirrors the reference HTML logic
-function computeYMax(rawMax: number): number {
-  if (rawMax <= 10)  return 10;
-  if (rawMax <= 20)  return 20;
-  if (rawMax <= 50)  return 50;
-  if (rawMax <= 100) return 100;
-  if (rawMax <= 200) return 200;
-  if (rawMax <= 500) return 500;
-  return Math.ceil(rawMax / 100) * 100;
-}
+// Y-axis helpers — use actual data max, generate ~4 evenly spaced ticks
 function computeYTicks(yMax: number): number[] {
-  let step = 10;
-  if (yMax <= 60)       step = 10;
-  else if (yMax <= 100) step = 20;
-  else if (yMax <= 200) step = 25;
-  else if (yMax <= 500) step = 50;
-  else                  step = 100;
-  const ticks: number[] = [];
-  for (let v = 0; v <= yMax; v += step) ticks.push(v);
+  if (yMax <= 1) return [0, 1];
+  const ticks: number[] = [0];
+  const step = Math.max(1, Math.round(yMax / 4));
+  for (let v = step; v < yMax; v += step) ticks.push(v);
+  ticks.push(yMax);
   return ticks;
 }
 
@@ -164,16 +152,22 @@ function promptSlug(query: string): string {
   return tail.length >= 3 ? tail.join('-') : words.slice(-3).join('-');
 }
 
-function exportPromptsCsv(rows: any[], brandName: string, topic?: string | null, appearedOnly?: boolean) {
-  const headers = ['Prompt','Category','Mentioned','Position','Winner Brand','Response'];
-  const data = rows.map((r: any) => [
-    r.query || r.prompt || '',
-    r.category || '',
-    (r.mentioned || r.brand_mentioned) ? 'Yes' : 'No',
-    r.position ?? '',
-    r.winner_brand || '',
-    (r.response_preview || r.response || r.response_text || '').replace(/\n/g, ' '),
-  ]);
+function exportPromptsCsv(rows: any[], brandName: string, topic?: string | null, appearedOnly?: boolean, clusters?: {id:string;vol:number;appearances:number}[]) {
+  const clusterMap = new Map((clusters||[]).map(c => [c.id, c]));
+  const headers = ['Prompt','Category','Topic Volume','Topic Appearances','Mentioned','Rank','Winner Brand','Response'];
+  const data = rows.map((r: any) => {
+    const cluster = clusterMap.get(r.category || '');
+    return [
+      r.query || r.prompt || '',
+      r.category || '',
+      cluster?.vol ?? '',
+      cluster?.appearances ?? '',
+      (r.mentioned || r.brand_mentioned) ? 'Yes' : 'No',
+      r.position ?? '',
+      r.winner_brand || '',
+      (r.response_preview || r.response || r.response_text || '').replace(/\n/g, ' '),
+    ];
+  });
   const csv = [headers, ...data].map(row => row.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -249,14 +243,64 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
   // Bubble positions
   const plotRef = useRef<HTMLDivElement>(null);
   const [bubblePositions, setBubblePositions] = useState<Record<string, { x: number; y: number; size: number }>>({});
+  const [chartH, setChartH] = useState(0);
+
+  // Staggered label placements (computed after bubble positions are known)
+  const LABEL_EST_W = 82;
+  const LABEL_H = 16;
+  const LINE_H_BASE = 16;
+  const labelPlacements = useMemo(() => {
+    if (!chartH || Object.keys(bubblePositions).length === 0) return {} as Record<string, { x: number; labelY: number; lineTop: number; lineH: number; above: boolean }>;
+    const midY = chartH / 2;
+    const GAP = 6;
+
+    const initial = bubbleData.map(b => {
+      const pos = bubblePositions[b.id];
+      if (!pos) return null;
+      const r = pos.size / 2;
+      const above = pos.y > midY;
+      const labelY = above
+        ? pos.y - r - LINE_H_BASE - LABEL_H
+        : pos.y + r + LINE_H_BASE;
+      return { id: b.id, x: pos.x, labelY, above, baseY: pos.y, r };
+    }).filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const stagger = (group: typeof initial) => {
+      group.sort((a, b) => a.x - b.x);
+      for (let i = 1; i < group.length; i++) {
+        const prev = group[i - 1];
+        const curr = group[i];
+        if ((LABEL_EST_W + GAP) - (curr.x - prev.x) > 0) {
+          curr.labelY = curr.above
+            ? prev.labelY - (LABEL_H + GAP)
+            : prev.labelY + (LABEL_H + GAP);
+        }
+      }
+    };
+
+    const aboveGroup = initial.filter(i => i.above);
+    const belowGroup = initial.filter(i => !i.above);
+    stagger(aboveGroup);
+    stagger(belowGroup);
+
+    const result: Record<string, { x: number; labelY: number; lineTop: number; lineH: number; above: boolean }> = {};
+    [...aboveGroup, ...belowGroup].forEach(item => {
+      const lineTop = item.above ? item.labelY + LABEL_H : item.baseY + item.r;
+      const lineH = item.above
+        ? (item.baseY - item.r) - (item.labelY + LABEL_H)
+        : item.labelY - (item.baseY + item.r);
+      result[item.id] = { x: item.x, labelY: item.labelY, lineTop, lineH: Math.max(0, lineH), above: item.above };
+    });
+    return result;
+  }, [bubbleData, bubblePositions, chartH]);
 
   const ROWS_PER_PAGE = 10;
   const PLOT_INSET = 60;
   const MIN_BUBBLE = 42;
   const MAX_BUBBLE = 100;
-  const MAX_JITTER = 30;
-  const SEP_PAD = 4;
-  const JITTER_ITERS = 12;
+  const MAX_JITTER = 120;
+  const SEP_PAD = 6;
+  const JITTER_ITERS = 40;
 
   // Compute bubble positions
   const computePositions = useCallback(() => {
@@ -265,14 +309,17 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
     const plotH = plotRef.current.offsetHeight;
     if (!plotW || !plotH) return;
 
-    const maxApp = Math.max(...bubbleData.map((b) => b.appearances), 1);
-    const yMax   = Math.max(...bubbleData.map((b) => b.vol), 1);
+    const maxApp  = Math.max(...bubbleData.map((b) => b.appearances), 1);
+    const yMax    = Math.max(...bubbleData.map((b) => b.vol), 1);
+    const rankMin = Math.min(...bubbleData.map((b) => b.rank));
+    const rankMax = Math.max(...bubbleData.map((b) => b.rank));
+    const rankSpan = rankMax === rankMin ? 1 : rankMax - rankMin;
 
     // Initial positions
     const positions: Array<{ id: string; x: number; y: number; size: number; jx: number; jy: number }> =
       bubbleData.map((b) => {
         const size = MIN_BUBBLE + ((b.appearances / maxApp) * (MAX_BUBBLE - MIN_BUBBLE));
-        const xNorm = (5 - b.rank) / 4; // rank 5 → left, rank 1 → right
+        const xNorm = (rankMax - b.rank) / rankSpan; // lower rank (better) → right
         const yNorm = (yMax - b.vol) / yMax; // high vol → top
         const x = PLOT_INSET + xNorm * (plotW - 2 * PLOT_INSET);
         const y = PLOT_INSET + yNorm * (plotH - 2 * PLOT_INSET);
@@ -305,6 +352,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
       result[p.id] = { x: p.x + p.jx, y: p.y + p.jy, size: p.size };
     });
     setBubblePositions(result);
+    setChartH(plotH);
   }, [bubbleData]);
 
   useLayoutEffect(() => {
@@ -550,7 +598,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               </div>
               <button className="ptBtnSecondary" onClick={() => { if (setLivePromptQuery) setLivePromptQuery(item.query || item.prompt || ''); setActiveParent(2); setActiveSub(1); }}>Run this prompt live →</button>
             </div>
-            <button className="ptFooterExport" onClick={() => exportPromptsCsv([item], brandName, `detail-${promptSlug(item.query || item.prompt || '')}`, false)}>
+            <button className="ptFooterExport" onClick={() => exportPromptsCsv([item], brandName, `detail-${promptSlug(item.query || item.prompt || '')}`, false, bubbleData)}>
               <span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/></svg>Export prompt data</span>
             </button>
           </div>
@@ -601,7 +649,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
           const maxApp = Math.max(...bubbleData.map((b) => b.appearances), 1);
           const maxVol = Math.max(...bubbleData.map((b) => b.vol), 1);
           const midVol = maxVol / 2;
-          const yMax   = computeYMax(maxVol);
+          const yMax   = maxVol;
           const yTicks = computeYTicks(yMax);
 
           // Quadrant helper
@@ -673,10 +721,10 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                   ))}
 
                   {/* Quadrant labels */}
-                  <div className="ptQLabel" style={{ top: 8, left: 8, color: TIER_ON_WHITE.fragmented }}>Urgent gaps</div>
-                  <div className="ptQLabel" style={{ top: 8, right: 8, color: TIER_ON_WHITE.authority }}>Strongholds</div>
-                  <div className="ptQLabel" style={{ bottom: 8, left: 8, color: '#8E8E8E' }}>Low priority</div>
-                  <div className="ptQLabel" style={{ bottom: 8, right: 8, color: '#6B6B6B' }}>Niche wins</div>
+                  <div className="ptQLabel" style={{ top: 8, left: 8, color: '#0A0A0F' }}>Urgent gaps</div>
+                  <div className="ptQLabel" style={{ top: 8, right: 8, color: '#0A0A0F' }}>Strongholds</div>
+                  <div className="ptQLabel" style={{ bottom: 8, left: 8, color: '#0A0A0F' }}>Low priority</div>
+                  <div className="ptQLabel" style={{ bottom: 8, right: 8, color: '#0A0A0F' }}>Niche wins</div>
 
                   {/* Bubbles — selected/hovered bubble is sorted last so it's always the top DOM node */}
                   {[...bubbleData]
@@ -691,10 +739,8 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                     const pos = bubblePositions[b.id];
                     if (!pos) return null;
                     const fill   = TIER_FILL[b.tier]   ?? '#8E8E8E';
-                    const textColor = TIER_TEXT[b.tier] ?? '#fff';
                     const stroke = TIER_STROKE[b.tier]  ?? 'transparent';
                     const isSelected = selectedTopicId === b.id;
-                    const fontSize = pos.size > 70 ? 12 : pos.size > 55 ? 11 : 10;
                     const baseZ = Math.round((MAX_BUBBLE - pos.size) / 10) + 2;
                     return (
                       <div
@@ -706,17 +752,59 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                           width: pos.size,
                           height: pos.size,
                           background: fill,
-                          color: textColor,
                           border: `1.5px solid ${stroke}`,
-                          fontSize,
                           zIndex: isSelected || hoveredTopicId === b.id ? 20 : baseZ,
                         }}
                         onClick={() => handleBubbleClick(b.id)}
                         onMouseEnter={() => handleBubbleEnter(b.id)}
                         onMouseLeave={handleBubbleLeave}
-                      >
-                        <span className="ptBubbleName">{b.name}</span>
-                      </div>
+                      />
+                    );
+                  })}
+
+                  {/* Leader lines + external labels (stagger-resolved) */}
+                  {bubbleData.map((b) => {
+                    const lp = labelPlacements[b.id];
+                    if (!lp) return null;
+                    const isHovered = hoveredTopicId === b.id;
+                    const isActive = isHovered || selectedTopicId === b.id;
+                    return (
+                      <React.Fragment key={`lbl-${b.id}`}>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: lp.x,
+                            top: lp.lineTop,
+                            width: 0,
+                            height: lp.lineH,
+                            borderLeft: '1px dashed rgba(10,10,15,0.28)',
+                            pointerEvents: 'none',
+                            zIndex: 25,
+                          }}
+                        />
+                        <div
+                          style={{
+                            position: 'absolute',
+                            left: lp.x,
+                            top: lp.labelY,
+                            transform: 'translateX(-50%)',
+                            fontSize: 12,
+                            fontWeight: isActive ? 700 : 600,
+                            lineHeight: `${LABEL_H}px`,
+                            color: '#0A0A0F',
+                            whiteSpace: 'nowrap',
+                            pointerEvents: 'none',
+                            zIndex: 26,
+                            opacity: isActive ? 1 : 0.72,
+                            letterSpacing: '0.01em',
+                            background: isActive ? '#fafafa' : 'transparent',
+                            padding: isActive ? '0 4px' : '0',
+                            borderRadius: 3,
+                          }}
+                        >
+                          {b.name}
+                        </div>
+                      </React.Fragment>
                     );
                   })}
                 </div>
@@ -726,19 +814,25 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
               <div className="ptXAxisWrap">
                 <div className="ptXAxisSpacer" />{/* matches the 60px Y-axis column */}
                 <div className="ptXAxisTrack">
-                  {[5,4,3,2,1].map(rank => (
-                    <div
-                      key={rank}
-                      className="ptXAxisTick"
-                      style={{ left: `calc(${PLOT_INSET}px + ${((5-rank)/4).toFixed(4)} * (100% - ${2*PLOT_INSET}px))` }}
-                    >
-                      <div className="ptXAxisTickMark" />
-                      <div className="ptXAxisTickLabel">{rank}</div>
-                    </div>
-                  ))}
+                  {(() => {
+                    const rMin = Math.min(...bubbleData.map(b => b.rank));
+                    const rMax = Math.max(...bubbleData.map(b => b.rank));
+                    const rSpan = rMax === rMin ? 1 : rMax - rMin;
+                    const ticks = [1,2,3,4,5].filter(r => r >= Math.floor(rMin) && r <= Math.ceil(rMax));
+                    return ticks.map(rank => (
+                      <div
+                        key={rank}
+                        className="ptXAxisTick"
+                        style={{ left: `calc(${PLOT_INSET}px + ${((rMax - rank) / rSpan).toFixed(4)} * (100% - ${2*PLOT_INSET}px))` }}
+                      >
+                        <div className="ptXAxisTickMark" />
+                        <div className="ptXAxisTickLabel">{rank}</div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
-              <div className="ptXAxisLabel">Avg rank <br /> (1 = top mention, 5 = lowest)</div>
+              <div className="ptXAxisLabel">Average rank <br /> (1 = top mention, 5 = lowest)</div>
               </div>{/* end ptChartView */}
 
               {/* ── Mobile list view ── */}
@@ -947,7 +1041,7 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
                   disabled={safePage >= totalPages}
                 >Next →</button>
               </div>
-              <span className="ptCtaLink" onClick={() => exportPromptsCsv(filteredRows, brandName, selectedTopicId, showAppeared)}>
+              <span className="ptCtaLink" onClick={() => exportPromptsCsv(filteredRows, brandName, selectedTopicId, showAppeared, bubbleData)}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/>
                 </svg>
@@ -956,26 +1050,6 @@ export default function PromptsTestedTab({ result, resultComps, setActiveParent,
             </div>
           </div>
         </div>
-
-        {/* ── Block 4: Teaser strip ───────────────────────────── */}
-        {teaserCount > 0 && (
-          <div className="ptTeaserStrip" id="pt-teaser-strip">
-            <div className="ptTeaserContent">
-              <div className="ptTeaserEyebrow">EXPAND YOUR PROMPT SET</div>
-              <div className="ptTeaserHeadline">
-                <span className="ptTeaserCount">{teaserCount}</span> trending prompts in{' '}
-                {indLabel || 'your industry'}{' '} you&apos;re not testing yet.
-              </div>
-              <div className="ptTeaserSub">Close coverage gaps before competitors do.</div>
-            </div>
-            <button
-              className="ptTeaserCta"
-              onClick={() => setActiveParent(3)}
-            >
-              See in Priorities →
-            </button>
-          </div>
-        )}
 
       </div>
     </div>

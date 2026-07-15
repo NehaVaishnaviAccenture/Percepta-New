@@ -3409,7 +3409,7 @@ Exactly 10 items. Mix of High (6), Medium (3), Low (1). No brand names.`;
       const mentioned = rdCat.mentioned;
       const winRate = rdCat.total > 0 ? Math.round((rdCat.mentioned / rdCat.total) * 100) : 0;
       const topCompetitor = getTopCompetitor(catRows);
-      const dailySearches = DAILY_SEARCH_EST[cat] || Math.round(10000 + Math.random() * 15000);
+      const dailySearches = DAILY_SEARCH_EST[cat] || total;
 
       // Cosine-like similarity: compare brand mention vectors across categories
       // Vector = binary array of whether brand was mentioned in each response position

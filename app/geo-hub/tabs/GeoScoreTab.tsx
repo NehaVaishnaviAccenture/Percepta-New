@@ -87,7 +87,7 @@ function ArchSVG({ score }: { score: number }) {
       {/* Needle */}
       <line x1={base.x} y1={base.y} x2={tip.x} y2={tip.y} stroke={MARKER_COLOR} strokeWidth="3.5" strokeLinecap="round" />
       {/* Score inside arch */}
-      <text x={CX} y={CY - 72} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="700" letterSpacing="0.06em" fill="#8E8E8E">GEO Score</text>
+      <text x={CX} y={CY - 72} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="13" fontWeight="700" letterSpacing="0.06em" fill="#8E8E8E">GEO Score</text>
       <text x={CX} y={CY - 28} textAnchor="middle" fontFamily="'Space Grotesk', sans-serif" fontSize="44" fontWeight="700" fill={tier.color}>{score}</text>
       <text x={CX} y={CY - 10} textAnchor="middle" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="600" letterSpacing="0.08em" fill="#8E8E8E">{tier.name.toUpperCase()}</text>
     </svg>
