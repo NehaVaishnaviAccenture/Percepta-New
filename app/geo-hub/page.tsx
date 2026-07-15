@@ -13,7 +13,7 @@ const METRIC_TIPS: Record<string, string> = {
   'visibility score': 'Measures how often your brand appears in AI-generated responses across key industry queries.',
   'citation score': 'Reflects how authoritatively AI models reference your brand compared to competitors.',
   'sentiment score': 'Captures the tone and favorability of AI responses when your brand is mentioned.',
-  'avg rank': 'Average position when your brand is mentioned within an AI response. #1 means AI names your brand first most often.',
+  'avg rank': 'Average position within each AI response when your brand is mentioned. #1 = AI names you first. #3 = two other brands named before you. Unrelated to leaderboard position.',
   'prominence score': 'Measures how early in AI responses your brand is mentioned.',
   'share of voice': 'Your brand mentions as a percentage of all brand mentions across AI responses.',
 };
@@ -105,11 +105,11 @@ function getProductDefs(indKey: string, lob: string): ProductDef[] {
     }));
   }
   return [
-    { label: 'Core Product', terms: ['product', 'service', 'solution'], color: TOPIC_COLORS[0] },
-    { label: 'Premium Tier', terms: ['premium', 'pro', 'plus', 'elite'], color: TOPIC_COLORS[1] },
-    { label: 'Entry Tier', terms: ['basic', 'starter', 'standard', 'free'], color: TOPIC_COLORS[2] },
-    { label: 'Bundles', terms: ['bundle', 'package', 'combo', 'suite'], color: TOPIC_COLORS[3] },
-    { label: 'Features', terms: ['feature', 'benefit', 'capability', 'tool'], color: TOPIC_COLORS[4] },
+    { label: 'Core Product', terms: [lobWords[0] || 'offering'], color: TOPIC_COLORS[0] },
+    { label: 'Premium Tier', terms: ['premium', 'elite', 'pro', 'platinum'], color: TOPIC_COLORS[1] },
+    { label: 'Entry Tier', terms: ['basic', 'starter', 'standard', 'entry'], color: TOPIC_COLORS[2] },
+    { label: 'Comparison', terms: ['vs', 'versus', 'compare', 'alternative', 'better than'], color: TOPIC_COLORS[3] },
+    { label: 'Reviews', terms: ['review', 'rating', 'recommend', 'worth it', 'best'], color: TOPIC_COLORS[4] },
   ];
 }
 
@@ -124,7 +124,7 @@ function computeProductMentions(productDefs: ProductDef[], rd: any[]): any[] {
         return p.terms.some((t: string) => txt.includes(t));
       }).length;
       const pct = Math.round((count / total) * 100);
-      return { ...p, mentions: count, pct, val: Math.max(5, count) };
+      return { ...p, mentions: count, pct, val: count };
     })
     .filter((p) => p.pct >= 2 || (pool.length < 20 && p.mentions >= 1));
 }
@@ -227,7 +227,7 @@ function SankeyFlowChart({ result }: { result: any }) {
   const sortedMentions = [...productMentions].sort((a: any, b: any) => b.mentions - a.mentions);
   const prodItems: any[] = sortedMentions.length >= 1
     ? sortedMentions.map((p, i) => ({ ...p, color: PROD_COLORS_POOL[i % PROD_COLORS_POOL.length] }))
-    : productDefs.map((p, i) => ({ ...p, mentions: Math.round(scanPool.length / (productDefs.length || 5)), pct: Math.round(100 / (productDefs.length || 5)), val: 20 + i * 5, color: PROD_COLORS_POOL[i % PROD_COLORS_POOL.length] }));
+    : [{ label: 'General', mentions: 1, pct: 100, val: 1, color: PROD_COLORS_POOL[0], terms: [] }];
 
   const signals = [
     { label: 'Visibility', val: vis, weight: 30, color: '#A100FF' },
@@ -237,7 +237,7 @@ function SankeyFlowChart({ result }: { result: any }) {
     { label: 'Share of Voice', val: sov, weight: 15, color: '#374151' },
   ];
 
-  const geoScore = Math.round(signals.reduce((s, m) => s + m.val * m.weight / 100, 0)) || result.overall_geo_score || 0;
+  const geoScore = result.overall_geo_score || 0;
   const W = 1040, H = 520, padT = 32, padB = 44;
   const col1 = 130, col2 = 300, col3 = 510, col4 = 720, nW = 26;
   const plotH = H - padT - padB;
@@ -485,7 +485,7 @@ function SentimentHeatmap({ result }: { result: any }) {
   const rows = [
     { name: brand, isYou: true, scores: myScores },
     ...competitors.slice(0, 8).map((c: any) => {
-      const visRatio = (c.Vis || 0) / Math.max(result.visibility || 1, 1);
+      const visRatio = Math.min(1, (c.Vis || 0) / Math.max(result.visibility || 1, 1));
       const compScores = productDefs.map((p, di) => {
         const baseScore = myScores[di] || 5;
         // Scale by competitor's visibility ratio + add slight variation by position
@@ -747,7 +747,7 @@ export default function GeoHub() {
       const data = await res.json();
       timers.forEach((t) => clearTimeout(t)); setLoadingProgress(100);
       await new Promise((r) => setTimeout(r, 400));
-      if (data.error) setError(data.error);
+      if (data.error) { setError(data.error); setLoadingProgress(0); }
       else {
         setResult(data); setCachedActions(null); setActionsLoading(false); setQueryPage(1); setSelectedCluster(null); setFilterCat('All'); setActiveTab(0);
         try { sessionStorage.setItem('geo_result', JSON.stringify(data)); sessionStorage.setItem('geo_url', url); } catch {}
@@ -811,8 +811,7 @@ export default function GeoHub() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}><div style={{ width: 7, height: 7, borderRadius: '50%', background: '#A100FF' }} /><span style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.14em', color: '#9CA3AF', textTransform: 'uppercase' as const }}>Brand URL</span></div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <div style={{ flex: 1, display: 'flex', alignItems: 'center', border: '1.5px solid #E5E7EB', borderRadius: 12, background: 'white', overflow: 'hidden', height: 52 }}>
-                <span style={{ padding: '0 0 0 20px', fontSize: '0.95rem', color: '#9CA3AF', flexShrink: 0, fontWeight: 500 }}>https://www.</span>
-                <input type="text" value={url.replace(/^https?:\/\/(www\.)?/, '')} onChange={(e) => { const v = e.target.value.replace(/^https?:\/\/(www\.)?/, '').replace(/^www\./, ''); setUrl('https://www.' + v); }} onKeyDown={(e) => e.key === 'Enter' && runAnalysis()} placeholder="chase.com/credit-cards" style={{ flex: 1, border: 'none', padding: '14px 12px 14px 4px', fontSize: '0.95rem', background: 'transparent', outline: 'none', color: '#374151' }} />
+                <input type="text" value={url} onChange={(e) => { const v = e.target.value.trim(); setUrl(v.startsWith('http') ? v : v ? 'https://' + v : ''); }} onKeyDown={(e) => e.key === 'Enter' && runAnalysis()} placeholder="https://chase.com/credit-cards" style={{ flex: 1, border: 'none', padding: '14px 20px', fontSize: '0.95rem', background: 'transparent', outline: 'none', color: '#374151' }} />
               </div>
               <button onClick={runAnalysis} disabled={loading} style={{ background: '#A100FF', color: 'white', border: 'none', borderRadius: 50, fontWeight: 700, fontSize: '0.95rem', height: 52, padding: '0 28px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(161,0,255,0.4)', whiteSpace: 'nowrap' as const, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>🔍 {loading ? 'Analysing...' : 'Run Live AI Analysis'}</button>
             </div>
@@ -868,7 +867,9 @@ export default function GeoHub() {
             {(() => {
               const comps = result.competitors || [];
               const sorted = [...comps].sort((a: any, b: any) => (b.GEO || 0) - (a.GEO || 0));
-              result._topCompBrand = sorted.length > 0 ? sorted[0].Brand : '';
+              const topCompBrandGlobal = sorted.length > 0 ? sorted[0].Brand : '';
+              // Store in a ref-safe way without mutating result
+              if (!result._topCompBrand) result._topCompBrand = topCompBrandGlobal;
               return null;
             })()}
 
@@ -878,14 +879,16 @@ export default function GeoHub() {
               const badge = scoreBadge(geo);
               const industryLabel = result.ind_label || result.industry || '';
               const metrics = [
-                { name: 'Visibility', val: vis, note: vis < 50 ? 'rarely appears in AI responses' : vis < 70 ? 'appears infrequently' : 'strong' },
-                { name: 'Prominence', val: prom, note: prom < 50 ? 'mentioned at the bottom' : prom < 70 ? 'appears mid-list' : 'named early' },
-                { name: 'Share of Voice', val: sov, note: sov < 50 ? 'competitors dominating' : sov < 70 ? 'modest share' : 'strong share' },
-                { name: 'Citation', val: cit, note: cit < 50 ? 'rarely cited' : cit < 70 ? 'occasionally cited' : 'frequently cited' },
-                { name: 'Sentiment', val: rawSent, note: rawSent < 50 ? 'neutral or negative' : rawSent < 70 ? 'mostly neutral' : 'positive tone' },
+                { name: 'Visibility', val: vis, note: vis < 30 ? 'rarely appears in AI responses' : vis < 55 ? 'appears in some AI responses' : 'appears frequently' },
+                { name: 'Prominence', val: prom, note: prom < 40 ? 'mentioned late in AI responses' : prom < 65 ? 'appears mid-list' : 'named early and prominently' },
+                { name: 'Share of Voice', val: sov, note: sov < 25 ? 'competitors dominating AI conversations' : sov < 50 ? 'moderate share of AI mentions' : 'strong share of AI conversations' },
+                { name: 'Citation', val: cit, note: cit < 30 ? 'rarely cited as authoritative' : cit < 60 ? 'occasionally cited' : 'frequently cited as authoritative' },
+                { name: 'Sentiment', val: rawSent, note: rawSent < 45 ? 'neutral or negative AI tone' : rawSent < 70 ? 'mostly neutral tone' : 'positive AI tone' },
               ].sort((a, b) => a.val - b.val);
-              const weakest = metrics.slice(0, 3);
-              const explanation = `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by ${weakest.map((m) => `${m.name} (${m.val}), ${m.note}`).join('; ')}.`;
+              const weakest = metrics.slice(0, 3).filter(m => m.val < 70);
+              const explanation = weakest.length > 0
+                ? `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by ${weakest.map((m) => `${m.name} (${m.val}), ${m.note}`).join('; ')}.`
+                : `GEO Score of ${geo} reflects strong performance across all signals — ${vis}% Visibility, ${rawSent} Sentiment, ${sov}% Share of Voice.`;
               const scoreBands = [
                 { range: '0-44', label: 'Poor', color: '#F44336', bg: '#FFEBEE', border: '#F44336', desc: 'Rarely mentioned. AI lacks enough signals to surface you reliably.' },
                 { range: '45-69', label: 'Needs Work', color: '#FF7043', bg: '#FBE9E7', border: '#FF7043', desc: 'Appears in lists but not as a primary recommendation.' },
@@ -934,13 +937,14 @@ export default function GeoHub() {
             {/* TAB 1: Competitors */}
             {activeTab === 1 && (() => {
               const geo = result.overall_geo_score, vis = result.visibility, cit = result.citation_share;
-              const sent = result.sentiment, sov = result.share_of_voice, prom = result.prominence || 0, avgRank = result.avg_rank;
+              const sent = result.sentiment, sov = result.share_of_voice, prom = result.prominence || 0;
+              const avgRank = result.avg_rank; // avg position within AI responses (e.g. #2 = named 2nd on average)
               const youEntry = { Brand: result.brand_name, URL: result.domain, GEO: geo, Vis: vis, Cit: cit, Sen: sent, Sov: sov, Prom: prom, Rank: avgRank, isYou: true };
-              const compEntries = (result.competitors || []).slice(0, 9).map((c: any) => ({ ...c, Prom: c.Prom || Math.round((c.Vis || 0) * 0.85), isYou: false }));
+              const compEntries = (result.competitors || []).slice(0, 9).map((c: any) => ({ ...c, isYou: false }));
               const top = [youEntry, ...compEntries].sort((a: any, b: any) => b.GEO - a.GEO);
               const myRank = top.findIndex((c) => c.isYou) + 1, leader = top[0], next = top[myRank] || null;
               const gapToTop = geo - leader.GEO, leadOver = next ? geo - next.GEO : null;
-              const resolvedRank = (c: any) => { const pos = top.findIndex((t) => t.Brand === c.Brand && t.isYou === c.isYou); if (pos < 0 || pos >= 5) return '--'; return `#${pos + 1}`; };
+              const resolvedRank = (c: any) => { const pos = top.findIndex((t: any) => t.Brand === c.Brand && t.isYou === c.isYou); if (pos < 0) return '--'; return `#${pos + 1}`; };
               const bW = Math.max(700, top.length * 80), bH = 160, bPad = 40, gW = (bW - bPad * 2) / top.length, bMH = bH - bPad;
               const allMetrics = [
                 { key: 'Vis', label: 'Visibility', color: '#A100FF', lightColor: '#D4ADFF' },
@@ -955,7 +959,7 @@ export default function GeoHub() {
                   <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>All scores computed from the same pool of {result.total_responses} AI responses</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
                     <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 22px' }}><div style={{ fontSize: '0.75rem', color: '#A100FF', fontWeight: 600, marginBottom: 4 }}>Your GEO Score</div><div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#A100FF' }}>{geo}</div><div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>ranked #{myRank} of {top.length} brands</div></div>
-                    <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 22px' }}><div style={{ fontSize: '0.75rem', color: '#92400E', fontWeight: 600, marginBottom: 4 }}>Gap to #1 ({leader.Brand})</div><div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#92400E' }}>{gapToTop === 0 ? '--' : `${gapToTop} pts`}</div><div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{myRank === 1 ? 'You are the leader' : Math.abs(gapToTop) <= 5 ? 'Close, strong opportunity' : 'Gap to close'}</div></div>
+                    <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 22px' }}><div style={{ fontSize: '0.75rem', color: '#92400E', fontWeight: 600, marginBottom: 4 }}>Gap to #1 ({leader.Brand})</div><div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#92400E' }}>{myRank === 1 ? '--' : `${Math.abs(gapToTop)} pts`}</div><div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{myRank === 1 ? 'You are the leader' : Math.abs(gapToTop) <= 5 ? 'Very close — strong opportunity' : 'Points behind #1'}</div></div>
                     <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '18px 22px' }}><div style={{ fontSize: '0.75rem', color: '#065F46', fontWeight: 600, marginBottom: 4 }}>{next ? `Lead over #${myRank + 1} (${next.Brand})` : 'Top Ranked'}</div><div style={{ fontSize: '2.2rem', fontWeight: 900, color: '#065F46' }}>{leadOver != null ? `+${leadOver} pts` : '--'}</div><div style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>{leadOver != null ? (leadOver < 10 ? 'Close, defend position' : 'Comfortable lead') : 'Leading the category'}</div></div>
                   </div>
                   <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '16px 20px', marginBottom: 20 }}>
@@ -969,7 +973,7 @@ export default function GeoHub() {
                           const subW = (gW * 0.8) / allMetrics.length;
                           return (<g key={i} onMouseEnter={() => setHovBar(i)} style={{ cursor: 'pointer' }}>
                             {allMetrics.map((m, mi) => { const val = (c as any)[m.key] || 0, mh = (val / 100) * bMH, mx = bx + gW * 0.1 + mi * subW; return <rect key={mi} x={mx} y={bH - mh} width={subW - 1} height={mh} fill={isY ? m.color : m.lightColor} rx={1} />; })}
-                            <text x={bx + gW / 2} y={bH + 13} textAnchor="middle" style={{ fontSize: 9, fill: isY ? '#A100FF' : '#6B7280', fontFamily: 'Inter,sans-serif', fontWeight: isY ? 700 : 400 }}>{(c.Brand || '').split(' ')[0]}</text>
+                            <text x={bx + gW / 2} y={bH + 13} textAnchor="middle" style={{ fontSize: 9, fill: isY ? '#A100FF' : '#6B7280', fontFamily: 'Inter,sans-serif', fontWeight: isY ? 700 : 400 }}>{(c.Brand || '').length > 8 ? (c.Brand || '').slice(0, 7) + '…' : (c.Brand || '')}</text>
                           </g>);
                         })}
                         {(() => {
@@ -992,7 +996,7 @@ export default function GeoHub() {
                   </div>
                   <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AVG. RANK'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AI POSITION'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c: any, i: number) => {
                         const gap2 = c.isYou ? null : c.GEO - geo;
                         return <tr key={i} style={{ background: c.isYou ? '#F5F0FF' : 'white', borderTop: '1px solid #F3F4F6', borderLeft: c.isYou ? '3px solid #A100FF' : 'none' }}>
@@ -1005,7 +1009,7 @@ export default function GeoHub() {
                           <td style={{ padding: '11px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Sen}</td>
                           <td style={{ padding: '11px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Sov}</td>
                           <td style={{ padding: '11px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Prom}</td>
-                          <td style={{ padding: '11px 12px', fontSize: '0.82rem', fontWeight: 600, color: '#A100FF' }}>{resolvedRank(c)}</td>
+                          <td style={{ padding: '11px 12px', fontSize: '0.82rem', fontWeight: 600, color: '#A100FF' }}>{c.Rank || '--'}</td>
                         </tr>;
                       })}</tbody>
                     </table>
@@ -1018,7 +1022,8 @@ export default function GeoHub() {
             {activeTab === 2 && (() => {
               const geo = result.overall_geo_score, vis = result.visibility, comps = result.competitors || [];
               const allVis = [vis, ...comps.map((c: any) => c.Vis)];
-              const myVisRank = [...allVis].sort((a, b) => b - a).indexOf(vis) + 1;
+              const sortedVis  = [...allVis].sort((a, b) => b - a);
+              const myVisRank  = sortedVis.indexOf(vis) + 1;
               const topComp = comps.length > 0 ? comps.reduce((a: any, b: any) => b.Vis > a.Vis ? b : a, comps[0]) : null;
               const gapToTop = vis - (topComp ? topComp.Vis : vis);
               const topCompBrand = result._topCompBrand || (comps.length > 0 ? comps[0].Brand : '');
@@ -1053,7 +1058,7 @@ export default function GeoHub() {
             {/* TAB 3: Sentiment */}
             {activeTab === 3 && (() => {
               const rawSent = result.sentiment, prom = result.prominence, avgRank = result.avg_rank;
-              const smood = rawSent >= 70 ? 'AI speaks favorably about your brand' : rawSent >= 45 ? 'AI tone is neutral' : 'AI tone is negative or missing';
+              const smood = rawSent >= 70 ? 'AI speaks favorably about your brand' : rawSent >= 50 ? 'AI tone is neutral' : rawSent >= 40 ? 'AI tone is slightly negative' : 'AI tone is negative or missing';
               const pmood = prom >= 70 ? 'Named first or near top of AI responses' : prom >= 45 ? 'Appears mid-list in AI responses' : 'Rarely named early in AI responses';
               return (
                 <div>
@@ -1149,8 +1154,8 @@ export default function GeoHub() {
                 <div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 20 }}>
                     <MetricCard label="queries run" val={totalQueries} sub="AI-generated consumer questions, no brand names" color="#A100FF" />
-                    <MetricCard label="appearances" val={`${totalMentions}/${totalQueries}`} sub="Queries where brand appeared in AI response" color="#A100FF" />
-                    <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Real computed from AI responses" color="#A100FF" />
+                    <MetricCard label="brand appearances" val={`${totalMentions}/${totalQueries}`} sub="Answered queries where your brand was mentioned" color="#A100FF" />
+                    <MetricCard label="appearance rate" val={`${displayRate}%`} sub="Of answered queries where brand was mentioned" color="#A100FF" />
                   </div>
                   {clusters.length > 0 && (<div style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 20, border: '1px solid #1E293B' }}>
                     <div style={{ background: '#0F172A', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -1195,7 +1200,7 @@ export default function GeoHub() {
                       </select>
                     </div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'YOUR RANK', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'AI POSITION', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{pageRows.map((item: any, i: number) => {
                         const globalIdx = (safePage - 1) * ROWS_PER_PAGE + i + 1, rp = item.position, rankLabel = rp === 1 ? '#1' : rp > 0 ? `#${rp}` : 'N/A', rankColor = rp === 1 ? '#10B981' : item.mentioned ? '#A100FF' : '#9CA3AF';
                         const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
