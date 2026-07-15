@@ -75,26 +75,42 @@ function aliases(brand: string): string[] {
 }
 
 // ─── POSITION DETECTION ───────────────────────────────────────────────────────
-// How many distinct named brands appear before ours in the response?
-// pos=1 means we were named first
-function position(text: string, als: string[]): number {
+// How many competitor brands are mentioned BEFORE our brand in the response?
+// pos=1 = we are the first brand named
+// pos=3 = two other brands named before us
+// Uses a known-brand list passed in, not fragile proper-noun detection
+function position(text: string, als: string[], compAliasList?: string[][]): number {
   if (!text) return 0;
   const tl = text.toLowerCase();
-  let first = Infinity;
+
+  // Find where our brand first appears
+  let ourIdx = Infinity;
   for (const a of als) {
-    const i = tl.indexOf(a);
-    if (i >= 0 && i < first) first = i;
+    const escaped = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = tl.match(new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`));
+    if (m && m.index !== undefined && m.index < ourIdx) ourIdx = m.index;
   }
-  if (first === Infinity) return 0;
-  const stop = new Set(['The','This','That','These','Those','When','Where','What',
-    'Which','How','Why','For','And','But','Or','In','On','At','To','Of','With','As',
-    'By','From','An','If','It','Its','Are','Is','Be','Was','Were','Has','Have','Had',
-    'Here','Some','Many','Most','More','Such','Each','Both','Also','Very','Just',
-    'About','After','Before','Between','Since','Without','Within','Around',
-  ]);
-  const nouns = (text.slice(0, first).match(/\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})*/g) || [])
-    .filter(w => !stop.has(w));
-  return nouns.length + 1;
+  if (ourIdx === Infinity) return 0;
+
+  // Count how many competitor aliases appear before our brand
+  if (!compAliasList || compAliasList.length === 0) {
+    // Fallback: return 1 (no competitor info available)
+    return 1;
+  }
+
+  let brandsBefore = 0;
+  for (const compAls of compAliasList) {
+    for (const a of compAls) {
+      const escaped = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = tl.match(new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`));
+      if (m && m.index !== undefined && m.index < ourIdx) {
+        brandsBefore++;
+        break; // count each competitor once
+      }
+    }
+  }
+
+  return brandsBefore + 1;
 }
 
 // ─── PARSE BATCH ANSWERS ──────────────────────────────────────────────────────
@@ -239,8 +255,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  // PROMINENCE
-  const positions = mentioned.map(r => position(r.a || '', als)).filter(p => p > 0);
+  // PROMINENCE — now uses competitor aliases for accurate position detection
+  const compAliasList = comps.map(c => aliases(c));
+  const positions = mentioned.map(r => position(r.a || '', als, compAliasList)).filter(p => p > 0);
   const avgPos    = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const prominence = mentionCount > 0 ? Math.round(Math.max(10, Math.min(95, 100 - (avgPos - 1) * 18))) : 0;
 
@@ -382,21 +399,25 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.GEO - a.GEO);
 
     // 7. Response detail
-    const responsesDetail = allQA.filter(Boolean).map(r => ({
-      category: r.category, stage: r.stage, persona: r.persona, query: r.q,
-      mentioned: hasAlias((r.a || '').toLowerCase(), als),
-      response_preview: r.a || '',
-      position: position(r.a || '', als),
-      winner_brand: (() => {
-        let winner = '', winPos = Infinity;
-        const brandPos = position(r.a || '', als);
-        competitors.slice(0, 12).forEach(c => {
-          const ca = aliases(c), pos = position(r.a || '', ca);
-          if (pos > 0 && pos < winPos && (brandPos === 0 || pos < brandPos)) { winPos = pos; winner = c; }
-        });
-        return winner || null;
-      })(),
-    }));
+    const compAliasList = competitors.map(c => aliases(c));
+    const responsesDetail = allQA.filter(Boolean).map(r => {
+      const t        = (r.a || '').toLowerCase();
+      const isMentioned = hasAlias(t, als);
+      const brandPos = isMentioned ? position(r.a || '', als, compAliasList) : 0;
+      let winner = '', winPos = Infinity;
+      competitors.slice(0, 12).forEach(c => {
+        const ca  = aliases(c);
+        const pos = position(r.a || '', ca, compAliasList.filter(x => x !== ca));
+        if (pos > 0 && pos < winPos && (brandPos === 0 || pos < brandPos)) { winPos = pos; winner = c; }
+      });
+      return {
+        category: r.category, stage: r.stage, persona: r.persona, query: r.q,
+        mentioned: isMentioned,
+        response_preview: r.a || '',
+        position: brandPos,
+        winner_brand: winner || null,
+      };
+    });
 
     // 8. Clusters
     const queryClusters = clusters(allQA, als, competitors);
