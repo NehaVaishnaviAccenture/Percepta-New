@@ -1360,10 +1360,17 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // Use raw quality scores directly — no scaling
-  const prominence    = rawProminence;
-  const sentiment     = rawSentiment;
-  const citationShare = rawCitation;
+  // Blend quality scores with visibility
+  // A brand with very few mentions has unreliable quality scores.
+  // We blend raw quality toward neutral (50) weighted by mention rate.
+  // mentionRate=0.8 (80%) → blend = 0.8×raw + 0.2×50 → quality mostly trusted
+  // mentionRate=0.05 (5%) → blend = 0.05×raw + 0.95×50 → mostly neutral
+  // This is a statistical blending principle — no hardcoded threshold
+  const mentionRate   = mentionCount / total;
+  const blend = (raw: number) => Math.round(mentionRate * raw + (1 - mentionRate) * 50);
+  const prominence    = blend(rawProminence);
+  const sentiment     = blend(rawSentiment);
+  const citationShare = blend(rawCitation);
 
   // GEO — weighted composite
   const geo = Math.round(
