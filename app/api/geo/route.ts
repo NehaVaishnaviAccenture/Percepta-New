@@ -1470,9 +1470,9 @@ export async function POST(req: NextRequest) {
       }).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a senior consumer finance expert. Answer every question by naming 2-4 specific real brands that genuinely fit what the question is asking. Different questions deserve different brand answers — a cash back question gets different brands than a travel question or a premium card question. Never name the same brands for every question. Base your recommendations purely on what the question asks. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a balanced consumer finance expert. For each question, name 2-3 brands that are genuinely the best fit for that specific question type. Cash back questions get cash back leaders. Travel questions get travel leaders. Student questions get student card leaders. No-fee questions get no-fee leaders. Balance transfer questions get balance transfer leaders. Credit building questions get secured card leaders. Do not default to the same brands across all questions — every category has different leaders. Be accurate and specific to what each question is actually asking. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Follow the Guidance for depth. Always name 2-4 specific real brands per answer.\n\n${ql}\n\nFormat:\n${lbs}` },
-      ], 0.4, 4000, 2);
+      ], 0.2, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
     }));
