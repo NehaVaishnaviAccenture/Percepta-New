@@ -1330,7 +1330,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const rank1Count = positions.filter(p => p === 1).length;
 
   // PROMINENCE — quality: of its own mentions, how often named first?
-  const prominence = Math.round((rank1Count / mentionCount) * 100);
+  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
 
   // SENTIMENT — quality: of its own mentions, how often positive or neutral tone?
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
@@ -1346,21 +1346,31 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
     if (!hasNeg) posMentions++;
   });
-  const sentiment = Math.round((posMentions / mentionCount) * 100);
+  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
 
-  // CITATION — quality: position quality across own mentions
+  // CITATION — position quality across own mentions
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round((citWeight / mentionCount) * 100);
+  const rawCitation   = Math.round((citWeight / mentionCount) * 100);
 
-  // SOV — frequency: share of all brand-mentioning responses
-  const top8     = comps.slice(0, 8);
+  // SOV — frequency: share of all brand-mentioning responses (top 10 competitors)
+  const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
     const t = (r.a || '').toLowerCase();
     if (hasAlias(t, als)) { brandSet.add(i); anySet.add(i); }
-    top8.forEach(c => { if (hasAlias(t, aliases(c))) anySet.add(i); });
+    top10.forEach(c => { if (hasAlias(t, aliases(c))) anySet.add(i); });
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
+
+  // QUALITY SCALING: weight quality metrics by sqrt(visibility/100)
+  // This prevents a brand appearing in 2% of responses from scoring 100% on sentiment.
+  // A brand must appear frequently enough for its quality score to be statistically meaningful.
+  // sqrt gives gentle scaling: 4% vis → quality scaled to 20%; 25% vis → 50%; 64% vis → 80%
+  // No hardcoded ceiling — purely derived from the brand's own visibility.
+  const qualityScale = Math.sqrt(visibility / 100);
+  const prominence    = Math.round(rawProminence   * qualityScale);
+  const sentiment     = Math.round(rawSentiment    * qualityScale);
+  const citationShare = Math.round(rawCitation     * qualityScale);
 
   // GEO — weighted composite
   const geo = Math.round(
@@ -1495,17 +1505,24 @@ ${lbs}` },
       });
     });
 
-    // Sort by actual AI mentions — most-mentioned competitors first
-    // Only include competitors GPT actually talked about (mention > 0)
-    // This IS the real competitor landscape as seen by AI
+    // COMPETITORS — ranked by actual AI mentions, always 10 shown
+    // Start with brands GPT actually mentioned (most credible)
+    // Pad with remaining discovered competitors if fewer than 10 appeared
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key);
 
-    // Score only real competitors — brands GPT actually mentioned
-    const competitorScoresRaw = realCompetitors
+    // Add any discovered competitors that didn't appear (score them as 0 visibility)
+    const notMentioned = competitors.filter(c =>
+      c.toLowerCase() !== brand.toLowerCase() &&
+      !mentionCounts[c.toLowerCase()]
+    );
+    const allCompetitors = [...realCompetitors, ...notMentioned]
       .filter(c => c.toLowerCase() !== brand.toLowerCase())
-      .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, [...realCompetitors]))
+      .slice(0, 10); // always exactly 10
+
+    const competitorScoresRaw = allCompetitors
+      .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allCompetitors))
       .sort((a, b) => b.GEO - a.GEO);
 
     // Assign ranks by GEO score order
