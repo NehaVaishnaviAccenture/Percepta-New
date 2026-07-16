@@ -1283,45 +1283,49 @@ Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
-// VISIBILITY  = mentions / total × 100              — how often brand appears (0-100)
-// PROMINENCE  = rank1 / mentions × 100              — when it appears, how often first (0-100)
-// SENTIMENT   = positive_mentions / mentions × 100  — tone quality of its mentions (0-100)
-// CITATION    = sum(1/pos) / mentions × 100         — position quality of mentions (0-100)
-// SOV         = brand_responses / any_brand × 100   — share of all brand conversations (0-100)
-// GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+// VISIBILITY  = mentions / relevant_queries × 100
+//               "Relevant" = query categories where this brand actually appeared.
+//               Derived from response data — no hardcoding of brand territories.
+//               A cash-back specialist isn't penalized for premium card queries.
+//               A brand with 0 mentions gets 0 across all metrics.
 //
-// Visibility and SOV relative to total — measure frequency.
-// Prominence, Sentiment, Citation relative to OWN mentions — measure quality.
-// A brand appearing 60% of the time with great quality will score GEO ~65.
-// A brand appearing 0% scores 0. No inflation, no deflation.
+// PROMINENCE  = rank1_mentions / mentions × 100   (quality within own mentions)
+// SENTIMENT   = positive_mentions / mentions × 100 (blended with mention rate)
+// CITATION    = sum(1/pos) / mentions × 100        (position quality)
+// SOV         = brand_responses / any_brand × 100  (share of all conversations)
+// GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
-  const answered     = qa.filter(r => r && (r.a || '').trim().length > 10);
-  const total        = answered.length || 1;
-  const compAls      = comps.map(c => aliases(c));
+  const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
+  const total     = answered.length || 1;
+  const compAls   = comps.map(c => aliases(c));
 
-  // VISIBILITY — frequency: how often across all queries
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
-  const visibility   = Math.round((mentionCount / total) * 100);
 
   if (mentionCount === 0) {
-    // Brand never appeared — all quality metrics are 0
-    const top8z = comps.slice(0, 8);
+    const top10z = comps.slice(0, 10);
     const anySetZ = new Set<number>();
-    answered.forEach((r, i) => { top8z.forEach(c => { if (hasAlias((r.a||'').toLowerCase(), aliases(c))) anySetZ.add(i); }); });
-    const sovZ = Math.round((0 / Math.max(anySetZ.size, 1)) * 100);
-    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: sovZ, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
+    answered.forEach((r, i) => { top10z.forEach(c => { if (hasAlias((r.a||'').toLowerCase(), aliases(c))) anySetZ.add(i); }); });
+    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: Math.round((0 / Math.max(anySetZ.size, 1)) * 100), geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
-  // POSITIONS — where is brand named in each response where it appears?
+  // OPTION B: Relevant visibility
+  // Find which categories this brand appeared in from the actual response data
+  // Then count visibility only against queries in those categories
+  const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
+  const relevantAnswered = brandCats.size > 0
+    ? answered.filter(r => brandCats.has(r.category))
+    : answered;
+  const relevantTotal = relevantAnswered.length || total;
+  const visibility = Math.round((mentionCount / relevantTotal) * 100);
+
+  // POSITIONS
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-
-  // PROMINENCE — quality: of its own mentions, how often named first?
   const rawProminence = Math.round((rank1Count / mentionCount) * 100);
 
-  // SENTIMENT — quality: of its own mentions, how often positive or neutral tone?
+  // SENTIMENT
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -1337,11 +1341,11 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
 
-  // CITATION — position quality across own mentions
-  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation   = Math.round((citWeight / mentionCount) * 100);
+  // CITATION
+  const citWeight   = positions.reduce((s, p) => s + 1 / p, 0);
+  const rawCitation = Math.round((citWeight / mentionCount) * 100);
 
-  // SOV — frequency: share of all brand-mentioning responses (top 10 competitors)
+  // SOV
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1351,19 +1355,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // Blend quality scores with visibility
-  // A brand with very few mentions has unreliable quality scores.
-  // We blend raw quality toward neutral (50) weighted by mention rate.
-  // mentionRate=0.8 (80%) → blend = 0.8×raw + 0.2×50 → quality mostly trusted
-  // mentionRate=0.05 (5%) → blend = 0.05×raw + 0.95×50 → mostly neutral
-  // This is a statistical blending principle — no hardcoded threshold
-  const mentionRate   = mentionCount / total;
+  // Blend quality toward neutral for low-mention brands (statistical reliability)
+  const mentionRate   = mentionCount / relevantTotal;
   const blend = (raw: number) => Math.round(mentionRate * raw + (1 - mentionRate) * 50);
   const prominence    = blend(rawProminence);
   const sentiment     = blend(rawSentiment);
   const citationShare = blend(rawCitation);
 
-  // GEO — weighted composite
   const geo = Math.round(
     visibility     * 0.30 +
     sentiment      * 0.20 +
