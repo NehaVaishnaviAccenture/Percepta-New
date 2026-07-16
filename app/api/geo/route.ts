@@ -1470,7 +1470,7 @@ export async function POST(req: NextRequest) {
       }).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a senior consumer finance expert. For every question, name 2-4 specific real brands. Always mention the major players in this space — for credit cards that means Chase, American Express, Capital One, Citi, Discover, and others as relevant. Name the brands that genuinely fit the question best, but ensure you are always recommending real named brands, never vague descriptions. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a senior consumer finance expert. Answer every question by naming 2-4 specific real brands that genuinely fit what the question is asking. Different questions deserve different brand answers — a cash back question gets different brands than a travel question or a premium card question. Never name the same brands for every question. Base your recommendations purely on what the question asks. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Follow the Guidance for depth. Always name 2-4 specific real brands per answer.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.4, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
