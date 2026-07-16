@@ -1298,7 +1298,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  if (mentionCount === 0) {
+  if (mentionCount === 0 || visibility === 0) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
