@@ -1290,50 +1290,51 @@ Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
 // SOV         = brand_responses / any_brand × 100
 // GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
-  const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
-  const total     = answered.length || 1;
-  const compAls   = comps.map(c => aliases(c));
+  const answered     = qa.filter(r => r && (r.a || '').trim().length > 10);
+  const total        = answered.length || 1;
+  const compAls      = comps.map(c => aliases(c));
 
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
-
-  // ALL metrics relative to total queries — same denominator everywhere
-  // This ensures consistency: a brand with 2% visibility cannot score 80 on any other metric
-  // visibility=20, prominence=15, citation=18, sentiment=18 all make sense together
-  const visibility = Math.round((mentionCount / total) * 100);
+  const visibility   = Math.round((mentionCount / total) * 100);
 
   if (mentionCount === 0) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
+  // PROMINENCE — quality of position when mentioned
+  // avgPos 1 = named first = prominence 100
+  // avgPos 2 = named second = prominence 82
+  // avgPos 3 = prominence 64, etc.
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const rank1Count = positions.filter(p => p === 1).length;
+  const prominence = mentionCount > 0 ? Math.round(Math.max(10, Math.min(95, 100 - (avgPos - 1) * 18))) : 0;
 
-  // PROMINENCE = rank1 mentions / total (not /mentionCount — prevents 2-mention brand scoring 100)
-  const prominence = Math.round((rank1Count / total) * 100);
-
-  // SENTIMENT = positive mentions / total (not /mentionCount)
+  // SENTIMENT — pos/neg word ratio in brand sentences, base 50
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
     'complicated','confusing','frustrating','complaints'];
-  let posMentions = 0;
+  let posW = 0, negW = 0;
   mentioned.forEach(r => {
-    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10);
-    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
-    if (!hasNeg) posMentions++;
+    (r.a || '').toLowerCase().split(/[.!?]+/)
+      .filter((s: string) => hasAlias(s, als) && s.length > 10)
+      .forEach((s: string) => {
+        POS.forEach(w => { if (s.includes(w)) posW++; });
+        NEG.forEach(w => { if (s.includes(w)) negW++; });
+      });
   });
-  const sentiment = Math.round((posMentions / total) * 100);
+  const sentiment = Math.round(Math.max(0, Math.min(95,
+    50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
+  )));
 
-  // CITATION = sum(1/pos) / total (not /mentionCount)
+  // CITATION — position quality relative to own mentions
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round((citWeight / total) * 100);
+  const citationShare = mentionCount > 0 ? Math.round(Math.min(95, (citWeight / mentionCount) * 100)) : 0;
 
-  // SOV = brand responses / any-brand responses
+  // SOV — share of all brand-mentioning responses
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1353,7 +1354,6 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
 
   return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
 }
-
 function scoreComp(name: string, url: string, qa: any[], allComps: string[]) {
   const als = aliases(name);
   const s   = score(name, als, qa, allComps.filter(c => c !== name));
