@@ -1360,15 +1360,10 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // QUALITY SCALING: weight quality metrics by sqrt(visibility/100)
-  // This prevents a brand appearing in 2% of responses from scoring 100% on sentiment.
-  // A brand must appear frequently enough for its quality score to be statistically meaningful.
-  // sqrt gives gentle scaling: 4% vis → quality scaled to 20%; 25% vis → 50%; 64% vis → 80%
-  // No hardcoded ceiling — purely derived from the brand's own visibility.
-  const qualityScale = Math.sqrt(visibility / 100);
-  const prominence    = Math.round(rawProminence   * qualityScale);
-  const sentiment     = Math.round(rawSentiment    * qualityScale);
-  const citationShare = Math.round(rawCitation     * qualityScale);
+  // Use raw quality scores directly — no scaling
+  const prominence    = rawProminence;
+  const sentiment     = rawSentiment;
+  const citationShare = rawCitation;
 
   // GEO — weighted composite
   const geo = Math.round(
@@ -1468,7 +1463,7 @@ export async function POST(req: NextRequest) {
       }).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a senior consumer finance expert. For every question you MUST name specific real brand names — never give a vague or generic answer. Name 2-4 brands per answer that genuinely fit what the question is asking. Different questions get different brand answers — match the brands to what is specifically being asked. Your goal is to help the user understand which real brands compete in this space. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a senior consumer finance expert. For every question, name 2-4 specific real brands. Always mention the major players in this space — for credit cards that means Chase, American Express, Capital One, Citi, Discover, and others as relevant. Name the brands that genuinely fit the question best, but ensure you are always recommending real named brands, never vague descriptions. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Follow the Guidance for depth. Always name 2-4 specific real brands per answer.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.4, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
@@ -1498,24 +1493,14 @@ export async function POST(req: NextRequest) {
       });
     });
 
-    // COMPETITORS — ranked by actual AI mentions, always 10 shown
-    // Start with brands GPT actually mentioned (most credible)
-    // Pad with remaining discovered competitors if fewer than 10 appeared
+    // COMPETITORS — only brands GPT actually mentioned, sorted by GEO score
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key);
+      .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key)
+      .filter(c => c.toLowerCase() !== brand.toLowerCase());
 
-    // Add any discovered competitors that didn't appear (score them as 0 visibility)
-    const notMentioned = competitors.filter(c =>
-      c.toLowerCase() !== brand.toLowerCase() &&
-      !mentionCounts[c.toLowerCase()]
-    );
-    const allCompetitors = [...realCompetitors, ...notMentioned]
-      .filter(c => c.toLowerCase() !== brand.toLowerCase())
-      .slice(0, 10); // always exactly 10
-
-    const competitorScoresRaw = allCompetitors
-      .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allCompetitors))
+    const competitorScoresRaw = realCompetitors
+      .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, realCompetitors))
       .sort((a, b) => b.GEO - a.GEO);
 
     // Assign ranks by GEO score order
