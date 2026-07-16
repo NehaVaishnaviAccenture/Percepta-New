@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 
 const bands = [
-  { bg: '#E8F5E9', border: '#43A047', color: '#43A047', range: '80-100', label: 'Excellent', desc: 'Well optimized for AI citation' },
-  { bg: '#FFFDE7', border: '#FDD835', color: '#F9A825', range: '70-79', label: 'Good', desc: 'Minor improvements recommended' },
-  { bg: '#FBE9E7', border: '#FF7043', color: '#FF7043', range: '45-69', label: 'Needs Work', desc: 'Several issues to address' },
-  { bg: '#FFEBEE', border: '#F44336', color: '#F44336', range: '0-44', label: 'Poor', desc: 'Major optimization needed' },
+  { bg: '#E8F5E9', border: '#1B5E20', color: '#1B5E20', range: '80-100', label: 'Authority', desc: 'You are the default reference — cited first, consistently, and on-message across signals.' },
+  { bg: '#E3F2FD', border: '#1565C0', color: '#1565C0', range: '70-79', label: 'Leader', desc: 'AI assistants surface you often, with strong, favourable framing. You set the category pace.' },
+  { bg: '#FFFDE7', border: '#F9A825', color: '#F9A825', range: '56-69', label: 'Competitive', desc: 'You are a regular part of the AI conversation, holding your ground on most signals.' },
+  { bg: '#FFF3E0', border: '#E65100', color: '#E65100', range: '45-55', label: 'Emerging', desc: 'You show up occasionally but inconsistently; competitors are cited more and more favourably.' },
+  { bg: '#FFEBEE', border: '#B71C1C', color: '#B71C1C', range: '0-44', label: 'Fragmented', desc: 'AI assistants rarely surface you, and rivals dominate the answer when they do.' },
 ];
 
 const METRIC_TIPS: Record<string, string> = {
@@ -21,10 +22,11 @@ const METRIC_TIPS: Record<string, string> = {
 const TABS = ['GEO Score', 'Competitors', 'Visibility', 'Sentiment', 'Citations', 'Prompts', 'Recommendations', 'Live Prompt', 'FAQ'];
 
 function scoreBadge(s: number) {
-  if (s >= 80) return { label: 'Excellent', color: '#43A047', bg: '#E8F5E9' };
-  if (s >= 70) return { label: 'Good', color: '#F9A825', bg: '#FFFDE7' };
-  if (s >= 45) return { label: 'Needs Work', color: '#FF7043', bg: '#FBE9E7' };
-  return { label: 'Poor', color: '#F44336', bg: '#FFEBEE' };
+  if (s >= 80) return { label: 'Authority',    color: '#1B5E20', bg: '#E8F5E9' };
+  if (s >= 70) return { label: 'Leader',       color: '#1565C0', bg: '#E3F2FD' };
+  if (s >= 56) return { label: 'Competitive',  color: '#F9A825', bg: '#FFFDE7' };
+  if (s >= 45) return { label: 'Emerging',     color: '#E65100', bg: '#FFF3E0' };
+  return              { label: 'Fragmented',   color: '#B71C1C', bg: '#FFEBEE' };
 }
 
 function classifyDomain(d: string) {
@@ -173,7 +175,7 @@ function GeoGauge({ score }: { score: number }) {
   return (
     <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: '16px 16px 14px', textAlign: 'center' }}>
       <svg viewBox="0 0 320 175" style={{ width: '100%', display: 'block', overflow: 'visible' }}>
-        {seg(0, 44, '#F44336')}{seg(44, 69, '#FF7043')}{seg(69, 79, '#FDD835')}{seg(79, 100, '#43A047')}
+        {seg(0, 44, '#B71C1C')}{seg(44, 55, '#E65100')}{seg(55, 69, '#F9A825')}{seg(69, 79, '#1565C0')}{seg(79, 100, '#1B5E20')}
         <line x1={ox(score, mi)} y1={oy(score, mi)} x2={ox(score, mo)} y2={oy(score, mo)} stroke="#A100FF" strokeWidth="4" strokeLinecap="round" />
         {[0, 20, 40, 60, 80, 100].map((t) => (
           <text key={t} x={ox(t, Ro + 18)} y={oy(t, Ro + 18)} textAnchor="middle" dominantBaseline="middle" style={{ fontSize: 10, fill: '#9CA3AF', fontFamily: 'Inter,sans-serif' }}>{t}</text>
@@ -204,7 +206,7 @@ function SankeyFlowChart({ result }: { result: any }) {
   const TOPIC_COLORS = ['#A100FF', '#7500C0', '#460073', '#6B7280', '#374151'];
   const topTopics = [...cl].sort((a: any, b: any) => (b.total || 0) - (a.total || 0)).slice(0, 5).map((c: any, i: number) => ({
     label: c.category,
-    val: Math.max(5, Math.min(95, c.winRate ?? 0)),
+    val: Math.min(95, c.winRate ?? 0),
     color: TOPIC_COLORS[i % TOPIC_COLORS.length],
     total: c.total || Math.round(totalRd / Math.max(cl.length, 1)),
   }));
@@ -824,7 +826,7 @@ export default function GeoHub() {
             const steps = [
               { icon: '🌐', label: 'Fetching brand page', detail: 'Reading website content and metadata' },
               { icon: '🤖', label: 'Discovering brand & industry', detail: 'AI detecting brand, competitors, categories' },
-              { icon: '📝', label: 'Generating AI queries', detail: 'Creating persona-based query matrix' },
+              { icon: '📝', label: 'Generating AI queries', detail: 'Building stage × pain point query matrix' },
               { icon: '🚀', label: 'Firing all query batches', detail: 'All batches running simultaneously' },
               { icon: '🔍', label: 'Detecting brand mentions', detail: `Scanning all AI responses for ${displayName}` },
               { icon: '📊', label: 'Computing real scores', detail: 'Pure math from actual response data' },
@@ -879,21 +881,22 @@ export default function GeoHub() {
               const badge = scoreBadge(geo);
               const industryLabel = result.ind_label || result.industry || '';
               const metrics = [
-                { name: 'Visibility', val: vis, note: vis < 30 ? 'rarely appears in AI responses' : vis < 55 ? 'appears in some AI responses' : 'appears frequently' },
-                { name: 'Prominence', val: prom, note: prom < 40 ? 'mentioned late in AI responses' : prom < 65 ? 'appears mid-list' : 'named early and prominently' },
-                { name: 'Share of Voice', val: sov, note: sov < 25 ? 'competitors dominating AI conversations' : sov < 50 ? 'moderate share of AI mentions' : 'strong share of AI conversations' },
-                { name: 'Citation', val: cit, note: cit < 30 ? 'rarely cited as authoritative' : cit < 60 ? 'occasionally cited' : 'frequently cited as authoritative' },
-                { name: 'Sentiment', val: rawSent, note: rawSent < 45 ? 'neutral or negative AI tone' : rawSent < 70 ? 'mostly neutral tone' : 'positive AI tone' },
+                { name: 'Visibility', val: vis, note: vis < 20 ? 'rarely appears in AI responses' : vis < 40 ? 'appears in some AI responses' : 'appears frequently in AI responses' },
+                { name: 'Prominence', val: prom, note: prom < 10 ? 'rarely named first in AI responses' : prom < 25 ? 'occasionally named first' : 'frequently named first' },
+                { name: 'Share of Voice', val: sov, note: sov < 20 ? 'competitors dominating AI conversations' : sov < 40 ? 'moderate share of AI mentions' : 'strong share of AI conversations' },
+                { name: 'Citation', val: cit, note: cit < 15 ? 'rarely cited as authoritative' : cit < 30 ? 'occasionally cited' : 'frequently cited as authoritative' },
+                { name: 'Sentiment', val: rawSent, note: rawSent < 20 ? 'neutral or negative AI tone' : rawSent < 40 ? 'mostly neutral tone' : 'positive AI tone' },
               ].sort((a, b) => a.val - b.val);
-              const weakest = metrics.slice(0, 3).filter(m => m.val < 70);
+              const weakest = metrics.slice(0, 3).filter(m => m.val < 50);
               const explanation = weakest.length > 0
                 ? `GEO Score of ${geo} reflects ${vis}% Visibility but is held back by ${weakest.map((m) => `${m.name} (${m.val}), ${m.note}`).join('; ')}.`
-                : `GEO Score of ${geo} reflects strong performance across all signals — ${vis}% Visibility, ${rawSent} Sentiment, ${sov}% Share of Voice.`;
+                : `GEO Score of ${geo} reflects strong performance across all signals — ${vis}% Visibility, ${rawSent}% Sentiment, ${sov}% Share of Voice.`;
               const scoreBands = [
-                { range: '0-44', label: 'Poor', color: '#F44336', bg: '#FFEBEE', border: '#F44336', desc: 'Rarely mentioned. AI lacks enough signals to surface you reliably.' },
-                { range: '45-69', label: 'Needs Work', color: '#FF7043', bg: '#FBE9E7', border: '#FF7043', desc: 'Appears in lists but not as a primary recommendation.' },
-                { range: '70-79', label: 'Good', color: '#F9A825', bg: '#FFFDE7', border: '#FDD835', desc: 'AI crosses the confidence threshold. Frequent top-3 placements begin.' },
-                { range: '80-100', label: 'Excellent', color: '#43A047', bg: '#E8F5E9', border: '#43A047', desc: 'Dominant brand signal. AI leads with you as the primary recommendation.' },
+                { range: '0-44',   label: 'Fragmented',  color: '#B71C1C', bg: '#FFEBEE', border: '#B71C1C', desc: 'AI assistants rarely surface you, and rivals dominate the answer when they do.' },
+                { range: '45-55',  label: 'Emerging',    color: '#E65100', bg: '#FFF3E0', border: '#E65100', desc: 'You show up occasionally but inconsistently; competitors are cited more and more favourably.' },
+                { range: '56-69',  label: 'Competitive', color: '#F9A825', bg: '#FFFDE7', border: '#F9A825', desc: 'You are a regular part of the AI conversation, holding your ground on most signals.' },
+                { range: '70-79',  label: 'Leader',      color: '#1565C0', bg: '#E3F2FD', border: '#1565C0', desc: 'AI assistants surface you often, with strong, favourable framing. You set the category pace.' },
+                { range: '80-100', label: 'Authority',   color: '#1B5E20', bg: '#E8F5E9', border: '#1B5E20', desc: 'You are the default reference — cited first, consistently, and on-message across signals.' },
               ];
               return (
                 <div>
