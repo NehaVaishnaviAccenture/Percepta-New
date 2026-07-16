@@ -1283,16 +1283,11 @@ Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
-// VISIBILITY  = mentions / relevant_queries × 100
-//               "Relevant" = query categories where this brand actually appeared.
-//               Derived from response data — no hardcoding of brand territories.
-//               A cash-back specialist isn't penalized for premium card queries.
-//               A brand with 0 mentions gets 0 across all metrics.
-//
-// PROMINENCE  = rank1_mentions / mentions × 100   (quality within own mentions)
+// VISIBILITY  = mentions / total × 100
+// PROMINENCE  = rank1 / mentions × 100
 // SENTIMENT   = positive_mentions / mentions × 100 (blended with mention rate)
-// CITATION    = sum(1/pos) / mentions × 100        (position quality)
-// SOV         = brand_responses / any_brand × 100  (share of all conversations)
+// CITATION    = sum(1/pos) / mentions × 100
+// SOV         = brand_responses / any_brand × 100
 // GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
@@ -1301,6 +1296,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
 
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
+  const visibility   = Math.round((mentionCount / total) * 100);
 
   if (mentionCount === 0) {
     const top10z = comps.slice(0, 10);
@@ -1309,23 +1305,11 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: Math.round((0 / Math.max(anySetZ.size, 1)) * 100), geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
-  // OPTION B: Relevant visibility
-  // Find which categories this brand appeared in from the actual response data
-  // Then count visibility only against queries in those categories
-  const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
-  const relevantAnswered = brandCats.size > 0
-    ? answered.filter(r => brandCats.has(r.category))
-    : answered;
-  const relevantTotal = relevantAnswered.length || total;
-  const visibility = Math.round((mentionCount / relevantTotal) * 100);
-
-  // POSITIONS
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
   const rawProminence = Math.round((rank1Count / mentionCount) * 100);
 
-  // SENTIMENT
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -1341,11 +1325,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
 
-  // CITATION
   const citWeight   = positions.reduce((s, p) => s + 1 / p, 0);
   const rawCitation = Math.round((citWeight / mentionCount) * 100);
 
-  // SOV
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1355,8 +1337,8 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // Blend quality toward neutral for low-mention brands (statistical reliability)
-  const mentionRate   = mentionCount / relevantTotal;
+  // Blend quality toward neutral for low-mention brands
+  const mentionRate   = mentionCount / total;
   const blend = (raw: number) => Math.round(mentionRate * raw + (1 - mentionRate) * 50);
   const prominence    = blend(rawProminence);
   const sentiment     = blend(rawSentiment);
