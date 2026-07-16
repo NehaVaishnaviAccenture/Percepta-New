@@ -1464,8 +1464,49 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // For competitors with 0 mentions, run targeted brand queries to get real data
+    const zeroComps = competitors.filter(c =>
+      c.toLowerCase() !== brand.toLowerCase() && !mentionCounts[c.toLowerCase()]
+    );
+
+    if (zeroComps.length > 0) {
+      const targetedQA = await Promise.all(zeroComps.map(async comp => {
+        const compQueries = [
+          `What credit cards does ${comp} offer and who are they best for?`,
+          `Is ${comp} a good credit card company?`,
+          `What are the best ${comp} credit cards?`,
+          `How does ${comp} compare to other credit card issuers?`,
+          `What do customers say about ${comp} credit cards?`,
+        ];
+        const ql = compQueries.map((q, j) => `Q${j+1}: ${q}`).join('\n\n');
+        const lbs = compQueries.map((_, j) => `A${j+1}:`).join('\n');
+        const raw = await ai([
+          { role: 'system', content: `You are a consumer finance expert. Answer honestly about this specific brand's credit card products. 2-3 sentences per answer.` },
+          { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
+        ], 0.1, 2000, 2);
+        const answers = parseAnswers(raw, compQueries.length);
+        return compQueries.map((q, j) => ({
+          category: 'General', stage: 'Awareness', persona: 'general consumer',
+          q, a: answers[j] || '', comp,
+        }));
+      }));
+
+      // Add targeted QA to mention counts
+      targetedQA.flat().forEach(r => {
+        const t = (r.a || '').toLowerCase();
+        const comp = r.comp;
+        const ca = aliases(comp);
+        if (hasAlias(t, ca)) {
+          const key = comp.toLowerCase();
+          mentionCounts[key] = (mentionCounts[key] || 0) + 1;
+          domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g,'')}.com`;
+        }
+        // Also add to allQA so scoring can use these responses
+        allQA.push(r);
+      });
+    }
+
     // COMPETITORS — ranked by AI mentions, always show up to 10
-    // Brands GPT mentioned = real scores; unmentioned brands = shown with 0 scores
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key)
