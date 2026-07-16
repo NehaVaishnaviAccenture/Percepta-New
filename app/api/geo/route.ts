@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const MODEL        = 'openai/gpt-5.4';
+const MODEL        = 'openai/gpt-4o';
 const ANSWER_BATCH = 20;
 const QUERY_BATCH  = 20;
 
@@ -45,9 +45,20 @@ function hasAlias(text: string, aliases: string[]): boolean {
 
 function aliases(brand: string): string[] {
   const bl = brand.toLowerCase().trim();
-  const set = new Set([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
-  bl.split(/[\s'\-\.&]+/).filter(w => w.length >= 6 && !SKIP_WORDS.has(w)).forEach(w => set.add(w));
-  return [...set].filter(a => a.length >= 3);
+  const set = new Set<string>([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
+  // Decompose known concatenated patterns e.g. "americanexpress" → "american express"
+  const known: Record<string, string> = {
+    'americanexpress': 'american express',
+    'bankofamerica': 'bank of america',
+    'wellsfargo': 'wells fargo',
+    'capitalone': 'capital one',
+    'usbancorp': 'us bank',
+    'usbank': 'us bank',
+  };
+  const key = bl.replace(/\s+/g, '').replace(/[^a-z]/g, '');
+  if (known[key]) { set.add(known[key]); set.add(known[key].replace(/\s+/g, '')); }
+  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 6 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+  return [...set].filter((a: string) => a.length >= 3);
 }
 
 function position(text: string, als: string[], compAliasList: string[][]): number {
@@ -113,16 +124,30 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
-  if (p?.brand_name) return {
-    brand: p.brand_name as string, industry: (p.industry || 'Consumer Products') as string,
-    industryKey: (p.industry_key || 'general') as string, lob: (p.lob || '') as string,
-    personas: ((p.personas || []) as string[]).slice(0, 5),
-    competitors: ((p.competitors || []) as string[]).slice(0, 10),
-    competitorUrls: (p.competitor_urls || {}) as Record<string, string>,
-    categories: ((p.categories || []) as string[]).slice(0, 10),
-  };
+  if (p?.brand_name) {
+    // Normalize concatenated brand names from AI discovery
+    const knownBrands: Record<string, string> = {
+      'americanexpress': 'American Express',
+      'bankofamerica': 'Bank of America',
+      'wellsfargo': 'Wells Fargo',
+      'capitalone': 'Capital One',
+      'usbank': 'U.S. Bank',
+      'usbancorp': 'U.S. Bank',
+    };
+    const rawBrand = p.brand_name as string;
+    const brandKey = rawBrand.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
+    const normalizedBrand = knownBrands[brandKey] || rawBrand;
+    return {
+      brand: normalizedBrand, industry: (p.industry || 'Consumer Products') as string,
+      industryKey: (p.industry_key || 'general') as string, lob: (p.lob || '') as string,
+      personas: ((p.personas || []) as string[]).slice(0, 5),
+      competitors: ((p.competitors || []) as string[]).slice(0, 10),
+      competitorUrls: (p.competitor_urls || {}) as Record<string, string>,
+      categories: ((p.categories || []) as string[]).slice(0, 10),
+    };
+  }
   const domain = new URL(url).hostname.replace('www.', '').split('.')[0];
   return { brand: domain.charAt(0).toUpperCase() + domain.slice(1), industry: 'Consumer Products', industryKey: 'general', lob: '', personas: [] as string[], competitors: [] as string[], competitorUrls: {} as Record<string, string>, categories: [] as string[] };
 }
@@ -1305,12 +1330,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-
-  // All quality metrics relative to mentionCount (measures quality within appearances)
-  // BUT capped at visibility to prevent low-visibility brands inflating quality scores
-  // This is derived purely from the brand own data — no external hardcoding
-  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
-  const prominence    = Math.min(rawProminence, visibility);
+  const prominence = Math.round((rank1Count / mentionCount) * 100);
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1327,15 +1347,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
         NEG.forEach(w => { if (s.includes(w)) negW++; });
       });
   });
-  const rawSentiment = Math.round(Math.max(0, Math.min(100,
+  const sentiment = Math.round(Math.max(0, Math.min(95,
     50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
   )));
-  // Sentiment capped at visibility — brand appearing 40% of the time can't score 90 on sentiment
-  const sentiment     = Math.min(rawSentiment, visibility);
 
-  const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
-  const citationShare  = Math.min(rawCitation, visibility);
+  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
+  const citationShare = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
 
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
@@ -1431,7 +1448,7 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert answering questions about ${lob || industry}. For every question name 2-4 specific real brands. Include both the most well-known major players AND the best specific fit for what the question asks. Always name real established brands — never vague descriptions. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a consumer finance expert. For every question name 2-4 specific real brands that genuinely best answer what is being asked. Name different brands for different question types — cash back questions get cash back leaders, travel questions get travel leaders, student questions get student card leaders. Never name the same brand for every answer. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Name specific real brands — major players and specialist brands that genuinely fit what each question asks.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
@@ -1461,8 +1478,49 @@ export async function POST(req: NextRequest) {
       });
     });
 
+    // For competitors with 0 mentions, run targeted brand queries to get real data
+    const zeroComps = competitors.filter(c =>
+      c.toLowerCase() !== brand.toLowerCase() && !mentionCounts[c.toLowerCase()]
+    );
+
+    if (zeroComps.length > 0) {
+      const targetedQA = await Promise.all(zeroComps.map(async comp => {
+        const compQueries = [
+          `What credit cards does ${comp} offer and who are they best for?`,
+          `Is ${comp} a good credit card company?`,
+          `What are the best ${comp} credit cards?`,
+          `How does ${comp} compare to other credit card issuers?`,
+          `What do customers say about ${comp} credit cards?`,
+        ];
+        const ql = compQueries.map((q, j) => `Q${j+1}: ${q}`).join('\n\n');
+        const lbs = compQueries.map((_, j) => `A${j+1}:`).join('\n');
+        const raw = await ai([
+          { role: 'system', content: `You are a consumer finance expert. Answer honestly about this specific brand's credit card products. 2-3 sentences per answer.` },
+          { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
+        ], 0.1, 2000, 2);
+        const answers = parseAnswers(raw, compQueries.length);
+        return compQueries.map((q, j) => ({
+          category: 'General', stage: 'Awareness', persona: 'general consumer',
+          q, a: answers[j] || '', comp,
+        }));
+      }));
+
+      // Add targeted QA to mention counts
+      targetedQA.flat().forEach(r => {
+        const t = (r.a || '').toLowerCase();
+        const comp = r.comp;
+        const ca = aliases(comp);
+        if (hasAlias(t, ca)) {
+          const key = comp.toLowerCase();
+          mentionCounts[key] = (mentionCounts[key] || 0) + 1;
+          domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g,'')}.com`;
+        }
+        // Also add to allQA so scoring can use these responses
+        allQA.push(r);
+      });
+    }
+
     // COMPETITORS — ranked by AI mentions, always show up to 10
-    // Brands GPT mentioned = real scores; unmentioned brands = shown with 0 scores
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key)
