@@ -1305,13 +1305,8 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
+  const prominence = Math.round((rank1Count / mentionCount) * 100);
 
-  // Quality metrics relative to own mentions (measures quality when appearing)
-  // Capped at visibility × multiplier — prevents tiny-sample brands inflating scores
-  // The cap scales purely from each brand's own visibility — no hardcoded numbers
-  const prominence    = Math.min(Math.round((rank1Count / mentionCount) * 100), visibility * 2);
-
-  // SENTIMENT — word ratio in brand sentences (base 50, quality metric)
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -1327,15 +1322,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
         NEG.forEach(w => { if (s.includes(w)) negW++; });
       });
   });
-  const sentiment     = Math.min(Math.round(Math.max(0, Math.min(95,
+  const sentiment = Math.round(Math.max(0, Math.min(95,
     50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
-  ))), visibility * 2);
+  )));
 
-  // CITATION — position quality within own mentions, capped at visibility × 1.5
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.min(Math.round(Math.min(95, (citWeight / mentionCount) * 100)), Math.round(visibility * 1.5));
+  const citationShare = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
 
-  // SOV — share of all brand-mentioning responses
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
