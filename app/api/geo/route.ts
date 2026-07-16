@@ -1330,7 +1330,15 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-  const prominence = Math.round((rank1Count / mentionCount) * 100);
+
+  // Quality metrics computed from own mentions, then scaled by visibility
+  // This means: a brand appearing 2% cannot score 95 on quality
+  // A brand appearing 73% with great quality scores proportionally high
+  // No hardcoded numbers — purely derived from each brand's own visibility
+  const visScale = visibility / 100;
+
+  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
+  const prominence    = Math.round(rawProminence * visScale);
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1338,21 +1346,19 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
     'complicated','confusing','frustrating','complaints'];
-  let posW = 0, negW = 0;
+  let posMentions = 0;
   mentioned.forEach(r => {
-    (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10)
-      .forEach((s: string) => {
-        POS.forEach(w => { if (s.includes(w)) posW++; });
-        NEG.forEach(w => { if (s.includes(w)) negW++; });
-      });
+    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
+      .filter((s: string) => hasAlias(s, als) && s.length > 10);
+    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
+    if (!hasNeg) posMentions++;
   });
-  const sentiment = Math.round(Math.max(0, Math.min(95,
-    50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
-  )));
+  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
+  const sentiment    = Math.round(rawSentiment * visScale);
 
-  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
+  const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
+  const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
+  const citationShare  = Math.round(rawCitation * visScale);
 
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
