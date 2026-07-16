@@ -1327,15 +1327,21 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
+  // RELEVANT VISIBILITY: score against queries in categories this brand appeared in
+  // BofA appears in General/Cash Back queries → scored against those ~100 queries
+  // This prevents BofA being penalized for not appearing in Premium/Travel queries
+  const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
+  const relevantTotal = brandCats.size > 0
+    ? answered.filter(r => brandCats.has(r.category)).length
+    : total;
+  const relevantVis = Math.round((mentionCount / relevantTotal) * 100);
+
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // Quality metrics computed from own mentions, then scaled by visibility
-  // This means: a brand appearing 2% cannot score 95 on quality
-  // A brand appearing 73% with great quality scores proportionally high
-  // No hardcoded numbers — purely derived from each brand's own visibility
-  const visScale = visibility / 100;
+  // Quality metrics scaled by relevant visibility
+  const visScale = relevantVis / 100;
 
   const rawProminence = Math.round((rank1Count / mentionCount) * 100);
   const prominence    = Math.round(rawProminence * visScale);
@@ -1360,6 +1366,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
   const citationShare  = Math.round(rawCitation * visScale);
 
+  // SOV always against full pool
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1369,15 +1376,17 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
+  // GEO uses relevant visibility so BofA scored on its territory
   const geo = Math.round(
-    visibility     * 0.30 +
+    relevantVis    * 0.30 +
     sentiment      * 0.20 +
     prominence     * 0.20 +
     citationShare  * 0.15 +
     shareOfVoice   * 0.15
   );
 
-  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
+  // Return both for display (show relevant vis as the visibility)
+  return { visibility: relevantVis, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
 }
 function scoreComp(name: string, url: string, qa: any[], allComps: string[]) {
   const als = aliases(name);
@@ -1454,7 +1463,7 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert. For every question name 3-4 specific real brands. Always include the dominant market leaders alongside the best specific fit. Name brands that genuinely compete in this space — for credit cards the major players are Chase, American Express, Capital One, Citi, Discover, Wells Fargo. Include whichever of these genuinely fits each question plus any specialist brands. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a consumer finance expert. For every question name 3-4 specific real brands that are the genuine best answers. Always name real established brands — include both well-known leaders and specialist brands that fit the question. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Name specific real brands — major players and specialist brands that genuinely fit what each question asks.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
