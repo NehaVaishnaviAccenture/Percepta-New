@@ -1309,25 +1309,24 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   // PROMINENCE — % of own mentions where named first (quality within mentions)
   const prominence = Math.round((rank1Count / mentionCount) * 100);
 
-  // SENTIMENT — positive vs negative in brand sentences (quality within mentions)
+  // SENTIMENT — positive brand mentions / total queries
+  // Proportional to visibility — cannot be high if brand rarely appears
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
     'complicated','confusing','frustrating','complaints'];
-  let posW = 0, negW = 0;
+  let posMentions = 0;
   mentioned.forEach(r => {
-    (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10)
-      .forEach((s: string) => {
-        POS.forEach(w => { if (s.includes(w)) posW++; });
-        NEG.forEach(w => { if (s.includes(w)) negW++; });
-      });
+    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
+      .filter((s: string) => hasAlias(s, als) && s.length > 10);
+    const hasPos = sents.some((s: string) => POS.some(w => s.includes(w)));
+    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
+    if (hasPos && !hasNeg) posMentions++;
+    else if (!hasPos && !hasNeg) posMentions++; // neutral = not negative
   });
-  const sentiment = Math.round(Math.max(0, Math.min(95,
-    50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
-  )));
+  const sentiment = Math.round((posMentions / total) * 100);
 
   // CITATION — position quality within own mentions
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
@@ -1428,8 +1427,8 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert. Answer each question by naming the 2-3 brands that are genuinely the best answer for that specific question. The question text tells you exactly what type of product is being asked about — answer accordingly. Questions about cash back → name cash back leaders. Questions about balance transfers → name balance transfer leaders. Questions about student cards → name student card leaders. Questions about secured cards → name secured card leaders. Questions about travel → name travel card leaders. Questions about premium cards → name premium card leaders. Always name real specific brands — never give a vague answer. 2-3 sentences per answer.` },
-        { role: 'user', content: `Answer each question below. Name the brands that are genuinely best for what each specific question is asking.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are a consumer finance expert answering questions about ${lob || industry}. For every question, name 2-4 specific brands. Always include the major established players that are relevant — for credit cards always consider Chase, American Express, Capital One, Citi, Discover as potential answers alongside any specialist brands. Name whichever of these genuinely fits the question best. 2-3 sentences per answer.` },
+        { role: 'user', content: `Answer each question. Name specific real brands that genuinely fit. Always include established major brands where relevant.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
