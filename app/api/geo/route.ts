@@ -113,7 +113,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that AI models genuinely recommend to US consumers for this product — brands that actually appear in ChatGPT and Google AI answers when US consumers ask about this product"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}\n\nFor credit cards the competitors must be brands like Chase, Capital One, Citi, Discover, Wells Fargo, Bank of America, US Bank, Synchrony, Navy Federal, PNC — not international brands that US AI rarely recommends.` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) return {
     brand: p.brand_name as string, industry: (p.industry || 'Consumer Products') as string,
@@ -1306,8 +1306,8 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // PROMINENCE — % of own mentions where named first (quality within mentions)
-  const prominence = Math.round((rank1Count / mentionCount) * 100);
+  // PROMINENCE — rank1 mentions / total queries (same scale as visibility)
+  const prominence = Math.round((rank1Count / total) * 100);
 
   // SENTIMENT — positive brand mentions / total queries
   // Proportional to visibility — cannot be high if brand rarely appears
@@ -1427,8 +1427,8 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert answering questions about ${lob || industry}. For every question, name 2-4 specific brands. Always include the major established players that are relevant — for credit cards always consider Chase, American Express, Capital One, Citi, Discover as potential answers alongside any specialist brands. Name whichever of these genuinely fits the question best. 2-3 sentences per answer.` },
-        { role: 'user', content: `Answer each question. Name specific real brands that genuinely fit. Always include established major brands where relevant.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are a consumer finance expert answering questions about ${lob || industry}. For every question name 2-4 specific real brands. Include both the most well-known major players AND the best specific fit for what the question asks. Always name real established brands — never vague descriptions. 2-3 sentences per answer.` },
+        { role: 'user', content: `Answer each question. Name specific real brands — major players and specialist brands that genuinely fit what each question asks.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
