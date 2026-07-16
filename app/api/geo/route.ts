@@ -1298,11 +1298,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  if (mentionCount === 0) {
+  // If brand never appeared OR rounds to 0% visibility — all metrics zero
+  if (mentionCount === 0 || visibility === 0) {
     const top10z = comps.slice(0, 10);
     const anySetZ = new Set<number>();
     answered.forEach((r, i) => { top10z.forEach(c => { if (hasAlias((r.a||'').toLowerCase(), aliases(c))) anySetZ.add(i); }); });
-    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: Math.round((0 / Math.max(anySetZ.size, 1)) * 100), geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
+    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
@@ -1431,7 +1432,7 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert. Answer each question by naming the 2-3 brands that are genuinely the best answer for that specific question. The question text tells you exactly what type of product is being asked about — answer accordingly. Questions about cash back → name cash back leaders. Questions about balance transfers → name balance transfer leaders. Questions about student cards → name student card leaders. Questions about secured cards → name secured card leaders. Questions about travel → name travel card leaders. Questions about premium cards → name premium card leaders. Do not name the same brands repeatedly across different question types. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a consumer finance expert. Answer each question by naming the 2-3 brands that are genuinely the best answer for that specific question. The question text tells you exactly what type of product is being asked about — answer accordingly. Questions about cash back → name cash back leaders. Questions about balance transfers → name balance transfer leaders. Questions about student cards → name student card leaders. Questions about secured cards → name secured card leaders. Questions about travel → name travel card leaders. Questions about premium cards → name premium card leaders. Always name real specific brands — never give a vague answer. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question below. Name the brands that are genuinely best for what each specific question is asking.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.2, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
