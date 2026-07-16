@@ -450,9 +450,6 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'General', query:'Which credit card has the most consistent rewards program that has never been devalued since launch?', stage:'Validation' },
   { category:'General', query:'I am a minimalist who wants one perfect credit card that handles everything without complexity — which comes closest to perfect?', stage:'Decision' },
   { category:'General', query:'What single credit card would you put in the wallet of every American adult who wants to be smart about spending?', stage:'Advocacy' },
-  { category:'General', query:'Which credit card consistently ranks at the top when independent experts compare all available options side by side?', stage:'Validation' },
-
-];
 
 ];
 
