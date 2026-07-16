@@ -45,9 +45,20 @@ function hasAlias(text: string, aliases: string[]): boolean {
 
 function aliases(brand: string): string[] {
   const bl = brand.toLowerCase().trim();
-  const set = new Set([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
-  bl.split(/[\s'\-\.&]+/).filter(w => w.length >= 6 && !SKIP_WORDS.has(w)).forEach(w => set.add(w));
-  return [...set].filter(a => a.length >= 3);
+  const set = new Set<string>([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
+  // Decompose known concatenated patterns e.g. "americanexpress" → "american express"
+  const known: Record<string, string> = {
+    'americanexpress': 'american express',
+    'bankofamerica': 'bank of america',
+    'wellsfargo': 'wells fargo',
+    'capitalone': 'capital one',
+    'usbancorp': 'us bank',
+    'usbank': 'us bank',
+  };
+  const key = bl.replace(/\s+/g, '').replace(/[^a-z]/g, '');
+  if (known[key]) { set.add(known[key]); set.add(known[key].replace(/\s+/g, '')); }
+  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 6 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+  return [...set].filter((a: string) => a.length >= 3);
 }
 
 function position(text: string, als: string[], compAliasList: string[][]): number {
@@ -113,7 +124,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) return {
     brand: p.brand_name as string, industry: (p.industry || 'Consumer Products') as string,
