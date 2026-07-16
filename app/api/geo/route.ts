@@ -1328,9 +1328,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const sentiment = Math.round((posMentions / total) * 100);
 
-  // CITATION — position quality within own mentions
+  // CITATION — position quality relative to total queries (same scale as visibility/sentiment)
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
+  const citationShare = Math.round((citWeight / total) * 100);
 
   // SOV — share of all brand-mentioning responses
   const top10    = comps.slice(0, 10);
