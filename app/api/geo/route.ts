@@ -113,7 +113,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors for this specific product — must be 10"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}\n\nIMPORTANT: competitors array must have EXACTLY 10 brands. If fewer obvious direct competitors exist, include the next closest alternatives.` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand only","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that AI models actually recommend to US consumers for this product — only brands that genuinely appear in AI recommendations, not just market players"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}\n\nCRITICAL: The competitors list must have EXACTLY 10 brands that AI models actually recommend in the US. For credit cards this means brands like Chase, Capital One, Citi, Discover, Wells Fargo, Bank of America — not Barclays or HSBC which AI rarely recommends to US consumers.` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) return {
     brand: p.brand_name as string, industry: (p.industry || 'Consumer Products') as string,
@@ -1337,12 +1337,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // Use raw quality for prominence and citation
-  // For sentiment: blend toward neutral only when sample is too small to trust
-  // Uses square root of mention fraction — gentle curve, no hardcoded threshold
   const prominence    = rawProminence;
+  // Sentiment blended by mention rate — low visibility = pulled toward neutral
+  // mentionRate 0.80 → sent = 0.80×raw + 0.20×50 (mostly trusted)
+  // mentionRate 0.05 → sent = 0.05×raw + 0.95×50 (mostly neutral)
   const mentionRate   = mentionCount / total;
-  const sentiment     = Math.round(Math.sqrt(mentionRate) * rawSentiment + (1 - Math.sqrt(mentionRate)) * 50);
+  const sentiment     = Math.round(mentionRate * rawSentiment + (1 - mentionRate) * 50);
   const citationShare = rawCitation;
 
   const geo = Math.round(
