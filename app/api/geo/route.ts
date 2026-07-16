@@ -1290,9 +1290,9 @@ Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
 // SOV         = brand_responses / any_brand × 100
 // GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
-  const answered     = qa.filter(r => r && (r.a || '').trim().length > 10);
-  const total        = answered.length || 1;
-  const compAls      = comps.map(c => aliases(c));
+  const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
+  const total     = answered.length || 1;
+  const compAls   = comps.map(c => aliases(c));
 
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
@@ -1302,15 +1302,14 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
-  // PROMINENCE — quality of position when mentioned
-  // avgPos 1 = named first = prominence 100
-  // avgPos 2 = named second = prominence 82
-  // avgPos 3 = prominence 64, etc.
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const prominence = mentionCount > 0 ? Math.round(Math.max(10, Math.min(95, 100 - (avgPos - 1) * 18))) : 0;
+  const rank1Count = positions.filter(p => p === 1).length;
 
-  // SENTIMENT — pos/neg word ratio in brand sentences, base 50
+  // PROMINENCE — % of own mentions where named first (quality within mentions)
+  const prominence = Math.round((rank1Count / mentionCount) * 100);
+
+  // SENTIMENT — positive vs negative in brand sentences (quality within mentions)
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -1330,9 +1329,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
   )));
 
-  // CITATION — position quality relative to own mentions
+  // CITATION — position quality within own mentions
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = mentionCount > 0 ? Math.round(Math.min(95, (citWeight / mentionCount) * 100)) : 0;
+  const citationShare = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
 
   // SOV — share of all brand-mentioning responses
   const top10    = comps.slice(0, 10);
@@ -1431,7 +1430,7 @@ export async function POST(req: NextRequest) {
       const raw = await ai([
         { role: 'system', content: `You are a consumer finance expert. Answer each question by naming the 2-3 brands that are genuinely the best answer for that specific question. The question text tells you exactly what type of product is being asked about — answer accordingly. Questions about cash back → name cash back leaders. Questions about balance transfers → name balance transfer leaders. Questions about student cards → name student card leaders. Questions about secured cards → name secured card leaders. Questions about travel → name travel card leaders. Questions about premium cards → name premium card leaders. Always name real specific brands — never give a vague answer. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question below. Name the brands that are genuinely best for what each specific question is asking.\n\n${ql}\n\nFormat:\n${lbs}` },
-      ], 0.2, 4000, 2);
+      ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
     }));
