@@ -1306,33 +1306,37 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // PROMINENCE — rank1 mentions / total queries (same scale as visibility)
-  const prominence = Math.round((rank1Count / total) * 100);
+  // All quality metrics relative to mentionCount (measures quality within appearances)
+  // BUT capped at visibility to prevent low-visibility brands inflating quality scores
+  // This is derived purely from the brand own data — no external hardcoding
+  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
+  const prominence    = Math.min(rawProminence, visibility);
 
-  // SENTIMENT — positive brand mentions / total queries
-  // Proportional to visibility — cannot be high if brand rarely appears
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
     'complicated','confusing','frustrating','complaints'];
-  let posMentions = 0;
+  let posW = 0, negW = 0;
   mentioned.forEach(r => {
-    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10);
-    const hasPos = sents.some((s: string) => POS.some(w => s.includes(w)));
-    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
-    if (hasPos && !hasNeg) posMentions++;
-    else if (!hasPos && !hasNeg) posMentions++; // neutral = not negative
+    (r.a || '').toLowerCase().split(/[.!?]+/)
+      .filter((s: string) => hasAlias(s, als) && s.length > 10)
+      .forEach((s: string) => {
+        POS.forEach(w => { if (s.includes(w)) posW++; });
+        NEG.forEach(w => { if (s.includes(w)) negW++; });
+      });
   });
-  const sentiment = Math.round((posMentions / total) * 100);
+  const rawSentiment = Math.round(Math.max(0, Math.min(100,
+    50 + ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 45) : 0)
+  )));
+  // Sentiment capped at visibility — brand appearing 40% of the time can't score 90 on sentiment
+  const sentiment     = Math.min(rawSentiment, visibility);
 
-  // CITATION — position quality relative to total queries (same scale as visibility/sentiment)
-  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round((citWeight / total) * 100);
+  const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
+  const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
+  const citationShare  = Math.min(rawCitation, visibility);
 
-  // SOV — share of all brand-mentioning responses
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
