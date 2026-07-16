@@ -1337,12 +1337,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // Blend quality toward neutral for low-mention brands
-  const mentionRate   = mentionCount / total;
-  const blend = (raw: number) => Math.round(mentionRate * raw + (1 - mentionRate) * 50);
-  const prominence    = blend(rawProminence);
-  const sentiment     = blend(rawSentiment);
-  const citationShare = blend(rawCitation);
+  const prominence    = rawProminence;
+  const sentiment     = rawSentiment;
+  const citationShare = rawCitation;
 
   const geo = Math.round(
     visibility     * 0.30 +
