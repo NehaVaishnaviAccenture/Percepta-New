@@ -1296,21 +1296,24 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
 
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
-  const visibility   = Math.round((mentionCount / total) * 100);
 
-  // If brand never appeared OR rounds to 0% visibility — all metrics zero
-  if (mentionCount === 0 || visibility === 0) {
-    const top10z = comps.slice(0, 10);
-    const anySetZ = new Set<number>();
-    answered.forEach((r, i) => { top10z.forEach(c => { if (hasAlias((r.a||'').toLowerCase(), aliases(c))) anySetZ.add(i); }); });
+  // ALL metrics relative to total queries — same denominator everywhere
+  // This ensures consistency: a brand with 2% visibility cannot score 80 on any other metric
+  // visibility=20, prominence=15, citation=18, sentiment=18 all make sense together
+  const visibility = Math.round((mentionCount / total) * 100);
+
+  if (mentionCount === 0) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
 
+  // PROMINENCE = rank1 mentions / total (not /mentionCount — prevents 2-mention brand scoring 100)
+  const prominence = Math.round((rank1Count / total) * 100);
+
+  // SENTIMENT = positive mentions / total (not /mentionCount)
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -1324,11 +1327,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
     if (!hasNeg) posMentions++;
   });
-  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
+  const sentiment = Math.round((posMentions / total) * 100);
 
-  const citWeight   = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation = Math.round((citWeight / mentionCount) * 100);
+  // CITATION = sum(1/pos) / total (not /mentionCount)
+  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
+  const citationShare = Math.round((citWeight / total) * 100);
 
+  // SOV = brand responses / any-brand responses
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1337,14 +1342,6 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     top10.forEach(c => { if (hasAlias(t, aliases(c))) anySet.add(i); });
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
-
-  const prominence    = rawProminence;
-  // Sentiment blended by mention rate — low visibility = pulled toward neutral
-  // mentionRate 0.80 → sent = 0.80×raw + 0.20×50 (mostly trusted)
-  // mentionRate 0.05 → sent = 0.05×raw + 0.95×50 (mostly neutral)
-  const mentionRate   = mentionCount / total;
-  const sentiment     = Math.round(mentionRate * rawSentiment + (1 - mentionRate) * 50);
-  const citationShare = rawCitation;
 
   const geo = Math.round(
     visibility     * 0.30 +
