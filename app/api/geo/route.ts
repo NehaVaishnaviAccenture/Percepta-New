@@ -240,77 +240,74 @@ async function genQueries(lob: string, industry: string, cats: string[], persona
 }
 
 // ─── SCORE COMPUTATION ────────────────────────────────────────────────────────
-// ALL metrics are on the same 0-100 scale relative to total answered queries.
-// A brand mentioned in 40% of queries cannot score above 40 on any metric
-// EXCEPT sentiment (which measures tone quality) and SOV (which measures share).
-//
-// VISIBILITY     = mentions / total × 100
-// PROMINENCE     = mentions where brand is #1 / total × 100
-//                  Pure: did the AI name this brand FIRST in this response?
-// SENTIMENT      = (positive sentences - negative sentences) / total × 100
-//                  Relative to total so a rarely-mentioned brand can't score 88
-// CITATION SHARE = sum(1/rank) / total × 100
-//                  Rewards being named first, penalises being named last
-// SHARE OF VOICE = brand response count / any-brand response count
+// VISIBILITY     = % of all queries where brand is mentioned (0-100)
+// PROMINENCE     = % of brand's OWN mentions where it was named first (0-100)
+//                  Measures quality of placement, independent of visibility
+// SENTIMENT      = net positive tone in brand sentences, scaled 0-100
+//                  Measures quality of language, independent of visibility
+// CITATION SHARE = avg position quality across brand's mentions: sum(1/pos)/mentions × 100
+//                  Measures how early brand is cited when it does appear
+// SHARE OF VOICE = brand mention responses / any-brand mention responses (0-100)
 // GEO SCORE      = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+//
+// Visibility measures HOW OFTEN. The other 4 measure HOW WELL when it does appear.
+// A brand appearing in 30% of queries but always named first = low vis, high prominence.
+// This gives a complete picture: frequency × quality.
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
   const total     = answered.length || 1;
   const compAliasList = comps.map(c => aliases(c));
 
-  // VISIBILITY
+  // VISIBILITY — how often brand appears across all queries
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  // PROMINENCE — how many responses named us #1 (first brand in response)
-  // rank 1 = brand named before any competitor = pure first position
+  // PROMINENCE — of all responses where brand appears, what % named it first?
+  // #1 = 100%, #2 = 0 for this metric — strict: only counts first-position mentions
   const positions = mentioned
     .map(r => position(r.a || '', als, compAliasList))
     .filter(p => p > 0);
-  const avgPos = positions.length > 0
-    ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  // PROMINENCE = % of ALL queries where brand was named first (#1 position)
-  // Pure and clean: no weights, no multipliers
-  // If brand is named first in 25 out of 300 queries → prominence = 8
+  const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-  const prominence = Math.round((rank1Count / total) * 100);
+  // Prominence = % of brand's mentions where it was named first
+  const prominence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
 
-  // SENTIMENT — relative to total queries, not just mentions
-  // Counts positive/negative word hits in brand-containing sentences
-  // Then scores as net positive hits / total queries
+  // SENTIMENT — % of all queries where brand is mentioned positively
+  // Counts sentences containing the brand that have more positive words than negative
+  // Divides by total queries so it scales with visibility naturally
+  // A brand in 40% of queries, all positive → sentiment ~40 (same ballpark as visibility)
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
     'complicated','confusing','frustrating','hidden fees','complaints'];
-  let posW = 0, negW = 0;
+  let posSentences = 0, negSentences = 0;
   mentioned.forEach(r => {
     (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als))
+      .filter((s: string) => hasAlias(s, als) && s.length > 10)
       .forEach((s: string) => {
-        POS.forEach(w => { if (s.includes(w)) posW++; });
-        NEG.forEach(w => { if (s.includes(w)) negW++; });
+        const p = POS.filter(w => s.includes(w)).length;
+        const n = NEG.filter(w => s.includes(w)).length;
+        if (p > n) posSentences++;
+        else if (n > p) negSentences++;
       });
   });
-  // Net sentiment hits as fraction of total queries × 100
-  // posW - negW = net positive signal. Divide by total to scale proportionally.
-  // A brand in 36% of queries with 40 pos hits in 107 mentions: 40/300 × 100 = 13
-  // But we want 0-100 range, so normalise by max possible (mentionCount)
-  const netSentiment = posW - negW;
-  const sentiment = mentionCount > 0
-    ? Math.round(Math.max(0, Math.min(100,
-        50 * (mentionCount / total) + // base proportional to visibility
-        (Math.max(netSentiment, 0) / mentionCount) * 50 * (mentionCount / total) // positive signal
-      )))
+  // sentiment = net positive brand sentences / total queries × 100
+  const sentiment = Math.round(Math.min(95, ((posSentences - negSentences) / total) * 100));
+
+  // CITATION SHARE — avg position quality across brand's mentions
+  // sum(1/pos) / mentionCount × 100
+  // Named first in every mention → citation = 100
+  // Named second in every mention → citation = 50
+  // Named third in every mention → citation = 33
+  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
+  const citationShare = mentionCount > 0
+    ? Math.round(Math.min(95, (citWeight / mentionCount) * 100))
     : 0;
 
-  // CITATION SHARE — sum(1/rank) / total × 100
-  const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = Math.round(Math.min(95, (citWeight / total) * 100));
-
-  // SHARE OF VOICE
+  // SHARE OF VOICE — brand's share of all brand-mentioning responses
   const top8     = comps.slice(0, 8);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -320,7 +317,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  // GEO
+  // GEO SCORE
   const geo = Math.round(
     visibility    * 0.30 +
     sentiment     * 0.20 +
@@ -535,7 +532,9 @@ export async function POST(req: NextRequest) {
             const avgP2  = posArr.length > 0 ? posArr.reduce((a: number, b: number) => a + b, 0) / posArr.length : 3;
             const cc: Record<string, number> = {};
             rows.forEach(r => { const t = (r.ans||'').toLowerCase(); competitors.forEach(c => { if (hasAlias(t, aliases(c)) && c.toLowerCase() !== bl) cc[c] = (cc[c]||0)+1; }); });
-            return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2/total2)*100) : 0, prominence: Math.round(Math.max(5, Math.min(95, 100-(avgP2-1)*18))), avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'', responses: rows.map(r => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
+            const rank1c = posArr.filter(p => p === 1).length;
+            const prom2  = total2 > 0 ? Math.round((rank1c / total2) * 100) : 0;
+            return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2/total2)*100) : 0, prominence: prom2, avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'', responses: rows.map(r => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
           }).sort((a, b) => b.winRate - a.winRate);
         } catch { return []; }
       })(),
