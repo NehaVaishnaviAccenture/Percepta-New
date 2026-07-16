@@ -1138,23 +1138,35 @@ function getCuratedQueries(
 
   const targetCats = PRODUCT_TO_CATEGORY[product] || [];
 
+  // Enrich curated queries with pain point context based on journey stage
+  // This gives GPT context so it answers specifically, not generically
+  const STAGE_PAIN_POINTS: Record<string, string> = {
+    Awareness    : 'Consumer is just discovering options and does not know where to start',
+    Consideration: 'Consumer is comparing 2-4 options and struggling to identify the key differences',
+    Decision     : 'Consumer is ready to choose and wants one clear specific recommendation',
+    Validation   : 'Consumer has almost decided and wants confirmation they are making the right choice',
+    Advocacy     : 'Consumer wants to recommend the single best option to someone they care about',
+  };
+
   if (product === 'general' || targetCats.length === 0) {
-    // General page (citi.com/credit-cards) → full 300 across all categories
-    // This shows which product categories are winning vs dragging down the brand
-    return bank.slice(0, total).map(q => ({ ...q, persona: 'general consumer' }));
+    return bank.slice(0, total).map(q => ({
+      ...q,
+      persona: 'general consumer',
+      context: STAGE_PAIN_POINTS[q.stage] || '',
+    }));
   }
 
-  // Specific product page (citi.com/credit-cards/double-cash) → ONLY that category's queries
-  // Pure score for that product — no contamination from other categories
   const productQueries = bank.filter(q => targetCats.includes(q.category));
-
-  // Repeat if needed to fill total (product category may have <300 queries)
   const out: typeof productQueries = [];
   while (out.length < total && productQueries.length > 0) {
     productQueries.forEach(q => { if (out.length < total) out.push(q); });
   }
 
-  return out.slice(0, total).map(q => ({ ...q, persona: 'general consumer' }));
+  return out.slice(0, total).map(q => ({
+    ...q,
+    persona: 'general consumer',
+    context: STAGE_PAIN_POINTS[q.stage] || '',
+  }));
 }
 
 // Stage × Pain Point query generation for non-core industries.
@@ -1261,38 +1273,51 @@ Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
 }
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
+// ALL metrics on same scale: relative to total answered queries.
+// This prevents low-visibility brands (2 mentions) from scoring 100 on prominence.
+// A brand appearing in 60% of queries and always named first scores:
+//   visibility=60, prominence=60, which makes sense and is comparable.
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
-  const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
-  const total     = answered.length || 1;
-  const compAls   = comps.map(c => aliases(c));
+  const answered     = qa.filter(r => r && (r.a || '').trim().length > 10);
+  const total        = answered.length || 1;
+  const compAls      = comps.map(c => aliases(c));
 
+  // VISIBILITY
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
+  // POSITIONS
   const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
-  const prominence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
 
-  const POS = ['best','top','recommended','leading','excellent','great','trusted','popular','ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive','generous','competitive','solid','standout','exceptional','renowned'];
-  const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing','inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated','complicated','confusing','frustrating','complaints'];
-  let posSent = 0, negSent = 0, totalSent = 0;
+  // PROMINENCE = rank1 mentions / total (not rank1/mentions — that inflates low-vis brands)
+  const prominence = Math.round((rank1Count / total) * 100);
+
+  // SENTIMENT = positive mentions / total queries
+  const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
+    'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
+    'generous','competitive','solid','standout','exceptional','renowned'];
+  const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
+    'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
+    'complicated','confusing','frustrating','complaints'];
+  let posMentions = 0;
   mentioned.forEach(r => {
-    (r.a || '').toLowerCase().split(/[.!?]+/).filter((s: string) => hasAlias(s, als) && s.length > 10).forEach((s: string) => {
-      totalSent++;
-      const p = POS.filter(w => s.includes(w)).length;
-      const n = NEG.filter(w => s.includes(w)).length;
-      if (p > n) posSent++;
-      else if (n > p) negSent++;
-    });
+    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
+      .filter((s: string) => hasAlias(s, als) && s.length > 10);
+    const hasPos = sents.some((s: string) => POS.some(w => s.includes(w)));
+    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
+    if (!hasNeg) posMentions++; // positive or neutral = counts
   });
-  const sentiment = mentionCount === 0 ? 0 : totalSent === 0 ? 50 : Math.round(Math.min(95, (posSent / totalSent) * 100));
+  const sentiment = Math.round((posMentions / total) * 100);
 
+  // CITATION = sum(1/pos) / total (position quality across ALL queries)
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
-  const citationShare = mentionCount > 0 ? Math.round(Math.min(95, (citWeight / mentionCount) * 100)) : 0;
+  const citationShare = Math.round((citWeight / total) * 100);
 
-  const top8 = comps.slice(0, 8);
+  // SOV = brand responses / any-brand responses
+  const top8     = comps.slice(0, 8);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
     const t = (r.a || '').toLowerCase();
@@ -1301,7 +1326,15 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
-  const geo = Math.round(visibility * 0.30 + sentiment * 0.20 + prominence * 0.20 + citationShare * 0.15 + shareOfVoice * 0.15);
+  // GEO
+  const geo = Math.round(
+    visibility     * 0.30 +
+    sentiment      * 0.20 +
+    prominence     * 0.20 +
+    citationShare  * 0.15 +
+    shareOfVoice   * 0.15
+  );
+
   return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
 }
 
@@ -1377,23 +1410,14 @@ export async function POST(req: NextRequest) {
     const batches = Array.from({ length: Math.ceil(queries.length / ANSWER_BATCH) }, (_, i) => queries.slice(i * ANSWER_BATCH, (i + 1) * ANSWER_BATCH));
 
     await Promise.all(batches.map(async (batch, bi) => {
-      // Enrich each query with its journey stage context
-      // This makes GPT give stage-appropriate answers not generic lists
-      const stageContext: Record<string, string> = {
-        Awareness    : '(Someone just starting to research, wants to understand their options)',
-        Consideration: '(Someone comparing 3-4 options, wants expert guidance on trade-offs)',
-        Decision     : '(Someone ready to choose, wants a specific clear recommendation)',
-        Validation   : '(Someone who has chosen, wants confirmation they made the right call)',
-        Advocacy     : '(Someone recommending to a friend, wants the single best answer)',
-      };
       const ql  = batch.map((q, j) => {
-        const ctx = stageContext[q.stage] || '';
-        return `Q${j + 1}: ${q.query} ${ctx}`;
+        const ctx = (q as any).context ? ` [${(q as any).context}]` : '';
+        return `Q${j + 1}: ${q.query}${ctx}`;
       }).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are an expert consumer advisor for ${lob || industry}. Answer each question honestly based on what it is actually asking. Name the brands that genuinely best fit each specific question — a cash back question should name the best cash back cards, a premium travel question should name premium travel cards. Give a clear direct recommendation, not a generic list. 2-3 sentences per answer.` },
-        { role: 'user',   content: `Answer each question with a specific honest recommendation. The context in parentheses shows where the consumer is in their journey — use it to calibrate how direct and specific your answer should be.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are an expert consumer advisor for ${lob || industry}. Answer each question based on what it is specifically asking. The context in brackets tells you where the consumer is in their decision journey — use it to give the right kind of answer. Decision-stage questions get one clear best recommendation. Awareness questions get a broader overview. Always name real specific brands that genuinely best fit the question. 2-3 sentences per answer.` },
+        { role: 'user',   content: `Answer each question below. Use the bracketed context to calibrate your answer. Name specific brands that genuinely fit what each question is asking.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.3, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
@@ -1410,11 +1434,49 @@ export async function POST(req: NextRequest) {
       .map(c => scoreComp(c, competitorUrls[c] || '', allQA, competitors))
       .sort((a, b) => b.GEO - a.GEO);
 
-    const allBrandScores = [{ name: brand, geo: scores.geo }, ...competitorScoresRaw.map(c => ({ name: c.Brand, geo: c.GEO }))].sort((a, b) => b.geo - a.geo);
+    // DYNAMIC NORMALIZATION — no hardcoded values
+    // Find the maximum of each metric across ALL brands in this run
+    // Scale so the top performer on each metric reaches 90 (leaves room above for a perfect score)
+    // This is purely relative — the data decides what "best" looks like
+    const allRaw = [
+      { v: scores.visibility, p: scores.prominence, s: scores.sentiment, c: scores.citationShare, so: scores.shareOfVoice },
+      ...competitorScoresRaw.map(x => ({ v: x.Vis, p: x.Prom, s: x.Sen, c: x.Cit, so: x.Sov })),
+    ].filter(x => x.v > 0); // only brands that actually appeared
+
+    const maxV  = Math.max(...allRaw.map(x => x.v),  1);
+    const maxP  = Math.max(...allRaw.map(x => x.p),  1);
+    const maxS  = Math.max(...allRaw.map(x => x.s),  1);
+    const maxC  = Math.max(...allRaw.map(x => x.c),  1);
+    const maxSo = Math.max(...allRaw.map(x => x.so), 1);
+
+    // Scale factor: best brand gets 90, others scale proportionally
+    // Brands with 0 visibility stay at 0 — no inflation
+    const n = (v: number, mx: number) => v === 0 ? 0 : Math.round(Math.min(98, (v / mx) * 90));
+    const normGeo = (v: number, p: number, s: number, c: number, so: number) =>
+      Math.round(n(v,maxV)*0.30 + n(s,maxS)*0.20 + n(p,maxP)*0.20 + n(c,maxC)*0.15 + n(so,maxSo)*0.15);
+
+    const ns = { vis: n(scores.visibility,maxV), prom: n(scores.prominence,maxP), sent: n(scores.sentiment,maxS), cit: n(scores.citationShare,maxC), sov: n(scores.shareOfVoice,maxSo) };
+    const normBrandGeo = normGeo(scores.visibility, scores.prominence, scores.sentiment, scores.citationShare, scores.shareOfVoice);
+
+    const allBrandScores = [
+      { name: brand, geo: normBrandGeo },
+      ...competitorScoresRaw.map(c => ({ name: c.Brand, geo: normGeo(c.Vis, c.Prom, c.Sen, c.Cit, c.Sov) })),
+    ].sort((a, b) => b.geo - a.geo);
+
     const rankMap: Record<string, string> = {};
     allBrandScores.forEach((b, i) => { rankMap[b.name.toLowerCase()] = b.geo > 0 ? `#${i + 1}` : 'N/A'; });
     const myAvgRank = rankMap[brand.toLowerCase()] || 'N/A';
-    const competitorScores = competitorScoresRaw.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
+
+    const competitorScores = competitorScoresRaw.map(c => ({
+      ...c,
+      GEO : normGeo(c.Vis, c.Prom, c.Sen, c.Cit, c.Sov),
+      Vis : n(c.Vis,  maxV),
+      Prom: n(c.Prom, maxP),
+      Sen : n(c.Sen,  maxS),
+      Cit : n(c.Cit,  maxC),
+      Sov : n(c.Sov,  maxSo),
+      Rank: rankMap[c.Brand.toLowerCase()] || 'N/A',
+    }));
 
     const compAlsForDetail = competitors.map(c => aliases(c));
     const responsesDetail = allQA.filter(Boolean).map(r => {
@@ -1449,7 +1511,7 @@ export async function POST(req: NextRequest) {
     const worstStage = [...stageWinRates].sort((a, b) => a.winRate - b.winRate)[0];
 
     const [insightsRaw, targetedClusters] = await Promise.all([
-      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
+      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${normBrandGeo} Vis:${ns.vis}%(${scores.mentionCount}/${scores.totalCount}) Prom:${ns.prom}(${myAvgRank}) Sen:${ns.sent} Cit:${ns.cit} SOV:${ns.sov}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
       (async (): Promise<any[]> => {
         try {
           const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob||industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
@@ -1492,9 +1554,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       brand_name: brand, industry, ind_key: industryKey, lob, ind_label: industry,
       query_type: industryType, product_type: productType,
-      visibility: scores.visibility, sentiment: scores.sentiment, prominence: scores.prominence,
-      citation_share: scores.citationShare, share_of_voice: scores.shareOfVoice,
-      overall_geo_score: scores.geo, avg_rank: myAvgRank,
+      visibility: ns.vis, sentiment: ns.sent, prominence: ns.prom,
+      citation_share: ns.cit, share_of_voice: ns.sov,
+      overall_geo_score: normBrandGeo, avg_rank: myAvgRank,
       responses_with_brand: scores.mentionCount, total_responses: scores.totalCount,
       personas, stage_win_rates: stageWinRates,
       responses_detail: responsesDetail, query_clusters: queryClusters,
