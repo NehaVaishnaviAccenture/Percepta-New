@@ -1337,8 +1337,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
 
+  // Use raw quality for prominence and citation
+  // For sentiment: blend toward neutral only when sample is too small to trust
+  // Uses square root of mention fraction — gentle curve, no hardcoded threshold
   const prominence    = rawProminence;
-  const sentiment     = rawSentiment;
+  const mentionRate   = mentionCount / total;
+  const sentiment     = Math.round(Math.sqrt(mentionRate) * rawSentiment + (1 - Math.sqrt(mentionRate)) * 50);
   const citationShare = rawCitation;
 
   const geo = Math.round(
