@@ -996,7 +996,7 @@ export default function GeoHub() {
                   </div>
                   <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AVG ORDER'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AVG RANK'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c: any, i: number) => {
                         const gap2 = c.isYou ? null : c.GEO - geo;
                         return <tr key={i} style={{ background: c.isYou ? '#F5F0FF' : 'white', borderTop: '1px solid #F3F4F6', borderLeft: c.isYou ? '3px solid #A100FF' : 'none' }}>
@@ -1200,7 +1200,7 @@ export default function GeoHub() {
                       </select>
                     </div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'AVG ORDER', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'AVG RANK', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{pageRows.map((item: any, i: number) => {
                         const globalIdx = (safePage - 1) * ROWS_PER_PAGE + i + 1, rp = item.position, rankLabel = rp === 1 ? '#1' : rp > 0 ? `#${rp}` : 'N/A', rankColor = rp === 1 ? '#10B981' : item.mentioned ? '#A100FF' : '#9CA3AF';
                         const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
