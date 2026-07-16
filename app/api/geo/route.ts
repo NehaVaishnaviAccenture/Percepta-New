@@ -1326,7 +1326,10 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
 
   const citWeight   = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation = Math.round((citWeight / mentionCount) * 100);
+  // Citation relative to total queries — proportional to visibility
+  // This prevents low-visibility brands from having citation > visibility
+  // Amex appearing in 36% of queries at position 1 → citation ≈ 36, not 84
+  const rawCitation = Math.round((citWeight / total) * 100);
 
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
