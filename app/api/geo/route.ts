@@ -126,14 +126,28 @@ async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
   const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
-  if (p?.brand_name) return {
-    brand: p.brand_name as string, industry: (p.industry || 'Consumer Products') as string,
-    industryKey: (p.industry_key || 'general') as string, lob: (p.lob || '') as string,
-    personas: ((p.personas || []) as string[]).slice(0, 5),
-    competitors: ((p.competitors || []) as string[]).slice(0, 10),
-    competitorUrls: (p.competitor_urls || {}) as Record<string, string>,
-    categories: ((p.categories || []) as string[]).slice(0, 10),
-  };
+  if (p?.brand_name) {
+    // Normalize concatenated brand names from AI discovery
+    const knownBrands: Record<string, string> = {
+      'americanexpress': 'American Express',
+      'bankofamerica': 'Bank of America',
+      'wellsfargo': 'Wells Fargo',
+      'capitalone': 'Capital One',
+      'usbank': 'U.S. Bank',
+      'usbancorp': 'U.S. Bank',
+    };
+    const rawBrand = p.brand_name as string;
+    const brandKey = rawBrand.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
+    const normalizedBrand = knownBrands[brandKey] || rawBrand;
+    return {
+      brand: normalizedBrand, industry: (p.industry || 'Consumer Products') as string,
+      industryKey: (p.industry_key || 'general') as string, lob: (p.lob || '') as string,
+      personas: ((p.personas || []) as string[]).slice(0, 5),
+      competitors: ((p.competitors || []) as string[]).slice(0, 10),
+      competitorUrls: (p.competitor_urls || {}) as Record<string, string>,
+      categories: ((p.categories || []) as string[]).slice(0, 10),
+    };
+  }
   const domain = new URL(url).hostname.replace('www.', '').split('.')[0];
   return { brand: domain.charAt(0).toUpperCase() + domain.slice(1), industry: 'Consumer Products', industryKey: 'general', lob: '', personas: [] as string[], competitors: [] as string[], competitorUrls: {} as Record<string, string>, categories: [] as string[] };
 }
