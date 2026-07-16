@@ -329,17 +329,14 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     shareOfVoice  * 0.15
   );
 
-  // Avg Rank = average position when mentioned (1=first, 2=second etc)
-  const avgRank = avgPos > 0 ? `#${Math.round(avgPos)}` : 'N/A';
-
-  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgRank, mentionCount, totalCount: answered.length };
+  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
 }
 
 // ─── COMPETITOR SCORING ───────────────────────────────────────────────────────
 function scoreComp(name: string, url: string, qa: any[], allComps: string[]) {
   const als = aliases(name);
   const s   = score(name, als, qa, allComps.filter(c => c !== name));
-  return { Brand: name, URL: url || `${name.toLowerCase().replace(/\s+/g, '')}.com`, GEO: s.geo, Vis: s.visibility, Cit: s.citationShare, Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence, Rank: s.avgRank };
+  return { Brand: name, URL: url || `${name.toLowerCase().replace(/\s+/g, '')}.com`, GEO: s.geo, Vis: s.visibility, Cit: s.citationShare, Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence, avgPos: s.avgPos };
 }
 
 // ─── CLUSTERS ─────────────────────────────────────────────────────────────────
@@ -431,10 +428,29 @@ export async function POST(req: NextRequest) {
     const scores = score(brand, als, allQA, competitors);
 
     // 6. Score competitors — same function, same response pool
-    const competitorScores = competitors
+    const competitorScoresRaw = competitors
       .filter(c => c.toLowerCase() !== brand.toLowerCase())
       .map(c => scoreComp(c, competitorUrls[c] || '', allQA, competitors))
       .sort((a, b) => b.GEO - a.GEO);
+
+    // Assign Avg Rank 1-N by GEO score order across ALL brands (brand + competitors)
+    // #1 = highest GEO score, #2 = second highest, etc.
+    // This gives clean integer ranks that differ meaningfully between brands
+    const allBrandScores = [
+      { name: brand, geo: scores.geo, isYou: true },
+      ...competitorScoresRaw.map(c => ({ name: c.Brand, geo: c.GEO, isYou: false })),
+    ].sort((a, b) => b.geo - a.geo);
+
+    const rankMap: Record<string, string> = {};
+    allBrandScores.forEach((b, i) => {
+      rankMap[b.name.toLowerCase()] = b.geo > 0 ? `#${i + 1}` : 'N/A';
+    });
+
+    const myAvgRank     = rankMap[brand.toLowerCase()] || 'N/A';
+    const competitorScores = competitorScoresRaw.map(c => ({
+      ...c,
+      Rank: rankMap[c.Brand.toLowerCase()] || 'N/A',
+    }));
 
     // 7. Response detail
     const compAliasList = competitors.map(c => aliases(c));
@@ -486,7 +502,7 @@ export async function POST(req: NextRequest) {
 
     const [insightsRaw, targetedClusters] = await Promise.all([
 
-      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${scores.avgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
+      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
 
       (async (): Promise<any[]> => {
         try {
@@ -531,7 +547,7 @@ export async function POST(req: NextRequest) {
       brand_name: brand, industry, ind_key: industryKey, lob, ind_label: industry,
       visibility: scores.visibility, sentiment: scores.sentiment, prominence: scores.prominence,
       citation_share: scores.citationShare, share_of_voice: scores.shareOfVoice,
-      overall_geo_score: scores.geo, avg_rank: scores.avgRank,
+      overall_geo_score: scores.geo, avg_rank: myAvgRank,
       responses_with_brand: scores.mentionCount, total_responses: scores.totalCount,
       personas, stage_win_rates: stageWinRates,
       responses_detail: responsesDetail, query_clusters: queryClusters,
