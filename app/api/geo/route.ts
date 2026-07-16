@@ -1377,11 +1377,23 @@ export async function POST(req: NextRequest) {
     const batches = Array.from({ length: Math.ceil(queries.length / ANSWER_BATCH) }, (_, i) => queries.slice(i * ANSWER_BATCH, (i + 1) * ANSWER_BATCH));
 
     await Promise.all(batches.map(async (batch, bi) => {
-      const ql  = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
+      // Enrich each query with its journey stage context
+      // This makes GPT give stage-appropriate answers not generic lists
+      const stageContext: Record<string, string> = {
+        Awareness    : '(Someone just starting to research, wants to understand their options)',
+        Consideration: '(Someone comparing 3-4 options, wants expert guidance on trade-offs)',
+        Decision     : '(Someone ready to choose, wants a specific clear recommendation)',
+        Validation   : '(Someone who has chosen, wants confirmation they made the right call)',
+        Advocacy     : '(Someone recommending to a friend, wants the single best answer)',
+      };
+      const ql  = batch.map((q, j) => {
+        const ctx = stageContext[q.stage] || '';
+        return `Q${j + 1}: ${q.query} ${ctx}`;
+      }).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a knowledgeable balanced consumer advisor for ${lob || industry}. Always name specific real brands. Never be vague or generic.` },
-        { role: 'user',   content: `Answer every question. Name 2-4 real brands per answer. Be balanced. 1-3 sentences each.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are an expert consumer advisor for ${lob || industry}. Answer each question honestly based on what it is actually asking. Name the brands that genuinely best fit each specific question — a cash back question should name the best cash back cards, a premium travel question should name premium travel cards. Give a clear direct recommendation, not a generic list. 2-3 sentences per answer.` },
+        { role: 'user',   content: `Answer each question with a specific honest recommendation. The context in parentheses shows where the consumer is in their journey — use it to calibrate how direct and specific your answer should be.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.3, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
