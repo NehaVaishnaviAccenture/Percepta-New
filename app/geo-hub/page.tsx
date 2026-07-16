@@ -13,7 +13,7 @@ const METRIC_TIPS: Record<string, string> = {
   'visibility score': 'Measures how often your brand appears in AI-generated responses across key industry queries.',
   'citation score': 'Reflects how authoritatively AI models reference your brand compared to competitors.',
   'sentiment score': 'Captures the tone and favorability of AI responses when your brand is mentioned.',
-  'avg rank': 'Average position within each AI response when your brand is mentioned. #1 = AI names you first. #3 = two other brands named before you. Unrelated to leaderboard position.',
+  'avg rank': 'When AI mentions your brand, what order does it name you? #1 = named first in that response. #2 = one other brand named before you. This is averaged across all responses where you appeared.',
   'prominence score': 'Measures how early in AI responses your brand is mentioned.',
   'share of voice': 'Your brand mentions as a percentage of all brand mentions across AI responses.',
 };
@@ -904,7 +904,7 @@ export default function GeoHub() {
                         <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#111827' }}>{result.brand_name}</div>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
                           {result.lob && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#A100FF', background: '#F5F0FF', borderRadius: 50, padding: '2px 10px' }}>{result.lob}</span>}
-                          <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151', background: '#F3F4F6', borderRadius: 50, padding: '2px 10px' }}>{industryLabel}</span>
+                          {industryLabel && industryLabel.toLowerCase() !== (result.lob || '').toLowerCase() && <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#374151', background: '#F3F4F6', borderRadius: 50, padding: '2px 10px' }}>{industryLabel}</span>}
                         </div>
                       </div>
                       <a href={result.page_url} target="_blank" rel="noreferrer" style={{ color: '#A100FF', fontSize: '0.82rem' }}>{(result.page_url || '').slice(0, 60)}{(result.page_url || '').length > 60 ? '...' : ''}</a>
@@ -996,7 +996,7 @@ export default function GeoHub() {
                   </div>
                   <div style={{ background: 'white', borderRadius: 14, border: '1px solid #E5E7EB', padding: '20px 24px' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AI POSITION'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#FAFAFA' }}>{['#', 'BRAND / URL', 'GEO SCORE', 'GAP', 'VISIBILITY', 'CITATIONS', 'SENTIMENT', 'SOV', 'PROMINENCE', 'AVG ORDER'].map((h) => <th key={h} style={{ padding: '10px 12px', textAlign: 'left' as const, fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{top.map((c: any, i: number) => {
                         const gap2 = c.isYou ? null : c.GEO - geo;
                         return <tr key={i} style={{ background: c.isYou ? '#F5F0FF' : 'white', borderTop: '1px solid #F3F4F6', borderLeft: c.isYou ? '3px solid #A100FF' : 'none' }}>
@@ -1200,7 +1200,7 @@ export default function GeoHub() {
                       </select>
                     </div>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'AI POSITION', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
+                      <thead><tr style={{ background: '#F8FAFC' }}>{['#', 'QUERY', 'AVG ORDER', 'WHO BEAT YOU'].map((h) => <th key={h} style={{ padding: '8px 12px', textAlign: 'left' as const, fontSize: '0.63rem', color: '#9CA3AF', fontWeight: 600, letterSpacing: '.06em' }}>{h}</th>)}</tr></thead>
                       <tbody>{pageRows.map((item: any, i: number) => {
                         const globalIdx = (safePage - 1) * ROWS_PER_PAGE + i + 1, rp = item.position, rankLabel = rp === 1 ? '#1' : rp > 0 ? `#${rp}` : 'N/A', rankColor = rp === 1 ? '#10B981' : item.mentioned ? '#A100FF' : '#9CA3AF';
                         const beater = item.winner_brand && item.winner_brand !== result.brand_name ? item.winner_brand : null;
