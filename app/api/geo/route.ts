@@ -240,40 +240,45 @@ async function genQueries(lob: string, industry: string, cats: string[], persona
 }
 
 // ─── SCORE COMPUTATION ────────────────────────────────────────────────────────
-// VISIBILITY     = % of answered queries mentioning brand (word-boundary matched)
-// PROMINENCE     = scaled avg position: pos1→100, pos2→82, pos3→64, pos4→46, pos5+→28
-// SENTIMENT      = positive vs negative word ratio in brand sentences (base 50, ±40)
-// CITATION SHARE = sum(1/pos) / mentionCount × 100 — position-quality score 0-95
-// SHARE OF VOICE = brand-mentioned responses / any-brand-mentioned responses (Set-based)
+// ALL metrics are on the same 0-100 scale relative to total answered queries.
+// A brand mentioned in 40% of queries cannot score above 40 on any metric
+// EXCEPT sentiment (which measures tone quality) and SOV (which measures share).
+//
+// VISIBILITY     = mentions / total × 100
+// PROMINENCE     = mentions where brand is #1 / total × 100
+//                  Pure: did the AI name this brand FIRST in this response?
+// SENTIMENT      = (positive sentences - negative sentences) / total × 100
+//                  Relative to total so a rarely-mentioned brand can't score 88
+// CITATION SHARE = sum(1/rank) / total × 100
+//                  Rewards being named first, penalises being named last
+// SHARE OF VOICE = brand response count / any-brand response count
 // GEO SCORE      = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
   const total     = answered.length || 1;
+  const compAliasList = comps.map(c => aliases(c));
 
-  // VISIBILITY — word-boundary match only
+  // VISIBILITY
   const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
   const visibility   = Math.round((mentionCount / total) * 100);
 
-  // PROMINENCE — fraction of ALL queries where brand was mentioned AND named early
-  // pos1 = full credit, pos2 = 0.75, pos3 = 0.5, pos4+ = 0.25
-  // Divided by total queries so it's on same scale as visibility
-  const compAliasList = comps.map(c => aliases(c));
+  // PROMINENCE — how many responses named us #1 (first brand in response)
+  // rank 1 = brand named before any competitor = pure first position
   const positions = mentioned
     .map(r => position(r.a || '', als, compAliasList))
     .filter(p => p > 0);
   const avgPos = positions.length > 0
     ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const posScore = positions.reduce((sum, p) => {
-    if (p === 1) return sum + 1.0;
-    if (p === 2) return sum + 0.75;
-    if (p === 3) return sum + 0.50;
-    return sum + 0.25;
-  }, 0);
-  // prominence = (weighted position score / total queries) × 100
-  const prominence = Math.round(Math.min(95, (posScore / total) * 100));
+  // PROMINENCE = % of ALL queries where brand was named first (#1 position)
+  // Pure and clean: no weights, no multipliers
+  // If brand is named first in 25 out of 300 queries → prominence = 8
+  const rank1Count = positions.filter(p => p === 1).length;
+  const prominence = Math.round((rank1Count / total) * 100);
 
-  // SENTIMENT
+  // SENTIMENT — relative to total queries, not just mentions
+  // Counts positive/negative word hits in brand-containing sentences
+  // Then scores as net positive hits / total queries
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
     'generous','competitive','solid','standout','exceptional','renowned'];
@@ -289,18 +294,23 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
         NEG.forEach(w => { if (s.includes(w)) negW++; });
       });
   });
-  const sentiment = Math.round(Math.max(0, Math.min(100,
-    (mentionCount > 0 ? 50 : 0) +
-    ((posW + negW) > 0 ? Math.round(((posW - negW) / (posW + negW)) * 40) : 0)
-  )));
+  // Net sentiment hits as fraction of total queries × 100
+  // posW - negW = net positive signal. Divide by total to scale proportionally.
+  // A brand in 36% of queries with 40 pos hits in 107 mentions: 40/300 × 100 = 13
+  // But we want 0-100 range, so normalise by max possible (mentionCount)
+  const netSentiment = posW - negW;
+  const sentiment = mentionCount > 0
+    ? Math.round(Math.max(0, Math.min(100,
+        50 * (mentionCount / total) + // base proportional to visibility
+        (Math.max(netSentiment, 0) / mentionCount) * 50 * (mentionCount / total) // positive signal
+      )))
+    : 0;
 
-  // CITATION SHARE — sum(1/pos) across ALL queries (not just mentions), ×100
-  // If brand never mentioned: citWeight=0, citationShare=0
-  // If mentioned at pos1 in every query: citWeight=total, citationShare=100
+  // CITATION SHARE — sum(1/rank) / total × 100
   const citWeight     = positions.reduce((s, p) => s + 1 / p, 0);
   const citationShare = Math.round(Math.min(95, (citWeight / total) * 100));
 
-  // SHARE OF VOICE — Set prevents one response with 5 brands counting 5× in denominator
+  // SHARE OF VOICE
   const top8     = comps.slice(0, 8);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -319,8 +329,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     shareOfVoice  * 0.15
   );
 
-  // avgRank = average position within AI responses when mentioned
-  // e.g. #2 means brand is typically the 2nd brand named in responses where it appears
+  // Avg Rank = average position when mentioned (1=first, 2=second etc)
   const avgRank = avgPos > 0 ? `#${Math.round(avgPos)}` : 'N/A';
 
   return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgRank, mentionCount, totalCount: answered.length };
