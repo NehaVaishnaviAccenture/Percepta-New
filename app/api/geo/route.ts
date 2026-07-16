@@ -1431,7 +1431,7 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert answering questions about ${lob || industry}. For every question name 2-4 specific real brands. Include both the most well-known major players AND the best specific fit for what the question asks. Always name real established brands — never vague descriptions. 2-3 sentences per answer.` },
+        { role: 'system', content: `You are a consumer finance expert. For every question name 2-4 specific real brands that genuinely best answer what is being asked. Name different brands for different question types — cash back questions get cash back leaders, travel questions get travel leaders, student questions get student card leaders. Never name the same brand for every answer. 2-3 sentences per answer.` },
         { role: 'user', content: `Answer each question. Name specific real brands — major players and specialist brands that genuinely fit what each question asks.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
