@@ -1455,23 +1455,12 @@ export async function POST(req: NextRequest) {
     const allQA: any[] = new Array(queries.length).fill(null);
     const batches = Array.from({ length: Math.ceil(queries.length / ANSWER_BATCH) }, (_, i) => queries.slice(i * ANSWER_BATCH, (i + 1) * ANSWER_BATCH));
 
-    const STAGE_GUIDANCE: Record<string, string> = {
-      Awareness    : 'Name 3-4 leading brands, what each is best known for, and which is the overall top pick.',
-      Consideration: 'Name 2-4 brands, compare them for this specific need, and state clearly which wins and why.',
-      Decision     : 'Name 2-3 brands that fit, explain which is the single best for exactly what is asked.',
-      Validation   : 'Name 2-3 brands and confirm which genuinely leads in this specific area.',
-      Advocacy     : 'Name 2-3 brands and give a clear confident recommendation with the key reason.',
-    };
-
     await Promise.all(batches.map(async (batch, bi) => {
-      const ql = batch.map((q, j) => {
-        const guidance = STAGE_GUIDANCE[q.stage] || STAGE_GUIDANCE['Consideration'];
-        return `Q${j + 1} [${q.category} — ${q.stage}]: ${q.query}\nGuidance: ${guidance}`;
-      }).join('\n\n');
+      const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a balanced consumer finance expert. For each question, name 2-3 brands that are genuinely the best fit for that specific question type. Cash back questions get cash back leaders. Travel questions get travel leaders. Student questions get student card leaders. No-fee questions get no-fee leaders. Balance transfer questions get balance transfer leaders. Credit building questions get secured card leaders. Do not default to the same brands across all questions — every category has different leaders. Be accurate and specific to what each question is actually asking. 2-3 sentences per answer.` },
-        { role: 'user', content: `Answer each question. Follow the Guidance for depth. Always name 2-4 specific real brands per answer.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are a consumer finance expert. Answer each question by naming the 2-3 brands that are genuinely the best answer for that specific question. The question text tells you exactly what type of product is being asked about — answer accordingly. Questions about cash back → name cash back leaders. Questions about balance transfers → name balance transfer leaders. Questions about student cards → name student card leaders. Questions about secured cards → name secured card leaders. Questions about travel → name travel card leaders. Questions about premium cards → name premium card leaders. Do not name the same brands repeatedly across different question types. 2-3 sentences per answer.` },
+        { role: 'user', content: `Answer each question below. Name the brands that are genuinely best for what each specific question is asking.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.2, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
