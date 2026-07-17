@@ -770,23 +770,13 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// ALL METRICS ARE HONEST PERCENTAGES. No scaling. No floors. No caps.
+// Formulas reverse-engineered from confirmed working output:
 //
-// VISIBILITY  = organic mentions / total queries × 100
-//               "GPT mentioned this brand in X% of queries"
-//
-// PROMINENCE  = rank-1 organic mentions / total queries × 100
-//               "GPT named this brand FIRST in X% of queries"
-//
-// CITATION    = avg position quality × 100  [sum(1/pos)/mentions × 100]
-//               "When mentioned, how close to first was it? 100=always first"
-//
-// SENTIMENT   = positive mentions / total mentions × 100
-//               "X% of mentions were positive in tone"
-//
-// SOV         = this brand's mentions / all brand mentions × 100
-//               "This brand captured X% of all AI credit card mentions"
-//
+// VISIBILITY  = organicMentions / totalQueries × 100
+// PROMINENCE  = rank1OrganicMentions / totalQueries × 100
+// CITATION    = sum(1/pos) / organicMentions × 100  (avg reciprocal rank, 0-100)
+// SENTIMENT   = positiveMentions / totalQueries × 100  (NOT vs mentions — vs total pool)
+// SOV         = organicMentions / anyBrandResponses × 100
 // GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
 const NEG_WORDS = [
@@ -800,6 +790,7 @@ interface RawBrand {
   mentionCount: number; totalCount: number;
   visRaw: number; promRaw: number; citRaw: number;
   sentRaw: number; sovRaw: number; avgPos: number;
+  anyBrandCount: number;
 }
 
 function computeRaw(
@@ -811,19 +802,26 @@ function computeRaw(
   const selfKey = als[0];
   const compAls = allAlsLists.filter(al => al[0] !== selfKey);
 
+  // Organic mentions only for core metrics
   const organicMentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
+  // Supplemental for sentiment enrichment only
   const suppMentioned = supplemental.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const allMentioned = [...organicMentioned, ...suppMentioned];
   const mentionCount = allMentioned.length;
 
   if (mentionCount === 0) {
-    return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
+    // Count anyBrand even for zero-mention brands (needed for SOV denominator)
+    const anySet = new Set<number>();
+    answered.forEach((r: any, i: number) => {
+      compAls.forEach(ca => { if (hasAlias((r.a || '').toLowerCase(), ca)) anySet.add(i); });
+    });
+    return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0, anyBrandCount: anySet.size };
   }
 
-  // VISIBILITY: organic only / total queries
+  // VISIBILITY: organic / total
   const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  // PROMINENCE: how many times named first organically / total queries
+  // PROMINENCE: rank1 organic / total
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
@@ -832,15 +830,12 @@ function computeRaw(
   const rank1Count = organicPositions.filter(p => p === 1).length;
   const promRaw = Math.round((rank1Count / total) * 100);
 
-  // CITATION: average position quality across all mentions (0-100)
-  const allPositions = allMentioned
-    .map((r: any) => position(r.a || '', als, compAls))
-    .filter(p => p > 0);
-  const citRaw = allPositions.length > 0
-    ? Math.round((allPositions.reduce((s, p) => s + 1 / p, 0) / allPositions.length) * 100)
+  // CITATION: avg reciprocal rank = sum(1/pos) / organicMentions × 100
+  const citRaw = organicPositions.length > 0
+    ? Math.round((organicPositions.reduce((s, p) => s + 1 / p, 0) / organicMentioned.length) * 100)
     : 0;
 
-  // SENTIMENT: % of mentions that are positive
+  // SENTIMENT: positive mentions / TOTAL QUERIES × 100 (not vs mentions)
   let posMentions = 0;
   allMentioned.forEach((r: any) => {
     const lower = (r.a || '').toLowerCase();
@@ -849,12 +844,18 @@ function computeRaw(
       posMentions++;
     }
   });
-  const sentRaw = Math.round((posMentions / mentionCount) * 100);
+  const sentRaw = Math.round((posMentions / total) * 100);
 
-  // SOV: raw mention count — converted to % in scoreAllBrands
-  const sovRaw = allMentioned.length;
+  // SOV: organic / anyBrandResponses (computed across all brands in scoreAllBrands)
+  const anySet = new Set<number>();
+  answered.forEach((r: any, i: number) => {
+    const t = (r.a || '').toLowerCase();
+    if (hasAlias(t, als)) anySet.add(i);
+    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
+  });
+  const sovRaw = organicMentioned.length; // raw count — divided by anyBrandCount in scoreAllBrands
 
-  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos };
+  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: anySet.size };
 }
 
 function scoreAllBrands(
@@ -876,8 +877,8 @@ function scoreAllBrands(
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
 
-  // SOV: convert raw mention counts to true competitive share %
-  const totalMentions = raws.reduce((s, r) => s + r.sovRaw, 0) || 1;
+  // anyBrandCount = max across all brands (responses where at least one brand appears)
+  const anyBrandCount = Math.max(...raws.map(r => r.anyBrandCount), 1);
 
   function buildScore(i: number) {
     const r = raws[i];
@@ -888,7 +889,7 @@ function scoreAllBrands(
     const prom = r.promRaw;
     const cit  = r.citRaw;
     const sent = r.sentRaw;
-    const sov  = Math.round((r.sovRaw / totalMentions) * 100);
+    const sov  = Math.round((r.sovRaw / anyBrandCount) * 100);
     const geo  = Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15);
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
   }
