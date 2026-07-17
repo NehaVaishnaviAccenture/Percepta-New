@@ -702,138 +702,154 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// ALL 5 METRICS ARE COMPUTED FROM ORGANIC QA ONLY.
-// Supplemental/targeted QA rows are never passed to this function.
+// ALL METRICS FROM ORGANIC QA ONLY. Peer-normalised within the competitive set.
 //
-// METRIC DEFINITIONS:
+// RAW FORMULAS:
+//   Visibility   = mentions / relevantCategoryTotal × 100  (not normalised, true ratio)
+//   Prominence   = rank1Count / totalQueries × 100         (peer-normalised 8–62)
+//   Citation     = sum(1/pos) / totalQueries × 133         (peer-normalised 15–85)
+//   Sentiment    = posMentions/mentions × sqrt(vis/100)    (not normalised, damped by reach)
+//   SOV          = brandResponses / anyBrandResponses × 100(peer-normalised 8–85)
+//   GEO          = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 //
-// VISIBILITY (0-100)
-//   = mentions / relevantTotal × 100
-//   relevantTotal = queries in categories where brand appeared
-//   → Barclays: 8 mentions / 80 General queries = 10
-//   → Chase: 252 mentions / 300 queries = 84  ✓ proportional
-//
-// PROMINENCE (0-100)
-//   = (rank1Count / total) × 100
-//   denominator = TOTAL query pool, not just mentions
-//   → Chase rank1 in 163 of 300 = 54  ✓
-//   → Barclays rank1 in 2 of 300 = 0-1  ✓ (not 100)
-//
-// SENTIMENT (0-100)
-//   = (posMentions / mentionCount) × 100 × visibilityDamper
-//   visibilityDamper = sqrt(visibility/100) — gently scales sentiment by reach
-//   → Brands barely mentioned can't claim "90 sentiment" — it's statistically unreliable
-//   → Chase: 71 raw × sqrt(0.84) = 65  ✓
-//   → Barclays: 90 raw × sqrt(0.10) = 28  ✓ (not 90)
-//   → U.S. Bank: 100 raw × sqrt(0.21) = 46  ✓ (not 100)
-//
-// CITATION (0-100)
-//   = (citWeight / total) × 100 × 4   (×4 because theoretical max citWeight/total ≈ 0.25 when all rank1)
-//   citWeight = sum(1/position) across ALL mentioned responses with a valid position
-//   denominator = TOTAL query pool (same as prominence) — anchors to query frequency
-//   → Chase: high citWeight / 300 × 400 = realistic high number
-//   → Barclays: low citWeight / 300 × 400 = low (not 95)
-//   Cap at 100.
-//
-// SOV (0-100)
-//   = brandResponses / anyBrandResponses × 100
-//   → Naturally proportional to frequency
-//
-// GEO = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+// PEER NORMALISATION:
+//   Scales each metric so top brand = ceiling, bottom brand = floor.
+//   Eliminates single-digit/zero values for brands with real data.
+//   Preserves exact relative ordering.
+//   Only applied to brands that have ≥1 organic mention; zero-mention brands stay at 0.
 
-function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps: string[]) {
-  const answered = organicQA.filter(r => r && (r.a || '').trim().length > 10);
-  const total = answered.length || 1;
-  const compAls = comps.map(c => aliases(c));
+function peerNorm(value: number, rawMin: number, rawMax: number, tMin: number, tMax: number): number {
+  if (rawMax === rawMin) return Math.round((tMin + tMax) / 2);
+  return Math.round(tMin + ((value - rawMin) / (rawMax - rawMin)) * (tMax - tMin));
+}
 
+interface RawMetrics {
+  name: string; url: string;
+  mentionCount: number; totalCount: number;
+  visibility: number;
+  promRaw: number; citRaw: number; sovRaw: number;
+  rawSentiment: number; avgPos: number;
+}
+
+function computeRaw(
+  name: string, url: string, als: string[],
+  answered: any[], total: number,
+  allAlsLists: string[][]
+): RawMetrics {
+  const compAls = allAlsLists.filter(al => al[0] !== als[0]);
   const mentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
   const mentionCount = mentioned.length;
 
   if (mentionCount === 0) {
-    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: total };
+    return { name, url, mentionCount: 0, totalCount: total, visibility: 0, promRaw: 0, citRaw: 0, sovRaw: 0, rawSentiment: 0, avgPos: 0 };
   }
 
-  // ── VISIBILITY ──
-  // Score against only the categories this brand actually competed in.
-  // Prevents penalizing niche brands for not appearing in irrelevant categories.
-  const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
-  const relevantAnswered = brandCats.size > 0
-    ? answered.filter(r => brandCats.has(r.category))
-    : answered;
-  const relevantTotal = relevantAnswered.length || 1;
-  const visibility = Math.min(100, Math.round((mentionCount / relevantTotal) * 100));
+  // Visibility — relevant categories only
+  const brandCats = new Set(mentioned.map((r: any) => r.category).filter(Boolean));
+  const relevantTotal = brandCats.size > 0
+    ? answered.filter((r: any) => brandCats.has(r.category)).length
+    : total;
+  const visibility = Math.min(100, Math.round((mentionCount / (relevantTotal || 1)) * 100));
 
-  // ── PROMINENCE ──
-  // rank1Count / TOTAL pool → forces realistic values for low-data brands.
-  // Barclays named first in 2 organic responses out of 300 → prominence = 0-1, not 100.
-  const positionData = mentioned
-    .map(r => ({ pos: position(r.a || '', als, compAls) }))
-    .filter(d => d.pos > 0);
-  const avgPos = positionData.length > 0
-    ? positionData.reduce((a, d) => a + d.pos, 0) / positionData.length
-    : 0;
-  const rank1Count = positionData.filter(d => d.pos === 1).length;
-  const prominence = Math.min(100, Math.round((rank1Count / total) * 100));
+  // Position data
+  const positions = mentioned.map((r: any) => position(r.a || '', als, compAls)).filter(p => p > 0);
+  const avgPos = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
+  const rank1Count = positions.filter(p => p === 1).length;
 
-  // ── SENTIMENT ──
-  // Raw tone ratio × visibility damper (square root scaling).
-  // The damper prevents low-data brands from claiming high sentiment on tiny sample sizes.
-  // sqrt(0.84) ≈ 0.92 → barely affects Chase/Amex
-  // sqrt(0.10) ≈ 0.32 → significantly deflates Barclays/PNC as expected
-  // sqrt(0.27) ≈ 0.52 → moderate deflation for mid-tier brands
+  // Raw prominence and citation (pre-normalisation)
+  const promRaw = (rank1Count / total) * 100;
+  const citWeight = positions.reduce((s, p) => s + 1 / p, 0);
+  const citRaw = (citWeight / total) * 133;
+
+  // Sentiment: tone quality × visibility damper (sqrt prevents 100 on tiny samples)
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
-    'complicated','confusing','frustrating','complaints','issues','trouble','hidden fees',
-    'poor customer service','hard to reach','difficult'];
+    'complicated','confusing','frustrating','complaints','issues','trouble'];
   let posMentions = 0;
-  mentioned.forEach(r => {
-    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10);
-    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
-    if (!hasNeg) posMentions++;
+  mentioned.forEach((r: any) => {
+    const sents = (r.a || '').toLowerCase().split(/[.!?]+/).filter((s: string) => hasAlias(s, als) && s.length > 10);
+    if (!sents.some((s: string) => NEG.some(w => s.includes(w)))) posMentions++;
   });
-  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
-  const visibilityDamper = Math.sqrt(visibility / 100); // 0.0–1.0
-  const sentiment = Math.min(100, Math.round(rawSentiment * visibilityDamper));
+  const rawSentiment = Math.min(100, Math.round((posMentions / mentionCount) * 100 * Math.sqrt(visibility / 100)));
 
-  // ── CITATION SHARE ──
-  // citWeight = sum(1/pos) across all organic mentions with a valid position.
-  // Denominator = TOTAL query pool (same as prominence).
-  // Multiplier 4 normalises the range: when a top brand appears at rank1 in ~25% of
-  // all queries, citWeight/total ≈ 0.25 → ×4 = 100 (theoretical ceiling for #1 brand).
-  // Low-visibility brands: citWeight/total is tiny → citation stays low regardless of
-  // their average rank when mentioned.
-  const citWeight = positionData.reduce((s, d) => s + 1 / d.pos, 0);
-  const citationShare = Math.min(100, Math.round((citWeight / total) * 133));
-
-  // ── SHARE OF VOICE ──
-  // Brand's share of all responses that mention any brand in the competitive set.
-  const top10 = comps.slice(0, 10);
-  const brandSet = new Set<number>();
-  const anySet = new Set<number>();
-  answered.forEach((r, i) => {
+  // SOV raw
+  const brandSet = new Set<number>(), anySet = new Set<number>();
+  answered.forEach((r: any, i: number) => {
     const t = (r.a || '').toLowerCase();
     if (hasAlias(t, als)) { brandSet.add(i); anySet.add(i); }
-    top10.forEach(c => { if (hasAlias(t, aliases(c))) anySet.add(i); });
+    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
   });
-  const shareOfVoice = Math.min(100, Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100));
+  const sovRaw = (brandSet.size / Math.max(anySet.size, 1)) * 100;
 
-  // ── GEO SCORE ──
-  const geo = Math.min(100, Math.round(
-    visibility    * 0.30 +
-    sentiment     * 0.20 +
-    prominence    * 0.20 +
-    citationShare * 0.15 +
-    shareOfVoice  * 0.15
-  ));
-
-  return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: total };
+  return { name, url, mentionCount, totalCount: total, visibility, promRaw, citRaw, sovRaw, rawSentiment, avgPos };
 }
 
-function scoreComp(name: string, url: string, organicQA: any[], allComps: string[]) {
-  const als = aliases(name);
-  const s = scoreOrganicOnly(name, als, organicQA, allComps.filter(c => c !== name));
-  return { Brand: name, URL: url || `${name.toLowerCase().replace(/\s+/g, '')}.com`, GEO: s.geo, Vis: s.visibility, Cit: s.citationShare, Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence, avgPos: s.avgPos };
+function applyNormAndScore(raw: RawMetrics, prom: number, cit: number, sov: number) {
+  const sentiment = Math.min(100, Math.max(0, raw.rawSentiment));
+  const geo = Math.min(100, Math.round(
+    raw.visibility * 0.30 + sentiment * 0.20 + prom * 0.20 + cit * 0.15 + sov * 0.15
+  ));
+  return { visibility: raw.visibility, prominence: prom, sentiment, citationShare: cit, shareOfVoice: sov, geo, avgPos: raw.avgPos, mentionCount: raw.mentionCount, totalCount: raw.totalCount };
+}
+
+// scoreAllBrands: computes metrics for primary + all competitors in one pass,
+// then applies peer normalisation across the full set simultaneously.
+function scoreAllBrands(
+  primaryBrand: string, primaryAls: string[],
+  compList: { name: string; url: string }[],
+  organicQA: any[]
+) {
+  const answered = organicQA.filter((r: any) => r && (r.a || '').trim().length > 10);
+  const total = answered.length || 1;
+
+  const allBrands = [
+    { name: primaryBrand, als: primaryAls, url: '' },
+    ...compList.map(c => ({ name: c.name, als: aliases(c.name), url: c.url })),
+  ];
+  const allAlsLists = allBrands.map(b => b.als);
+
+  // Compute raw metrics for every brand
+  const raws = allBrands.map(b => computeRaw(b.name, b.url, b.als, answered, total, allAlsLists));
+
+  // Separate brands with mentions from zero-mention brands
+  const active = raws.filter(r => r.mentionCount > 0);
+
+  function normDim(key: keyof Pick<RawMetrics, 'promRaw' | 'citRaw' | 'sovRaw'>, tMin: number, tMax: number): Map<string, number> {
+    const vals = active.map(r => r[key] as number);
+    const rawMin = Math.min(...vals), rawMax = Math.max(...vals);
+    const result = new Map<string, number>();
+    raws.forEach(r => {
+      if (r.mentionCount === 0) { result.set(r.name, 0); return; }
+      result.set(r.name, peerNorm(r[key] as number, rawMin, rawMax, tMin, tMax));
+    });
+    return result;
+  }
+
+  const promMap = normDim('promRaw', 8, 62);
+  const citMap  = normDim('citRaw',  15, 85);
+  const sovMap  = normDim('sovRaw',  8, 85);
+
+  // Build final scored objects
+  const primaryRaw = raws[0];
+  const primaryScores = applyNormAndScore(
+    primaryRaw,
+    promMap.get(primaryBrand) ?? 0,
+    citMap.get(primaryBrand) ?? 0,
+    sovMap.get(primaryBrand) ?? 0
+  );
+
+  const competitorScores = raws.slice(1).map((r, i) => {
+    const s = applyNormAndScore(r, promMap.get(r.name) ?? 0, citMap.get(r.name) ?? 0, sovMap.get(r.name) ?? 0);
+    return {
+      Brand: r.name,
+      URL: compList[i].url || `${r.name.toLowerCase().replace(/\s+/g, '')}.com`,
+      GEO: s.geo, Vis: s.visibility, Cit: s.citationShare,
+      Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence,
+      avgPos: s.avgPos, Rank: '',
+    };
+  });
+
+  return { primaryScores, competitorScores };
 }
 
 function buildClusters(qa: any[], als: string[], comps: string[]) {
@@ -923,9 +939,6 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < organicQA.length; i++) {
       if (!organicQA[i]) organicQA[i] = { category: queries[i]?.category || '', stage: queries[i]?.stage || '', persona: queries[i]?.persona || '', q: queries[i]?.query || '', a: '' };
     }
-
-    // Score the primary brand from organic QA only
-    const scores = scoreOrganicOnly(brand, als, organicQA, competitors);
 
     // ── COMPETITOR MENTIONS FROM ORGANIC QA ──
     const mentionCounts: Record<string, number> = {};
@@ -1037,24 +1050,25 @@ export async function POST(req: NextRequest) {
 
     const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 10);
 
-    // Score each competitor:
-    // - Organic QA pool is always the BASE (ensures denominator consistency)
-    // - Supplemental QA for this competitor is appended (for mention/sentiment signal only)
-    // - scoreOrganicOnly() uses the combined array but prominence/citation denominators
-    //   are still relative to the full pool size → low-data brands get realistic scores
-    const competitorScoresRaw = allForScoring.map(c => {
-      const supplemental = supplementalQAMap[c.toLowerCase()] || [];
-      // Merge: supplemental rows tagged so we can distinguish if needed in future
-      const combinedQA = [...organicQA, ...supplemental];
-      return scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', combinedQA, allForScoring);
-    }).sort((a, b) => b.GEO - a.GEO);
+    // ── SCORE ALL BRANDS TOGETHER (peer-normalised in one pass) ──
+    // scoreAllBrands computes raw metrics for primary + all 10 competitors,
+    // then peer-normalises Prominence, Citation, SOV across the full set.
+    // This eliminates single-digit values while preserving relative ordering.
+    const compList = allForScoring.map(c => ({
+      name: c,
+      url: domainMap[c.toLowerCase()] || competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g, '')}.com`,
+    }));
 
-    // Rank assignment
-    const allBrandScores = [{ name: brand, geo: scores.geo }, ...competitorScoresRaw.map(c => ({ name: c.Brand, geo: c.GEO }))].sort((a, b) => b.geo - a.geo);
+    const { primaryScores: scores, competitorScores: competitorScoresRaw } = scoreAllBrands(brand, als, compList, organicQA);
+
+    const sortedCompScores = [...competitorScoresRaw].sort((a, b) => b.GEO - a.GEO);
+
+    // Rank assignment across primary + all competitors
+    const allBrandScores = [{ name: brand, geo: scores.geo }, ...sortedCompScores.map(c => ({ name: c.Brand, geo: c.GEO }))].sort((a, b) => b.geo - a.geo);
     const rankMap: Record<string, string> = {};
     allBrandScores.forEach((b, i) => { rankMap[b.name.toLowerCase()] = b.geo > 0 ? `#${i + 1}` : 'N/A'; });
     const myAvgRank = rankMap[brand.toLowerCase()] || 'N/A';
-    const competitorScores = competitorScoresRaw.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
+    const competitorScores = sortedCompScores.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
 
     const compAlsForDetail = competitors.map(c => aliases(c));
     const responsesDetail = organicQA.filter(Boolean).map(r => {
