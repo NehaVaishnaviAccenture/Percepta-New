@@ -124,7 +124,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that consumers would find when asking AI assistants about this product in the USA — major national brands that AI models actually recommend"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that ChatGPT and Perplexity actually name when US consumers ask about this product — only brands that AI models genuinely recommend, not just market participants"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     // Normalize concatenated brand names from AI discovery
@@ -474,7 +474,7 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'General', query:'I want to get a credit card and stick with it for 20 years — which company has the best relationship with long-term loyal customers?', stage:'Advocacy' },
   { category:'General', query:'Which credit card has the most consistent rewards program that has never been devalued since launch?', stage:'Validation' },
   { category:'General', query:'I am a minimalist who wants one perfect credit card that handles everything without complexity — which comes closest to perfect?', stage:'Decision' },
-  { category:'General', query:'What single credit card would you put in the wallet of every American adult who wants to be smart about spending?', stage:'Advocacy' },
+  { category:'General', query:'Which credit card consistently ranks at the top when independent experts compare all options side by side?', stage:'Validation' },
 
 ];
 
@@ -1463,8 +1463,8 @@ export async function POST(req: NextRequest) {
       const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
       const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
       const raw = await ai([
-        { role: 'system', content: `You are a consumer finance expert. For every question name 3-4 specific real brands that are the genuine best answers. Always name real established brands — include both well-known leaders and specialist brands that fit the question. 2-3 sentences per answer.` },
-        { role: 'user', content: `Answer each question. Name specific real brands — major players and specialist brands that genuinely fit what each question asks.\n\n${ql}\n\nFormat:\n${lbs}` },
+        { role: 'system', content: `You are a consumer finance expert. For every question name exactly 4 specific real brands. Always include the most well-known national leaders in the category alongside the best specific fit for the question. Vary which brands you lead with based on what each question asks. 2 sentences per answer.` },
+        { role: 'user', content: `Answer each question by naming exactly 4 real brands. Include the top nationally recognized brands plus any specialist that fits best.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
@@ -1492,6 +1492,56 @@ export async function POST(req: NextRequest) {
         }
       });
     });
+
+    // COMPETITORS — extracted from actual AI responses
+    // First pass: count mentions of discovered competitors
+    const mentionCounts: Record<string, number> = {};
+    const domainMap: Record<string, string> = {};
+    allQA.filter(Boolean).forEach(r => {
+      const t = (r.a || '').toLowerCase();
+      competitors.forEach(c => {
+        const ca = aliases(c);
+        if (hasAlias(t, ca)) {
+          const key = c.toLowerCase();
+          mentionCounts[key] = (mentionCounts[key] || 0) + 1;
+          domainMap[key] = competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g,'')}.com`;
+        }
+      });
+    });
+
+    // Second pass: scan for any well-known brands GPT mentioned that weren't discovered
+    // This catches cases where discovery missed a brand GPT actually recommends
+    const KNOWN_CC_BRANDS: Record<string, string> = {
+      'chase': 'chase.com', 'american express': 'americanexpress.com', 'amex': 'americanexpress.com',
+      'capital one': 'capitalone.com', 'citi': 'citi.com', 'citibank': 'citi.com',
+      'discover': 'discover.com', 'wells fargo': 'wellsfargo.com', 'bank of america': 'bankofamerica.com',
+      'barclays': 'barclaysus.com', 'us bank': 'usbank.com', 'u.s. bank': 'usbank.com',
+      'pnc': 'pnc.com', 'synchrony': 'synchrony.com', 'navy federal': 'navyfederal.org',
+      'usaa': 'usaa.com', 'apple card': 'apple.com', 'goldman sachs': 'goldmansachs.com',
+    };
+    const extraBrands: Record<string, number> = {};
+    allQA.filter(Boolean).forEach(r => {
+      const t = (r.a || '').toLowerCase();
+      Object.entries(KNOWN_CC_BRANDS).forEach(([name, domain]) => {
+        const isAlreadyTracked = competitors.some(c => aliases(c).some(a => a === name));
+        if (!isAlreadyTracked && hasAlias(t, [name, name.replace(/\s+/g,'')])) {
+          extraBrands[name] = (extraBrands[name] || 0) + 1;
+          if (!domainMap[name]) domainMap[name] = domain;
+        }
+      });
+    });
+
+    // Merge extra brands into competitors list if they have significant mentions
+    Object.entries(extraBrands)
+      .filter(([,count]) => count >= 3)
+      .sort((a,b) => b[1]-a[1])
+      .forEach(([name]) => {
+        if (!competitors.some(c => c.toLowerCase() === name || aliases(c).includes(name))) {
+          const proper = name.split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+          competitors.push(proper);
+          mentionCounts[name] = extraBrands[name];
+        }
+      });
 
     // COMPETITORS — ranked by AI mentions, always show up to 10
     const realCompetitors = Object.entries(mentionCounts)
