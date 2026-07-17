@@ -1562,28 +1562,54 @@ export async function POST(req: NextRequest) {
       c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase())
     );
 
-    // Run 3 targeted queries per unmentioned competitor to get real scores
-    if (unmentioned.length > 0 && realCompetitors.length < 10) {
-      const needed = unmentioned.slice(0, 10 - realCompetitors.length);
-      await Promise.all(needed.map(async (comp) => {
+    // Run targeted queries for ALL competitors with fewer than 20 mentions
+    // This ensures every competitor has enough data for all 5 signals
+    // 20 queries gives reliable prominence, sentiment, citation data
+    const lowDataComps = [...realCompetitors, ...unmentioned.slice(0, 10 - realCompetitors.length)]
+      .filter(c => (mentionCounts[c.toLowerCase()] || 0) < 20);
+
+    if (lowDataComps.length > 0) {
+      await Promise.all(lowDataComps.map(async (comp) => {
         const compQ = [
-          `What credit cards does ${comp} offer and who are they best for?`,
-          `How does ${comp} credit card compare to Chase and Capital One?`,
-          `Is ${comp} a good credit card issuer for rewards?`,
+          // Awareness — brand-leading questions (most likely to get comp named first)
+          `What credit cards does ${comp} offer?`,
+          `Is ${comp} a good credit card company?`,
+          `What is ${comp} best known for in credit cards?`,
+          `Who should get a ${comp} credit card?`,
+          // Decision — specific recommendations
           `What are the best ${comp} credit cards available right now?`,
-          `Who should consider a ${comp} credit card?`,
+          `Which ${comp} card gives the best rewards?`,
+          `What is the top ${comp} credit card for everyday spending?`,
+          `Which ${comp} card is easiest to get approved for?`,
+          // Comparison — where comp might appear alongside others
+          `How does ${comp} compare to Chase for credit cards?`,
+          `How does ${comp} compare to Capital One credit cards?`,
+          `Is ${comp} or Discover better for cash back?`,
+          // Advocacy — triggers first-position mentions
+          `What do people say about ${comp} credit cards?`,
+          `Would you recommend a ${comp} credit card?`,
+          `What is ${comp} credit card reputation?`,
+          // Validation — positive/negative sentiment signals
+          `What are the pros and cons of ${comp} credit cards?`,
+          `Is ${comp} credit card worth it?`,
+          `What are common complaints about ${comp} credit cards?`,
+          `What do ${comp} credit card customers love most?`,
+          `Has ${comp} improved their credit card products recently?`,
+          `What makes ${comp} credit cards different from competitors?`,
         ];
         const ql = compQ.map((q, j) => `Q${j+1}: ${q}`).join('\n\n');
         const lbs = compQ.map((_, j) => `A${j+1}:`).join('\n');
         const raw = await ai([
-          { role: 'system', content: `You are a consumer finance expert. Answer honestly about this brand's credit card products compared to major issuers.` },
+          { role: 'system', content: `You are a consumer finance expert. Answer each question honestly and specifically about the brand mentioned. Name the brand directly in your answer. 1-2 sentences per answer.` },
           { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
-        ], 0.1, 1500, 1);
+        ], 0.1, 3000, 2);
         const answers = parseAnswers(raw, compQ.length);
         compQ.forEach((q, j) => {
           if (answers[j] && answers[j].length > 10) {
-            allQA.push({ category: 'General', stage: 'Awareness', persona: 'general consumer', q, a: answers[j] });
-            // Count mentions
+            allQA.push({
+              category: 'General', stage: j < 4 ? 'Awareness' : j < 8 ? 'Decision' : j < 11 ? 'Consideration' : j < 14 ? 'Advocacy' : 'Validation',
+              persona: 'general consumer', q, a: answers[j],
+            });
             const t = answers[j].toLowerCase();
             const ca = aliases(comp);
             if (hasAlias(t, ca)) {
@@ -1593,7 +1619,6 @@ export async function POST(req: NextRequest) {
             }
           }
         });
-        // Add to real competitors if now mentioned
         if (mentionCounts[comp.toLowerCase()] && !mentionedSet.has(comp.toLowerCase())) {
           realCompetitors.push(comp);
           mentionedSet.add(comp.toLowerCase());
@@ -1601,12 +1626,11 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // Fill remaining spots with unmentioned brands (will score low but honest)
-    const stillNeeded = competitors.filter(c =>
-      c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase())
-    ).slice(0, Math.max(0, 10 - realCompetitors.length));
-
-    const allForScoring = [...realCompetitors, ...stillNeeded].slice(0, 10);
+    // Always show exactly 10 competitors
+    const allForScoring = [
+      ...realCompetitors,
+      ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase())),
+    ].slice(0, 10);
 
     const competitorScoresRaw = allForScoring
       .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allForScoring))
