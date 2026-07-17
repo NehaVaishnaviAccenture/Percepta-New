@@ -597,7 +597,10 @@ export default function GeoHub() {
     <div id="percepta-shell" className="shell">
 
       {/* ── Sidebar ── */}
-      <Sidebar onNewAnalysis={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}}/>
+      <Sidebar
+        onNewAnalysis={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}}
+        breadcrumb={result?.brand_name ? {section:'Reports',label:result.brand_name} : undefined}
+      />
 
       {/* ── Content column ── */}
       <div id="percepta-content-col" className="contentCol">

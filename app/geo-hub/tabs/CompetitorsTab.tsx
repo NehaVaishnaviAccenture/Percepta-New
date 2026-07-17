@@ -77,7 +77,6 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
         <div id="competitors-rank-pillar" className="cmpCard cmpCardSpan2">
           <div className="cmpCardHeader">
             <div className="cmpCardLabel">Where you rank · {result.ind_label||'your industry'}</div>
-            <button className="cmpCardLinkBtn">See methodology ›</button>
           </div>
           <div className="cmpRankRow">
             <div className="cmpRankNumber">
@@ -99,7 +98,6 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
         <div id="competitors-ladder" className="cmpCard">
           <div className="cmpCardHeader">
             <div className="cmpCardLabel">The ladder</div>
-            <button onClick={()=>setActiveParent(3)} className="cmpCardLinkBtn">Open Priorities ›</button>
           </div>
           <div className="cmpLadderList">
             {/* TODO: consider removing the border-left on badges entirely — the tier color
@@ -135,7 +133,6 @@ export default function CompetitorsTab({ result, resultComps, setActiveParent, s
             <div className="cmpCardLabel">The field</div>
             <div className="cmpChartSubLabel">Where every brand sits on the selected lens. Your brand highlighted.</div>
           </div>
-          <button onClick={()=>setActiveParent(3)} className="cmpCardLinkBtn">Open Priorities ›</button>
         </div>
         <div className="cmpChartControls">
           <div className="cmpLensButtons">

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 interface SidebarProps {
   onNewAnalysis?: () => void;
+  breadcrumb?: { section?: string; label?: string };
 }
 
 const LogoSvg = () => (
@@ -15,7 +16,7 @@ const LogoSvg = () => (
   </svg>
 );
 
-export default function Sidebar({ onNewAnalysis }: SidebarProps) {
+export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
   const router = useRouter();
   const [pinned, setPinned] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -84,10 +85,20 @@ export default function Sidebar({ onNewAnalysis }: SidebarProps) {
 
       {/* ── Mobile topbar ── */}
       <div className="mobileTopbar">
-        <Link href="/" className="mobileTopbarLogo">
-          <div className="sidebarLogoIcon"><LogoSvg/></div>
-          <span className="mobileTopbarBrand">Percepta</span>
-        </Link>
+        <div className="mobileTopbarLeft">
+          <Link href="/" className="mobileTopbarLogo">
+            <div className="sidebarLogoIcon"><LogoSvg/></div>
+          </Link>
+          <span className="mobileTopbarPath">
+            <span className="mobileTopbarBrand">Percepta</span>
+            {breadcrumb?.section && (
+              <><span className="mobileTopbarSep">/</span><span className="mobileTopbarSection">{breadcrumb.section}</span></>
+            )}
+            {breadcrumb?.label && (
+              <><span className="mobileTopbarSep">/</span><span className="mobileTopbarLabel">{breadcrumb.label}</span></>
+            )}
+          </span>
+        </div>
         <button className="mobileHamburger" onClick={() => setDrawerOpen(true)} aria-label="Open navigation">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
             <line x1="3" y1="6" x2="17" y2="6"/>

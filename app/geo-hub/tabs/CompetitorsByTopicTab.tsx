@@ -124,7 +124,7 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
         <div id="cbt-radar-eyebrow" className="cbtRadarEyebrow">Your topic shape · vs. median competitor</div>
         <div id="cbt-radar-wrap" className="cbtRadarWrap">
           <div id="cbt-radar-svg-wrap" className="cbtRadarSvgWrap">
-            <svg id="cbt-radar-svg" width="400" height="400" viewBox="-230 -230 460 460" overflow="visible">
+            <svg id="cbt-radar-svg" viewBox="-320 -270 640 540" overflow="visible" style={{width:'100%',height:'auto',display:'block'}}>
               <defs>
                 <filter id="bt-blur" x="-10%" y="-10%" width="120%" height="120%">
                   <feGaussianBlur in="SourceGraphic" stdDeviation="3"/>
@@ -150,7 +150,7 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
               {/* Axis lines */}
               {angles.map((a,i)=><line key={i} x1="0" y1="0" x2={(R*Math.cos(a)).toFixed(1)} y2={(R*Math.sin(a)).toFixed(1)} stroke="#E5E5E5" strokeWidth="1"/>)}
               {/* Tick labels */}
-              {[25,50,75,100].map(v=><text key={v} x="4" y={(-v/100*R-2).toFixed(1)} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,fill:'#8E8E8E'}}>{v}</text>)}
+              {[25,50,75,100].map(v=><text key={v} x="4" y={(-v/100*R-2).toFixed(1)} style={{fontFamily:"'JetBrains Mono',monospace",fontSize:13,fill:'#8E8E8E'}}>{v}</text>)}
               {/* Tier rings clipped to user polygon with blur */}
               <g clipPath="url(#bt-user-clip)" opacity="0.45">
                 <g filter="url(#bt-blur)">
@@ -164,7 +164,7 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
               {/* Vertex dots colored by tier */}
               {topics.map((t,i)=>{const[x,y]=rPt(userScores[t]??0,i);return <circle key={i} cx={x.toFixed(1)} cy={y.toFixed(1)} r="4" fill={tOf(userScores[t]??0).c} stroke="#A100FF" strokeWidth="1"/>;} )}
               {/* Axis labels */}
-              {topics.map((t,i)=>{const a=angles[i];const lx=LR*Math.cos(a);const ly=LR*Math.sin(a);return <text key={i} x={lx.toFixed(1)} y={ly.toFixed(1)} textAnchor={labelAnchors(lx)} dominantBaseline="middle" style={{fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,fill:'#4A4A4A'}}>{t}</text>;})}
+              {topics.map((t,i)=>{const a=angles[i];const lx=LR*Math.cos(a);const ly=LR*Math.sin(a);return <text key={i} x={lx.toFixed(1)} y={ly.toFixed(1)} textAnchor={labelAnchors(lx)} dominantBaseline="middle" style={{fontFamily:'Inter,sans-serif',fontSize:17,fontWeight:500,fill:'#4A4A4A'}}>{t}</text>;})}
             </svg>
           </div>
           <div id="cbt-radar-side" className="cbtRadarSide">
@@ -220,7 +220,8 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
       {/* Heatmap block */}
       <div id="cbt-heatmap-block" className="cbtCard">
         <div id="cbt-heatmap-eyebrow" className="cbtHeatmapEyebrow">The field · by topic</div>
-        <div id="cbt-heatmap-grid" className="cbtHeatmapGrid" style={{display:'grid',gridTemplateColumns:`160px repeat(${N},1fr)`}}>
+        <div className="cbtHeatmapScroll">
+        <div id="cbt-heatmap-grid" className="cbtHeatmapGrid" style={{display:'grid',gridTemplateColumns:`160px repeat(${N},minmax(60px,1fr))`}}>
           <div/>
           {topics.map(t=>(
             <div key={t} className={`cbt-heatmap-col-head cbtHeatmapColHead`}>{t}</div>
@@ -249,6 +250,7 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
             )
           ))}
         </div>
+        </div>
         <div id="cbt-heatmap-status" className="cbtHeatmapStatus">
           {hmHov?(
             <div id="cbt-heatmap-status-text" className="cbtHeatmapStatusText">
@@ -259,7 +261,10 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
               {' '}with a score of <span style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:600,color:'#0A0A0A'}}>{hmHov.score}</span>.
             </div>
           ):(
-            <div id="cbt-heatmap-status-default" className="cbtHeatmapStatusDefault">Hover any cell to see detail.</div>
+            <>
+              <div id="cbt-heatmap-status-default" className="cbtHeatmapStatusDefault cbtHeatmapStatusHover">Hover any cell to see detail.</div>
+              <div id="cbt-heatmap-status-default-mobile" className="cbtHeatmapStatusDefault cbtHeatmapStatusTouch">Tap any cell to see detail.</div>
+            </>
           )}
         </div>
         <div id="cbt-heatmap-legend" className="cbtHeatmapLegend">
@@ -276,7 +281,6 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
       <div id="cbt-focus-block" className="cbtFocusCard">
         <div id="cbt-focus-head" className="cbtFocusHead">
           <div id="cbt-focus-eyebrow" className="cbtFocusEyebrow">Where to focus</div>
-          <button id="cbt-focus-action-plan-btn" onClick={()=>{setActiveParent(3);setActiveSub(0);}} className="cbtFocusActionBtn">Open Priorities ›</button>
         </div>
         <p id="cbt-focus-content" className="cbtFocusContent">
           <span id="cbt-focus-gap-name" style={{color:'#E0003B',fontWeight:600}}>{gapTopic}</span> is your largest opportunity — a {Math.abs(gapDelta)}-point gap below the competitor median{tlBrand?`, with ${tlBrand} leading at ${tlScore}`:''}.

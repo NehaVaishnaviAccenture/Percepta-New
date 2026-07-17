@@ -175,6 +175,29 @@ function ScatterChart({ brand, vis, sent, prom, competitors, topCompBrand, visib
 
   const qls = { fontSize: 8, fontFamily: "'Space Grotesk',sans-serif", fontWeight: 700, letterSpacing: '0.07em', pointerEvents: 'none' as const };
 
+  if (mobile) {
+    const sorted = [...all].sort((a, b) => b.x - a.x);
+    return (
+      <div ref={wrapRef} className="scatterList">
+        <div className="scatterListHeader">
+          <span className="scatterListColBrand">Brand</span>
+          <span className="scatterListColStat">Vis</span>
+          <span className="scatterListColStat">Sent</span>
+          <span className="scatterListColStat">Prom</span>
+        </div>
+        {sorted.map((a, i) => (
+          <div key={a.label} className={`scatterListRow${a.isYou ? ' scatterListRow--you' : ''}`}>
+            <span className="scatterListRank">{i + 1}</span>
+            <span className="scatterListBrand">{a.label}{a.isYou && <span className="scatterListYouTag">you</span>}</span>
+            <span className="scatterListStat">{Math.round(a.x)}</span>
+            <span className="scatterListStat">{Math.round(a.y)}</span>
+            <span className="scatterListStat">{Math.round(a.sz)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div ref={wrapRef}>
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', overflow: 'visible' }}>
@@ -278,6 +301,27 @@ function buildInfoSentence(
 
   const rankNote = visRank === 1 ? 'leads the field on visibility' : `#${visRank} of ${n} on visibility and #${sentRank} on sentiment`;
   return <><strong>{node.label}</strong>: Visibility {node.x} · Sentiment {node.y} · Prominence {node.sz} — {rankNote}</>;
+}
+
+function exportPositioningCsv(brand: string, vis: number, sent: number, prom: number, competitors: any[], visibleComps: Set<string>) {
+  const headers = ['Rank', 'Brand', 'Visibility', 'Sentiment', 'Prominence'];
+  const rows: any[][] = [
+    [1, brand, vis, sent, prom],
+    ...competitors
+      .filter(c => visibleComps.has(c.Brand))
+      .map((c: any) => [0, c.Brand, c.Vis ?? 0, c.Sen ?? 0, c.Prom ?? 0]),
+  ];
+  // sort by visibility desc and assign rank
+  rows.sort((a, b) => b[2] - a[2]);
+  rows.forEach((r, i) => { r[0] = i + 1; });
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${brand.trim().replace(/\s+/g, '-').toLowerCase()}-market-positioning.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Main component ─────────────────────────────────────────────
@@ -395,6 +439,11 @@ export default function AiPresenceTab({ result, resultComps }: TabProps) {
         />
         <div className="aiPresChartInfo" style={{ color: activeNode ? '#111827' : '#9CA3AF' }}>
           {infoSentence}
+        </div>
+        <div className="cmpTableFooter">
+          <button className="cmpExportBtn" onClick={() => exportPositioningCsv(result.brand_name, vis, sent, prom, comps, selectedComps)}>
+            <span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 1v6.5M3.5 5.5L6 8l2.5-2.5"/><path d="M1.5 10.5h9"/></svg>Export CSV</span>
+          </button>
         </div>
       </div>
     </div>

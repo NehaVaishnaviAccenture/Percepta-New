@@ -452,3 +452,78 @@
   color: rgba(255, 255, 255, 0.8);
   margin-top: 5px;
 }
+
+/* ── Responsive ── */
+
+/* Tablet ≤ 900px */
+@media (max-width: 900px) {
+  .gsHero,
+  .gsApproach,
+  .gsWorkstreams,
+  .gsStats,
+  .gsDeliverables,
+  .gsPilots,
+  .gsResults {
+    padding-left: 28px;
+    padding-right: 28px;
+  }
+
+  .gsWorkstreamsGrid {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .gsWorkstreamsDiagram { display: none; }
+  .gsWsItemLeft  { padding-right: 0; }
+  .gsWsItemRight { padding-left: 0; }
+
+  .gsDeliverHeaders,
+  .gsDeliverActivities,
+  .gsDeliverOutputs {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .gsPilotsGrid { grid-template-columns: 1fr 1fr; }
+  .gsPilotCard--recommended { margin-top: 14px; }
+
+  .gsResultsGrid { grid-template-columns: 1fr; gap: 40px; }
+}
+
+/* Mobile ≤ 640px */
+@media (max-width: 640px) {
+  .gsHero { padding: 40px 20px; }
+  .gsHeroTitle { font-size: 2rem; }
+
+  .gsApproach { padding: 40px 20px 0; }
+  .gsApproachTitle { font-size: 26px; }
+
+  .gsWorkstreams { padding: 0 20px 32px; }
+  .gsWorkstreamsGrid { grid-template-columns: 1fr; gap: 0; }
+
+  .gsStats { padding: 28px 20px 32px; }
+  .gsStatsGrid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .gsStatDivider { display: none; }
+  .gsStatItem {
+    padding: 20px 0;
+    border-bottom: 1px dashed #D1D1D1;
+  }
+  .gsStatItem:last-child { border-bottom: 0; }
+
+  .gsDeliverables { padding: 40px 20px; }
+  .gsDeliverablesTitle { font-size: 26px; }
+  .gsDeliverHeaders,
+  .gsDeliverActivities,
+  .gsDeliverOutputs {
+    grid-template-columns: 1fr;
+  }
+
+  .gsPilots { padding: 40px 20px; }
+  .gsPilotsTitle { font-size: 26px; }
+  .gsPilotsGrid { grid-template-columns: 1fr; }
+  .gsPilotCard--recommended { margin-top: 20px; }
+
+  .gsResults { padding: 40px 20px; }
+  .gsResultsTitle { font-size: 1.6rem; }
+}
