@@ -1346,7 +1346,7 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const visScale = relevantVis / 100;
 
   const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
-  const prominence    = mentionCount > 0 ? Math.max(1, Math.round(rawProminence * visScale)) : 0;
+  const prominence    = Math.round(rawProminence * visScale);
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1363,14 +1363,14 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   });
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
   // sentiment: min 1 if brand has mentions (GPT mentioned them = at least neutral)
-  const sentiment    = mentionCount > 0 ? Math.max(1, Math.round(rawSentiment * visScale)) : 0;
+  const sentiment    = Math.round(rawSentiment * visScale);
 
   const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
+  const rawCitation    = Math.round((citWeight / mentionCount) * 100); // no artificial cap
   // citation: min 1 if brand has any position data
-  const citationShare  = positions.length > 0 ? Math.max(1, Math.round(rawCitation * visScale)) : 0;
+  const citationShare  = Math.round(rawCitation * visScale);
 
-  // SOV always against full pool
+  // SOV — brand's share of all competitive AI conversations
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
@@ -1533,7 +1533,7 @@ export async function POST(req: NextRequest) {
 
     // Merge extra brands into competitors list if they have significant mentions
     Object.entries(extraBrands)
-      .filter(([,count]) => count >= 3)
+      .filter(([,count]) => count >= 2)
       .sort((a,b) => b[1]-a[1])
       .forEach(([name]) => {
         if (!competitors.some(c => c.toLowerCase() === name || aliases(c).includes(name))) {
@@ -1544,21 +1544,69 @@ export async function POST(req: NextRequest) {
       });
 
     // COMPETITORS — ranked by actual AI mention frequency
-    // Only brands GPT genuinely mentioned get scored and shown
-    // Brands never mentioned by GPT are excluded entirely — they have no AI presence
+    // Only brands GPT genuinely mentioned get scored
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([key]) => {
         const found = competitors.find(c => c.toLowerCase() === key);
         if (found) return found;
-        // Proper-case fallback for extra brands found in scan
         return key.split(' ').map((w: string) => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
       })
       .filter(c => c.toLowerCase() !== brand.toLowerCase());
 
-    // Use only brands GPT actually mentioned — no zero-score fillers
-    // If fewer than 10 were mentioned, show what we have (honest data)
-    const allForScoring = realCompetitors.slice(0, 10);
+    // Always show 10 competitors
+    // If fewer than 10 were mentioned, pad with unmentioned discovered competitors
+    // but run targeted queries for them so they get real data not zeros
+    const mentionedSet = new Set(realCompetitors.map(c => c.toLowerCase()));
+    const unmentioned = competitors.filter(c =>
+      c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase())
+    );
+
+    // Run 3 targeted queries per unmentioned competitor to get real scores
+    if (unmentioned.length > 0 && realCompetitors.length < 10) {
+      const needed = unmentioned.slice(0, 10 - realCompetitors.length);
+      await Promise.all(needed.map(async (comp) => {
+        const compQ = [
+          `What credit cards does ${comp} offer and who are they best for?`,
+          `How does ${comp} credit card compare to Chase and Capital One?`,
+          `Is ${comp} a good credit card issuer for rewards?`,
+          `What are the best ${comp} credit cards available right now?`,
+          `Who should consider a ${comp} credit card?`,
+        ];
+        const ql = compQ.map((q, j) => `Q${j+1}: ${q}`).join('\n\n');
+        const lbs = compQ.map((_, j) => `A${j+1}:`).join('\n');
+        const raw = await ai([
+          { role: 'system', content: `You are a consumer finance expert. Answer honestly about this brand's credit card products compared to major issuers.` },
+          { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
+        ], 0.1, 1500, 1);
+        const answers = parseAnswers(raw, compQ.length);
+        compQ.forEach((q, j) => {
+          if (answers[j] && answers[j].length > 10) {
+            allQA.push({ category: 'General', stage: 'Awareness', persona: 'general consumer', q, a: answers[j] });
+            // Count mentions
+            const t = answers[j].toLowerCase();
+            const ca = aliases(comp);
+            if (hasAlias(t, ca)) {
+              const key = comp.toLowerCase();
+              mentionCounts[key] = (mentionCounts[key] || 0) + 1;
+              domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g,'')}.com`;
+            }
+          }
+        });
+        // Add to real competitors if now mentioned
+        if (mentionCounts[comp.toLowerCase()] && !mentionedSet.has(comp.toLowerCase())) {
+          realCompetitors.push(comp);
+          mentionedSet.add(comp.toLowerCase());
+        }
+      }));
+    }
+
+    // Fill remaining spots with unmentioned brands (will score low but honest)
+    const stillNeeded = competitors.filter(c =>
+      c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase())
+    ).slice(0, Math.max(0, 10 - realCompetitors.length));
+
+    const allForScoring = [...realCompetitors, ...stillNeeded].slice(0, 10);
 
     const competitorScoresRaw = allForScoring
       .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allForScoring))
