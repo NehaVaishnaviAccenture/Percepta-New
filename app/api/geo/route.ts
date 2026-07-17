@@ -1327,6 +1327,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
+  // For prominence and citation: exclude targeted queries
+  // Targeted queries ask directly about the brand so it's always named first — artificially inflates position scores
+  // Only organic responses from the 300 curated queries give honest prominence/citation data
+  const organicMentioned = mentioned.filter(r => !r.targeted);
+  const positionBase     = organicMentioned.length > 0 ? organicMentioned : mentioned; // fallback to all if no organic
+
   // RELEVANT VISIBILITY: score against queries in categories this brand appeared in
   // BofA appears in General/Cash Back queries → scored against those ~100 queries
   // This prevents BofA being penalized for not appearing in Premium/Travel queries
@@ -1336,17 +1342,21 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     : total;
   const relevantVis = Math.round((mentionCount / relevantTotal) * 100);
 
-  const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
+  // For prominence and citation: exclude targeted queries
+  // Targeted queries ask directly about the brand → always named first → artificially inflates scores
+  const organicMentioned = mentioned.filter(r => !r.targeted);
+  const positionBase     = organicMentioned.length > 0 ? organicMentioned : mentioned;
+  const posBase          = positionBase.length || 1;
+
+  const positions  = positionBase.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // Quality metrics — computed from own mentions (quality signal), scaled by relevantVis
-  // prominence: % of own mentions where named first — pure quality ratio, no scaling
-  // Already naturally bounded 0-100 by definition (can't exceed 100% of own mentions)
+  // Quality metrics
   const visScale = relevantVis / 100;
 
-  const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
-  const prominence    = rawProminence; // pure ratio — no scaling needed
+  const rawProminence = Math.round((rank1Count / posBase) * 100);
+  const prominence    = rawProminence; // pure ratio from organic responses only
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1366,8 +1376,8 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const sentiment    = Math.round(rawSentiment * visScale);
 
   const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
-  // citation: pure position quality — no scaling, naturally bounded 0-100
-  const rawCitation    = Math.round((citWeight / mentionCount) * 100);
+  // citation: pure position quality from organic responses only — no scaling
+  const rawCitation    = Math.round((citWeight / posBase) * 100);
   const citationShare  = rawCitation;
 
   // SOV — brand's share of all competitive AI conversations
@@ -1610,8 +1620,10 @@ export async function POST(req: NextRequest) {
         compQ.forEach((q, j) => {
           if (answers[j] && answers[j].length > 10) {
             allQA.push({
-              category: 'General', stage: j < 4 ? 'Awareness' : j < 8 ? 'Decision' : j < 11 ? 'Consideration' : j < 14 ? 'Advocacy' : 'Validation',
+              category: 'General',
+              stage: j < 4 ? 'Awareness' : j < 8 ? 'Decision' : j < 11 ? 'Consideration' : j < 14 ? 'Advocacy' : 'Validation',
               persona: 'general consumer', q, a: answers[j],
+              targeted: true, // flag — exclude from prominence/citation (brand named first artificially)
             });
             const t = answers[j].toLowerCase();
             const ca = aliases(comp);
