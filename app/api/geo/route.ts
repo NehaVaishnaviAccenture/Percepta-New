@@ -1341,12 +1341,12 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const rank1Count = positions.filter(p => p === 1).length;
 
   // Quality metrics — computed from own mentions (quality signal), scaled by relevantVis
-  // prominence: % of OWN mentions where named first × visScale
-  // Minimum of 1 if brand has any mentions at all — prominence can never be zero if visible
+  // prominence: % of own mentions where named first — pure quality ratio, no scaling
+  // Already naturally bounded 0-100 by definition (can't exceed 100% of own mentions)
   const visScale = relevantVis / 100;
 
   const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
-  const prominence    = Math.round(rawProminence * visScale);
+  const prominence    = rawProminence; // pure ratio — no scaling needed
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1362,13 +1362,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     if (!hasNeg) posMentions++;
   });
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
-  // sentiment: min 1 if brand has mentions (GPT mentioned them = at least neutral)
+  // sentiment scaled by visScale — tone quality needs frequency anchor
   const sentiment    = Math.round(rawSentiment * visScale);
 
   const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation    = Math.round((citWeight / mentionCount) * 100); // no artificial cap
-  // citation: min 1 if brand has any position data
-  const citationShare  = Math.round(rawCitation * visScale);
+  // citation: pure position quality — no scaling, naturally bounded 0-100
+  const rawCitation    = Math.round((citWeight / mentionCount) * 100);
+  const citationShare  = rawCitation;
 
   // SOV — brand's share of all competitive AI conversations
   const top10    = comps.slice(0, 10);
