@@ -770,38 +770,24 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// PHILOSOPHY: Individual metrics show TRUTH. GEO score floored at 5.
+// ALL METRICS ARE HONEST PERCENTAGES. No scaling. No floors. No caps.
 //
-// Individual metrics are NOT floored — they show the actual computed ratio.
-// If Barclays has 5% visibility and 0% prominence, it shows 5 and 0.
-// That is the honest signal: Barclays barely registers in AI responses.
+// VISIBILITY  = organic mentions / total queries × 100
+//               "GPT mentioned this brand in X% of queries"
 //
-// The ONLY normalisation applied:
-//   scale the entire set DOWN proportionally so the top brand = 80.
-//   If top brand is already ≤ 80, no scaling — raw values shown as-is.
-//   This prevents Chase from showing 100 visibility when it appears in 80% of queries.
+// PROMINENCE  = rank-1 organic mentions / total queries × 100
+//               "GPT named this brand FIRST in X% of queries"
 //
-// GEO is floored at 5 (not 0) so no brand completely disappears from the chart.
+// CITATION    = avg position quality × 100  [sum(1/pos)/mentions × 100]
+//               "When mentioned, how close to first was it? 100=always first"
 //
-// METRICS:
-//   Visibility  = mentions / totalQueries × 100         (honest %, scaled if >80)
-//   Prominence  = rank1Count / totalQueries × 100       (how often named first)
-//   Citation    = sum(1/pos) / totalQueries × 133       (position-weighted frequency)
-//   Sentiment   = posMentions/mentions × sqrt(vis/100)  (tone, damped by reach)
-//   SOV         = brandResponses / anyBrandResponses × 100
-//   GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
-
-// ─── SCORING ENGINE ──────────────────────────────────────────────────────────
+// SENTIMENT   = positive mentions / total mentions × 100
+//               "X% of mentions were positive in tone"
 //
-// DESIGN PRINCIPLES:
-// 1. All metrics computed from real data — no floors, no artificial caps per metric
-// 2. Scores scaled so the top brand in the peer set = 100, others proportional
-//    This means scores are RELATIVE within the competitive set — that is correct.
-//    "Chase scores 80 visibility" means Chase appears in 80% of the queries the
-//    top-visibility brand appears in. That is the right framing for a GEO tool.
-// 3. GEO floored at 5 only — so no brand shows 0 on the chart
-// 4. SOV = true competitive share of mentions across all brands in the set
-// 5. Sentiment = raw positive ratio, no damping — let the data speak
+// SOV         = this brand's mentions / all brand mentions × 100
+//               "This brand captured X% of all AI credit card mentions"
+//
+// GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
 const NEG_WORDS = [
   'worst','poor','bad','avoid','weak','limited','disappointing','inferior',
@@ -812,12 +798,8 @@ const NEG_WORDS = [
 interface RawBrand {
   name: string; url: string;
   mentionCount: number; totalCount: number;
-  visRaw: number;   // organic mentions / total  × 100
-  promRaw: number;  // rank1 / total × 100
-  citRaw: number;   // sum(1/pos) / total × 100
-  sentRaw: number;  // positive / mentions × 100
-  sovRaw: number;   // mention count (converted to share in scoreAllBrands)
-  avgPos: number;
+  visRaw: number; promRaw: number; citRaw: number;
+  sentRaw: number; sovRaw: number; avgPos: number;
 }
 
 function computeRaw(
@@ -838,26 +820,27 @@ function computeRaw(
     return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
   }
 
-  // VISIBILITY: organic mentions / total queries × 100
-  const visRaw = (organicMentioned.length / total) * 100;
+  // VISIBILITY: organic only / total queries
+  const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  // PROMINENCE: how often named first in organic queries / total queries × 100
+  // PROMINENCE: how many times named first organically / total queries
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
   const avgPos = organicPositions.length > 0
     ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
   const rank1Count = organicPositions.filter(p => p === 1).length;
-  const promRaw = (rank1Count / total) * 100;
+  const promRaw = Math.round((rank1Count / total) * 100);
 
-  // CITATION: harmonic position quality across all mentions / total × 100
+  // CITATION: average position quality across all mentions (0-100)
   const allPositions = allMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
-  const citWeight = allPositions.reduce((s, p) => s + 1 / p, 0);
-  const citRaw = allPositions.length > 0 ? (citWeight / allPositions.length) * 100 : 0;
+  const citRaw = allPositions.length > 0
+    ? Math.round((allPositions.reduce((s, p) => s + 1 / p, 0) / allPositions.length) * 100)
+    : 0;
 
-  // SENTIMENT: pure positive ratio — no damping
+  // SENTIMENT: % of mentions that are positive
   let posMentions = 0;
   allMentioned.forEach((r: any) => {
     const lower = (r.a || '').toLowerCase();
@@ -866,20 +849,12 @@ function computeRaw(
       posMentions++;
     }
   });
-  const sentRaw = (posMentions / mentionCount) * 100;
+  const sentRaw = Math.round((posMentions / mentionCount) * 100);
 
-  // SOV: raw mention count — normalised to % share in scoreAllBrands
+  // SOV: raw mention count — converted to % in scoreAllBrands
   const sovRaw = allMentioned.length;
 
   return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos };
-}
-
-// Relative scale: top brand in the set = 100, others proportional
-// This is the correct approach for a competitive intelligence tool
-function relativeScale(values: number[]): number[] {
-  const max = Math.max(...values);
-  if (max === 0) return values.map(() => 0);
-  return values.map(v => Math.round((v / max) * 100));
 }
 
 function scoreAllBrands(
@@ -901,29 +876,19 @@ function scoreAllBrands(
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
 
-  // Convert SOV raw counts to competitive share %
+  // SOV: convert raw mention counts to true competitive share %
   const totalMentions = raws.reduce((s, r) => s + r.sovRaw, 0) || 1;
-  const sovPercents = raws.map(r => (r.sovRaw / totalMentions) * 100);
-
-  // Scale each metric: top brand = 100, others proportional
-  // This gives meaningful separation — if Chase appears in 80% of queries and
-  // Barclays in 5%, Chase gets 100 and Barclays gets 6. Real differentiation.
-  const visScaled  = relativeScale(raws.map(r => r.visRaw));
-  const promScaled = relativeScale(raws.map(r => r.promRaw));
-  const citScaled  = relativeScale(raws.map(r => r.citRaw));
-  const sentScaled = relativeScale(raws.map(r => r.sentRaw));
-  const sovScaled  = relativeScale(sovPercents);
 
   function buildScore(i: number) {
     const r = raws[i];
     if (r.mentionCount === 0) {
       return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
     }
-    const vis  = visScaled[i];
-    const prom = promScaled[i];
-    const cit  = citScaled[i];
-    const sent = sentScaled[i];
-    const sov  = sovScaled[i];
+    const vis  = r.visRaw;
+    const prom = r.promRaw;
+    const cit  = r.citRaw;
+    const sent = r.sentRaw;
+    const sov  = Math.round((r.sovRaw / totalMentions) * 100);
     const geo  = Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15);
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
   }
