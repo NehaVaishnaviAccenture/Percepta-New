@@ -151,7 +151,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that ChatGPT and Perplexity actually name when US consumers ask about this product — only brands that AI models genuinely recommend, not just market participants"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nAnalyse what SPECIFIC product this URL is about (e.g. premium travel card, cash back card, checking account). Return:\n{"brand_name":"parent brand with proper spacing","industry":"industry for THIS URL","industry_key":"snake_case","lob":"specific product category on this page e.g. premium travel credit cards","competitors":["exactly 10 brands that AI models name when consumers ask about THIS SPECIFIC product category — competitors who actually compete in the same product space, not just the same broad industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent queries specific to this exact product category"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     const knownBrands: Record<string, string> = {
@@ -643,21 +643,45 @@ function detectIndustry(industryKey: string, lob: string, urlPath: string): { in
   return { industry, product };
 }
 
-function getCuratedQueries(industry: IndustryType, product: ProductCategory, total: number): { category: string; query: string; stage: string; persona: string }[] {
+function getCuratedQueries(
+  industry: IndustryType,
+  product: ProductCategory,
+  total: number,
+  discoveredLob: string = ''  // the AI-discovered product description
+): { category: string; query: string; stage: string; persona: string }[] {
   const bank = industry === 'credit_cards' ? CREDIT_CARD_QUERIES
     : industry === 'retail_banking' ? RETAIL_BANKING_QUERIES
     : SAVINGS_ACCOUNT_QUERIES;
 
-  // HOMEPAGE / GENERAL: distribute queries EQUALLY across all categories.
-  // This is the standard scoring mode — every brand homepage gets the same query mix.
-  // Equal distribution = comparable scores across all brand runs.
-  // A brand that runs amex.com will be scored on the exact same query proportions
-  // as a brand that runs chase.com — making GEO scores directly comparable.
-  if (product === 'general' || !product) {
+  const PRODUCT_TO_CATEGORY: Partial<Record<ProductCategory, string[]>> = {
+    cash_back: ['Cash Back'], travel: ['Travel Rewards'], premium: ['Premium Cards'],
+    balance_transfer: ['Balance Transfer'], no_annual_fee: ['No Annual Fee'],
+    business: ['Business Cards'], student: ['Student Cards'], credit_building: ['Credit Building'],
+    high_yield: ['High Yield Savings'], cd: ['CD Accounts'], money_market: ['Money Market'],
+    checking: ['Checking Accounts'],
+  };
+
+  // Detect product from URL OR from the AI-discovered lob description
+  // e.g. lob = "premium travel credit cards" → product = premium/travel
+  const lobLower = discoveredLob.toLowerCase();
+  let effectiveProduct = product;
+  if (effectiveProduct === 'general' && lobLower) {
+    if (lobLower.includes('cash back') || lobLower.includes('cashback') || lobLower.includes('rewards') && lobLower.includes('everyday')) effectiveProduct = 'cash_back';
+    else if (lobLower.includes('travel') || lobLower.includes('miles') || lobLower.includes('points') && lobLower.includes('travel')) effectiveProduct = 'travel';
+    else if (lobLower.includes('premium') || lobLower.includes('luxury') || lobLower.includes('platinum') || lobLower.includes('prestige')) effectiveProduct = 'premium';
+    else if (lobLower.includes('balance transfer') || lobLower.includes('0% apr') || lobLower.includes('debt')) effectiveProduct = 'balance_transfer';
+    else if (lobLower.includes('no annual fee') || lobLower.includes('no-fee') || lobLower.includes('free card')) effectiveProduct = 'no_annual_fee';
+    else if (lobLower.includes('business') || lobLower.includes('corporate')) effectiveProduct = 'business';
+    else if (lobLower.includes('student') || lobLower.includes('college')) effectiveProduct = 'student';
+    else if (lobLower.includes('secured') || lobLower.includes('credit build') || lobLower.includes('rebuild')) effectiveProduct = 'credit_building';
+  }
+
+  const targetCats = PRODUCT_TO_CATEGORY[effectiveProduct] || [];
+
+  if (effectiveProduct === 'general' || targetCats.length === 0) {
+    // True homepage with no detectable product: distribute equally across all categories
     const cats = [...new Set(bank.map(q => q.category))];
-    const perCat = Math.ceil(total / cats.length);
     const out: { category: string; query: string; stage: string; persona: string }[] = [];
-    // Take queries round-robin from each category so every category gets equal weight
     let idx = 0;
     while (out.length < total) {
       const cat = cats[idx % cats.length];
@@ -669,24 +693,34 @@ function getCuratedQueries(industry: IndustryType, product: ProductCategory, tot
     return out.slice(0, total);
   }
 
-  // SPECIFIC PAGE (e.g. /credit-cards/double-cash): 60% product-specific + 40% general.
-  // Only triggered when URL path reveals a specific product — never from brand name.
-  const PRODUCT_TO_CATEGORY: Partial<Record<ProductCategory, string[]>> = {
-    cash_back: ['Cash Back'], travel: ['Travel Rewards'], premium: ['Premium Cards'],
-    balance_transfer: ['Balance Transfer'], no_annual_fee: ['No Annual Fee'],
-    business: ['Business Cards'], student: ['Student Cards'], credit_building: ['Credit Building'],
-    high_yield: ['High Yield Savings'], cd: ['CD Accounts'], money_market: ['Money Market'],
-    checking: ['Checking Accounts'],
-  };
-  const targetCats = PRODUCT_TO_CATEGORY[product] || [];
+  // SPECIFIC PRODUCT DETECTED: run ALL queries from that product category
+  // This means amex.com/premium → 300 premium card queries
+  // Everyone in the competitor table is scored on the same premium card queries
+  // Making scores directly comparable within this product context
   const productQ = bank.filter(q => targetCats.includes(q.category));
-  const generalQ = bank.filter(q => !targetCats.includes(q.category));
-  const productCount = Math.ceil(total * 0.6);
-  const out: { category: string; query: string; stage: string }[] = [];
-  let pi = 0, gi = 0;
-  while (out.length < productCount && productQ.length > 0) { out.push(productQ[pi % productQ.length]); pi++; }
-  while (out.length < total && generalQ.length > 0) { out.push(generalQ[gi % generalQ.length]); gi++; }
-  return out.slice(0, total).map(q => ({ ...q, persona: 'general consumer' }));
+  if (productQ.length === 0) {
+    // Fallback to equal distribution if category not found
+    const out: { category: string; query: string; stage: string; persona: string }[] = [];
+    let idx = 0;
+    const cats = [...new Set(bank.map(q => q.category))];
+    while (out.length < total) {
+      const cat = cats[idx % cats.length];
+      const catQ = bank.filter(q => q.category === cat);
+      const pick = catQ[(Math.floor(idx / cats.length)) % catQ.length];
+      if (pick) out.push({ ...pick, persona: 'general consumer' });
+      idx++;
+    }
+    return out.slice(0, total);
+  }
+
+  // Fill total by cycling through the product queries
+  const out: { category: string; query: string; stage: string; persona: string }[] = [];
+  let i = 0;
+  while (out.length < total) {
+    out.push({ ...productQ[i % productQ.length], persona: 'general consumer' });
+    i++;
+  }
+  return out.slice(0, total);
 }
 
 async function genAIQueries(lob: string, industry: string, cats: string[], total: number): Promise<{ category: string; query: string; stage: string; persona: string }[]> {
@@ -862,29 +896,48 @@ function scoreAllBrands(
     ...compList.map(c => ({ name: c.name, als: aliases(c.name), url: c.url })),
   ];
   const allAlsLists = allBrands.map(b => b.als);
+
+  // Compute raw metrics for every brand
   const raws = allBrands.map(b => {
-    // Pass each brand's supplemental QA so low-organic brands get fair visibility/sentiment
     const supp = supplementalMap[b.name.toLowerCase()] || [];
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
-  const hasMentions = raws.map(r => r.mentionCount > 0);
 
-  // Scale each dimension so top brand ≤ 80 — no floors on individual metrics
-  const visN  = scaleToMax(raws.map(r => r.visRaw),  hasMentions);
-  const promN = scaleToMax(raws.map(r => r.promRaw), hasMentions);
-  const citN  = scaleToMax(raws.map(r => r.citRaw),  hasMentions);
-  const sentN = scaleToMax(raws.map(r => r.sentRaw), hasMentions);
-  // Convert sovRaw (mention counts) to true competitive share %
+  // SOV = each brand's mention share of total mentions across all brands
   const totalAllMentions = raws.reduce((sum, r) => sum + r.sovRaw, 0) || 1;
-  const sovShares = raws.map((r, i) => hasMentions[i] ? (r.sovRaw / totalAllMentions) * 100 : 0);
-  const sovN  = scaleToMax(sovShares, hasMentions);
+
+  // ABSOLUTE SCORING — no peer scaling, no scaleToMax.
+  // Every metric is a true ratio against the fixed query pool (total = 300).
+  // This guarantees: same URL always produces same score regardless of competitor set.
+  // Individual metrics capped at 80 (prevents inflation, keeps numbers credible).
+  // Minimum of 10 for any metric where the brand HAS real data (organic or supplemental).
+  // Minimum of 0 only for brands with zero mentions.
+  const CAP = 80;
+  const MIN_IF_DATA = 10; // floor for brands with real data — no fake zeros
 
   function buildScore(i: number) {
-    const vis  = visN[i],  prom = promN[i], cit  = citN[i];
-    const sent = sentN[i], sov  = sovN[i];
+    const r = raws[i];
+    if (r.mentionCount === 0) {
+      const geo = Math.max(GEO_FLOOR, 0);
+      return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
+    }
+
+    const sovShare = (r.sovRaw / totalAllMentions) * 100;
+
+    // Apply cap then floor: cap(raw, 80) then max(result, 10) if brand has data
+    const floor = (v: number) => v > 0 ? Math.max(MIN_IF_DATA, Math.min(CAP, Math.round(v))) : 0;
+    const capOnly = (v: number) => Math.min(CAP, Math.round(v));
+
+    const vis  = capOnly(r.visRaw);           // visibility: true %, no floor (0 is valid if no mentions)
+    const prom = capOnly(r.promRaw);           // prominence: 0 is valid (never named first)
+    const cit  = floor(r.citRaw);             // citation: floor 10 if has data
+    const sent = floor(r.sentRaw);            // sentiment: floor 10 if has data
+    const sov  = floor(sovShare);             // SOV: floor 10 if has data
+
     const geoRaw = Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15);
-    const geo = Math.max(GEO_FLOOR, geoRaw); // GEO floor only — individual metrics unchanged
-    return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: raws[i].avgPos, mentionCount: raws[i].mentionCount, totalCount: raws[i].totalCount };
+    const geo = Math.max(GEO_FLOOR, geoRaw);
+
+    return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
   }
 
   const primaryScores = buildScore(0);
@@ -966,7 +1019,7 @@ export async function POST(req: NextRequest) {
     const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '');
     const [queries, citRaw, trendRaw] = await Promise.all([
       industryType !== 'other'
-        ? Promise.resolve(getCuratedQueries(industryType, productType, MAX))
+        ? Promise.resolve(getCuratedQueries(industryType, productType, MAX, lob))
         : genAIQueries(lob, industry, categories, MAX),
       ai([{ role: 'user', content: `List 10 domains AI models cite for ${lob || industry} questions in the USA. Brand: ${brand} (domain: ${page.domain})\nReturn ONLY valid JSON:\n[{"rank":1,"domain":"nerdwallet.com","category":"Earned Media","citation_share":12,"top_pages":[]}]\nInclude ${page.domain} as rank 1 (Owned Media). Exactly 10 items.` }], 0.1, 1000),
       ai([{ role: 'user', content: `List 10 trending questions consumers ask AI about ${lob || industry} in USA. No brand names. Short natural questions.\nReturn ONLY valid JSON:\n[{"query":"best credit card for groceries","trend":"Rising","opportunity":"High","category":"Cash Back","estimated_daily_searches":8200}]\nExactly 10 items.` }], 0.3, 900),
