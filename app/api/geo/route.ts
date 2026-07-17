@@ -612,15 +612,17 @@ const SAVINGS_ACCOUNT_QUERIES: { category: string; query: string; stage: string 
 type IndustryType = 'credit_cards' | 'retail_banking' | 'savings' | 'other';
 type ProductCategory = 'cash_back' | 'travel' | 'premium' | 'balance_transfer' | 'no_annual_fee' | 'business' | 'student' | 'credit_building' | 'high_yield' | 'checking' | 'cd' | 'money_market' | 'general';
 
-function detectIndustry(industryKey: string, lob: string, urlPath: string, brand: string = ''): { industry: IndustryType; product: ProductCategory } {
+function detectIndustry(industryKey: string, lob: string, urlPath: string): { industry: IndustryType; product: ProductCategory } {
   const k = (industryKey + ' ' + lob + ' ' + urlPath).toLowerCase();
-  const b = brand.toLowerCase();
 
   let industry: IndustryType = 'other';
   if (k.includes('credit_card') || k.includes('credit card') || k.includes('credit-card')) industry = 'credit_cards';
   else if (k.includes('savings') || k.includes('hysa') || k.includes('high-yield') || k.includes('high yield') || k.includes('money market') || k.includes('money-market') || k.includes('cd ') || k.includes('certificate')) industry = 'savings';
   else if (k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) industry = 'retail_banking';
 
+  // Product detection: ONLY from URL path and page content — never from brand name.
+  // Brand homepages always return 'general' so all brands compete on the same full query set.
+  // This is the only way scores are comparable across different brand runs.
   let product: ProductCategory = 'general';
   if (industry === 'credit_cards') {
     if (k.includes('cash back') || k.includes('cashback') || k.includes('cash-back') || k.includes('double cash') || k.includes('freedom')) product = 'cash_back';
@@ -631,31 +633,6 @@ function detectIndustry(industryKey: string, lob: string, urlPath: string, brand
     else if (k.includes('business') || k.includes('corporate') || k.includes('ink ') || k.includes('spark')) product = 'business';
     else if (k.includes('student') || k.includes('college') || k.includes('university')) product = 'student';
     else if (k.includes('secured') || k.includes('credit builder') || k.includes('credit-builder') || k.includes('rebuild')) product = 'credit_building';
-
-    // Brand homepage fallback: if product still 'general', use brand's known strength
-    // This ensures amex.com gets premium/travel queries, not cash-back queries
-    if (product === 'general') {
-      const BRAND_STRENGTHS: Record<string, ProductCategory> = {
-        'american express': 'premium',
-        'amex': 'premium',
-        'chase': 'travel',
-        'capital one': 'travel',
-        'discover': 'cash_back',
-        'citi': 'cash_back',
-        'citibank': 'cash_back',
-        'bank of america': 'cash_back',
-        'wells fargo': 'cash_back',
-        'us bank': 'cash_back',
-        'barclays': 'travel',
-        'synchrony': 'no_annual_fee',
-        'navy federal': 'cash_back',
-        'pnc': 'cash_back',
-        'usaa': 'cash_back',
-      };
-      for (const [brandKey, strength] of Object.entries(BRAND_STRENGTHS)) {
-        if (b.includes(brandKey)) { product = strength; break; }
-      }
-    }
   } else if (industry === 'savings') {
     if (k.includes('high yield') || k.includes('high-yield') || k.includes('hysa')) product = 'high_yield';
     else if (k.includes('cd') || k.includes('certificate')) product = 'cd';
@@ -671,6 +648,29 @@ function getCuratedQueries(industry: IndustryType, product: ProductCategory, tot
     : industry === 'retail_banking' ? RETAIL_BANKING_QUERIES
     : SAVINGS_ACCOUNT_QUERIES;
 
+  // HOMEPAGE / GENERAL: distribute queries EQUALLY across all categories.
+  // This is the standard scoring mode — every brand homepage gets the same query mix.
+  // Equal distribution = comparable scores across all brand runs.
+  // A brand that runs amex.com will be scored on the exact same query proportions
+  // as a brand that runs chase.com — making GEO scores directly comparable.
+  if (product === 'general' || !product) {
+    const cats = [...new Set(bank.map(q => q.category))];
+    const perCat = Math.ceil(total / cats.length);
+    const out: { category: string; query: string; stage: string; persona: string }[] = [];
+    // Take queries round-robin from each category so every category gets equal weight
+    let idx = 0;
+    while (out.length < total) {
+      const cat = cats[idx % cats.length];
+      const catQueries = bank.filter(q => q.category === cat);
+      const pick = catQueries[(Math.floor(idx / cats.length)) % catQueries.length];
+      if (pick) out.push({ ...pick, persona: 'general consumer' });
+      idx++;
+    }
+    return out.slice(0, total);
+  }
+
+  // SPECIFIC PAGE (e.g. /credit-cards/double-cash): 60% product-specific + 40% general.
+  // Only triggered when URL path reveals a specific product — never from brand name.
   const PRODUCT_TO_CATEGORY: Partial<Record<ProductCategory, string[]>> = {
     cash_back: ['Cash Back'], travel: ['Travel Rewards'], premium: ['Premium Cards'],
     balance_transfer: ['Balance Transfer'], no_annual_fee: ['No Annual Fee'],
@@ -679,34 +679,13 @@ function getCuratedQueries(industry: IndustryType, product: ProductCategory, tot
     checking: ['Checking Accounts'],
   };
   const targetCats = PRODUCT_TO_CATEGORY[product] || [];
-
-  const STAGE_PAIN_POINTS: Record<string, string> = {
-    Awareness: 'Consumer is just discovering options and does not know where to start',
-    Consideration: 'Consumer is comparing 2-4 options and struggling to identify the key differences',
-    Decision: 'Consumer is ready to choose and wants one clear specific recommendation',
-    Validation: 'Consumer has almost decided and wants confirmation they are making the right choice',
-    Advocacy: 'Consumer wants to recommend the single best option to someone they care about',
-  };
-
-  if (product === 'general' || targetCats.length === 0) {
-    // Use all categories proportionally — cycle through until we reach total
-    const out: typeof bank = [];
-    let i = 0;
-    while (out.length < total) { out.push(bank[i % bank.length]); i++; }
-    return out.slice(0, total).map(q => ({ ...q, persona: 'general consumer' }));
-  }
-
-  // Specific product: 60% product-specific + 40% general awareness queries
   const productQ = bank.filter(q => targetCats.includes(q.category));
   const generalQ = bank.filter(q => !targetCats.includes(q.category));
   const productCount = Math.ceil(total * 0.6);
-  const generalCount = total - productCount;
-
   const out: { category: string; query: string; stage: string }[] = [];
   let pi = 0, gi = 0;
   while (out.length < productCount && productQ.length > 0) { out.push(productQ[pi % productQ.length]); pi++; }
   while (out.length < total && generalQ.length > 0) { out.push(generalQ[gi % generalQ.length]); gi++; }
-
   return out.slice(0, total).map(q => ({ ...q, persona: 'general consumer' }));
 }
 
@@ -979,7 +958,7 @@ export async function POST(req: NextRequest) {
     const { brand, industry, industryKey, lob, personas, competitors, competitorUrls, categories } = d;
     const als = aliases(brand);
 
-    const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '', brand);
+    const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '');
     const [queries, citRaw, trendRaw] = await Promise.all([
       industryType !== 'other'
         ? Promise.resolve(getCuratedQueries(industryType, productType, MAX))
