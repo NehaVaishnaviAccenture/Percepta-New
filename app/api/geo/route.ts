@@ -814,14 +814,20 @@ function computeRaw(
   // Supplemental adds real mentions, denominator stays organic pool size
   const visRaw = Math.min(100, (mentionCount / total) * 100);
 
-  // Prominence and Citation use ORGANIC ONLY — supplemental would inflate rank1
+  // Prominence uses ORGANIC ONLY — only consumer-initiated queries count for first-mention
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
   const avgPos = organicPositions.length > 0 ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
   const rank1Count = organicPositions.filter(p => p === 1).length;
   const promRaw = (rank1Count / total) * 100;
-  const citWeight = organicPositions.reduce((s, p) => s + 1 / p, 0);
+
+  // Citation uses ALL mentions (organic + supplemental) — position quality is a brand property
+  // Supplemental answers also reveal how GPT positions the brand relative to competitors
+  const allPositions = allMentioned
+    .map((r: any) => position(r.a || '', als, compAls))
+    .filter(p => p > 0);
+  const citWeight = allPositions.reduce((s, p) => s + 1 / p, 0);
   const citRaw = (citWeight / total) * 133;
 
   // Sentiment uses ALL mentions (organic + supplemental) — tone is a brand property
@@ -834,14 +840,10 @@ function computeRaw(
   });
   const sentRaw = (posMentions / Math.max(mentionCount, 1)) * 100 * Math.sqrt(visRaw / 100);
 
-  // SOV uses organic only — share of competitive voice in real consumer queries
-  const brandSet = new Set<number>(), anySet = new Set<number>();
-  answered.forEach((r: any, i: number) => {
-    const t = (r.a || '').toLowerCase();
-    if (hasAlias(t, als)) { brandSet.add(i); anySet.add(i); }
-    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
-  });
-  const sovRaw = (brandSet.size / Math.max(anySet.size, 1)) * 100;
+  // SOV raw = total mention count (organic + supplemental)
+  // Converted to competitive share % in scoreAllBrands after all brands are scored
+  // This gives true relative share: Chase 32% of all mentions, Barclays 2% etc.
+  const sovRaw = allMentioned.length;
 
   return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos };
 }
@@ -872,7 +874,10 @@ function scoreAllBrands(
   const promN = scaleToMax(raws.map(r => r.promRaw), hasMentions);
   const citN  = scaleToMax(raws.map(r => r.citRaw),  hasMentions);
   const sentN = scaleToMax(raws.map(r => r.sentRaw), hasMentions);
-  const sovN  = scaleToMax(raws.map(r => r.sovRaw),  hasMentions);
+  // Convert sovRaw (mention counts) to true competitive share %
+  const totalAllMentions = raws.reduce((sum, r) => sum + r.sovRaw, 0) || 1;
+  const sovShares = raws.map((r, i) => hasMentions[i] ? (r.sovRaw / totalAllMentions) * 100 : 0);
+  const sovN  = scaleToMax(sovShares, hasMentions);
 
   function buildScore(i: number) {
     const vis  = visN[i],  prom = promN[i], cit  = citN[i];
