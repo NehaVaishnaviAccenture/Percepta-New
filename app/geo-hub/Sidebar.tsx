@@ -71,7 +71,7 @@ export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
 
         <Link href="/geo-optimization-services" className="sidebarNavItem">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><circle cx="8" cy="8" r="6"/><path d="M6.5 6.5a1.5 1.5 0 0 1 3 .5c0 1-1.5 1.5-1.5 2.5"/><circle cx="8" cy="12" r=".6" fill="currentColor" stroke="none"/></svg>
-          <span className="sidebarNavLabel">GEO Services</span>
+          <span className="sidebarNavLabel">Optimization Services</span>
         </Link>
 
         <div className="sidebarBottom">
@@ -140,7 +140,7 @@ export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
 
             <Link href="/geo-optimization-services" className="sidebarNavItem" style={{padding:'0 14px'}} onClick={() => setDrawerOpen(false)}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><circle cx="8" cy="8" r="6"/><path d="M6.5 6.5a1.5 1.5 0 0 1 3 .5c0 1-1.5 1.5-1.5 2.5"/><circle cx="8" cy="12" r=".6" fill="currentColor" stroke="none"/></svg>
-              GEO Services
+              Optimization Services
             </Link>
 
             <div className="sidebarBottom">

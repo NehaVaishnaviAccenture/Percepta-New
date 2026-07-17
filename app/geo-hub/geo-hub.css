@@ -307,8 +307,10 @@
   padding: 3px 10px;
   background: var(--color-brand-chip-bg);
   border: 1px solid var(--color-brand-chip-border);
-  flex-shrink: 0;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
+  width: min-content;
+  align-self: center;
 }
 
 /* ── Tab bar ───────────────────────────────────────────────── */
@@ -590,4 +592,11 @@
   .canvasInner {
     padding: 20px 16px 40px;
   }
+
+  /* ── Font-size overrides ─────────────────────────────────── */
+  .orgName      { font-size: 14px; }
+  .orgMeta      { font-size: 11px; }
+  .orgChip      { font-size: 11px; }
+  .tabBtn       { font-size: 12px; padding: 11px 10px; }
+  .subtabBtn    { font-size: 11px; padding: 4px 8px; }
 }

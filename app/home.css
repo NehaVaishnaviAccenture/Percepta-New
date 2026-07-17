@@ -682,6 +682,9 @@
     padding: 0 20px;
   }
 
+  .navUserEmail { display: none; }
+  .navUserPill  { padding: 4px; gap: 0; }
+
   .navLink {
     padding: 8px 12px;
     font-size: 0.8125rem;
