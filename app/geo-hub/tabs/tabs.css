@@ -5931,12 +5931,12 @@
 /* SoV chart */
 .reachSovChart { display: flex; flex-direction: column; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; margin-top: 12px; }
 .reachSovEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
-.reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; }
-.reachSovBar { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; gap: 4px; height: 100%; }
+.reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; margin-bottom: 90px; }
+.reachSovBar { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; gap: 4px; height: 100%; position: relative; }
 .reachSovBarTrack { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-height: 0; }
 .reachSovBarFill { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.3s; }
 .reachSovBarPct { font-size: 0.7rem; font-weight: 700; text-align: center; line-height: 1.4; flex-shrink: 0; }
-.reachSovBarLabel { font-size: 0.62rem; color: #6B7280; padding: 6px 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-align: center; }
+.reachSovBarLabel { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%) rotate(180deg); writing-mode: vertical-rl; white-space: nowrap; font-size: 0.62rem; color: #6B7280; }
 
 /* Citation sources */
 .reachSourcesCard { background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
