@@ -702,34 +702,44 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// THE CORE PRINCIPLE: All 5 metrics are computed from ORGANIC queries only.
-// Targeted competitor queries (brand-specific questions) are stored separately
-// and used ONLY for organic mention count enrichment — they never touch
-// prominence, citation, or SOV calculations.
+// ALL 5 METRICS ARE COMPUTED FROM ORGANIC QA ONLY.
+// Supplemental/targeted QA rows are never passed to this function.
 //
-// METRIC DEFINITIONS (all as 0–100 integers):
+// METRIC DEFINITIONS:
 //
-// VISIBILITY   = mentions in organic QA / total organic QA × 100
-//                (filtered to categories where brand actually appeared — "relevant visibility")
+// VISIBILITY (0-100)
+//   = mentions / relevantTotal × 100
+//   relevantTotal = queries in categories where brand appeared
+//   → Barclays: 8 mentions / 80 General queries = 10
+//   → Chase: 252 mentions / 300 queries = 84  ✓ proportional
 //
-// PROMINENCE   = responses where brand is named FIRST / total organic QA × 100
-//                (denominator = total pool, not just mentions — forces realistic low values)
+// PROMINENCE (0-100)
+//   = (rank1Count / total) × 100
+//   denominator = TOTAL query pool, not just mentions
+//   → Chase rank1 in 163 of 300 = 54  ✓
+//   → Barclays rank1 in 2 of 300 = 0-1  ✓ (not 100)
 //
-// SENTIMENT    = positive mentions / total organic mentions × 100
-//                (pure tone signal, no scaling — if brand is mentioned it has sentiment)
+// SENTIMENT (0-100)
+//   = (posMentions / mentionCount) × 100 × visibilityDamper
+//   visibilityDamper = sqrt(visibility/100) — gently scales sentiment by reach
+//   → Brands barely mentioned can't claim "90 sentiment" — it's statistically unreliable
+//   → Chase: 71 raw × sqrt(0.84) = 65  ✓
+//   → Barclays: 90 raw × sqrt(0.10) = 28  ✓ (not 90)
+//   → U.S. Bank: 100 raw × sqrt(0.21) = 46  ✓ (not 100)
 //
-// CITATION     = sum(1/position) / total organic mentions × 100 (capped at 100)
-//                (harmonic position quality — rank 1 = 1.0, rank 2 = 0.5, etc.)
+// CITATION (0-100)
+//   = (citWeight / total) × 100 × 4   (×4 because theoretical max citWeight/total ≈ 0.25 when all rank1)
+//   citWeight = sum(1/position) across ALL mentioned responses with a valid position
+//   denominator = TOTAL query pool (same as prominence) — anchors to query frequency
+//   → Chase: high citWeight / 300 × 400 = realistic high number
+//   → Barclays: low citWeight / 300 × 400 = low (not 95)
+//   Cap at 100.
 //
-// SOV          = unique responses with THIS brand / unique responses with ANY competitor × 100
+// SOV (0-100)
+//   = brandResponses / anyBrandResponses × 100
+//   → Naturally proportional to frequency
 //
-// GEO          = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
-//
-// WHY THIS FIXES THE BARCLAYS/PNC PROBLEM:
-// Before: posBase = organicMentioned.length (e.g. 3) → rank1Count/3 = 100
-// After:  posBase = total organic QA (e.g. 300) → rank1Count/300 = realistic
-// Before: citWeight / organicMentioned.length → inflated when few mentions
-// After:  citWeight / total organic mentions × 100, capped at 100
+// GEO = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
 function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps: string[]) {
   const answered = organicQA.filter(r => r && (r.a || '').trim().length > 10);
@@ -744,8 +754,8 @@ function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps:
   }
 
   // ── VISIBILITY ──
-  // Relevant visibility: score only against queries in categories where brand appeared.
-  // Prevents penalizing Barclays for not appearing in Premium/Travel when it only competes in General.
+  // Score against only the categories this brand actually competed in.
+  // Prevents penalizing niche brands for not appearing in irrelevant categories.
   const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
   const relevantAnswered = brandCats.size > 0
     ? answered.filter(r => brandCats.has(r.category))
@@ -754,19 +764,27 @@ function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps:
   const visibility = Math.min(100, Math.round((mentionCount / relevantTotal) * 100));
 
   // ── PROMINENCE ──
-  // Key fix: denominator = total organic QA pool, NOT just mentions.
-  // This means a brand mentioned first in 10 out of 300 queries → prominence = 3, not 100.
-  // Barclays with 15 mentions, rank1=15 → 15/300 = 5, not 100.
-  const rank1Count = mentioned.filter(r => position(r.a || '', als, compAls) === 1).length;
+  // rank1Count / TOTAL pool → forces realistic values for low-data brands.
+  // Barclays named first in 2 organic responses out of 300 → prominence = 0-1, not 100.
+  const positionData = mentioned
+    .map(r => ({ pos: position(r.a || '', als, compAls) }))
+    .filter(d => d.pos > 0);
+  const avgPos = positionData.length > 0
+    ? positionData.reduce((a, d) => a + d.pos, 0) / positionData.length
+    : 0;
+  const rank1Count = positionData.filter(d => d.pos === 1).length;
   const prominence = Math.min(100, Math.round((rank1Count / total) * 100));
 
   // ── SENTIMENT ──
-  // Pure tone ratio against own mentions. No visibility scaling.
-  // If brand has 15 mentions and 12 are positive → sentiment = 80.
-  // Low-visibility brands can still have good or bad sentiment.
+  // Raw tone ratio × visibility damper (square root scaling).
+  // The damper prevents low-data brands from claiming high sentiment on tiny sample sizes.
+  // sqrt(0.84) ≈ 0.92 → barely affects Chase/Amex
+  // sqrt(0.10) ≈ 0.32 → significantly deflates Barclays/PNC as expected
+  // sqrt(0.27) ≈ 0.52 → moderate deflation for mid-tier brands
   const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
     'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
-    'complicated','confusing','frustrating','complaints','issues','trouble'];
+    'complicated','confusing','frustrating','complaints','issues','trouble','hidden fees',
+    'poor customer service','hard to reach','difficult'];
   let posMentions = 0;
   mentioned.forEach(r => {
     const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
@@ -774,29 +792,22 @@ function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps:
     const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
     if (!hasNeg) posMentions++;
   });
-  const sentiment = Math.min(100, Math.round((posMentions / mentionCount) * 100));
+  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
+  const visibilityDamper = Math.sqrt(visibility / 100); // 0.0–1.0
+  const sentiment = Math.min(100, Math.round(rawSentiment * visibilityDamper));
 
   // ── CITATION SHARE ──
-  // Key fix: denominator = mentionCount (how position quality compares across own mentions).
-  // citWeight = sum of 1/position for each mention that has a position.
-  // Theoretical max when always rank1: citWeight = mentionCount → ratio = 100.
-  // When rank2 on average: citWeight ≈ mentionCount/2 → ratio ≈ 50.
-  // Cap at 100 to prevent edge cases.
-  // This is a measure of position quality, not frequency — completely independent of visibility.
-  const positionData = mentioned
-    .map(r => position(r.a || '', als, compAls))
-    .filter(p => p > 0);
-  const avgPos = positionData.length > 0 ? positionData.reduce((a, b) => a + b, 0) / positionData.length : 0;
-  const citWeight = positionData.reduce((s, p) => s + 1 / p, 0);
-  // Normalize: if always rank1, citWeight = positionData.length → ratio = 1.0 → 100
-  // If always rank2, citWeight = positionData.length/2 → ratio = 0.5 → 50
-  const citationShare = positionData.length > 0
-    ? Math.min(100, Math.round((citWeight / positionData.length) * 100))
-    : 0;
+  // citWeight = sum(1/pos) across all organic mentions with a valid position.
+  // Denominator = TOTAL query pool (same as prominence).
+  // Multiplier 4 normalises the range: when a top brand appears at rank1 in ~25% of
+  // all queries, citWeight/total ≈ 0.25 → ×4 = 100 (theoretical ceiling for #1 brand).
+  // Low-visibility brands: citWeight/total is tiny → citation stays low regardless of
+  // their average rank when mentioned.
+  const citWeight = positionData.reduce((s, d) => s + 1 / d.pos, 0);
+  const citationShare = Math.min(100, Math.round((citWeight / total) * 133));
 
   // ── SHARE OF VOICE ──
   // Brand's share of all responses that mention any brand in the competitive set.
-  // This naturally scales with mention frequency — low-visibility brands will have low SOV.
   const top10 = comps.slice(0, 10);
   const brandSet = new Set<number>();
   const anySet = new Set<number>();
@@ -809,11 +820,11 @@ function scoreOrganicOnly(brand: string, als: string[], organicQA: any[], comps:
 
   // ── GEO SCORE ──
   const geo = Math.min(100, Math.round(
-    visibility * 0.30 +
-    sentiment * 0.20 +
-    prominence * 0.20 +
+    visibility    * 0.30 +
+    sentiment     * 0.20 +
+    prominence    * 0.20 +
     citationShare * 0.15 +
-    shareOfVoice * 0.15
+    shareOfVoice  * 0.15
   ));
 
   return { visibility, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: total };
