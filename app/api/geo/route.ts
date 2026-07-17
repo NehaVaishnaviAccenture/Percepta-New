@@ -1111,8 +1111,8 @@ function detectIndustry(industryKey: string, lob: string, urlPath: string): { in
   let industry: IndustryType = 'other';
   if (k.includes('credit_card') || k.includes('credit card') || k.includes('credit-card')) industry = 'credit_cards';
   else if (k.includes('savings') || k.includes('hysa') || k.includes('high-yield') || k.includes('high yield') || k.includes('money market') || k.includes('money-market') || k.includes('cd ') || k.includes('certificate')) industry = 'savings';
-  else if (k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) industry = 'retail_banking';
-
+  //else if (k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) 
+else if ((k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) && !k.includes('savings')) industry = 'retail_banking';
   // Detect specific product category within credit cards
   let product: ProductCategory = 'general';
   if (industry === 'credit_cards') {
