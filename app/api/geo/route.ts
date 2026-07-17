@@ -1527,16 +1527,22 @@ export async function POST(req: NextRequest) {
         }
       });
 
-    // COMPETITORS — ranked by AI mentions, always show up to 10
+    // COMPETITORS — ranked by actual AI mention frequency
+    // Only brands GPT genuinely mentioned get scored and shown
+    // Brands never mentioned by GPT are excluded entirely — they have no AI presence
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => competitors.find(c => c.toLowerCase() === key) || key)
+      .map(([key]) => {
+        const found = competitors.find(c => c.toLowerCase() === key);
+        if (found) return found;
+        // Proper-case fallback for extra brands found in scan
+        return key.split(' ').map((w: string) => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+      })
       .filter(c => c.toLowerCase() !== brand.toLowerCase());
 
-    const notMentioned = competitors
-      .filter(c => c.toLowerCase() !== brand.toLowerCase() && !mentionCounts[c.toLowerCase()]);
-
-    const allForScoring = [...realCompetitors, ...notMentioned].slice(0, 10);
+    // Use only brands GPT actually mentioned — no zero-score fillers
+    // If fewer than 10 were mentioned, show what we have (honest data)
+    const allForScoring = realCompetitors.slice(0, 10);
 
     const competitorScoresRaw = allForScoring
       .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allForScoring))
