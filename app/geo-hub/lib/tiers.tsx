@@ -112,115 +112,6 @@ export function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
-export function buildFeatureDims(
-  indKey: string,
-  rd: any[],
-  sent: number, prom: number, vis: number, cit: number, sov: number
-) {
-  const rate = (cats: string[]): number | null => {
-    const rows = rd.filter((r: any) => cats.some(c => (r.category||'').toLowerCase().includes(c.toLowerCase())));
-    if (rows.length === 0) return null;
-    return Math.round((rows.filter((r: any) => r.mentioned).length / rows.length) * 100);
-  };
-
-  if (indKey === 'fin' || indKey === 'fin_cc_travel' || indKey === 'fin_cc_cashback' ||
-      indKey === 'fin_cc_rewards' || indKey === 'fin_cc_student' || indKey === 'fin_cc_student_rewards' ||
-      indKey === 'fin_cc_secured' || indKey === 'fin_cc_balance_transfer' || indKey === 'fin_small_business_cc') {
-    const cashBack    = rate(['Cash Back','Flat Rate','Category','Redemption']);
-    const travel      = rate(['Travel & Rewards','Miles & Points','Perks & Benefits','Value']);
-    const feesApr     = rate(['Interest & Fees','0% APR','Fees','Debt Payoff','Balance Transfer']);
-    const rewards     = rate(['Rewards Optimization','Points','Cash Back vs Points']);
-    const creditBuild = rate(['Credit Building','Approval & Credit','Credit Builder','Deposit & Fees','Features']);
-    const perks       = rate(['Card Benefits','Expert Recommendation','Premium Cards','Comparison']);
-    return [
-      { label: 'Cash Back',       val: cashBack    ?? Math.round(vis * 0.6 + sov * 0.4) },
-      { label: 'Travel Benefits', val: travel      ?? Math.round(sent * 0.5 + prom * 0.5) },
-      { label: 'Fees & APR',      val: feesApr     ?? Math.round(cit * 0.5 + sent * 0.5) },
-      { label: 'Rewards / Points',val: rewards     ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'Credit Building', val: creditBuild ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Perks & Benefits',val: perks       ?? Math.round(sent * 0.55 + prom * 0.45) },
-    ];
-  }
-
-  if (indKey === 'fin_retail_bank') {
-    const savingsRate = rate(['Savings Accounts','Savings Rate','High Yield']);
-    const noFees      = rate(['No Fees & Access','General Banking']);
-    const atmAccess   = rate(['No Fees & Access','Checking Accounts']);
-    const mobile      = rate(['Digital & Mobile']);
-    const cdRates     = rate(['CD Accounts']);
-    const family      = rate(['Kids & Family Banking','Teen & Youth Banking','Account Comparison']);
-    return [
-      { label: 'Savings Rate',    val: savingsRate ?? Math.round(vis * 0.6 + sent * 0.4) },
-      { label: 'No Fees',         val: noFees      ?? Math.round(sent * 0.5 + sov * 0.5) },
-      { label: 'ATM Access',      val: atmAccess   ?? Math.round(cit * 0.5 + prom * 0.5) },
-      { label: 'Mobile & Digital',val: mobile      ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'CD Rates',        val: cdRates     ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Family Banking',  val: family      ?? Math.round(sent * 0.55 + prom * 0.45) },
-    ];
-  }
-
-  if (indKey === 'fin_retirement' || indKey === 'fin_wealth') {
-    const retPlans  = rate(['Retirement Planning','Employer Benefits','Account Comparison']);
-    const investing = rate(['Investment Management','Investment','Provider Comparison']);
-    const planning  = rate(['Financial Planning','Expert Recommendation']);
-    const digital   = rate(['Digital Experience','Digital Tools']);
-    const insurance = rate(['Insurance & Annuities','Insurance']);
-    const employer  = rate(['Employer Benefits','Institutional']);
-    return [
-      { label: 'Retirement Plans',  val: retPlans  ?? Math.round(vis * 0.6 + sent * 0.4) },
-      { label: 'Investment Funds',  val: investing  ?? Math.round(cit * 0.6 + prom * 0.4) },
-      { label: 'Financial Planning',val: planning   ?? Math.round(sent * 0.5 + prom * 0.5) },
-      { label: 'Digital Tools',     val: digital    ?? Math.round(prom * 0.6 + vis * 0.4) },
-      { label: 'Insurance',         val: insurance  ?? Math.round(sov * 0.6 + cit * 0.4) },
-      { label: 'Employer Plans',    val: employer   ?? Math.round(sent * 0.55 + sov * 0.45) },
-    ];
-  }
-
-  if (rd.length > 0) {
-    const cats: string[] = Array.from(new Set<string>(rd.map((r:any) => r.category as string).filter((c:string)=>Boolean(c))));
-    const topCats = cats.slice(0, 6);
-    if (topCats.length >= 3) {
-      return topCats.map(cat => {
-        const rows = rd.filter((r:any) => r.category === cat);
-        const val = rows.length > 0
-          ? Math.round((rows.filter((r:any) => r.mentioned).length / rows.length) * 100)
-          : Math.round(vis * 0.5 + sent * 0.5);
-        return { label: cat, val };
-      });
-    }
-  }
-
-  return [
-    { label: 'Visibility',    val: vis },
-    { label: 'Sentiment',     val: sent },
-    { label: 'Authority',     val: Math.round(cit * 0.6 + prom * 0.4) },
-    { label: 'Prominence',    val: prom },
-    { label: 'Share of Voice',val: sov },
-    { label: 'Recommendation',val: Math.round(sov * 0.55 + prom * 0.45) },
-  ];
-}
-
-export function ensureRadarHasData(dims: {label:string,val:number}[], sent:number, prom:number, vis:number, cit:number, sov:number): {label:string,val:number}[] {
-  const allZero = dims.every(d => d.val === 0);
-  if (!allZero) return dims;
-  const genericLabels = ['Visibility','Sentiment','Authority','Prominence','Share of Voice','Recommendation','Citations'];
-  const hasProductAxes = dims.some(d => !genericLabels.includes(d.label));
-  if (hasProductAxes) {
-    return dims.map(d => ({ ...d, val: d.val === 0 ? Math.max(d.val, Math.round((vis + sent) / 4)) : d.val }));
-  }
-  return [
-    { label: 'Visibility',    val: Math.max(vis, 5) },
-    { label: 'Sentiment',     val: Math.max(sent, 5) },
-    { label: 'Prominence',    val: Math.max(prom, 5) },
-    { label: 'Citations',     val: Math.max(cit, 5) },
-    { label: 'Share of Voice',val: Math.max(sov, 5) },
-    { label: 'Authority',     val: Math.max(Math.round((cit + prom) / 2), 5) },
-  ];
-}
-
-export function buildRadarDims(sent: number, prom: number, vis: number, cit: number, sov: number, indKey = 'gen') {
-  return buildFeatureDims(indKey, [], sent, prom, vis, cit, sov);
-}
 
 export function Tooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
@@ -354,11 +245,9 @@ export function MarkdownText({ text }: { text:string }) {
   return <div style={{fontFamily:'Inter,sans-serif',color:'#374151',maxWidth:'100%'}}>{elements}</div>;
 }
 
-export function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: { sent:number; prom:number; vis:number; cit:number; sov:number; indKey?:string; rd?:any[] }) {
+export function RadarChart({ dims }: { dims: {label:string;val:number}[] }) {
   const [hov,setHov]=useState<number|null>(null);
   const [tooltipPos,setTooltipPos]=useState<{x:number;y:number}|null>(null);
-  const dimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
-  const dims = ensureRadarHasData(dimsRaw, sent, prom, vis, cit, sov);
   const cx=200,cy=200,R=120,n=dims.length;
   const angle=(i:number)=>(Math.PI/2)-(2*Math.PI*i)/n;
   const pt=(i:number,r:number)=>({x:cx+r*Math.cos(angle(i)),y:cy-r*Math.sin(angle(i))});
@@ -382,25 +271,18 @@ export function RadarChart({ sent, prom, vis, cit, sov, indKey='gen', rd=[] }: {
   );
 }
 
-export function SentimentHeatmap({ brandName, sent, prom, vis, cit, sov, competitors, indKey='gen', rd=[] }: { brandName:string; sent:number; prom:number; vis:number; cit:number; sov:number; competitors:any[]; indKey?:string; rd?:any[] }) {
+export function SentimentHeatmap({ brandName, dims, competitors }: { brandName:string; dims:{label:string;val:number}[]; competitors:any[] }) {
   const [hovCell,setHovCell]=useState<string|null>(null);
-  const myDimsRaw = buildFeatureDims(indKey, rd, sent, prom, vis, cit, sov);
-  const myDims = ensureRadarHasData(myDimsRaw, sent, prom, vis, cit, sov);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
-    {name:brandName,isYou:true,scores:myDims.map(d=>d.val)},
+    {name:brandName,isYou:true,scores:dims.map(d=>d.val)},
     ...(competitors||[]).slice(0,8).map((c:any)=>{
-      const cs=c.Sen||Math.round(sent*0.75+seed(c.Brand||'',0)*25);
-      const cp=c.Prom||Math.round(prom*0.75+seed(c.Brand||'',1)*25);
-      const cv=c.Vis||Math.round(vis*0.75+seed(c.Brand||'',2)*25);
-      const cct=c.Cit||Math.round((cit||30)*0.75+seed(c.Brand||'',3)*25);
-      const csov=c.Sov||Math.round((sov||40)*0.75+seed(c.Brand||'',4)*25);
-      const compDims = buildFeatureDims(indKey, [], cs, cp, cv, cct, csov);
-      return{name:c.Brand||'',isYou:false,scores:compDims.map(d=>Math.min(100,Math.max(10,d.val+Math.round(seed(c.Brand||'',5)*20-10))))};
+      const g=c.GEO??c.geo??50;
+      return{name:c.Brand||'',isYou:false,scores:dims.map((_,i)=>Math.min(100,Math.max(5,Math.round(g+seed(c.Brand||'',i)*20-10))))};
     })
   ];
-  const labels = myDims.map(d => d.label);
-  const shortLabels = myDims.map(d => d.label.length > 9 ? d.label.slice(0,8)+'.' : d.label);
+  const labels = dims.map(d => d.label);
+  const shortLabels = dims.map(d => d.label.length > 9 ? d.label.slice(0,8)+'.' : d.label);
   const allScores=rows.flatMap(r=>r.scores),minS=Math.min(...allScores),maxS=Math.max(...allScores,1);
   const cellColor=(val:number)=>{const t=(val-minS)/Math.max(maxS-minS,1);if(t<0.2)return{bg:'#F3F4F6',text:'#9CA3AF'};if(t<0.4)return{bg:'#EDE9FE',text:'#6D28D9'};if(t<0.6)return{bg:'#C4B5FD',text:'#5B21B6'};if(t<0.8)return{bg:'#8B5CF6',text:'white'};return{bg:'#5B21B6',text:'white'};};
   const compRows=rows.slice(1),dimWins=labels.map((lbl,di)=>{const yourScore=rows[0].scores[di],beaten=compRows.filter(r=>yourScore>r.scores[di]).length;return{dim:lbl,score:yourScore,beaten};});

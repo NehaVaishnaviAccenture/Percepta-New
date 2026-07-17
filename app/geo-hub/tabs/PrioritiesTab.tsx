@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useLayoutEffect, useState } from 'react';
+import Link from 'next/link';
 import { geoTier } from '../lib/tiers';
 
 interface TabProps {
@@ -258,6 +259,7 @@ function HealthSummaryCard({ result }: { result: any }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function StatLine({ ev }: { ev: ActionEvidence }) {
+  if (!ev) return null;
   const median = ev.score - ev.delta;
   const d = ev.delta >= 0 ? `+${ev.delta}` : `−${Math.abs(ev.delta)}`;
   return (
@@ -279,8 +281,9 @@ function PriorityBars({ priority }: { priority: string }) {
 }
 
 function WhoLine({ who }: { who: string[] }) {
-  const head = who.slice(0, 2).join(' · ');
-  const extra = who.length > 2 ? who.length - 2 : 0;
+  const safe = who || [];
+  const head = safe.slice(0, 2).join(' · ');
+  const extra = safe.length > 2 ? safe.length - 2 : 0;
   return (
     <>
       <span className="pb-who-lead">For</span> {head}
@@ -301,7 +304,7 @@ function ActionCard({
   action: Action; index: number; expanded: boolean; topicFilter: string;
   onToggle: (i: number) => void; onOpen: (i: number) => void;
 }) {
-  const topics = action.topics.map(t => t.name);
+  const topics = (action.topics || []).map(t => t.name);
   const hidden = topicFilter !== 'all' && !topics.includes(topicFilter);
 
   return (
@@ -314,7 +317,7 @@ function ActionCard({
     >
       <div className="pb-card-top" onClick={() => onToggle(index)}>
         <div className="pb-card-topics">
-          <span className="pb-topic-chip">{action.topics[0].name}</span>
+          {action.topics?.[0] && <span className="pb-topic-chip">{action.topics[0].name}</span>}
         </div>
         <span className="pb-card-chev">⌄</span>
       </div>
@@ -348,7 +351,7 @@ function exportActionsCsv(actions: Action[], brandName: string, topicFilter: str
   const topicSlug = topicFilter === 'all' ? '-all' : '-' + topicFilter.toLowerCase().replace(/\s+/g, '-');
   const filename = `${slug}-priority-actions${topicSlug}.csv`;
   const rows = actions.filter(a =>
-    topicFilter === 'all' || a.topics.some(t => t.name === topicFilter)
+    topicFilter === 'all' || (a.topics || []).some(t => t.name === topicFilter)
   );
   const headers = ['Priority', 'Title', 'Topics', 'Who', 'Why', 'Evidence Topic', 'Evidence Score', 'Evidence Delta'];
   const escape = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
@@ -357,7 +360,7 @@ function exportActionsCsv(actions: Action[], brandName: string, topicFilter: str
     ...rows.map(a => [
       escape(a.priority),
       escape(a.title),
-      escape(a.topics.map(t => t.name).join('; ')),
+      escape((a.topics || []).map(t => t.name).join('; ')),
       escape(a.who.join('; ')),
       escape(a.why),
       escape(a.evidence?.topic ?? ''),
@@ -389,12 +392,12 @@ function BoardView({
     });
   };
 
-  const allTopics = [...new Set(actions.flatMap(a => a.topics.map(t => t.name)))].sort();
+  const allTopics = [...new Set(actions.flatMap(a => (a.topics || []).map(t => t.name)))].sort();
 
   const visibleCountForLane = (laneKey: string) => {
     const laneItems = actions.filter(a => a.priority.toLowerCase() === laneKey);
     if (topicFilter === 'all') return laneItems.length;
-    return laneItems.filter(a => a.topics.some(t => t.name === topicFilter)).length;
+    return laneItems.filter(a => (a.topics || []).some(t => t.name === topicFilter)).length;
   };
 
   return (
@@ -515,7 +518,7 @@ function ActionView({ action, onBack }: { action: Action; onBack: () => void }) 
           <PriorityBars priority={action.priority} />
           <span className="pb-av-prio-label">{action.priority} priority</span>
         </span>
-        <div className="pb-av-eyebrow">{action.topics[0].name}</div>
+        {action.topics?.[0] && <div className="pb-av-eyebrow">{action.topics[0].name}</div>}
         <h2 className="pb-av-title" style={{ paddingRight: '160px' }}>{action.title}</h2>
         <div className="pb-av-teaser">{action.teaser}</div>
       </div>
@@ -567,7 +570,7 @@ function ActionView({ action, onBack }: { action: Action; onBack: () => void }) 
             <div className="pb-rail-row">
               <span className="pb-rail-k">Topics</span>
               <span className="pb-rail-v">
-                {action.topics.map(t => (
+                {(action.topics || []).map(t => (
                   <span key={t.name} className="pb-topic-chip">{t.name}</span>
                 ))}
               </span>
@@ -595,6 +598,25 @@ function ActionView({ action, onBack }: { action: Action; onBack: () => void }) 
         </aside>
       </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Support strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SupportStrip() {
+  return (
+    <Link href="/geo-optimization-services" className="pb-support-strip">
+      <div className="pb-support-inner">
+        <span className="pb-support-eyebrow">Get support</span>
+        <span className="pb-support-heading">Want help turning these into a plan?</span>
+        <span className="pb-support-sub">Our team can scope, prioritize, and build alongside you.</span>
+      </div>
+      <svg className="pb-support-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 8h10M9 4l4 4-4 4"/>
+      </svg>
+    </Link>
   );
 }
 
@@ -652,6 +674,7 @@ export default function PrioritiesTab({ result, playbookActions }: TabProps) {
               onOpenAction={openAction}
             />
           )}
+          <SupportStrip />
         </>
       )}
       {viewState === 'action' && selectedAction !== null && playbookActions && (

@@ -19,45 +19,6 @@ function sigTier(s: number) {
   return               { label: 'Fragmented',  text: '#B7002F', bg: '#FFE4EC' };
 }
 
-const OWNED_URLS: Record<string, string[]> = {
-  'capitalone':      ['https://www.capitalone.com/credit-cards/', 'https://www.capitalone.com/credit-cards/venture/', 'https://www.capitalone.com/credit-cards/quicksilver/', 'https://www.capitalone.com/credit-cards/savor/', 'https://www.capitalone.com/credit-cards/secured/'],
-  'chase':           ['https://www.chase.com/personal/credit-cards', 'https://www.chase.com/personal/credit-cards/sapphire', 'https://www.chase.com/personal/credit-cards/freedom', 'https://www.chase.com/personal/credit-cards/ink-business', 'https://www.chase.com/personal/credit-cards/amazon'],
-  'citi':            ['https://www.citi.com/credit-cards/home', 'https://www.citi.com/credit-cards/citi-double-cash-credit-card', 'https://www.citi.com/credit-cards/citi-custom-cash-card', 'https://www.citi.com/credit-cards/citi-premier-card', 'https://www.citi.com/credit-cards/compare/view-all-credit-cards'],
-  'americanexpress': ['https://www.americanexpress.com/us/credit-cards/', 'https://www.americanexpress.com/us/credit-cards/gold-card/', 'https://www.americanexpress.com/us/credit-cards/platinum/', 'https://www.americanexpress.com/us/credit-cards/blue-cash-preferred/', 'https://www.americanexpress.com/us/credit-cards/blue-cash-everyday/'],
-  'discover':        ['https://www.discover.com/credit-cards/', 'https://www.discover.com/credit-cards/cash-back/', 'https://www.discover.com/credit-cards/student/', 'https://www.discover.com/credit-cards/secured/', 'https://www.discover.com/credit-cards/miles/'],
-  'wellsfargo':      ['https://www.wellsfargo.com/credit-cards/', 'https://www.wellsfargo.com/credit-cards/active-cash/', 'https://www.wellsfargo.com/credit-cards/autograph/', 'https://www.wellsfargo.com/credit-cards/reflect/', 'https://www.wellsfargo.com/credit-cards/compare/'],
-  'bankofamerica':   ['https://www.bankofamerica.com/credit-cards/', 'https://www.bankofamerica.com/credit-cards/products/cash-back-credit-card/', 'https://www.bankofamerica.com/credit-cards/products/travel-rewards-credit-card/', 'https://www.bankofamerica.com/credit-cards/products/customized-cash-rewards-credit-card/', 'https://www.bankofamerica.com/credit-cards/compare-credit-cards/'],
-};
-
-const DOMAIN_URLS: Record<string, string[]> = {
-  'nerdwallet.com':       ['https://www.nerdwallet.com/best/credit-cards', 'https://www.nerdwallet.com/best/credit-cards/cash-back', 'https://www.nerdwallet.com/best/credit-cards/travel', 'https://www.nerdwallet.com/best/credit-cards/no-annual-fee', 'https://www.nerdwallet.com/best/credit-cards/balance-transfer'],
-  'bankrate.com':         ['https://www.bankrate.com/credit-cards/best-credit-cards/', 'https://www.bankrate.com/credit-cards/cash-back/', 'https://www.bankrate.com/credit-cards/travel/', 'https://www.bankrate.com/credit-cards/reviews/', 'https://www.bankrate.com/credit-cards/compare/'],
-  'creditkarma.com':      ['https://www.creditkarma.com/credit-cards', 'https://www.creditkarma.com/credit-cards/i/best-cash-back-credit-cards', 'https://www.creditkarma.com/credit-cards/i/best-travel-credit-cards', 'https://www.creditkarma.com/credit-cards/i/best-rewards-credit-cards', 'https://www.creditkarma.com/reviews'],
-  'thepointsguy.com':     ['https://thepointsguy.com/credit-cards/best/', 'https://thepointsguy.com/credit-cards/travel/', 'https://thepointsguy.com/credit-cards/cash-back/', 'https://thepointsguy.com/reviews/', 'https://thepointsguy.com/credit-cards/compare/'],
-  'wallethub.com':        ['https://wallethub.com/best-credit-cards', 'https://wallethub.com/best/cash-back-credit-cards/8574c', 'https://wallethub.com/best/travel-credit-cards/9126c', 'https://wallethub.com/best/secured-credit-cards/11369c', 'https://wallethub.com/answers/cc/'],
-  'forbes.com':           ['https://www.forbes.com/advisor/credit-cards/best/', 'https://www.forbes.com/advisor/credit-cards/best-cash-back-credit-cards/', 'https://www.forbes.com/advisor/credit-cards/best-travel-credit-cards/', 'https://www.forbes.com/advisor/credit-cards/reviews/', 'https://www.forbes.com/advisor/credit-cards/compare/'],
-  'cnbc.com':             ['https://www.cnbc.com/select/best-credit-cards/', 'https://www.cnbc.com/select/best-cash-back-credit-cards/', 'https://www.cnbc.com/select/best-travel-credit-cards/', 'https://www.cnbc.com/select/best-no-annual-fee-credit-cards/', 'https://www.cnbc.com/select/credit-cards/'],
-  'investopedia.com':     ['https://www.investopedia.com/best-credit-cards-4801582', 'https://www.investopedia.com/best-cash-back-credit-cards-4801556', 'https://www.investopedia.com/best-travel-credit-cards-4800550', 'https://www.investopedia.com/best-no-annual-fee-credit-cards-4767278', 'https://www.investopedia.com/credit-cards/'],
-  'reddit.com':           ['https://www.reddit.com/r/personalfinance/', 'https://www.reddit.com/r/CreditCards/', 'https://www.reddit.com/r/financialindependence/', 'https://www.reddit.com/r/churning/', 'https://www.reddit.com/r/CreditCards/wiki/index'],
-  'wikipedia.org':        ['https://en.wikipedia.org/wiki/Credit_card', 'https://en.wikipedia.org/wiki/Cashback_reward_program', 'https://en.wikipedia.org/wiki/Rewards_credit_card', 'https://en.wikipedia.org/wiki/Travel_credit_card', 'https://en.wikipedia.org/wiki/Secured_credit_card'],
-  'consumerfinance.gov':  ['https://www.consumerfinance.gov/consumer-tools/credit-cards/', 'https://www.consumerfinance.gov/ask-cfpb/what-is-a-credit-card/', 'https://www.consumerfinance.gov/consumer-tools/credit-cards/explore-cards/', 'https://www.consumerfinance.gov/about-us/blog/choosing-right-credit-card/', 'https://www.consumerfinance.gov/consumer-tools/'],
-  'wsj.com':              ['https://www.wsj.com/buyside/personal-finance/credit-cards/best-credit-cards', 'https://www.wsj.com/buyside/personal-finance/credit-cards/best-cash-back-credit-cards', 'https://www.wsj.com/buyside/personal-finance/credit-cards/best-travel-credit-cards', 'https://www.wsj.com/buyside/personal-finance/credit-cards/reviews', 'https://www.wsj.com/buyside/personal-finance/credit-cards/'],
-};
-
-const PAGE_TITLES: Record<string, string[]> = {
-  'nerdwallet.com':       ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'No Annual Fee Cards', 'Balance Transfer Cards'],
-  'bankrate.com':         ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'Card Reviews', 'Compare Cards'],
-  'creditkarma.com':      ['Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'Best Rewards Cards', 'Card Reviews'],
-  'thepointsguy.com':     ['Best Credit Cards', 'Best Travel Cards', 'Best Cash Back Cards', 'Card Reviews', 'Compare Cards'],
-  'wallethub.com':        ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'Best Secured Cards', 'Credit Card Answers'],
-  'forbes.com':           ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'Card Reviews', 'Compare Cards'],
-  'cnbc.com':             ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'No Annual Fee Cards', 'All Credit Cards'],
-  'investopedia.com':     ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'No Annual Fee Cards', 'Credit Cards Guide'],
-  'reddit.com':           ['r/personalfinance', 'r/CreditCards', 'r/financialindependence', 'r/churning', 'r/CreditCards Wiki'],
-  'wikipedia.org':        ['Credit Card', 'Cashback Reward Program', 'Rewards Credit Card', 'Travel Credit Card', 'Secured Credit Card'],
-  'consumerfinance.gov':  ['Credit Card Tools', 'What Is a Credit Card?', 'Explore Cards', 'Choosing the Right Card', 'Consumer Tools'],
-  'wsj.com':              ['Best Credit Cards', 'Best Cash Back Cards', 'Best Travel Cards', 'Card Reviews', 'Credit Cards'],
-};
 
 function SovChart({ brand, sovScore, competitors }: { brand: string; sovScore: number; competitors: any[] }) {
   const bars: { label: string; value: number; isYou: boolean }[] = [
@@ -245,12 +206,8 @@ export default function ReachTab({ result, resultComps }: TabProps) {
               const cat = getCat(s);
               const cc = catColor(cat, s);
               const isExp = expandedDomain === s.domain;
-              const urls = s.isOwned
-                ? (OWNED_URLS[brandKey] || [`https://www.${s.domain}/`])
-                : (DOMAIN_URLS[s.domain] || [`https://www.${s.domain}/`]);
-              const titles = s.isOwned
-                ? urls.map((u: string) => u.replace(/^https?:\/\/[^/]+/, '').replace(/\/$/, '') || '/')
-                : (PAGE_TITLES[s.domain] || urls.map((u: string) => u));
+              const urls = [`https://www.${s.domain}/`];
+              const titles = urls.map((u: string) => u);
               const share = Math.min(s.citation_share ?? 5, s.isOwned ? 15 : 5);
               const barW = Math.round((share / 15) * 100);
 

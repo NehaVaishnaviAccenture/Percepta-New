@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { AppShell } from '../components/AppShell';
-import './get-support.css';
+import './geo-optimization-services.css';
 
 const deliver = [
   {
@@ -51,12 +51,12 @@ const options = [
 
 export default function GetSupport() {
   return (
-    <AppShell breadcrumb="Get Support">
+    <AppShell breadcrumb="GEO Optimization Services">
     <main id="gs-main" className="gsMain">
 
       {/* HERO */}
       <section id="gs-hero" className="gsHero">
-        <span id="gs-hero-eyebrow" className="gsEyebrow gsHeroEyebrow">GEO Services</span>
+        <span id="gs-hero-eyebrow" className="gsEyebrow gsHeroEyebrow">GEO Optimization Services</span>
         <h1 id="gs-hero-title" className="gsHeroTitle">
           We&apos;ve Got You Covered
         </h1>

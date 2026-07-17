@@ -1,9 +1,9 @@
 'use client'
+import { useClerk } from '@clerk/nextjs'
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function SignOutPage() {
-  const router = useRouter()
-  useEffect(() => { router.replace('/') }, [router])
+  const { signOut } = useClerk()
+  useEffect(() => { signOut({ redirectUrl: '/' }) }, [])
   return <p style={{ padding: 40 }}>Signing out...</p>
 }
