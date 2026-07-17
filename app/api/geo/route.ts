@@ -1476,22 +1476,6 @@ export async function POST(req: NextRequest) {
 
     const scores = score(brand, als, allQA, competitors);
 
-    // REAL COMPETITORS — extracted from actual AI responses, not guessed from discovery
-    // These are the brands GPT actually mentions when answering consumer questions
-    // Much more accurate than a predefined list
-    const mentionCounts: Record<string, number> = {};
-    const domainMap: Record<string, string> = {};
-    allQA.filter(Boolean).forEach(r => {
-      const t = (r.a || '').toLowerCase();
-      competitors.forEach(c => {
-        const ca = aliases(c);
-        if (hasAlias(t, ca)) {
-          const key = c.toLowerCase();
-          mentionCounts[key] = (mentionCounts[key] || 0) + 1;
-          domainMap[key] = competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g,'')}.com`;
-        }
-      });
-    });
 
     // COMPETITORS — extracted from actual AI responses
     // First pass: count mentions of discovered competitors
