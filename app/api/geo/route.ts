@@ -1343,10 +1343,10 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   // Quality metrics — computed from own mentions (quality signal), scaled by relevantVis
   // prominence: % of OWN mentions where named first × visScale
   // Minimum of 1 if brand has any mentions at all — prominence can never be zero if visible
+  const visScale = relevantVis / 100;
+
   const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
   const prominence    = mentionCount > 0 ? Math.max(1, Math.round(rawProminence * visScale)) : 0;
-
-  const visScale = relevantVis / 100;
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
