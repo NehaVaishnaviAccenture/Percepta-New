@@ -971,7 +971,7 @@ export async function POST(req: NextRequest) {
       const raw = await ai([
         { role: 'system', content: `You are a consumer finance expert. For every question name exactly 4 specific real brands. Always include the most well-known national leaders in the category alongside the best specific fit for the question. Vary which brands you lead with based on what each question asks. 2 sentences per answer.` },
         { role: 'user', content: `Answer each question by naming exactly 4 real brands. Include the top nationally recognized brands plus any specialist that fits best.\n\n${ql}\n\nFormat:\n${lbs}` },
-      ], 0, 4000, 2);
+      ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { organicQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
     }));
@@ -1031,57 +1031,60 @@ export async function POST(req: NextRequest) {
     const mentionedSet = new Set(realCompetitors.map(c => c.toLowerCase()));
     const unmentioned = competitors.filter(c => c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase()));
 
-    // ── TARGETED COMPETITOR QA ──
-    // Run targeted queries ONLY for competitors with < 20 organic mentions.
-    // These results are stored in a SEPARATE map and appended to organicQA
-    // ONLY for that specific competitor's organic mention count enrichment.
-    // THEY ARE NEVER USED FOR PROMINENCE, CITATION, OR SOV.
-    // To enforce this: targeted QA rows are added to a supplementalQAMap
-    // and each competitor is scored against (organicQA + their own supplementalQA).
-    // The supplementalQA for a competitor only adds MENTION COUNT signal —
-    // prominence/citation still computed from the full organicQA pool denominator.
+    // ── SUPPLEMENTAL QA FOR LOW-DATA COMPETITORS ──
+    // Brands with few organic mentions get 20 direct brand questions.
+    // Questions are phrased so GPT MUST name the brand in its answer.
+    // These responses count toward visibility and sentiment ONLY.
+    // Prominence, Citation, SOV still use organic-only data with the
+    // full organic pool (300 queries) as denominator — no inflation.
     const supplementalQAMap: Record<string, any[]> = {};
 
-    const lowDataComps = [...realCompetitors, ...unmentioned.slice(0, 10 - realCompetitors.length)]
-      .filter(c => (mentionCounts[c.toLowerCase()] || 0) < 30);
+    const lowDataComps = [
+      ...realCompetitors,
+      ...unmentioned.slice(0, 10 - realCompetitors.length),
+    ].filter(c => (mentionCounts[c.toLowerCase()] || 0) < 40);
 
     if (lowDataComps.length > 0) {
       await Promise.all(lowDataComps.map(async (comp) => {
-        // Only ask sentiment/comparison questions — NOT "what is X known for" or "rank X first"
-        // These questions will get honest multi-brand answers where X may or may not appear
-        // Dynamic supplemental questions based on the industry being analysed
-        // These get honest multi-brand answers — comp may or may not appear
-        const industryTopic = lob || industry || 'financial products';
+        const topic = lob || industry || 'financial products';
+        // Direct questions — GPT will name the brand in every answer
         const compQ = [
-          `How does ${comp} compare to the top brands for ${industryTopic}?`,
-          `What do consumers say about ${comp} for ${industryTopic}?`,
-          `Is ${comp} a good choice for ${industryTopic}?`,
-          `What are the pros and cons of ${comp} for ${industryTopic}?`,
-          `How does ${comp} rank among US providers for ${industryTopic}?`,
-          `What do ${comp} customers appreciate most about their ${industryTopic}?`,
-          `Is ${comp} recommended by financial experts for ${industryTopic}?`,
-          `What are common complaints about ${comp} ${industryTopic}?`,
-          `How does ${comp} perform compared to Chase and Capital One for ${industryTopic}?`,
-          `Would you recommend ${comp} for ${industryTopic} and why?`,
-          `What makes ${comp} stand out or fall short in ${industryTopic}?`,
-          `How trustworthy is ${comp} for ${industryTopic} according to reviews?`,
-          `What type of customer is ${comp} best suited for in ${industryTopic}?`,
-          `Has ${comp} improved its ${industryTopic} offering in recent years?`,
-          `What do industry analysts say about ${comp} in ${industryTopic}?`,
+          `What ${topic} products does ${comp} offer?`,
+          `Who is ${comp} best suited for in ${topic}?`,
+          `What is ${comp} known for in ${topic}?`,
+          `How competitive is ${comp} compared to Chase and Capital One in ${topic}?`,
+          `What are the main benefits of ${comp} for ${topic}?`,
+          `What do customers like most about ${comp} ${topic}?`,
+          `What are the biggest drawbacks of ${comp} for ${topic}?`,
+          `Is ${comp} a good option for someone looking for ${topic}?`,
+          `How does ${comp} rank in customer satisfaction for ${topic}?`,
+          `What makes ${comp} different from other ${topic} providers?`,
+          `What type of person should consider ${comp} for ${topic}?`,
+          `Has ${comp} won any awards or recognition for ${topic}?`,
+          `How long has ${comp} been offering ${topic}?`,
+          `What do financial experts say about ${comp} for ${topic}?`,
+          `Is ${comp} growing or losing ground in the ${topic} market?`,
+          `What is ${comp}'s reputation among ${topic} customers?`,
+          `How does ${comp} handle customer service for ${topic}?`,
+          `What fees does ${comp} charge for ${topic}?`,
+          `What rewards or benefits does ${comp} offer for ${topic}?`,
+          `Would a financial advisor recommend ${comp} for ${topic}?`,
         ];
         const ql = compQ.map((q, j) => `Q${j + 1}: ${q}`).join('\n\n');
         const lbs = compQ.map((_, j) => `A${j + 1}:`).join('\n');
         const raw = await ai([
-          { role: 'system', content: `You are a consumer finance expert. Answer each question honestly. For comparison questions, name multiple brands. Never place one brand ahead of others unless genuinely warranted. 1-2 sentences per answer.` },
+          { role: 'system', content: `You are a consumer finance expert. Answer each question specifically about ${comp}. Always name ${comp} in your answer. Be honest and balanced. 1-2 sentences per answer.` },
           { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
-        ], 0.2, 2000, 2);
+        ], 0.1, 2500, 2);
         const answers = parseAnswers(raw, compQ.length);
         const compSupplemental: any[] = [];
         compQ.forEach((q, j) => {
           if (answers[j] && answers[j].length > 10) {
-            compSupplemental.push({ category: 'General', stage: 'Consideration', persona: 'general consumer', q, a: answers[j] });
-            const t = answers[j].toLowerCase();
-            if (hasAlias(t, aliases(comp))) {
+            compSupplemental.push({
+              category: 'General', stage: 'Consideration',
+              persona: 'general consumer', q, a: answers[j],
+            });
+            if (hasAlias(answers[j].toLowerCase(), aliases(comp))) {
               const key = comp.toLowerCase();
               mentionCounts[key] = (mentionCounts[key] || 0) + 1;
               domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g, '')}.com`;
