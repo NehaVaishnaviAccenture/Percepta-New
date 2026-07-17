@@ -1340,11 +1340,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // Quality metrics scaled by relevant visibility
-  const visScale = relevantVis / 100;
+  // Quality metrics — computed from own mentions (quality signal), scaled by relevantVis
+  // prominence: % of OWN mentions where named first × visScale
+  // Minimum of 1 if brand has any mentions at all — prominence can never be zero if visible
+  const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
+  const prominence    = mentionCount > 0 ? Math.max(1, Math.round(rawProminence * visScale)) : 0;
 
-  const rawProminence = Math.round((rank1Count / mentionCount) * 100);
-  const prominence    = Math.round(rawProminence * visScale);
+  const visScale = relevantVis / 100;
 
   const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
     'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
@@ -1360,11 +1362,13 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     if (!hasNeg) posMentions++;
   });
   const rawSentiment = Math.round((posMentions / mentionCount) * 100);
-  const sentiment    = Math.round(rawSentiment * visScale);
+  // sentiment: min 1 if brand has mentions (GPT mentioned them = at least neutral)
+  const sentiment    = mentionCount > 0 ? Math.max(1, Math.round(rawSentiment * visScale)) : 0;
 
   const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
   const rawCitation    = Math.round(Math.min(95, (citWeight / mentionCount) * 100));
-  const citationShare  = Math.round(rawCitation * visScale);
+  // citation: min 1 if brand has any position data
+  const citationShare  = positions.length > 0 ? Math.max(1, Math.round(rawCitation * visScale)) : 0;
 
   // SOV always against full pool
   const top10    = comps.slice(0, 10);
@@ -1496,21 +1500,33 @@ export async function POST(req: NextRequest) {
     // Second pass: scan for any well-known brands GPT mentioned that weren't discovered
     // This catches cases where discovery missed a brand GPT actually recommends
     const KNOWN_CC_BRANDS: Record<string, string> = {
-      'chase': 'chase.com', 'american express': 'americanexpress.com', 'amex': 'americanexpress.com',
+      'chase': 'chase.com', 'american express': 'americanexpress.com',
       'capital one': 'capitalone.com', 'citi': 'citi.com', 'citibank': 'citi.com',
       'discover': 'discover.com', 'wells fargo': 'wellsfargo.com', 'bank of america': 'bankofamerica.com',
-      'barclays': 'barclaysus.com', 'us bank': 'usbank.com', 'u.s. bank': 'usbank.com',
-      'pnc': 'pnc.com', 'synchrony': 'synchrony.com', 'navy federal': 'navyfederal.org',
-      'usaa': 'usaa.com', 'apple card': 'apple.com', 'goldman sachs': 'goldmansachs.com',
+      'us bank': 'usbank.com', 'u.s. bank': 'usbank.com',
+      'synchrony': 'synchrony.com', 'navy federal': 'navyfederal.org',
+      'usaa': 'usaa.com', 'goldman sachs': 'goldmansachs.com',
+    };
+    // Aliases that map to canonical brand names (not separate brands)
+    const BRAND_ALIASES: Record<string, string> = {
+      'amex': 'american express', 'citibank': 'citi',
+      'u.s. bank': 'us bank', 'usbank': 'us bank',
     };
     const extraBrands: Record<string, number> = {};
     allQA.filter(Boolean).forEach(r => {
       const t = (r.a || '').toLowerCase();
       Object.entries(KNOWN_CC_BRANDS).forEach(([name, domain]) => {
-        const isAlreadyTracked = competitors.some(c => aliases(c).some(a => a === name));
+        // Resolve alias to canonical name
+        const canonical = BRAND_ALIASES[name] || name;
+        // Skip if already tracked under canonical or any alias
+        const isAlreadyTracked = competitors.some(c =>
+          c.toLowerCase() === canonical ||
+          aliases(c).includes(canonical) ||
+          aliases(c).includes(name)
+        );
         if (!isAlreadyTracked && hasAlias(t, [name, name.replace(/\s+/g,'')])) {
-          extraBrands[name] = (extraBrands[name] || 0) + 1;
-          if (!domainMap[name]) domainMap[name] = domain;
+          extraBrands[canonical] = (extraBrands[canonical] || 0) + 1;
+          if (!domainMap[canonical]) domainMap[canonical] = domain;
         }
       });
     });
