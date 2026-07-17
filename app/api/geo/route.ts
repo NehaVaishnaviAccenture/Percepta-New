@@ -702,45 +702,54 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// ALL METRICS PEER-NORMALISED across the full competitive set (primary + 10 comps).
-// Computed from ORGANIC QA only. Supplemental QA never enters this function.
+// ALL METRICS PEER-NORMALISED. ORGANIC QA ONLY. ZERO HARDCODED CEILINGS.
 //
-// PHILOSOPHY:
-//   Every metric is a relative signal within this peer group, not an absolute score.
-//   Peer-normalisation means: top brand always = ceiling, bottom brand always = floor.
-//   No brand with real organic data ever shows 0 or single digits.
-//   Ordering is perfectly preserved — only the range is rescaled.
+// APPROACH:
+//   For each metric, compute raw values for all brands in one pass.
+//   Then apply dynamicNorm():
+//     - ceiling = min(top_brand_raw_score, MAX_CAP=80) — data-driven, not hardcoded
+//     - floor   = FLOOR=15 — the only hardcoded value (guarantees readability)
+//     - brands with 0 mentions → score 0 (fall to bottom, not floored)
+//     - brands with mentions but raw=0 (e.g. never ranked first) → get floor
 //
-// METRIC FLOORS & CEILINGS:
-//   Visibility   15–88  (true mention ratio, but floored so 3-query brands aren't crushed)
-//   Citation     15–85  (position-weighted frequency, anchored to total query pool)
-//   Sentiment    20–82  (tone quality, damped by sqrt(vis) to penalise tiny samples)
-//   SOV           8–85  (share of competitive responses)
-//   Prominence    8–62  (first-mention frequency over total query pool)
-//   GEO           = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+//   This means:
+//     In a competitive market where Chase has 80% raw visibility → ceiling=80
+//     In a niche market where top brand has 45% visibility → ceiling=45
+//     The floor of 15 is the ONLY constant — everything else is data-driven.
 //
-// SENTIMENT FIX:
-//   Only scan sentences that actually contain the brand alias.
-//   If no brand-containing sentences found, default to POSITIVE (GPT rarely mentions
-//   a brand negatively unless explicitly asked — neutral mentions count as positive).
-//
-// ZERO-MENTION BRANDS:
-//   If a brand has 0 organic mentions, all metrics = 0 and it falls to the bottom.
+// METRICS:
+//   Visibility   = mentions / relevantCategoryTotal × 100
+//   Prominence   = rank1Count / totalQueries × 100
+//   Citation     = sum(1/pos) / totalQueries × 133
+//   Sentiment    = posMentions/mentions × 100 × sqrt(vis/100)
+//   SOV          = brandResponses / anyBrandResponses × 100
+//   GEO          = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
-function peerNorm(v: number, rawMin: number, rawMax: number, tMin: number, tMax: number): number {
-  if (rawMax <= rawMin) return Math.round((tMin + tMax) / 2);
-  const clamped = Math.max(rawMin, Math.min(rawMax, v));
-  return Math.round(tMin + ((clamped - rawMin) / (rawMax - rawMin)) * (tMax - tMin));
+const SCORE_FLOOR = 15;   // minimum score for any brand with real organic data
+const SCORE_MAX_CAP = 80; // maximum any single metric can show (prevents inflated 90s/100s)
+
+function dynamicNorm(rawValues: number[], hasMentions: boolean[]): number[] {
+  // Only consider brands that have organic mentions
+  const activeVals = rawValues.filter((_, i) => hasMentions[i]);
+  if (activeVals.length === 0) return rawValues.map(() => 0);
+
+  const rawMin = Math.min(...activeVals);
+  const rawMax = Math.max(...activeVals);
+  // Ceiling = top brand's actual raw score, capped at MAX_CAP — never hardcoded
+  const ceiling = Math.min(rawMax, SCORE_MAX_CAP);
+
+  return rawValues.map((v, i) => {
+    if (!hasMentions[i]) return 0; // no organic data → 0, not floored
+    if (rawMax === rawMin) return Math.round((SCORE_FLOOR + ceiling) / 2);
+    // FLOOR guaranteed for every brand with mentions, regardless of raw value
+    return Math.round(SCORE_FLOOR + (v - rawMin) / (rawMax - rawMin) * (ceiling - SCORE_FLOOR));
+  });
 }
 
 interface RawBrand {
   name: string; url: string;
   mentionCount: number; totalCount: number;
-  visRaw: number;     // mention ratio × 100 (true, un-normalised)
-  promRaw: number;    // rank1 / total × 100
-  citRaw: number;     // sum(1/pos) / total × 133
-  sentRaw: number;    // pos/mentions × 100 × sqrt(vis/100)
-  sovRaw: number;     // brand/anyBrand × 100
+  visRaw: number; promRaw: number; citRaw: number; sentRaw: number; sovRaw: number;
   avgPos: number;
 }
 
@@ -763,51 +772,34 @@ function computeRaw(
     return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
   }
 
-  // ── VISIBILITY RAW ──
-  // Use full query pool (not just relevant categories) so that brands appearing
-  // across all categories aren't artificially boosted vs niche brands.
-  // relevantTotal = queries in categories this brand appeared in.
+  // Visibility: relevant categories only
   const brandCats = new Set(mentioned.map((r: any) => r.category).filter(Boolean));
   const relevantTotal = brandCats.size > 0
     ? answered.filter((r: any) => brandCats.has(r.category)).length
     : total;
   const visRaw = Math.min(100, (mentionCount / (relevantTotal || 1)) * 100);
 
-  // ── POSITION DATA ──
-  const positions = mentioned
-    .map((r: any) => position(r.a || '', als, compAls))
-    .filter(p => p > 0);
+  // Position data
+  const positions = mentioned.map((r: any) => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // ── PROMINENCE RAW ── rank1 / totalPool
+  // Raw prominence and citation
   const promRaw = (rank1Count / total) * 100;
-
-  // ── CITATION RAW ── citWeight / totalPool × 133
   const citWeight = positions.reduce((s, p) => s + 1 / p, 0);
   const citRaw = (citWeight / total) * 133;
 
-  // ── SENTIMENT RAW ──
-  // For each mention, check sentences containing the brand alias for negative language.
-  // If no brand-containing sentences found (very short answer), default to positive.
-  // Apply sqrt(vis/100) damper so brands with 3 mentions can't claim 100% sentiment.
+  // Sentiment: per-sentence brand check, sqrt(vis) damper, default positive when no brand sentences found
   let posMentions = 0;
   mentioned.forEach((r: any) => {
     const answerLower = (r.a || '').toLowerCase();
-    const brandSents = answerLower
-      .split(/[.!?\n]+/)
-      .filter((s: string) => s.length > 5 && hasAlias(s, als));
-    if (brandSents.length === 0) {
-      // No brand-containing sentences found — count as positive (neutral mention)
-      posMentions++;
-      return;
-    }
-    const hasNeg = brandSents.some((s: string) => NEG_WORDS.some(w => s.includes(w)));
-    if (!hasNeg) posMentions++;
+    const brandSents = answerLower.split(/[.!?\n]+/).filter((s: string) => s.length > 5 && hasAlias(s, als));
+    if (brandSents.length === 0) { posMentions++; return; } // neutral = positive
+    if (!brandSents.some((s: string) => NEG_WORDS.some(w => s.includes(w)))) posMentions++;
   });
   const sentRaw = (posMentions / mentionCount) * 100 * Math.sqrt(visRaw / 100);
 
-  // ── SOV RAW ──
+  // SOV
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r: any, i: number) => {
     const t = (r.a || '').toLowerCase();
@@ -833,49 +825,26 @@ function scoreAllBrands(
   ];
   const allAlsLists = allBrands.map(b => b.als);
   const raws = allBrands.map(b => computeRaw(b.name, b.url, b.als, answered, total, allAlsLists));
+  const hasMentions = raws.map(r => r.mentionCount > 0);
 
-  // Brands with real organic data
-  const active = raws.filter(r => r.mentionCount > 0);
+  // Normalise all 5 dimensions dynamically — ceiling = top brand's raw score (≤80)
+  const visNorm  = dynamicNorm(raws.map(r => r.visRaw),  hasMentions);
+  const promNorm = dynamicNorm(raws.map(r => r.promRaw), hasMentions);
+  const citNorm  = dynamicNorm(raws.map(r => r.citRaw),  hasMentions);
+  const sentNorm = dynamicNorm(raws.map(r => r.sentRaw), hasMentions);
+  const sovNorm  = dynamicNorm(raws.map(r => r.sovRaw),  hasMentions);
 
-  // Peer-normalise all 5 dimensions
-  function normDim(
-    key: keyof Pick<RawBrand, 'visRaw' | 'promRaw' | 'citRaw' | 'sentRaw' | 'sovRaw'>,
-    tMin: number, tMax: number
-  ): Map<string, number> {
-    const vals = active.map(r => r[key] as number);
-    const rawMin = Math.min(...vals), rawMax = Math.max(...vals);
-    const out = new Map<string, number>();
-    raws.forEach(r => {
-      if (r.mentionCount === 0) { out.set(r.name, 0); return; }
-      out.set(r.name, peerNorm(r[key] as number, rawMin, rawMax, tMin, tMax));
-    });
-    return out;
-  }
-
-  // Target ranges chosen so:
-  // - Top brand gets a credibly high score (not always 100)
-  // - Bottom real brand never shows single digits
-  // - The spread feels meaningful to a client
-  const visMap  = normDim('visRaw',  15, 88);
-  const promMap = normDim('promRaw',  8, 62);
-  const citMap  = normDim('citRaw',  15, 85);
-  const sentMap = normDim('sentRaw', 20, 82);
-  const sovMap  = normDim('sovRaw',   8, 85);
-
-  function build(r: RawBrand, i: number) {
-    const vis  = visMap.get(r.name)  ?? 0;
-    const prom = promMap.get(r.name) ?? 0;
-    const cit  = citMap.get(r.name)  ?? 0;
-    const sent = sentMap.get(r.name) ?? 0;
-    const sov  = sovMap.get(r.name)  ?? 0;
+  function buildScore(i: number) {
+    const vis  = visNorm[i],  prom = promNorm[i], cit  = citNorm[i];
+    const sent = sentNorm[i], sov  = sovNorm[i];
     const geo  = Math.min(100, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15));
-    return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
+    return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: raws[i].avgPos, mentionCount: raws[i].mentionCount, totalCount: raws[i].totalCount };
   }
 
-  const primaryScores = build(raws[0], 0);
+  const primaryScores = buildScore(0);
 
   const competitorScores = raws.slice(1).map((r, i) => {
-    const s = build(r, i + 1);
+    const s = buildScore(i + 1);
     return {
       Brand: r.name,
       URL: compList[i].url || `${r.name.toLowerCase().replace(/\s+/g, '')}.com`,
