@@ -1371,6 +1371,9 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
   const citationShare  = rawCitation;
 
   // SOV — brand's share of all competitive AI conversations
+  // brandSet: responses where THIS brand appears
+  // anySet: responses where ANY competitor appears  
+  // Chase at 85% means Chase appears in 85% of all responses that mention any credit card brand
   const top10    = comps.slice(0, 10);
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r, i) => {
