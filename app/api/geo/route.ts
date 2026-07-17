@@ -1327,12 +1327,6 @@ function score(brand: string, als: string[], qa: any[], comps: string[]) {
     return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
   }
 
-  // For prominence and citation: exclude targeted queries
-  // Targeted queries ask directly about the brand so it's always named first — artificially inflates position scores
-  // Only organic responses from the 300 curated queries give honest prominence/citation data
-  const organicMentioned = mentioned.filter(r => !r.targeted);
-  const positionBase     = organicMentioned.length > 0 ? organicMentioned : mentioned; // fallback to all if no organic
-
   // RELEVANT VISIBILITY: score against queries in categories this brand appeared in
   // BofA appears in General/Cash Back queries → scored against those ~100 queries
   // This prevents BofA being penalized for not appearing in Premium/Travel queries
