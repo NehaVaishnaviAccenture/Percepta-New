@@ -755,43 +755,50 @@ const NEG_WORDS = [
 function computeRaw(
   name: string, url: string, als: string[],
   answered: any[], total: number,
-  allAlsLists: string[][]
+  allAlsLists: string[][],
+  supplemental: any[] = []   // extra brand-specific QA — counted for vis/sent, NOT prom/SOV
 ): RawBrand {
   const compAls = allAlsLists.filter(al => al !== als);
-  const mentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
-  const mentionCount = mentioned.length;
 
-  if (mentionCount === 0) {
+  // Organic mentions — used for prominence, citation, SOV (denominator = organic total)
+  const organicMentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
+
+  // Supplemental mentions — only for visibility and sentiment enrichment
+  const suppMentioned = supplemental.filter(r => hasAlias((r.a || '').toLowerCase(), als));
+
+  // Combined for visibility/sentiment
+  const allMentioned = [...organicMentioned, ...suppMentioned];
+  const mentionCount = allMentioned.length;
+
+  if (mentionCount === 0 && organicMentioned.length === 0) {
     return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
   }
 
-  // Visibility = mentions / total query pool (honest percentage)
+  // Visibility = ALL mentions (organic + supplemental) / organic total
+  // Supplemental adds real mentions, denominator stays organic pool size
   const visRaw = Math.min(100, (mentionCount / total) * 100);
 
-  // Positions
-  const positions = mentioned.map((r: any) => position(r.a || '', als, compAls)).filter(p => p > 0);
-  const avgPos = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const rank1Count = positions.filter(p => p === 1).length;
-
-  // Prominence = rank1 / total pool
+  // Prominence and Citation use ORGANIC ONLY — supplemental would inflate rank1
+  const organicPositions = organicMentioned
+    .map((r: any) => position(r.a || '', als, compAls))
+    .filter(p => p > 0);
+  const avgPos = organicPositions.length > 0 ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
+  const rank1Count = organicPositions.filter(p => p === 1).length;
   const promRaw = (rank1Count / total) * 100;
-
-  // Citation = sum(1/pos) / total × 133
-  const citWeight = positions.reduce((s, p) => s + 1 / p, 0);
+  const citWeight = organicPositions.reduce((s, p) => s + 1 / p, 0);
   const citRaw = (citWeight / total) * 133;
 
-  // Sentiment = tone quality × sqrt(vis) damper
-  // Default to positive when no brand-containing sentences found (neutral = positive)
+  // Sentiment uses ALL mentions (organic + supplemental) — tone is a brand property
   let posMentions = 0;
-  mentioned.forEach((r: any) => {
+  allMentioned.forEach((r: any) => {
     const answerLower = (r.a || '').toLowerCase();
     const brandSents = answerLower.split(/[.!?\n]+/).filter((s: string) => s.length > 5 && hasAlias(s, als));
     if (brandSents.length === 0) { posMentions++; return; }
     if (!brandSents.some((s: string) => NEG_WORDS.some(w => s.includes(w)))) posMentions++;
   });
-  const sentRaw = (posMentions / mentionCount) * 100 * Math.sqrt(visRaw / 100);
+  const sentRaw = (posMentions / Math.max(mentionCount, 1)) * 100 * Math.sqrt(visRaw / 100);
 
-  // SOV = brand responses / any-brand responses
+  // SOV uses organic only — share of competitive voice in real consumer queries
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r: any, i: number) => {
     const t = (r.a || '').toLowerCase();
@@ -806,7 +813,8 @@ function computeRaw(
 function scoreAllBrands(
   primaryBrand: string, primaryAls: string[],
   compList: { name: string; url: string }[],
-  organicQA: any[]
+  organicQA: any[],
+  supplementalMap: Record<string, any[]> = {}
 ) {
   const answered = organicQA.filter((r: any) => r && (r.a || '').trim().length > 10);
   const total = answered.length || 1;
@@ -816,7 +824,11 @@ function scoreAllBrands(
     ...compList.map(c => ({ name: c.name, als: aliases(c.name), url: c.url })),
   ];
   const allAlsLists = allBrands.map(b => b.als);
-  const raws = allBrands.map(b => computeRaw(b.name, b.url, b.als, answered, total, allAlsLists));
+  const raws = allBrands.map(b => {
+    // Pass each brand's supplemental QA so low-organic brands get fair visibility/sentiment
+    const supp = supplementalMap[b.name.toLowerCase()] || [];
+    return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
+  });
   const hasMentions = raws.map(r => r.mentionCount > 0);
 
   // Scale each dimension so top brand ≤ 80 — no floors on individual metrics
@@ -1001,23 +1013,31 @@ export async function POST(req: NextRequest) {
     const supplementalQAMap: Record<string, any[]> = {};
 
     const lowDataComps = [...realCompetitors, ...unmentioned.slice(0, 10 - realCompetitors.length)]
-      .filter(c => (mentionCounts[c.toLowerCase()] || 0) < 20);
+      .filter(c => (mentionCounts[c.toLowerCase()] || 0) < 30);
 
     if (lowDataComps.length > 0) {
       await Promise.all(lowDataComps.map(async (comp) => {
         // Only ask sentiment/comparison questions — NOT "what is X known for" or "rank X first"
         // These questions will get honest multi-brand answers where X may or may not appear
+        // Dynamic supplemental questions based on the industry being analysed
+        // These get honest multi-brand answers — comp may or may not appear
+        const industryTopic = lob || industry || 'financial products';
         const compQ = [
-          `How does ${comp} compare to Chase for credit cards?`,
-          `How does ${comp} compare to Capital One credit cards?`,
-          `Is ${comp} or Discover better for cash back?`,
-          `What are the pros and cons of ${comp} credit cards?`,
-          `Is ${comp} credit card worth getting for everyday spending?`,
-          `What do consumers say about ${comp} credit cards overall?`,
-          `How does ${comp} rank among US credit card issuers?`,
-          `Is ${comp} a good choice for a primary credit card?`,
-          `What are common issues with ${comp} credit cards?`,
-          `What do ${comp} cardholders appreciate most?`,
+          `How does ${comp} compare to the top brands for ${industryTopic}?`,
+          `What do consumers say about ${comp} for ${industryTopic}?`,
+          `Is ${comp} a good choice for ${industryTopic}?`,
+          `What are the pros and cons of ${comp} for ${industryTopic}?`,
+          `How does ${comp} rank among US providers for ${industryTopic}?`,
+          `What do ${comp} customers appreciate most about their ${industryTopic}?`,
+          `Is ${comp} recommended by financial experts for ${industryTopic}?`,
+          `What are common complaints about ${comp} ${industryTopic}?`,
+          `How does ${comp} perform compared to Chase and Capital One for ${industryTopic}?`,
+          `Would you recommend ${comp} for ${industryTopic} and why?`,
+          `What makes ${comp} stand out or fall short in ${industryTopic}?`,
+          `How trustworthy is ${comp} for ${industryTopic} according to reviews?`,
+          `What type of customer is ${comp} best suited for in ${industryTopic}?`,
+          `Has ${comp} improved its ${industryTopic} offering in recent years?`,
+          `What do industry analysts say about ${comp} in ${industryTopic}?`,
         ];
         const ql = compQ.map((q, j) => `Q${j + 1}: ${q}`).join('\n\n');
         const lbs = compQ.map((_, j) => `A${j + 1}:`).join('\n');
@@ -1057,7 +1077,7 @@ export async function POST(req: NextRequest) {
       url: domainMap[c.toLowerCase()] || competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g, '')}.com`,
     }));
 
-    const { primaryScores: scores, competitorScores: competitorScoresRaw } = scoreAllBrands(brand, als, compList, organicQA);
+    const { primaryScores: scores, competitorScores: competitorScoresRaw } = scoreAllBrands(brand, als, compList, organicQA, supplementalQAMap);
 
     const sortedCompScores = [...competitorScoresRaw].sort((a, b) => b.GEO - a.GEO);
 
