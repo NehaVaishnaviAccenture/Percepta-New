@@ -702,47 +702,40 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 
 // ─── SCORING ENGINE ──────────────────────────────────────────────────────────
 //
-// ALL METRICS PEER-NORMALISED. ORGANIC QA ONLY. ZERO HARDCODED CEILINGS.
+// PHILOSOPHY: Individual metrics show TRUTH. GEO score floored at 5.
 //
-// APPROACH:
-//   For each metric, compute raw values for all brands in one pass.
-//   Then apply dynamicNorm():
-//     - ceiling = min(top_brand_raw_score, MAX_CAP=80) — data-driven, not hardcoded
-//     - floor   = FLOOR=15 — the only hardcoded value (guarantees readability)
-//     - brands with 0 mentions → score 0 (fall to bottom, not floored)
-//     - brands with mentions but raw=0 (e.g. never ranked first) → get floor
+// Individual metrics are NOT floored — they show the actual computed ratio.
+// If Barclays has 5% visibility and 0% prominence, it shows 5 and 0.
+// That is the honest signal: Barclays barely registers in AI responses.
 //
-//   This means:
-//     In a competitive market where Chase has 80% raw visibility → ceiling=80
-//     In a niche market where top brand has 45% visibility → ceiling=45
-//     The floor of 15 is the ONLY constant — everything else is data-driven.
+// The ONLY normalisation applied:
+//   scaleToMax(): if the top brand's raw score exceeds MAX_CAP (80),
+//   scale the entire set DOWN proportionally so the top brand = 80.
+//   If top brand is already ≤ 80, no scaling — raw values shown as-is.
+//   This prevents Chase from showing 100 visibility when it appears in 80% of queries.
+//
+// GEO is floored at 5 (not 0) so no brand completely disappears from the chart.
 //
 // METRICS:
-//   Visibility   = mentions / relevantCategoryTotal × 100
-//   Prominence   = rank1Count / totalQueries × 100
-//   Citation     = sum(1/pos) / totalQueries × 133
-//   Sentiment    = posMentions/mentions × 100 × sqrt(vis/100)
-//   SOV          = brandResponses / anyBrandResponses × 100
-//   GEO          = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+//   Visibility  = mentions / totalQueries × 100         (honest %, scaled if >80)
+//   Prominence  = rank1Count / totalQueries × 100       (how often named first)
+//   Citation    = sum(1/pos) / totalQueries × 133       (position-weighted frequency)
+//   Sentiment   = posMentions/mentions × sqrt(vis/100)  (tone, damped by reach)
+//   SOV         = brandResponses / anyBrandResponses × 100
+//   GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
-const SCORE_FLOOR = 10;   // minimum score for any brand with real organic data
-const SCORE_MAX_CAP = 80; // maximum any single metric can show (prevents inflated 90s/100s)
+const SCORE_MAX_CAP = 80; // top brand's metric is capped here; others scale proportionally
+const GEO_FLOOR = 5;      // minimum GEO any brand shows (not 0)
 
-function dynamicNorm(rawValues: number[], hasMentions: boolean[]): number[] {
-  // Only consider brands that have organic mentions
+function scaleToMax(rawValues: number[], hasMentions: boolean[]): number[] {
   const activeVals = rawValues.filter((_, i) => hasMentions[i]);
-  if (activeVals.length === 0) return rawValues.map(() => 0);
-
-  const rawMin = Math.min(...activeVals);
+  if (!activeVals.length) return rawValues.map(() => 0);
   const rawMax = Math.max(...activeVals);
-  // Ceiling = top brand's actual raw score, capped at MAX_CAP — never hardcoded
-  const ceiling = Math.min(rawMax, SCORE_MAX_CAP);
-
+  // Only scale down if top brand exceeds cap — never scale up, never floor
+  const scale = rawMax > SCORE_MAX_CAP ? SCORE_MAX_CAP / rawMax : 1.0;
   return rawValues.map((v, i) => {
-    if (!hasMentions[i]) return 0; // no organic data → 0, not floored
-    if (rawMax === rawMin) return Math.round((SCORE_FLOOR + ceiling) / 2);
-    // FLOOR guaranteed for every brand with mentions, regardless of raw value
-    return Math.round(SCORE_FLOOR + (v - rawMin) / (rawMax - rawMin) * (ceiling - SCORE_FLOOR));
+    if (!hasMentions[i]) return 0;
+    return Math.round(v * scale);
   });
 }
 
@@ -772,32 +765,33 @@ function computeRaw(
     return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
   }
 
-  // Visibility: mentions / total query pool (not filtered by category).
-  // Using total gives the honest answer: "GPT named you in X% of all queries run."
-  // Relevant-category filtering was inflating low-data brands by shrinking the denominator.
+  // Visibility = mentions / total query pool (honest percentage)
   const visRaw = Math.min(100, (mentionCount / total) * 100);
 
-  // Position data
+  // Positions
   const positions = mentioned.map((r: any) => position(r.a || '', als, compAls)).filter(p => p > 0);
   const avgPos = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
   const rank1Count = positions.filter(p => p === 1).length;
 
-  // Raw prominence and citation
+  // Prominence = rank1 / total pool
   const promRaw = (rank1Count / total) * 100;
+
+  // Citation = sum(1/pos) / total × 133
   const citWeight = positions.reduce((s, p) => s + 1 / p, 0);
   const citRaw = (citWeight / total) * 133;
 
-  // Sentiment: per-sentence brand check, sqrt(vis) damper, default positive when no brand sentences found
+  // Sentiment = tone quality × sqrt(vis) damper
+  // Default to positive when no brand-containing sentences found (neutral = positive)
   let posMentions = 0;
   mentioned.forEach((r: any) => {
     const answerLower = (r.a || '').toLowerCase();
     const brandSents = answerLower.split(/[.!?\n]+/).filter((s: string) => s.length > 5 && hasAlias(s, als));
-    if (brandSents.length === 0) { posMentions++; return; } // neutral = positive
+    if (brandSents.length === 0) { posMentions++; return; }
     if (!brandSents.some((s: string) => NEG_WORDS.some(w => s.includes(w)))) posMentions++;
   });
   const sentRaw = (posMentions / mentionCount) * 100 * Math.sqrt(visRaw / 100);
 
-  // SOV
+  // SOV = brand responses / any-brand responses
   const brandSet = new Set<number>(), anySet = new Set<number>();
   answered.forEach((r: any, i: number) => {
     const t = (r.a || '').toLowerCase();
@@ -825,17 +819,18 @@ function scoreAllBrands(
   const raws = allBrands.map(b => computeRaw(b.name, b.url, b.als, answered, total, allAlsLists));
   const hasMentions = raws.map(r => r.mentionCount > 0);
 
-  // Normalise all 5 dimensions dynamically — ceiling = top brand's raw score (≤80)
-  const visNorm  = dynamicNorm(raws.map(r => r.visRaw),  hasMentions);
-  const promNorm = dynamicNorm(raws.map(r => r.promRaw), hasMentions);
-  const citNorm  = dynamicNorm(raws.map(r => r.citRaw),  hasMentions);
-  const sentNorm = dynamicNorm(raws.map(r => r.sentRaw), hasMentions);
-  const sovNorm  = dynamicNorm(raws.map(r => r.sovRaw),  hasMentions);
+  // Scale each dimension so top brand ≤ 80 — no floors on individual metrics
+  const visN  = scaleToMax(raws.map(r => r.visRaw),  hasMentions);
+  const promN = scaleToMax(raws.map(r => r.promRaw), hasMentions);
+  const citN  = scaleToMax(raws.map(r => r.citRaw),  hasMentions);
+  const sentN = scaleToMax(raws.map(r => r.sentRaw), hasMentions);
+  const sovN  = scaleToMax(raws.map(r => r.sovRaw),  hasMentions);
 
   function buildScore(i: number) {
-    const vis  = visNorm[i],  prom = promNorm[i], cit  = citNorm[i];
-    const sent = sentNorm[i], sov  = sovNorm[i];
-    const geo  = Math.min(100, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15));
+    const vis  = visN[i],  prom = promN[i], cit  = citN[i];
+    const sent = sentN[i], sov  = sovN[i];
+    const geoRaw = Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15);
+    const geo = Math.max(GEO_FLOOR, geoRaw); // GEO floor only — individual metrics unchanged
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: raws[i].avgPos, mentionCount: raws[i].mentionCount, totalCount: raws[i].totalCount };
   }
 
