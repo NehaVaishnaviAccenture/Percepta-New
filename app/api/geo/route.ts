@@ -151,7 +151,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nAnalyse what SPECIFIC product this URL is about (e.g. premium travel card, cash back card, checking account). Return:\n{"brand_name":"parent brand with proper spacing","industry":"industry for THIS URL","industry_key":"snake_case","lob":"specific product category on this page e.g. premium travel credit cards","competitors":["exactly 10 brands that AI models name when consumers ask about THIS SPECIFIC product category — competitors who actually compete in the same product space, not just the same broad industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent queries specific to this exact product category"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nYou are a brand intelligence analyst. Analyse this URL and identify what SPECIFIC financial product category this page represents.\n\nIf the URL is a brand homepage (e.g. americanexpress.com, chase.com), identify what the brand is MOST KNOWN FOR in credit cards or banking (e.g. American Express = premium travel cards, Chase = travel rewards, Citi = cash back, Discover = cash back, Capital One = travel rewards).\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"credit cards or banking or savings","industry_key":"snake_case e.g. credit_cards","lob":"the most specific product category e.g. premium travel credit cards OR cash back credit cards OR travel rewards credit cards","competitors":["exactly 10 brands that directly compete in THIS specific product category — brands AI recommends when asked about this specific product, not just the same broad industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas for this specific product"],"categories":["10 consumer intent questions specific to this product category"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     const knownBrands: Record<string, string> = {
@@ -925,14 +925,14 @@ function scoreAllBrands(
     const sovShare = (r.sovRaw / totalAllMentions) * 100;
 
     // Apply cap then floor: cap(raw, 80) then max(result, 10) if brand has data
-    const floor = (v: number) => v > 0 ? Math.max(MIN_IF_DATA, Math.min(CAP, Math.round(v))) : 0;
+    const floor = (v: number) => Math.max(MIN_IF_DATA, Math.min(CAP, Math.round(v)));
     const capOnly = (v: number) => Math.min(CAP, Math.round(v));
 
-    const vis  = capOnly(r.visRaw);           // visibility: true %, no floor (0 is valid if no mentions)
-    const prom = capOnly(r.promRaw);           // prominence: 0 is valid (never named first)
-    const cit  = floor(r.citRaw);             // citation: floor 10 if has data
-    const sent = floor(r.sentRaw);            // sentiment: floor 10 if has data
-    const sov  = floor(sovShare);             // SOV: floor 10 if has data
+    const vis  = capOnly(r.visRaw);   // true % — can be low for niche brands
+    const prom = floor(r.promRaw);    // floored: even brands never named first show 10
+    const cit  = floor(r.citRaw);     // floored
+    const sent = floor(r.sentRaw);    // floored
+    const sov  = floor(sovShare);     // floored
 
     const geoRaw = Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15);
     const geo = Math.max(GEO_FLOOR, geoRaw);
