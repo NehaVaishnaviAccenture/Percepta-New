@@ -46,6 +46,8 @@ function hasAlias(text: string, aliases: string[]): boolean {
 function aliases(brand: string): string[] {
   const bl = brand.toLowerCase().trim();
   const set = new Set<string>([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
+
+  // Known brand normalisations (concatenated → spaced)
   const known: Record<string, string> = {
     'americanexpress': 'american express',
     'bankofamerica': 'bank of america',
@@ -56,7 +58,33 @@ function aliases(brand: string): string[] {
   };
   const key = bl.replace(/\s+/g, '').replace(/[^a-z]/g, '');
   if (known[key]) { set.add(known[key]); set.add(known[key].replace(/\s+/g, '')); }
-  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 6 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+
+  // Known short abbreviations — GPT often uses these without the full name
+  // Controlled short-form aliases — only add ones that are unambiguous
+  const abbrevs: Record<string, string[]> = {
+    'pnc bank': ['pnc'],
+    'pnc': ['pnc'],
+    'usaa': ['usaa'],
+    'hsbc': ['hsbc'],
+    'u.s. bank': ['us bank', 'usbank'],
+    'navy federal': ['navy federal', 'navyfederal', 'navy fed'],
+    'american express': ['amex'],
+    'bank of america': ['bofa', 'bankofamerica'],
+    'wells fargo': ['wellsfargo'],
+    'synchrony': ['synchrony'],
+    'goldman sachs': ['goldman sachs', 'marcus'],
+  };
+  const abbrevKey = bl.replace(/[^a-z\s]/g, '').trim();
+  (abbrevs[abbrevKey] || abbrevs[bl] || []).forEach(a => set.add(a.toLowerCase()));
+
+  // Split on common separators and add meaningful words (≥5 chars, not skip words)
+  // Short brand names like 'amex', 'pnc', 'citi' are handled via the abbrevs map above
+  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 5 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+
+  // Also add the full string without punctuation for brands like "U.S. Bank"
+  const noPunct = bl.replace(/[^a-z0-9\s]/g, '').trim();
+  if (noPunct && noPunct !== bl) set.add(noPunct);
+
   return [...set].filter((a: string) => a.length >= 3);
 }
 
@@ -758,7 +786,9 @@ function computeRaw(
   allAlsLists: string[][],
   supplemental: any[] = []   // extra brand-specific QA — counted for vis/sent, NOT prom/SOV
 ): RawBrand {
-  const compAls = allAlsLists.filter(al => al !== als);
+  // Use first-alias string comparison (not reference equality) to exclude self
+  const selfKey = als[0];
+  const compAls = allAlsLists.filter(al => al[0] !== selfKey);
 
   // Organic mentions — used for prominence, citation, SOV (denominator = organic total)
   const organicMentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
@@ -941,7 +971,7 @@ export async function POST(req: NextRequest) {
       const raw = await ai([
         { role: 'system', content: `You are a consumer finance expert. For every question name exactly 4 specific real brands. Always include the most well-known national leaders in the category alongside the best specific fit for the question. Vary which brands you lead with based on what each question asks. 2 sentences per answer.` },
         { role: 'user', content: `Answer each question by naming exactly 4 real brands. Include the top nationally recognized brands plus any specialist that fits best.\n\n${ql}\n\nFormat:\n${lbs}` },
-      ], 0.1, 4000, 2);
+      ], 0, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
       batch.forEach((q, j) => { organicQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
     }));
