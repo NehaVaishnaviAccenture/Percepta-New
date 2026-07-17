@@ -612,8 +612,10 @@ const SAVINGS_ACCOUNT_QUERIES: { category: string; query: string; stage: string 
 type IndustryType = 'credit_cards' | 'retail_banking' | 'savings' | 'other';
 type ProductCategory = 'cash_back' | 'travel' | 'premium' | 'balance_transfer' | 'no_annual_fee' | 'business' | 'student' | 'credit_building' | 'high_yield' | 'checking' | 'cd' | 'money_market' | 'general';
 
-function detectIndustry(industryKey: string, lob: string, urlPath: string): { industry: IndustryType; product: ProductCategory } {
+function detectIndustry(industryKey: string, lob: string, urlPath: string, brand: string = ''): { industry: IndustryType; product: ProductCategory } {
   const k = (industryKey + ' ' + lob + ' ' + urlPath).toLowerCase();
+  const b = brand.toLowerCase();
+
   let industry: IndustryType = 'other';
   if (k.includes('credit_card') || k.includes('credit card') || k.includes('credit-card')) industry = 'credit_cards';
   else if (k.includes('savings') || k.includes('hysa') || k.includes('high-yield') || k.includes('high yield') || k.includes('money market') || k.includes('money-market') || k.includes('cd ') || k.includes('certificate')) industry = 'savings';
@@ -629,6 +631,31 @@ function detectIndustry(industryKey: string, lob: string, urlPath: string): { in
     else if (k.includes('business') || k.includes('corporate') || k.includes('ink ') || k.includes('spark')) product = 'business';
     else if (k.includes('student') || k.includes('college') || k.includes('university')) product = 'student';
     else if (k.includes('secured') || k.includes('credit builder') || k.includes('credit-builder') || k.includes('rebuild')) product = 'credit_building';
+
+    // Brand homepage fallback: if product still 'general', use brand's known strength
+    // This ensures amex.com gets premium/travel queries, not cash-back queries
+    if (product === 'general') {
+      const BRAND_STRENGTHS: Record<string, ProductCategory> = {
+        'american express': 'premium',
+        'amex': 'premium',
+        'chase': 'travel',
+        'capital one': 'travel',
+        'discover': 'cash_back',
+        'citi': 'cash_back',
+        'citibank': 'cash_back',
+        'bank of america': 'cash_back',
+        'wells fargo': 'cash_back',
+        'us bank': 'cash_back',
+        'barclays': 'travel',
+        'synchrony': 'no_annual_fee',
+        'navy federal': 'cash_back',
+        'pnc': 'cash_back',
+        'usaa': 'cash_back',
+      };
+      for (const [brandKey, strength] of Object.entries(BRAND_STRENGTHS)) {
+        if (b.includes(brandKey)) { product = strength; break; }
+      }
+    }
   } else if (industry === 'savings') {
     if (k.includes('high yield') || k.includes('high-yield') || k.includes('hysa')) product = 'high_yield';
     else if (k.includes('cd') || k.includes('certificate')) product = 'cd';
@@ -952,7 +979,7 @@ export async function POST(req: NextRequest) {
     const { brand, industry, industryKey, lob, personas, competitors, competitorUrls, categories } = d;
     const als = aliases(brand);
 
-    const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '');
+    const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '', brand);
     const [queries, citRaw, trendRaw] = await Promise.all([
       industryType !== 'other'
         ? Promise.resolve(getCuratedQueries(industryType, productType, MAX))
