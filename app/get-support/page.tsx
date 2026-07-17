@@ -32,8 +32,8 @@ const WS_LEFT = [
 ];
 
 const WS_RIGHT = [
-  { ws: 'Workstream 3', title: 'Distribution and Technical Influence Layer (DTI)', desc: 'Pinpoint and <strong>propose specific technical and distribution improvements</strong> to maximize LLM ingestion.' },
   { ws: 'Workstream 2', title: 'Agent Optimization Plan (AOP)', desc: '<strong>Design and deploy a specific optimization strategy</strong> aimed at elevating agent recognition of your brand.' },
+  { ws: 'Workstream 3', title: 'Distribution and Technical Influence Layer (DTI)', desc: 'Pinpoint and <strong>propose specific technical and distribution improvements</strong> to maximize LLM ingestion.' },
 ];
 
 const stats = [
@@ -87,11 +87,10 @@ export default function GetSupport() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <div id="gs-workstreams-diagram" className="gsWorkstreamsDiagram">
             <img
-              id="gs-infinity-img"
+              id="gs-circle-arrows-img"
               className="gsInfinityImg"
-              src="/infinity.png"
-              alt="Infinity diagram showing the four workstreams"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              src="/circle-arrows.svg"
+              alt="Circle diagram showing the four workstreams"
             />
           </div>
 

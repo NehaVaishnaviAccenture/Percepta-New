@@ -33,7 +33,7 @@
 
 .gsHeroTitle {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 2.8rem;
+  font-size: clamp(1.75rem, 6vw, 2.8rem);
   font-weight: 500;
   color: white;
   margin: 0 0 14px;
@@ -62,7 +62,7 @@
 
 .gsApproachTitle {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 34px;
+  font-size: clamp(22px, 4vw, 34px);
   font-weight: 700;
   color: #0A0A0A;
   margin: 0 0 10px;
@@ -164,7 +164,7 @@
 
 .gsStatNum {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 3.2rem;
+  font-size: clamp(2rem, 7vw, 3.2rem);
   font-weight: 700;
   color: #0A0A0A;
   line-height: 1;
@@ -197,7 +197,7 @@
 
 .gsDeliverablesTitle {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 34px;
+  font-size: clamp(22px, 4vw, 34px);
   font-weight: 700;
   color: #0A0A0A;
   margin: 0;
@@ -300,7 +300,7 @@
 
 .gsPilotsTitle {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 34px;
+  font-size: clamp(22px, 4vw, 34px);
   font-weight: 700;
   color: #0A0A0A;
   margin: 0 0 6px;
@@ -355,7 +355,7 @@
 
 .gsPilotWeeks {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 3rem;
+  font-size: clamp(2rem, 6vw, 3rem);
   font-weight: 700;
   color: #0A0A0A;
   line-height: 1;
@@ -520,10 +520,20 @@
   }
 
   .gsPilots { padding: 40px 20px; }
-  .gsPilotsTitle { font-size: 26px; }
   .gsPilotsGrid { grid-template-columns: 1fr; }
   .gsPilotCard--recommended { margin-top: 20px; }
 
   .gsResults { padding: 40px 20px; }
   .gsResultsTitle { font-size: 1.6rem; }
+
+  /* ── Font-size overrides ─────────────────────────────────── */
+  .gsHeroBody        { font-size: 0.92rem; }
+  .gsApproachBody    { font-size: 0.88rem; }
+  .gsWsLabel         { font-size: 0.88rem; }
+  .gsWsTitle         { font-size: 0.82rem; }
+  .gsStatLabel       { font-size: 0.88rem; }
+  .gsStatSub         { font-size: 0.78rem; }
+  .gsPilotWeeksLabel { font-size: 0.88rem; }
+  .gsPilotItem       { font-size: 0.82rem; }
+  .gsResultsBody     { font-size: 0.88rem; }
 }

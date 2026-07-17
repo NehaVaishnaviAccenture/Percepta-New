@@ -67,7 +67,7 @@
 .ovScoreNumber {
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 88px;
+  font-size: clamp(48px, 10vw, 88px);
   line-height: 0.95;
   letter-spacing: -0.04em;
   color: var(--color-ink);
@@ -82,7 +82,7 @@
 .ovScoreTier {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 28px;
+  font-size: clamp(18px, 3.5vw, 28px);
   letter-spacing: -0.01em;
   line-height: 1.1;
   /* color is dynamic (tier.text) — applied inline */
@@ -314,6 +314,18 @@
     flex-direction: column;
     gap: 10px;
   }
+
+  /* ── Global tab font-size floor ─────────────────────────── */
+  .ovTeaserHeadline        { font-size: 14px; }
+  .ovActionsTitle          { font-size: 13px; }
+  .ovActionCardTitle       { font-size: 14px; }
+  .ovActionCardDesc        { font-size: 12px; }
+  .cbtStatValue,
+  .cbtStatValueInk         { font-size: 18px; }
+  .gsoInterpText           { font-size: 14px; }
+  .gsoRankText             { font-size: 13px; }
+  .tabBtn                  { font-size: 14px; padding: 11px 10px; }
+  .subtabBtn               { font-size: 12px; padding: 4px 8px; }
 }
 
 
@@ -369,7 +381,7 @@
 .gsoHeroHeadline {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: clamp(18px, 3.5vw, 26px);
   font-weight: 700;
   line-height: 1.25;
   color: var(--color-ink, #0F0F11);
@@ -490,7 +502,7 @@
 .gsoScoreNumber {
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 88px;
+  font-size: clamp(48px, 10vw, 88px);
   line-height: 0.95;
   letter-spacing: -0.04em;
   color: var(--color-ink);
@@ -499,7 +511,7 @@
 .gsoScoreTierLabel {
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 22px;
+  font-size: clamp(16px, 3vw, 22px);
   letter-spacing: -0.01em;
   /* color is dynamic (tier color) — applied inline */
 }
