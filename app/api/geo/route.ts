@@ -725,7 +725,7 @@ async function genAIQueries(lob: string, industry: string, cats: string[], total
 //   SOV          = brandResponses / anyBrandResponses × 100
 //   GEO          = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
 
-const SCORE_FLOOR = 15;   // minimum score for any brand with real organic data
+const SCORE_FLOOR = 10;   // minimum score for any brand with real organic data
 const SCORE_MAX_CAP = 80; // maximum any single metric can show (prevents inflated 90s/100s)
 
 function dynamicNorm(rawValues: number[], hasMentions: boolean[]): number[] {
@@ -772,12 +772,10 @@ function computeRaw(
     return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0 };
   }
 
-  // Visibility: relevant categories only
-  const brandCats = new Set(mentioned.map((r: any) => r.category).filter(Boolean));
-  const relevantTotal = brandCats.size > 0
-    ? answered.filter((r: any) => brandCats.has(r.category)).length
-    : total;
-  const visRaw = Math.min(100, (mentionCount / (relevantTotal || 1)) * 100);
+  // Visibility: mentions / total query pool (not filtered by category).
+  // Using total gives the honest answer: "GPT named you in X% of all queries run."
+  // Relevant-category filtering was inflating low-data brands by shrinking the denominator.
+  const visRaw = Math.min(100, (mentionCount / total) * 100);
 
   // Position data
   const positions = mentioned.map((r: any) => position(r.a || '', als, compAls)).filter(p => p > 0);
