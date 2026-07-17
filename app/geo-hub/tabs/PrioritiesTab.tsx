@@ -608,7 +608,7 @@ export default function PrioritiesTab({ result, playbookActions }: TabProps) {
 
   const brand      = result.brand_name || 'Your brand';
   const visibility = result.visibility ?? 0;
-  const totalQA    = (result.responses_detail || []).length;
+  const totalQA    = result.total_responses ?? (result.responses_detail || []).length;
 
   const pbTotal     = playbookActions?.length ?? 0;
   const pbHigh      = playbookActions?.filter(a => a.priority === 'High').length ?? 0;

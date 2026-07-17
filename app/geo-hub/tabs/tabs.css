@@ -309,6 +309,13 @@
   line-height: 1;
 }
 
+@media (max-width: 640px) {
+  .ovTeasers {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
 
 /* ── GeoScoreTab ── */
 
@@ -1655,18 +1662,6 @@
   white-space: nowrap;
 }
 
-.cmpCardLinkBtn {
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-brand-link-under);
-  padding: 0 0 1px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-brand-dark);
-  white-space: nowrap;
-}
-
 /* ── Rank pillar content ─────────────────────────────────────── */
 .cmpRankRow {
   display: flex;
@@ -2257,7 +2252,7 @@
 
 .cbtRadarSvgWrap {
   flex-shrink: 0;
-  padding: 0 48px;
+  width: 420px;
 }
 
 .cbtRadarSide {
@@ -2538,18 +2533,6 @@
   color: var(--color-brand);
 }
 
-.cbtFocusActionBtn {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-brand-dark);
-  background: none;
-  border: none;
-  border-bottom: 1px solid var(--color-brand-link-under);
-  padding-bottom: 1px;
-  cursor: pointer;
-  font-family: inherit;
-  line-height: 1.4;
-}
 
 .cbtFocusContent {
   font-family: var(--font-display);
@@ -2567,6 +2550,61 @@
   color: var(--color-text-muted);
   line-height: 1.55;
   letter-spacing: 0;
+}
+
+/* ── CompetitorsByTopicTab — scroll wrapper ─────────────────── */
+/* TODO: the heatmap is left as-is for mobile for now (horizontal scroll).
+   Consider replacing it with a per-topic sorted list on small screens. */
+.cbtHeatmapScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cbtHeatmapStatusTouch { display: none; }
+
+/* ── CompetitorsByTopicTab — responsive ─────────────────────── */
+@media (max-width: 768px) {
+  .cbtCard,
+  .cbtBridge,
+  .cbtFocusCard {
+    padding: 18px 16px;
+  }
+
+  .cbtRadarWrap {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+  }
+
+  .cbtRadarSvgWrap {
+    padding: 0;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .cbtBridge {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .cbtHeatmapStatusHover { display: none; }
+  .cbtHeatmapStatusTouch { display: block; }
+
+  .cbtBridgeStat {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .cbtStatLabel {
+    width: 100%;
+  }
+
+  .cbtHeatmapGrid {
+    min-width: 480px;
+  }
 }
 
 /* ── PromptsTestedTab ── */
@@ -5518,6 +5556,7 @@
   .pb-block-head { padding: 18px 16px 14px; }
   .pb-board-toggle { padding: 0 16px; }
   .pb-board-note { padding: 14px 16px 16px; }
+  .pb-board-footer { flex-direction: column; align-items: flex-start; padding: 14px 16px 16px; }
   .pb-av-card { padding: 20px 18px; }
   .pb-av-prio-strip--pinned { top: 18px; right: 16px; }
   .pb-rail-fields { grid-template-columns: 1fr; gap: 14px; }
@@ -5568,7 +5607,6 @@
   font-size: 16px;
   letter-spacing: -0.01em;
   color: #0A0A0A;
-  white-space: nowrap;
 }
 
 .geoExplainerHint {
@@ -5587,6 +5625,10 @@
   color: var(--color-brand);
   margin-right: 6px;
   white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .geoExplainerLearnMore { display: none; }
 }
 
 .geoExplainerChev {
@@ -5938,6 +5980,86 @@
 .aiPresLegendDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
 .aiPresLegendLine { display: inline-block; width: 20px; height: 2px; background: #C4B5FD; flex-shrink: 0; border-radius: 1px; }
 .aiPresLegendItemMuted { color: #9CA3AF; margin-left: auto;  }
+
+/* ── Scatter → mobile list ─────────────────────────────────── */
+.scatterList {
+  border: 1px solid var(--color-card-border);
+  overflow: hidden;
+}
+.scatterListHeader {
+  display: grid;
+  grid-template-columns: 24px 1fr 40px 40px 40px;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #F5F5F5;
+  border-bottom: 1px solid var(--color-card-border);
+}
+.scatterListColBrand {
+  grid-column: 2;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8E8E8E;
+}
+.scatterListColStat {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8E8E8E;
+  text-align: right;
+}
+.scatterListRow {
+  display: grid;
+  grid-template-columns: 24px 1fr 40px 40px 40px;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #F2F2F2;
+}
+.scatterListRow:last-child { border-bottom: 0; }
+.scatterListRow--you {
+  background: rgba(161, 0, 255, 0.04);
+  border-left: 2px solid #A100FF;
+  padding-left: 12px;
+}
+.scatterListRank {
+  font-size: 11px;
+  color: #B8B8B8;
+  font-variant-numeric: tabular-nums;
+}
+.scatterListBrand {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0A0A0A;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scatterListRow--you .scatterListBrand { font-weight: 700; color: #0A0A0A; }
+.scatterListYouTag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #A100FF;
+  background: rgba(161, 0, 255, 0.1);
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+.scatterListStat {
+  font-size: 13px;
+  font-weight: 500;
+  color: #4A4A4A;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.scatterListRow--you .scatterListStat { color: #A100FF; font-weight: 600; }
 
 /* Competitor filter dropdown */
 .compFilterWrap { position: relative; flex-shrink: 0; }
