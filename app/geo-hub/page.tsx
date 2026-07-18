@@ -1,705 +1,775 @@
-// v2.17.0: adjusted node colors, 10 instead of 11, adjusting headers & page widths, removed trends, redid geo score
-
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-function isValidUrl(u: string): boolean {
-  if (!u) return false;
-  try {
-    const parsed = new URL(u);
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname.includes('.');
-  } catch { return false; }
-}
-
-const BANK_KEYWORDS = ['bank','credit','savings','financial','finance','fcu','cu','federal','lending','loan','mortgage','wealth','invest','capital','citi','chase','wellsfargo','bofa','usaa','penfed','navy'];
-function isBankUrl(u: string): boolean {
-  if (!u) return false;
-  try {
-    const host = new URL(u).hostname.toLowerCase().replace(/^www\./, '');
-    return BANK_KEYWORDS.some(k => host.includes(k));
-  } catch { return false; }
-}
-const BANK_SCOPES = ['Credit Cards', 'Savings Accounts'];
-import Link from 'next/link';
-import Sidebar from './Sidebar';
-import GeoScoreTab from './tabs/GeoScoreTab';
-import AiPresenceTab from './tabs/AiPresenceTab';
-import ReachTab from './tabs/ReachTab';
-import CompetitorsTab from './tabs/CompetitorsTab';
-import CompetitorsByTopicTab from './tabs/CompetitorsByTopicTab';
-import PromptsTestedTab from './tabs/PromptsTestedTab';
-import PromptsLiveTab from './tabs/PromptsLiveTab';
-
-import PrioritiesTab from './tabs/PrioritiesTab';
-import { scoreBadge } from './lib/tiers';
-
-
-
-const TOP_TABS = [
-  {label:'Overview',subs:['GEO Score','AI Presence','Reach']},
-  {label:'Competitors',subs:['Overall','By Topic']},
-  {label:'Prompts',subs:['Tested Prompts','Live Prompt']},
-  {label:'Priorities',subs:[]},
+const bands = [
+  { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
+  { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70–79', label: 'Good', desc: 'Minor improvements recommended' },
+  { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45–69', label: 'Needs Work', desc: 'Several issues to address' },
+  { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
 ];
 
-export default function GeoHub() {
-  const [url,setUrl]=useState('');
-  const [loading,setLoading]=useState(false);
-  const [loadingStep,setLoadingStep]=useState(0);
-  const [loadingProgress,setLoadingProgress]=useState(0);
-  const [result,setResult]=useState<any>(null);
-  const [error,setError]=useState('');
-  const [activeParent,setActiveParent]=useState(0);
-  const [activeSub,setActiveSub]=useState(0);
-  const [hoverParent,setHoverParent]=useState<number|null>(null);
-  const hoverTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const promptCount = 300;
-  const [d3ScopeSelected,setD3ScopeSelected]=useState('');
-  const [d3ShowCustomScope,setD3ShowCustomScope]=useState(false);
-  const [d3CustomScope,setD3CustomScope]=useState('');
-  const [detectedScopes,setDetectedScopes]=useState<string[]>([]);
-  const [scopeDetecting,setScopeDetecting]=useState(false);
-  const scopeDebounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
-  const [elapsedSec,setElapsedSec]=useState(0);
-  const [analysisError,setAnalysisError]=useState<{title:string;code:string;message:string;reduceDesc:string}|null>(null);
-  const [playbookActions,setPlaybookActions]=useState<any[]|null>(null);
-  const [livePromptQuery,setLivePromptQuery]=useState('');
-  const [livePromptHistory,setLivePromptHistory]=useState<{q:string;a:string}[]>([]);
+const METRIC_TIPS: Record<string, string> = {
+  'Visibility Score': 'How many of 20 generic AI queries mentioned your brand.',
+  'Citation Score': 'How authoritatively your brand was cited across AI responses.',
+  'Sentiment Score': 'The tone and favorability of AI responses when your brand appeared.',
+  'Prominence Score': 'How early in AI responses your brand was mentioned.',
+  'Share of Voice': 'Your brand mentions as a percentage of all brand mentions in AI responses.',
+  'Avg. Rank': 'The average position your brand appeared across all AI responses.',
+};
 
-  // Restore report from session storage on mount — actions are stored with the result.
-  useEffect(()=>{try{const saved=sessionStorage.getItem('geo_result'),savedUrl=sessionStorage.getItem('geo_url');if(saved){const parsed=JSON.parse(saved);setResult(parsed);setPlaybookActions(Array.isArray(parsed.actions)&&parsed.actions.length>0?parsed.actions:null);}if(savedUrl)setUrl(savedUrl);}catch{}},[]);
-  useEffect(()=>{if(loading){setElapsedSec(0);const t=setInterval(()=>setElapsedSec(s=>s+1),1000);return()=>clearInterval(t);}}, [loading]);
+function scoreBadge(score: number) {
+  if (score >= 80) return { label: 'Excellent', color: '#065F46', bg: '#D1FAE5' };
+  if (score >= 70) return { label: 'Good', color: '#1E40AF', bg: '#DBEAFE' };
+  if (score >= 45) return { label: 'Needs Work', color: '#92400E', bg: '#FEF3C7' };
+  return { label: 'Poor', color: '#991B1B', bg: '#FEE2E2' };
+}
 
-  // Scope detection: fires when url becomes valid; debounced 700ms
-  useEffect(()=>{
-    if(!isValidUrl(url)){
-      setDetectedScopes([]);
-      setD3ScopeSelected('');
-      setD3ShowCustomScope(false);
-      setD3CustomScope('');
-      setScopeDetecting(false);
-      if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
-      return;
-    }
-    setScopeDetecting(true);
-    setDetectedScopes([]);
-    setD3ScopeSelected('');
-    setD3ShowCustomScope(false);
-    setD3CustomScope('');
-    if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
-    scopeDebounceRef.current=setTimeout(async()=>{
-      try{
-        const res=await fetch('/api/detect-scope',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
-        const data=await res.json();
-        if(data.scopes&&Array.isArray(data.scopes)) setDetectedScopes(data.scopes);
-      }catch{}
-      setScopeDetecting(false);
-    },700);
-    return()=>{if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);};
-  },[url]);
+function classifyDomain(d: string) {
+  const dl = d.toLowerCase();
+  if (['reddit','twitter','youtube','facebook','instagram','tiktok','linkedin'].some(s => dl.includes(s))) return { label: 'Social', color: '#7C3AED', bg: '#EDE9FE' };
+  if (['wikipedia','gov','edu','consumerreports','bbb.org','federalreserve','fdic'].some(s => dl.includes(s))) return { label: 'Institution', color: '#1E40AF', bg: '#DBEAFE' };
+  if (['nerdwallet','forbes','bankrate','creditkarma','cnbc','wsj','nytimes','bloomberg','businessinsider','investopedia','motleyfool','motortrend','caranddriver','edmunds','reuters'].some(s => dl.includes(s))) return { label: 'Earned Media', color: '#065F46', bg: '#D1FAE5' };
+  return { label: 'Other', color: '#374151', bg: '#F3F4F6' };
+}
 
+const TABS = ['GEO Score', 'Competitors', 'Visibility', 'Sentiment', 'Citations', 'Prompts', 'Recommendations', 'Live Prompt'];
 
-  async function runAnalysis(){
-    const effectiveScope=d3ScopeSelected==='+ Custom'?d3CustomScope.trim():d3ScopeSelected;
-    if(!isValidUrl(url)){setError('Please enter a valid URL (e.g. citi.com)');return;}
-    if(!effectiveScope){setError('Please select a scope before running the analysis.');return;}
-    setError('');setAnalysisError(null);setLoading(true);setLoadingStep(0);setLoadingProgress(0);
-    const steps = [
-      { step: 0, progress: 5, delay: 200 },
-      { step: 1, progress: 15, delay: 2000 },
-      { step: 2, progress: 28, delay: 4000 },
-      { step: 3, progress: 42, delay: 6000 },
-      { step: 4, progress: 58, delay: 8000 },
-      { step: 5, progress: 72, delay: 10000 },
-      { step: 6, progress: 84, delay: 12000 },
-      { step: 7, progress: 93, delay: 14000 },
-    ];
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    steps.forEach(({step,progress,delay})=>{
-      timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));
+// Tooltip component
+function Tooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 6, cursor: 'help' }}
+      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
+      <span style={{
+        width: 16, height: 16, borderRadius: '50%', background: '#E5E7EB',
+        color: '#6B7280', fontSize: '0.65rem', fontWeight: 700,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      }}>?</span>
+      {show && (
+        <span style={{
+          position: 'absolute', bottom: '130%', left: '50%', transform: 'translateX(-50%)',
+          background: '#1F2937', color: 'white', fontSize: '0.75rem', lineHeight: 1.5,
+          borderRadius: 8, padding: '10px 14px', width: 220, textAlign: 'left',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)', zIndex: 9999, pointerEvents: 'none',
+          whiteSpace: 'normal',
+        }}>
+          {text}
+          <span style={{
+            position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)',
+            borderWidth: 6, borderStyle: 'solid', borderColor: '#1F2937 transparent transparent transparent',
+          }} />
+        </span>
+      )}
+    </span>
+  );
+}
+
+// Metric card
+function MetricCard({ label, val, sub, color = '#7C3AED' }: { label: string; val: any; sub: string; color?: string }) {
+  return (
+    <div style={{ background: 'white', borderRadius: 10, padding: '18px 16px', border: '1px solid #E5E7EB' }}>
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: '0.7rem', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.08em', textTransform: 'uppercase' as const, marginBottom: 6 }}>
+        {label}
+        {METRIC_TIPS[label] && <Tooltip text={METRIC_TIPS[label]} />}
+      </div>
+      <div style={{ fontSize: '1.8rem', fontWeight: 800, color, lineHeight: 1 }}>{val}</div>
+      <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 3 }}>{sub}</div>
+    </div>
+  );
+}
+
+// Gauge component
+function GeoGauge({ score, brand }: { score: number; brand: string }) {
+  const badge = scoreBadge(score);
+  const r = 80;
+  const cx = 110, cy = 105;
+  const startAngle = Math.PI;
+  const endAngle = 0;
+  const totalArc = Math.PI;
+  const scoreAngle = startAngle - (score / 100) * totalArc;
+
+  const polarToCartesian = (angle: number, radius: number) => ({
+    x: cx + radius * Math.cos(angle),
+    y: cy - radius * Math.sin(angle),
+  });
+
+  const describeArc = (start: number, end: number, radius: number) => {
+    const s = polarToCartesian(start, radius);
+    const e = polarToCartesian(end, radius);
+    const large = Math.abs(start - end) > Math.PI ? 1 : 0;
+    return `M ${s.x} ${s.y} A ${radius} ${radius} 0 ${large} 1 ${e.x} ${e.y}`;
+  };
+
+  const zones = [
+    { start: Math.PI, end: Math.PI * (1 - 0.44), color: '#FEE2E2' },
+    { start: Math.PI * (1 - 0.44), end: Math.PI * (1 - 0.69), color: '#FEF3C7' },
+    { start: Math.PI * (1 - 0.69), end: Math.PI * (1 - 0.79), color: '#DBEAFE' },
+    { start: Math.PI * (1 - 0.79), end: 0, color: '#D1FAE5' },
+  ];
+
+  const needle = polarToCartesian(scoreAngle, r - 10);
+
+  return (
+    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: 24, textAlign: 'center' }}>
+      <svg viewBox="0 0 220 120" style={{ width: '100%', maxWidth: 260, margin: '0 auto', display: 'block', overflow: 'visible' }}>
+        {/* Background track */}
+        <path d={describeArc(Math.PI, 0, r)} fill="none" stroke="#F3F4F6" strokeWidth="18" strokeLinecap="butt" />
+        {/* Color zones */}
+        {zones.map((z, i) => (
+          <path key={i} d={describeArc(z.start, z.end, r)} fill="none" stroke={z.color} strokeWidth="18" strokeLinecap="butt" />
+        ))}
+        {/* Score arc overlay */}
+        <path d={describeArc(Math.PI, scoreAngle, r)} fill="none" stroke="#7C3AED" strokeWidth="14" strokeLinecap="round" />
+        {/* Needle */}
+        <line
+          x1={cx} y1={cy}
+          x2={needle.x} y2={needle.y}
+          stroke="#374151" strokeWidth="2.5" strokeLinecap="round"
+        />
+        <circle cx={cx} cy={cy} r="5" fill="#374151" />
+        {/* Score text */}
+        <text x={cx} y={cy - 18} textAnchor="middle" style={{ fontSize: 28, fontWeight: 900, fill: '#7C3AED', fontFamily: 'Inter, sans-serif' }}>{score}</text>
+        <text x={cx} y={cy - 4} textAnchor="middle" style={{ fontSize: 9, fill: '#9CA3AF', fontFamily: 'Inter, sans-serif' }}>out of 100</text>
+        {/* Zone labels */}
+        <text x="18" y="108" style={{ fontSize: 7, fill: '#991B1B', fontFamily: 'Inter, sans-serif' }}>Poor</text>
+        <text x="185" y="108" style={{ fontSize: 7, fill: '#065F46', fontFamily: 'Inter, sans-serif' }}>Excellent</text>
+      </svg>
+      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#374151', marginBottom: 8 }}>{brand}</div>
+      <span style={{ background: badge.bg, color: badge.color, borderRadius: 50, padding: '5px 18px', fontSize: '0.82rem', fontWeight: 700 }}>{badge.label}</span>
+    </div>
+  );
+}
+
+// Sankey Chart
+function SankeyChart({ result }: { result: any }) {
+  const vis = result.visibility ?? 0;
+  const cit = result.citation_share ?? 0;
+  const sent = result.sentiment ?? 0;
+  const prom = result.prominence ?? 0;
+  const sov = result.share_of_voice ?? 0;
+  const geo = result.overall_geo_score ?? 0;
+
+  const total = vis + cit + sent + prom + sov || 1;
+  const h = 320;
+  const nodeW = 24;
+  const gap = 12;
+
+  const inputs = [
+    { label: 'Visibility', value: vis, color: '#7C3AED', weight: 0.30 },
+    { label: 'Sentiment', value: sent, color: '#10B981', weight: 0.20 },
+    { label: 'Prominence', value: prom, color: '#3B82F6', weight: 0.20 },
+    { label: 'Citation', value: cit, color: '#F59E0B', weight: 0.15 },
+    { label: 'Share of Voice', value: sov, color: '#EF4444', weight: 0.15 },
+  ];
+
+  const totalH = h - gap * (inputs.length - 1);
+  let leftY = 20;
+  const nodes = inputs.map(n => {
+    const nodeH = Math.max(20, (n.value / 100) * totalH * 0.8);
+    const y = leftY;
+    leftY += nodeH + gap;
+    return { ...n, y, h: nodeH };
+  });
+
+  const rightY = h / 2 - 60;
+  const rightH = 120;
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24, marginTop: 24 }}>
+      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>GEO Score Composition</div>
+      <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 20 }}>How each signal flows into your overall GEO Score</div>
+      <svg viewBox="0 0 520 360" style={{ width: '100%', maxHeight: 360 }}>
+        {nodes.map((n, i) => {
+          const srcX = 60 + nodeW;
+          const dstX = 360;
+          const srcMidY = n.y + n.h / 2;
+          const dstMidY = rightY + rightH / 2;
+          const cp1x = srcX + (dstX - srcX) * 0.4;
+          const cp2x = srcX + (dstX - srcX) * 0.6;
+          const halfSrc = n.h / 2;
+          const halfDst = (n.h / totalH) * rightH / 2;
+
+          return (
+            <g key={i}>
+              {/* Flow band */}
+              <path
+                d={`M ${srcX} ${n.y} C ${cp1x} ${n.y}, ${cp2x} ${dstMidY - halfDst}, ${dstX} ${dstMidY - halfDst}
+                    L ${dstX} ${dstMidY + halfDst} C ${cp2x} ${dstMidY + halfDst}, ${cp1x} ${n.y + n.h}, ${srcX} ${n.y + n.h} Z`}
+                fill={n.color} opacity={0.18}
+              />
+              {/* Source node */}
+              <rect x={60} y={n.y} width={nodeW} height={n.h} rx={4} fill={n.color} />
+              {/* Label */}
+              <text x={52} y={n.y + n.h / 2 + 4} textAnchor="end" style={{ fontSize: 11, fill: '#374151', fontFamily: 'Inter,sans-serif', fontWeight: 600 }}>{n.label}</text>
+              <text x={52} y={n.y + n.h / 2 + 16} textAnchor="end" style={{ fontSize: 10, fill: n.color, fontFamily: 'Inter,sans-serif' }}>{n.value}</text>
+            </g>
+          );
+        })}
+
+        {/* Destination GEO node */}
+        <rect x={360} y={rightY} width={nodeW} height={rightH} rx={4} fill="#7C3AED" />
+        <text x={360 + nodeW + 8} y={rightY + rightH / 2 - 8} style={{ fontSize: 12, fill: '#111827', fontFamily: 'Inter,sans-serif', fontWeight: 700 }}>GEO Score</text>
+        <text x={360 + nodeW + 8} y={rightY + rightH / 2 + 8} style={{ fontSize: 22, fill: '#7C3AED', fontFamily: 'Inter,sans-serif', fontWeight: 900 }}>{geo}</text>
+
+        {/* Weight labels */}
+        {nodes.map((n, i) => (
+          <text key={i} x={200} y={n.y + n.h / 2 + 4}
+            textAnchor="middle"
+            style={{ fontSize: 9, fill: n.color, fontFamily: 'Inter,sans-serif', fontWeight: 600 }}>
+            {Math.round(n.weight * 100)}%
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// Link Analysis Network
+function LinkAnalysis({ result }: { result: any }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const brand = result.brand_name || 'Brand';
+  const competitors = (result.competitors || []).slice(0, 6);
+  const sources = (result.citation_sources || []).slice(0, 5);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const cx = W / 2, cy = H / 2;
+
+    // Nodes
+    const nodes: { x: number; y: number; label: string; color: string; r: number; type: string }[] = [];
+
+    // Center — brand
+    nodes.push({ x: cx, y: cy, label: brand, color: '#7C3AED', r: 28, type: 'brand' });
+
+    // Competitors — left arc
+    competitors.forEach((c: any, i: number) => {
+      const angle = Math.PI * 0.25 + (i / Math.max(competitors.length - 1, 1)) * Math.PI * 1.1;
+      nodes.push({ x: cx - 160 * Math.cos(angle), y: cy - 120 * Math.sin(angle), label: c.Brand, color: '#EF4444', r: 16, type: 'competitor' });
     });
-    try{
-      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url, promptCount, scope: effectiveScope})});
-      const data=await res.json();
-      timers.forEach(t=>clearTimeout(t));
-      setLoadingProgress(100);
-      await new Promise(r=>setTimeout(r,400));
-      if(data.error){
-        const msg:string=data.error||'';
-        const status:number=res.status;
-        if(status===429||msg.includes('429')||msg.toLowerCase().includes('rate')){
-          setAnalysisError({title:'Rate limit reached',code:'429 Too Many Requests',message:'The API rate limit was hit. This usually resolves within 1–2 minutes. Retrying with fewer prompts will help.',reduceDesc:'Fewer prompts sends fewer API requests, which is less likely to trigger rate limiting.'});
-        } else if(status===408||msg.toLowerCase().includes('timeout')){
-          setAnalysisError({title:'Analysis timed out',code:'408 Request Timeout',message:'The OpenAI model exceeded the response time limit. This can happen during high load periods. Wait a minute and try again.',reduceDesc:'Fewer prompts means a shorter run time, which is less likely to hit the timeout threshold.'});
-        } else {
-          setAnalysisError({title:'Analysis couldn\'t complete',code:`${status||503} Service Unavailable`,message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
-        }
-      } else{
-        // playbook_actions come back in the same response — no second fetch needed.
-        setResult(data);setActiveParent(0);setActiveSub(0);setPlaybookActions(data.actions||[]);setLivePromptHistory([]);setLivePromptQuery('');
-        try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}
-      }
-    }catch(e:any){
-      timers.forEach(t=>clearTimeout(t));
-      const msg:string=e.message||'';
-      if(msg.toLowerCase().includes('network')||msg.toLowerCase().includes('fetch')){
-        setAnalysisError({title:'Connection failed',code:'ERR_NETWORK_CHANGED',message:'The connection to the analysis engine was interrupted. Check your internet connection and try again.',reduceDesc:'A shorter run is less likely to be interrupted by a brief connection issue.'});
-      } else if(msg.toLowerCase().includes('timeout')){
-        setAnalysisError({title:'Analysis timed out',code:'408 Request Timeout',message:'The OpenAI model exceeded the response time limit. This can happen during high load periods. Wait a minute and try again.',reduceDesc:'Fewer prompts means a shorter run time, which is less likely to hit the timeout threshold.'});
+
+    // Citation sources — right arc
+    sources.forEach((s: any, i: number) => {
+      const angle = -Math.PI * 0.3 + (i / Math.max(sources.length - 1, 1)) * Math.PI * 0.9;
+      nodes.push({ x: cx + 170 * Math.cos(angle), y: cy - 100 * Math.sin(angle), label: s.domain, color: '#10B981', r: 14, type: 'source' });
+    });
+
+    // Draw edges
+    nodes.slice(1).forEach(n => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(n.x, n.y);
+      ctx.strokeStyle = n.type === 'competitor' ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)';
+      ctx.lineWidth = n.type === 'competitor' ? 2 : 1.5;
+      ctx.setLineDash(n.type === 'source' ? [4, 4] : []);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Arrow
+      const angle = Math.atan2(n.y - cy, n.x - cx);
+      const ax = n.x - (n.r + 4) * Math.cos(angle);
+      const ay = n.y - (n.r + 4) * Math.sin(angle);
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(ax - 8 * Math.cos(angle - 0.4), ay - 8 * Math.sin(angle - 0.4));
+      ctx.lineTo(ax - 8 * Math.cos(angle + 0.4), ay - 8 * Math.sin(angle + 0.4));
+      ctx.closePath();
+      ctx.fillStyle = n.type === 'competitor' ? 'rgba(239,68,68,0.5)' : 'rgba(16,185,129,0.5)';
+      ctx.fill();
+    });
+
+    // Draw nodes
+    nodes.forEach(n => {
+      // Shadow
+      ctx.shadowColor = n.color + '44';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+      ctx.fillStyle = n.type === 'brand' ? n.color : 'white';
+      ctx.fill();
+      ctx.strokeStyle = n.color;
+      ctx.lineWidth = n.type === 'brand' ? 0 : 2.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Label
+      ctx.fillStyle = n.type === 'brand' ? 'white' : '#111827';
+      ctx.font = `${n.type === 'brand' ? '700' : '600'} ${n.type === 'brand' ? 11 : 9}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const words = n.label.split(' ');
+      if (words.length > 1 && n.type !== 'brand') {
+        ctx.fillText(words[0], n.x, n.y - 5);
+        ctx.fillText(words.slice(1).join(' '), n.x, n.y + 6);
       } else {
-        setAnalysisError({title:'Analysis couldn\'t complete',code:'503 Service Unavailable',message:'The OpenAI model returned an error. This is usually temporary — retrying typically resolves it within a minute.',reduceDesc:'Try half the prompts — lower load may avoid the error.'});
+        ctx.fillText(n.label.length > 12 ? n.label.slice(0, 11) + '…' : n.label, n.x, n.y);
       }
-    }
+    });
+
+    // Legend
+    const legend = [{ color: '#7C3AED', label: 'Your Brand' }, { color: '#EF4444', label: 'Competitors' }, { color: '#10B981', label: 'Citation Sources' }];
+    legend.forEach((l, i) => {
+      ctx.beginPath();
+      ctx.arc(20, H - 50 + i * 18, 5, 0, Math.PI * 2);
+      ctx.fillStyle = l.color;
+      ctx.fill();
+      ctx.fillStyle = '#374151';
+      ctx.font = '500 10px Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(l.label, 30, H - 46 + i * 18);
+    });
+
+  }, [result, brand, competitors, sources]);
+
+  return (
+    <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24, marginTop: 24 }}>
+      <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Brand Link Analysis</div>
+      <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>
+        How your brand connects to competitors and citation sources in AI responses.
+        <span style={{ marginLeft: 12, color: '#EF4444' }}>— Competitors</span>
+        <span style={{ marginLeft: 12, color: '#10B981' }}>– – Citation Sources</span>
+      </div>
+      <canvas ref={canvasRef} width={700} height={380} style={{ width: '100%', borderRadius: 8, background: '#FAFAFA' }} />
+    </div>
+  );
+}
+
+export default function GeoHub() {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState(0);
+  const [promptInput, setPromptInput] = useState('');
+  const [promptHistory, setPromptHistory] = useState<{ q: string; a: string }[]>([]);
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [filterCat, setFilterCat] = useState('All');
+
+  async function runAnalysis() {
+    if (!url.trim() || !url.startsWith('http')) { setError('Please enter a valid URL starting with http:// or https://'); return; }
+    setError(''); setLoading(true);
+    try {
+      const res = await fetch('/api/geo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const data = await res.json();
+      if (data.error) { setError(data.error); } else { setResult(data); setActiveTab(0); }
+    } catch (e: any) { setError(e.message); }
     setLoading(false);
   }
 
-  // ── D3 shell — initial search (pre-analysis) ──────────────────────────────
-  if (!result && !loading && !analysisError) {
-    const displayUrl = url.replace(/^https?:\/\//, '');
-    const urlValid = isValidUrl(url);
-    const scopeVisible = urlValid;
-    const effectiveScope = d3ScopeSelected === '+ Custom' ? d3CustomScope.trim() : d3ScopeSelected;
-    const canRun = urlValid && effectiveScope !== '' && !loading;
+  async function runPrompt() {
+    if (!promptInput.trim()) return;
+    setPromptLoading(true);
+    try {
+      const res = await fetch('/api/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt: promptInput }) });
+      const data = await res.json();
+      setPromptHistory(h => [{ q: promptInput, a: data.response }, ...h]);
+      setPromptInput('');
+    } catch {}
+    setPromptLoading(false);
+  }
 
-    const SCOPE_PILLS = isBankUrl(url) ? ['General', ...BANK_SCOPES] : ['General', ...detectedScopes];
+  return (
+    <main style={{ minHeight: '100vh', background: '#F3F4F6' }}>
+      {/* HERO */}
+      <div style={{ background: 'linear-gradient(135deg,#5B21B6 0%,#7C3AED 50%,#9333EA 100%)', padding: '64px 40px 72px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1.5px solid rgba(255,255,255,0.4)', borderRadius: 50, padding: '8px 24px', fontSize: '0.82rem', fontWeight: 600, color: 'white', marginBottom: 32, background: 'rgba(255,255,255,0.15)' }}>
+          ✦ &nbsp;Real Time GEO Scoring
+        </div>
+        <h1 style={{ fontSize: '3.6rem', fontWeight: 900, color: 'white', margin: '0 0 16px', letterSpacing: '-1.5px', lineHeight: 1.1 }}>GEO Scorecard</h1>
+        <p style={{ fontSize: '1.1rem', color: 'rgba(255,255,255,0.9)', margin: '0 0 20px' }}>Enter any brand URL · Discover your brand&apos;s AI presence</p>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, border: '1.5px solid rgba(255,255,255,0.3)', borderRadius: 50, padding: '8px 22px', fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.12)' }}>
+          ⏱ &nbsp;Live data · Updated in real-time · Not cached like competitors
+        </div>
+      </div>
 
-    const sbIcon = (active=false): React.CSSProperties => ({
-      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
-      color:active?'#A100FF':'rgba(255,255,255,0.12)',
-      background:active?'rgba(161,0,255,0.12)':'transparent',
-    });
-
-    return (
-      <>
-        <style>{`@keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}} #d3url::placeholder{font-style:italic;}`}</style>
-        <div id="percepta-scan-form" className="perceptaScanForm" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
-
-          {/* ── Sidebar ── */}
-          <Sidebar onNewAnalysis={()=>{setAnalysisError(null);setLoading(false);}}/>
-
-          {/* ── Content column ── */}
-          <div id="scan-content-col" className="scanContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
-
-            {/* Dark topbar */}
-            <div id="scan-topbar" className="scanTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div id="scan-breadcrumb" className="scanBreadcrumb" style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
-                <span id="scan-breadcrumb-root" className="scanBreadcrumbRoot">Percepta GEO</span>
-                <span id="scan-breadcrumb-sep" className="scanBreadcrumbSep" style={{color:'rgba(255,255,255,0.12)'}}>/</span>
-                <span id="scan-breadcrumb-active" className="scanBreadcrumbActive" style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
+      {!result ? (
+        <div style={{ padding: '48px 40px 60px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 24, marginBottom: 40 }}>
+            {bands.map((b, i) => (
+              <div key={i} style={{ background: b.bg, borderRadius: 20, padding: '36px 28px', textAlign: 'center', border: `1.5px solid ${b.border}` }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: b.color, marginBottom: 8 }}>{b.range}</div>
+                <div style={{ fontSize: '1.8rem', fontWeight: 900, color: b.color, marginBottom: 8 }}>{b.label}</div>
+                <div style={{ fontSize: '0.85rem', color: b.color, lineHeight: 1.5 }}>{b.desc}</div>
               </div>
-              <div id="scan-topbar-right" className="scanTopbarRight" style={{marginLeft:'auto'}}>
-                <span id="scan-live-badge" className="scanLiveBadge" style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:10,fontWeight:600,letterSpacing:'0.08em',textTransform:'uppercase' as const,color:'#00D1C7',background:'rgba(0,209,199,0.08)',border:'1px solid rgba(0,209,199,0.18)',padding:'3px 8px',fontFamily:'Inter,sans-serif'}}>
-                  <span id="scan-live-dot" className="scanLiveDot" style={{width:5,height:5,borderRadius:'50%',background:'#00D1C7',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
-                  Live
-                </span>
-              </div>
+            ))}
+          </div>
+          <div style={{ background: 'white', borderRadius: 20, border: '1px solid #E5E7EB', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', padding: '28px 32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#7C3AED' }} />
+              <span style={{ fontSize: '0.72rem', fontWeight: 700, letterSpacing: '.14em', color: '#9CA3AF', textTransform: 'uppercase' as const }}>Brand URL</span>
             </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <input type="text" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && runAnalysis()} placeholder="https://www.capitalone.com/"
+                style={{ flex: 1, borderRadius: 12, border: '1.5px solid #E5E7EB', padding: '14px 20px', fontSize: '0.95rem', height: 52, background: 'white', outline: 'none', color: '#374151', boxSizing: 'border-box' as const }} />
+              <button onClick={runAnalysis} disabled={loading}
+                style={{ background: '#7C3AED', color: 'white', border: 'none', borderRadius: 50, fontWeight: 700, fontSize: '0.95rem', height: 52, padding: '0 28px', cursor: 'pointer', boxShadow: '0 4px 16px rgba(124,58,237,0.4)', whiteSpace: 'nowrap' as const, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                🔍 {loading ? 'Analysing...' : 'Run Live AI Analysis'}
+              </button>
+            </div>
+            {error && <div style={{ color: '#EF4444', fontSize: '0.85rem', marginTop: 10 }}>{error}</div>}
+          </div>
+        </div>
+      ) : (
+        <div style={{ padding: '0 0 40px' }}>
+          {/* Tabs */}
+          <div style={{ borderBottom: '1px solid #E5E7EB', background: 'white', display: 'flex', padding: '0 40px', gap: 4 }}>
+            {TABS.map((t, i) => (
+              <button key={i} onClick={() => setActiveTab(i)} style={{ background: 'none', border: 'none', borderBottom: activeTab === i ? '2px solid #7C3AED' : '2px solid transparent', color: activeTab === i ? '#7C3AED' : '#6B7280', fontWeight: activeTab === i ? 700 : 500, fontSize: '0.85rem', padding: '12px 20px', cursor: 'pointer', transition: 'all 0.15s' }}>
+                {t}
+              </button>
+            ))}
+            <button onClick={() => { setResult(null); setUrl(''); }} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #E5E7EB', borderRadius: 8, color: '#6B7280', fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer', alignSelf: 'center' }}>
+              ← New Analysis
+            </button>
+          </div>
 
+          <div style={{ padding: '32px 40px', maxWidth: 1000, margin: '0 auto' }}>
 
-            {/* ── White canvas ── */}
-            <div id="scan-canvas" className="scanCanvas" style={{flex:1,background:'#f3f4f6',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px',position:'relative'}}>
-
-              {/* Scan content */}
-              <div id="scan-card" className="scanCard" style={{position:'relative',zIndex:1,width:'100%',maxWidth:'75%',display:'flex',flexDirection:'column',alignItems:'center',gap:18}}>
-
-                {/* Eyebrow */}
-                <div id="scan-eyebrow" className="scanEyebrow" style={{fontFamily:'Inter,sans-serif',fontSize:10,fontWeight:600,letterSpacing:'0.16em',textTransform:'uppercase' as const,color:'rgba(10,10,15,0.28)'}}>
-                  Percepta GEO
-                  {/* · Powered by Accenture */}
-                </div>
-
-                {/* Headline */}
-                <div id="scan-headline" className="scanHeadline" style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:56,fontWeight:500,color:'#0A0A0F',letterSpacing:'-0.03em',textAlign:'center',lineHeight:1.1}}>
-                  How does AI <span id="scan-headline-see" className="scanHeadlineSee" style={{color:'#A100FF'}}>see</span> your brand<span id="scan-headline-punct" className="scanHeadlinePunct" style={{color:'#A100FF'}}>?</span>
-                </div>
-
-                {/* Sub */}
-                <div id="scan-sub" className="scanSub" style={{fontSize:13,color:'#7A7A90',textAlign:'center',maxWidth:400,lineHeight:1.65,fontFamily:'Inter,sans-serif'}}>
-                  Enter any brand URL to get a full GEO analysis across visibility, prominence, sentiment, citations, and share of voice.
-                </div>
-
-                {/* URL input + run button */}
-                <div id="scan-input-row" className="scanInputRow" style={{display:'flex',width:'100%'}}>
-                  <input
-                    id="d3url"
-                    className="scanUrlInput"
-                    type="text"
-                    value={displayUrl}
-                    onChange={e=>{const v=e.target.value.replace(/^https?:\/\//,'');setUrl(v?'https://'+v:'');}}
-                    onKeyDown={e=>e.key==='Enter'&&runAnalysis()}
-                    placeholder="e.g. firstmeridian.com"
-                    style={{flex:1,background:'#FFFFFF',border:'1px solid #D0D0DC',borderRight:'none',color:'#0A0A0F',fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:13,padding:'0 16px',height:48,outline:'none'}}
-                  />
-                  <button
-                    id="scan-submit-btn"
-                    className={`scanSubmitBtn${canRun?'':' scanSubmitBtnDisabled'}`}
-                    onClick={canRun?runAnalysis:undefined}
-                    disabled={!canRun}
-                    style={{background:canRun?'#A100FF':'#C8C8D8',color:canRun?'white':'rgba(255,255,255,0.55)',border:'none',fontFamily:'Inter,sans-serif',fontSize:11,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,padding:'0 24px',height:48,cursor:canRun?'pointer':'not-allowed',whiteSpace:'nowrap' as const,flexShrink:0,transition:'background 0.2s, color 0.2s'}}
-                  >
-                    Run Analysis →
-                  </button>
-                </div>
-
-                {/* Scope — contextual reveal after valid URL entered */}
-                <div id="scan-scope-section" className="scanScopeSection" style={{width:'100%',opacity:scopeVisible?1:0,transform:scopeVisible?'translateY(0)':'translateY(-6px)',pointerEvents:scopeVisible?'all':'none' as const,transition:'opacity 0.25s cubic-bezier(0.20,0,0.00,1), transform 0.25s cubic-bezier(0.20,0,0.00,1)'}}>
-                  <div id="scan-scope-header" className="scanScopeHeader" style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap' as const,gap:8,marginBottom:8}}>
-                    <div id="scan-scope-label" className="scanScopeLabel" style={{fontSize:10,fontWeight:600,letterSpacing:'0.1em',textTransform:'uppercase' as const,color:'#7A7A90',fontFamily:'Inter,sans-serif'}}>Scope</div>
-                    {scopeDetecting?(
-                      <div id="scan-scope-detecting" className="scanScopeDetecting" style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC'}}>
-                        <span id="scan-scope-detecting-dot" className="scanScopeDetectingDot" style={{width:5,height:5,borderRadius:'50%',background:'#B8B8CC',flexShrink:0,display:'inline-block',animation:'d3live 1.2s ease-in-out infinite'}}/>
-                        Detecting scopes…
+            {/* TAB 0: GEO Score */}
+            {activeTab === 0 && (() => {
+              const geo = result.overall_geo_score;
+              const badge = scoreBadge(geo);
+              const vis = result.visibility; const cit = result.citation_share;
+              const sent = result.sentiment; const prom = result.prominence;
+              const sov = result.share_of_voice; const avgRank = result.avg_rank;
+              const top10 = [
+                { Brand: result.brand_name, URL: result.domain, GEO: geo, Vis: vis, Cit: cit, Sen: sent, Sov: sov, Rank: avgRank, isYou: true },
+                ...(result.competitors || []).map((c: any) => ({ ...c, isYou: false }))
+              ].sort((a, b) => b.GEO - a.GEO);
+              return (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 24, marginBottom: 24 }}>
+                    <GeoGauge score={geo} brand={result.brand_name} />
+                    <div style={{ background: 'white', borderRadius: 16, border: '1px solid #E5E7EB', padding: 24 }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#111827', marginBottom: 4 }}>{result.brand_name}</div>
+                      <a href={result.page_url} target="_blank" rel="noreferrer" style={{ color: '#7C3AED', fontSize: '0.82rem' }}>{result.page_url?.slice(0, 70)}{result.page_url?.length > 70 ? '...' : ''}</a>
+                      <div style={{ margin: '8px 0 4px', fontSize: '0.7rem', fontWeight: 600, color: '#9CA3AF', letterSpacing: '.1em', textTransform: 'uppercase' as const }}>Status</div>
+                      <span style={{ background: badge.bg, color: badge.color, padding: '4px 14px', borderRadius: 50, fontSize: '0.78rem', fontWeight: 700 }}>{badge.label}</span>
+                      <div style={{ fontSize: '0.82rem', color: '#6B7280', lineHeight: 1.7, borderTop: '1px solid #F3F4F6', paddingTop: 12, marginTop: 12 }}>
+                        GEO Score of {geo} reflects {vis}% Visibility{
+                          [cit < 40 ? `Citation (${cit}): rarely top pick` : null, prom < 40 ? `Prominence (${prom}): typically mentioned mid-list rather than first` : null, sov < 20 ? `Share of Voice (${sov}), competitors dominating more of the AI conversation` : null].filter(Boolean).length > 0
+                            ? ` but is held back by: ${[cit < 40 ? `Citation (${cit}): rarely top pick` : null, prom < 40 ? `Prominence (${prom}): typically mentioned mid-list rather than first` : null, sov < 20 ? `Share of Voice (${sov}), competitors dominating more of the AI conversation` : null].filter(Boolean).join('; ')}.`
+                            : '. Strong performance across all metrics.'
+                        }
                       </div>
-                    ):(detectedScopes.length>0&&(
-                      <div id="scan-scope-detected" className="scanScopeDetected" style={{display:'inline-flex',alignItems:'center',gap:5,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
-                        <span id="scan-scope-detected-dot" className="scanScopeDetectedDot" style={{width:5,height:5,borderRadius:'50%',background:'#00C853',flexShrink:0,display:'inline-block'}}/>
-                        Scopes detected
-                      </div>
-                    ))}
+                    </div>
                   </div>
 
-                  {/* Pills — shown immediately (General always present); brand scopes appear after detection */}
-                  <div id="scan-scope-pills" className="scanScopePills" style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
-                    {SCOPE_PILLS.map((pill,i)=>{
-                      const sel=d3ScopeSelected===pill;
+                  {/* Metrics */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+                    <MetricCard label="Visibility Score" val={vis} sub="out of 100" />
+                    <MetricCard label="Citation Score" val={cit} sub="out of 100" />
+                    <MetricCard label="Sentiment Score" val={sent} sub="out of 100" color="#10B981" />
+                    <MetricCard label="Prominence Score" val={prom} sub="out of 100" color="#3B82F6" />
+                    <MetricCard label="Share of Voice" val={sov} sub="out of 100" color="#F59E0B" />
+                  </div>
+
+                  {/* Sankey */}
+                  <SankeyChart result={result} />
+
+                  {/* Link Analysis */}
+                  <LinkAnalysis result={result} />
+
+                  {/* Competitor Table */}
+                  <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24, marginTop: 24 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>{result.domain} vs Competitors — {result.ind_label}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Real-time GEO scores. Highlighted row is you.</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
+                          {['#', 'Brand', 'GEO', 'Visibility', 'Citation', 'Sentiment', 'Share of Voice', 'Avg Rank'].map(h => (
+                            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {top10.map((c: any, i: number) => {
+                          const gcol = c.GEO >= 80 ? '#10B981' : c.GEO >= 60 ? '#F59E0B' : '#EF4444';
+                          return (
+                            <tr key={i} style={{ background: c.isYou ? '#F5F3FF' : i % 2 === 0 ? 'white' : '#FAFAFA', borderLeft: c.isYou ? '3px solid #7C3AED' : 'none' }}>
+                              <td style={{ padding: '10px 12px', fontSize: '0.8rem', color: '#9CA3AF', fontWeight: 600 }}>{i + 1}</td>
+                              <td style={{ padding: '10px 12px' }}>
+                                <div style={{ fontSize: '0.84rem', fontWeight: c.isYou ? 700 : 400, color: '#111827' }}>
+                                  {c.Brand} {c.isYou && <span style={{ background: '#EDE9FE', color: '#7C3AED', borderRadius: 4, padding: '1px 6px', fontSize: '0.7rem', fontWeight: 700 }}>You</span>}
+                                </div>
+                                <div style={{ fontSize: '0.72rem', color: '#9CA3AF' }}>{c.URL}</div>
+                              </td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.88rem', fontWeight: 700, color: gcol }}>{c.GEO}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Vis}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Cit}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Sen}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Sov}</td>
+                              <td style={{ padding: '10px 12px', fontSize: '0.82rem', color: '#374151' }}>{c.Rank}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* TAB 1: Competitors */}
+            {activeTab === 1 && (
+              <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                <p style={{ color: '#6B7280' }}>Competitor breakdown is shown in the GEO Score tab.</p>
+              </div>
+            )}
+
+            {/* TAB 2: Visibility */}
+            {activeTab === 2 && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+                  <MetricCard label="Visibility Score" val={result.visibility} sub={`Appeared in ${result.responses_with_brand} of 20 queries`} />
+                  <MetricCard label="Avg. Rank" val={result.avg_rank} sub="Position when mentioned" color="#3B82F6" />
+                  <MetricCard label="Citation Score" val={`${result.responses_with_brand}/20`} sub="Out of 20 generic industry queries" color="#10B981" />
+                </div>
+                {(result.internal_links || []).length > 0 && (
+                  <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Page Intelligence</div>
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Which pages of {result.domain} are being cited by AI.</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>
+                          {['Page', 'Path', 'Status'].map(h => <th key={h} style={{ padding: '8px 14px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(result.internal_links || []).slice(0, 8).map((lk: any, i: number) => (
+                          <tr key={i} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                            <td style={{ padding: '10px 14px', fontSize: '0.84rem', fontWeight: 600, color: '#111827' }}>{lk.label}</td>
+                            <td style={{ padding: '10px 14px', fontSize: '0.72rem', color: '#9CA3AF' }}>{lk.path}</td>
+                            <td style={{ padding: '10px 14px' }}><span style={{ background: '#F3F4F6', color: '#9CA3AF', borderRadius: 4, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 700 }}>Detected</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB 3: Sentiment */}
+            {activeTab === 3 && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+                  <MetricCard label="Sentiment Score" val={result.sentiment} sub={result.sentiment >= 70 ? 'Positive — AI speaks favorably' : result.sentiment >= 45 ? 'Neutral — room to improve' : 'Needs attention'} color="#10B981" />
+                  <MetricCard label="Prominence Score" val={result.prominence} sub={result.prominence >= 70 ? 'Named first — strong prominence' : result.prominence >= 45 ? 'Mid-list mentions' : 'Buried in responses'} color="#3B82F6" />
+                  <MetricCard label="Avg. Rank" val={result.avg_rank} sub="Average mention position" color="#F59E0B" />
+                </div>
+                <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 16 }}>Sentiment Strengths</div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {(result.strengths_list || []).slice(0, 3).map((s: string, i: number) => (
+                      <li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #F0FDF4' }}>
+                        <span style={{ color: '#10B981', fontWeight: 700, flexShrink: 0 }}>+</span><span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 4: Citations */}
+            {activeTab === 4 && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+                  <MetricCard label="Citation Score" val={result.citation_share} sub="How authoritatively your brand was cited" />
+                  <MetricCard label="Share of Voice" val={result.share_of_voice} sub="Your brand mentions as % of all mentions" color="#F59E0B" />
+                </div>
+                {(result.citation_sources || []).length > 0 && (
+                  <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Sources AI is Pulling From</div>
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Domains influencing AI knowledge about this brand.</div>
+                    {(result.citation_sources || []).map((s: any, i: number) => {
+                      const cls = classifyDomain(s.domain);
+                      const bw = Math.min(s.citation_share * 3, 100);
                       return (
-                        <div
-                          id={`scan-scope-pill-${i}`}
-                          className={`scanScopePill${sel?' scanScopePillSelected':''}`}
-                          key={pill}
-                          onClick={()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}}
-                          style={{background:sel?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px solid ${sel?'#A100FF':'#D0D0DC'}`,color:sel?'#A100FF':'#3D3D50',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
-                        >
-                          {pill}
+                        <div key={i} style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '12px 16px', marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: '0.78rem', color: '#9CA3AF', fontWeight: 600, width: 18 }}>{s.rank}</span>
+                            <img src={`https://www.google.com/s2/favicons?domain=${s.domain}&sz=14`} width={14} height={14} alt="" />
+                            <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#111827', flex: 1 }}>{s.domain}</span>
+                            <span style={{ background: cls.bg, color: cls.color, borderRadius: 50, padding: '2px 10px', fontSize: '0.7rem', fontWeight: 600 }}>{cls.label}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, width: 80, overflow: 'hidden' }}>
+                                <div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: bw }} />
+                              </div>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#7C3AED' }}>{s.citation_share}%</span>
+                            </div>
+                          </div>
+                          {s.top_pages?.length > 0 && (
+                            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '0.5px solid #F3F4F6' }}>
+                              {s.top_pages.slice(0, 3).map((pg: string, j: number) => <div key={j} style={{ fontSize: '0.75rem', color: '#7C3AED', padding: '2px 0' }}>{pg}</div>)}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
-                    <div
-                      id="scan-scope-custom"
-                      className={`scanScopeCustom${d3ScopeSelected==='+ Custom'?' scanScopeCustomSelected':''}`}
-                      onClick={()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}}
-                      style={{background:d3ScopeSelected==='+ Custom'?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px ${d3ScopeSelected==='+ Custom'?'solid':'dashed'} ${d3ScopeSelected==='+ Custom'?'#A100FF':'#D0D0DC'}`,color:d3ScopeSelected==='+ Custom'?'#A100FF':'#B8B8CC',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
-                    >
-                      + Custom
-                    </div>
                   </div>
-
-                  {/* Custom scope text input */}
-                  {d3ShowCustomScope&&(
-                    <div id="scan-custom-input-wrap" className="scanCustomInputWrap" style={{marginTop:8}}>
-                      <input
-                        id="scan-custom-input"
-                        className="scanCustomInput"
-                        type="text"
-                        value={d3CustomScope}
-                        onChange={e=>setD3CustomScope(e.target.value)}
-                        placeholder="Describe the product or service you want to analyze…"
-                        style={{width:'100%',background:'#FFFFFF',border:'1px dashed #D0D0DC',color:'#0A0A0F',fontFamily:'Inter,sans-serif',fontSize:12,padding:'0 12px',height:36,outline:'none',boxSizing:'border-box' as const}}
-                      />
-                    </div>
-                  )}
-
-                  {/* Scope hint */}
-                  {!d3ScopeSelected&&!scopeDetecting&&(
-                    <div id="scan-scope-hint" className="scanScopeHint" style={{marginTop:6,fontFamily:'Inter,sans-serif',fontSize:10,color:'#B8B8CC',fontStyle:'italic'}}>
-                      Select a scope to focus the analysis — or choose General for the brand as a whole.
-                    </div>
-                  )}
-                </div>
-
-{/* Error */}
-                {error&&<div id="scan-error-msg" className="scanErrorMsg" style={{color:'#EF4444',fontSize:'0.85rem',width:'100%',fontFamily:'Inter,sans-serif'}}>{error}</div>}
-
-                {/* Hint */}
-                <div id="scan-hint" className="scanHint" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#B8B8CC',textAlign:'center',lineHeight:1.7}}>
-                  Accepts any URL format<br/>
-                  bofa.com · www.bankofamerica.com · https://www.bankofamerica.com/
-                </div>
-
+                )}
               </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
+            )}
 
-  // ── D3 shell — failure state ──────────────────────────────────────────────
-  if (!result && !loading && analysisError) {
-    const cleanDomain = url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
-    const cleanedKey = cleanDomain.replace(/^www\./,'').split('.')[0].toLowerCase();
-    const brandNames: Record<string,string> = {
-      'bankofamerica':'Bank of America','bofa':'Bank of America','chase':'Chase','wellsfargo':'Wells Fargo',
-      'capitalone':'Capital One','americanexpress':'American Express','amex':'American Express',
-      'firstmeridian':'First Meridian','citi':'Citi','usbank':'U.S. Bank',
-      'google':'Google','microsoft':'Microsoft','apple':'Apple','amazon':'Amazon',
-      'marriott':'Marriott','hilton':'Hilton','target':'Target','walmart':'Walmart',
-    };
-    const brandLabel = brandNames[cleanedKey] || cleanDomain;
-    const sbIcon = (active=false): React.CSSProperties => ({
-      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
-      color:active?'#A100FF':'rgba(255,255,255,0.12)',background:active?'rgba(161,0,255,0.12)':'transparent',
-    });
-    return (
-      <>
-        <style>{`@keyframes d3fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}`}</style>
-        <div id="percepta-error" className="perceptaError" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
-          {/* Sidebar */}
-          <Sidebar onNewAnalysis={()=>setAnalysisError(null)}/>
-          {/* Content column */}
-          <div id="error-content-col" className="errorContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
-            {/* Topbar */}
-            <div id="error-topbar" className="errorTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div id="error-breadcrumb" className="errorBreadcrumb" style={{display:'flex',alignItems:'center',gap:7,fontSize:12,color:'rgba(255,255,255,0.35)',fontFamily:'Inter,sans-serif'}}>
-                <span id="error-breadcrumb-brand" className="errorBreadcrumbBrand">{brandLabel}</span>
-                <span id="error-breadcrumb-sep" className="errorBreadcrumbSep" style={{color:'rgba(255,255,255,0.15)'}}>/</span>
-                <span id="error-breadcrumb-active" className="errorBreadcrumbActive" style={{color:'rgba(255,255,255,0.75)',fontWeight:500}}>Analysis Failed</span>
-              </div>
-              <div id="error-topbar-right" className="errorTopbarRight" style={{marginLeft:'auto'}}>
-                <span id="error-status-badge" className="errorStatusBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,color:'#E03131',background:'rgba(224,49,49,0.10)',border:'1px solid rgba(224,49,49,0.20)',padding:'3px 10px'}}>✕ Analysis failed</span>
-              </div>
-            </div>
-            {/* Greyed report nav */}
-            <div id="error-nav" className="errorNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.05)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,pointerEvents:'none',opacity:0.3}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities'].map((t,i)=>(
-                <div id={`error-nav-item-${i}`} className="errorNavItem" key={t} style={{fontSize:12,color:'rgba(255,255,255,0.3)',padding:'0 14px',display:'flex',alignItems:'center',whiteSpace:'nowrap' as const,fontFamily:'Inter,sans-serif'}}>{t}</div>
-              ))}
-            </div>
-            {/* White canvas */}
-            <div id="error-canvas" className="errorCanvas" style={{flex:1,background:'#f3f4f6',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',position:'relative',overflow:'hidden',padding:'40px 24px'}}>
-              {/* Failure card */}
-              <div id="error-card" className="errorCard" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,animation:'d3fadeUp 0.35s cubic-bezier(0.20,0,0.00,1) both',boxShadow:'0 4px 32px rgba(0,0,0,0.10)'}}>
-                {/* Dark header */}
-                <div id="error-card-header" className="errorCardHeader" style={{background:'#0F0F11',padding:'22px 28px',display:'flex',alignItems:'center',gap:16}}>
-                  <div id="error-card-icon" className="errorCardIcon" style={{width:40,height:40,borderRadius:'50%',background:'rgba(224,49,49,0.12)',border:'1px solid rgba(224,49,49,0.25)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#E03131" strokeWidth="2">
-                      <circle cx="9" cy="9" r="8"/>
-                      <line x1="9" y1="5.5" x2="9" y2="10"/>
-                      <circle cx="9" cy="12.5" r="0.8" fill="#E03131" stroke="none"/>
-                    </svg>
+            {/* TAB 5: Prompts */}
+            {activeTab === 5 && (() => {
+              const rd = result.responses_detail || [];
+              const cats = ['All', ...Array.from(new Set(rd.map((r: any) => r.category))) as string[]];
+              const filtered = rd.filter((r: any) => filterCat === 'All' || r.category === filterCat).slice(0, 10);
+              const catStats: Record<string, { total: number; mentioned: number }> = {};
+              rd.forEach((r: any) => {
+                if (!catStats[r.category]) catStats[r.category] = { total: 0, mentioned: 0 };
+                catStats[r.category].total++;
+                if (r.mentioned) catStats[r.category].mentioned++;
+              });
+              return (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
+                    {Object.entries(catStats).map(([c, v]) => (
+                      <div key={c} style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 8, padding: '14px 18px' }}>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#111827', marginBottom: 6 }}>{c}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{ background: '#F3F4F6', borderRadius: 4, height: 5, flex: 1, overflow: 'hidden' }}>
+                            <div style={{ background: '#7C3AED', height: 5, borderRadius: 4, width: `${Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%` }} />
+                          </div>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#7C3AED' }}>{Math.round((v.mentioned / Math.max(v.total, 1)) * 100)}%</span>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#9CA3AF', marginTop: 4 }}>{v.mentioned} of {v.total} queries</div>
+                      </div>
+                    ))}
                   </div>
-                  <div id="error-card-text" className="errorCardText" style={{flex:1}}>
-                    <div id="error-title" className="errorTitle" style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.01em',marginBottom:3}}>{analysisError.title}</div>
-                    <div id="error-meta" className="errorMeta" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.3)'}}>{cleanDomain} · {d3ScopeSelected} · {promptCount.toLocaleString()} prompts</div>
+                  <div style={{ marginBottom: 16 }}>
+                    <select value={filterCat} onChange={e => setFilterCat(e.target.value)} style={{ border: '1px solid #E5E7EB', borderRadius: 8, padding: '8px 14px', fontSize: '0.85rem', color: '#374151', background: 'white', outline: 'none' }}>
+                      {cats.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Top 10 Prompts</div>
+                    <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 16 }}>Generic consumer questions. No brand name used.</div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ borderBottom: '2px solid #E5E7EB', background: '#FAFAFA' }}>
+                          {['#', 'Query', 'Rank'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((item: any, i: number) => {
+                          const rp = item.position; const rd2 = rp > 0 ? `#${rp}` : 'N/A';
+                          const rc = rp === 1 ? '#10B981' : rp <= 3 ? '#7C3AED' : item.mentioned ? '#F59E0B' : '#9CA3AF';
+                          return (
+                            <tr key={i} style={{ background: item.mentioned ? '#F5F3FF' : 'white', borderBottom: '1px solid #F3F4F6' }}>
+                              <td style={{ padding: '10px 12px', fontSize: '0.78rem', color: '#9CA3AF', fontWeight: 600 }}>{i + 1}</td>
+                              <td style={{ padding: '10px 14px' }}>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5 }}>
+                                  <span style={{ background: '#EDE9FE', color: '#5B21B6', borderRadius: 4, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 600 }}>{item.category}</span>
+                                  <span style={{ background: item.mentioned ? '#D1FAE5' : '#F3F4F6', color: item.mentioned ? '#065F46' : '#9CA3AF', borderRadius: 4, padding: '1px 7px', fontSize: '0.7rem', fontWeight: 700 }}>{item.mentioned ? 'Appeared' : 'Not Mentioned'}</span>
+                                </div>
+                                <div style={{ fontSize: '0.83rem', color: '#374151' }}>{item.query}</div>
+                              </td>
+                              <td style={{ padding: '10px 16px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: rc }}>{rd2}</div>
+                                <div style={{ fontSize: '0.68rem', color: '#9CA3AF' }}>Rank</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                {/* White body */}
-                <div id="error-card-body" className="errorCardBody" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'24px 28px',display:'flex',flexDirection:'column',gap:20}}>
-                  {/* What happened */}
-                  <div id="error-what-happened" className="errorWhatHappened">
-                    <div id="error-what-happened-label" className="errorWhatHappenedLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:10,fontFamily:'Inter,sans-serif'}}>What happened</div>
-                    <div id="error-code-box" className="errorCodeBox" style={{background:'#F7F7F9',border:'1px solid #E4E4EC',borderLeft:'2px solid #E03131',padding:'12px 14px',display:'flex',flexDirection:'column',gap:4}}>
-                      <div id="error-code" className="errorCode" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'#E03131'}}>{analysisError.code}</div>
-                      <div id="error-message" className="errorMessage" style={{fontSize:11,color:'#7A7A90',lineHeight:1.55,marginTop:2,fontFamily:'Inter,sans-serif'}}>{analysisError.message}</div>
-                    </div>
+              );
+            })()}
+
+            {/* TAB 6: Recommendations */}
+            {activeTab === 6 && (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#065F46', marginBottom: 16 }}>What is Working Well</div>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      {(result.strengths_list || []).slice(0, 3).map((s: string, i: number) => (
+                        <li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #F0FDF4' }}>
+                          <span style={{ color: '#10B981', fontWeight: 700, flexShrink: 0 }}>+</span><span>{s}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  {/* v1 transparency note */}
-                  <div id="error-v1-note" className="errorV1Note" style={{display:'flex',gap:10,padding:'10px 12px',background:'rgba(161,0,255,0.08)',border:'1px solid rgba(161,0,255,0.22)'}}>
-                    <div id="error-v1-icon" className="errorV1Icon" style={{flexShrink:0,marginTop:1}}>
-                      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#A100FF" strokeWidth="1.5"><circle cx="8" cy="8" r="7"/><line x1="8" y1="6" x2="8" y2="9"/><circle cx="8" cy="11.5" r="0.6" fill="#A100FF" stroke="none"/></svg>
-                    </div>
-                    <div id="error-v1-text" className="errorV1Text" style={{fontSize:11,color:'#3D3D50',lineHeight:1.55,fontFamily:'Inter,sans-serif'}}>
-                      <strong style={{color:'#0A0A0F'}}>Percepta GEO v1</strong> uses OpenAI GPT-4o for all analysis. A single engine failure cancels the entire scan — partial results are not available in this version.
-                    </div>
-                  </div>
-                  {/* Actions */}
-                  <div id="error-what-you-can-do" className="errorWhatYouCanDo" style={{display:'flex',flexDirection:'column',gap:8}}>
-                    <div id="error-actions-label" className="errorActionsLabel" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#B8B8CC',marginBottom:2,fontFamily:'Inter,sans-serif'}}>What you can do</div>
-                    {/* Try again */}
-                    <div id="error-action-retry" className="errorActionRetry" onClick={runAnalysis} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid rgba(161,0,255,0.22)',background:'rgba(161,0,255,0.08)',cursor:'pointer'}}>
-                      <div id="error-retry-icon" className="errorRetryIcon" style={{width:30,height:30,background:'rgba(161,0,255,0.12)',border:'1px solid rgba(161,0,255,0.22)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#A100FF" strokeWidth="1.5"><path d="M12 7A5 5 0 1 1 7 2"/><polyline points="12,2 12,7 7,7"/></svg>
-                      </div>
-                      <div id="error-retry-text" className="errorRetryText" style={{flex:1}}>
-                        <div id="error-retry-title" className="errorRetryTitle" style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Try again</div>
-                        <div id="error-retry-desc" className="errorRetryDesc" style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Most failures are temporary. Retrying usually resolves within a minute.</div>
-                      </div>
-                      <div id="error-retry-arrow" className="errorRetryArrow" style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
-                    </div>
-                    {/* Go to dashboard */}
-                    <div id="error-action-go-back" className="errorActionGoBack" onClick={()=>setAnalysisError(null)} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',border:'1px solid #E4E4EC',cursor:'pointer'}}>
-                      <div id="error-goback-icon" className="errorGobackIcon" style={{width:30,height:30,background:'#F0F0F4',border:'1px solid #E4E4EC',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#7A7A90" strokeWidth="1.5"><path d="M2 6l5-4 5 4v6H2V6z"/></svg>
-                      </div>
-                      <div id="error-goback-text" className="errorGobackText" style={{flex:1}}>
-                        <div id="error-goback-title" className="errorGobackTitle" style={{fontSize:13,fontWeight:600,color:'#0A0A0F',marginBottom:2,fontFamily:'Inter,sans-serif'}}>Go to dashboard</div>
-                        <div id="error-goback-desc" className="errorGobackDesc" style={{fontSize:11,color:'#7A7A90',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>Return home and try again later. Nothing was saved from this run.</div>
-                      </div>
-                      <div id="error-goback-arrow" className="errorGobackArrow" style={{color:'#B8B8CC',fontSize:14,marginTop:2}}>→</div>
-                    </div>
-                  </div>
-                  {/* Support note */}
-                  <div id="error-support-note" className="errorSupportNote" style={{fontSize:11,color:'#B8B8CC',textAlign:'center',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
-                    Seeing this repeatedly? <span id="error-support-link" className="errorSupportLink" style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>Contact support</span> or check <span id="error-status-link" className="errorStatusLink" style={{color:'#7A7A90',cursor:'pointer',textDecoration:'underline'}}>system status</span>.
+                  <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 24 }}>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#9F1239', marginBottom: 16 }}>What Needs Improvement</div>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      {(result.improvements_list || []).slice(0, 5).map((w: string, i: number) => (
+                        <li key={i} style={{ padding: '10px 0', fontSize: '0.84rem', color: '#374151', display: 'flex', gap: 12, alignItems: 'flex-start', borderBottom: '1px solid #FFF1F2' }}>
+                          <span style={{ color: '#EF4444', fontWeight: 700, flexShrink: 0 }}>x</span><span>{w}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── D3 shell — loading state ───────────────────────────────────────────────
-  if (!result && loading) {
-    const cleanDomain = url.replace(/^https?:\/\/(www\.)?/,'').split('/')[0];
-    const cleanedKey = cleanDomain.replace(/^www\./, '').split('.')[0].toLowerCase();
-    const brandNames: Record<string,string> = {
-      'bankofamerica':'Bank of America','bofa':'Bank of America',
-      'chase':'Chase','wellsfargo':'Wells Fargo',
-      'capitalone':'Capital One','americanexpress':'American Express',
-      'amex':'American Express','firstmeridian':'First Meridian',
-      'citi':'Citi','usbank':'U.S. Bank',
-      'google':'Google','microsoft':'Microsoft',
-      'apple':'Apple','amazon':'Amazon',
-      'marriott':'Marriott','hilton':'Hilton',
-      'target':'Target','walmart':'Walmart',
-    };
-    const brandLabel = brandNames[cleanedKey] || cleanDomain;
-    const progressLabel = loadingProgress < 15 ? 'Initializing…' : loadingProgress < 45 ? 'Firing queries…' : loadingProgress < 80 ? 'Analysing responses…' : loadingProgress < 100 ? 'Calculating scores…' : 'Complete';
-    const elapsed = `${Math.floor(elapsedSec/60)}:${String(elapsedSec%60).padStart(2,'0')}`;
-
-    const sbIcon = (active=false): React.CSSProperties => ({
-      width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
-      color:active?'#A100FF':'rgba(255,255,255,0.12)',
-      // background:active?'rgba(161,0,255,0.12)':'transparent',
-    });
-
-    return (
-      <>
-        <style>{`
-          @keyframes d3live{0%,100%{opacity:1}50%{opacity:0.3}}
-          @keyframes d3spin{to{transform:rotate(360deg)}}
-          @keyframes d3shimmer{0%{transform:translateX(-80px);opacity:0}40%{opacity:1}100%{transform:translateX(80px);opacity:0}}
-          @keyframes d3indeterminate{0%{background-position:100% 0}100%{background-position:-100% 0}}
-        `}</style>
-        <div id="percepta-loading" className="perceptaLoading" style={{display:'flex',height:'100vh',overflow:'hidden',background:'#0F0F11'}}>
-
-          {/* Sidebar */}
-          <Sidebar onNewAnalysis={()=>{setLoading(false);setAnalysisError(null);}}/>
-
-          {/* Content column */}
-          <div id="loading-content-col" className="loadingContentCol" style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
-
-            {/* Dark topbar */}
-            <div id="loading-topbar" className="loadingTopbar" style={{height:44,background:'#0F0F11',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'center',padding:'0 20px',gap:10,flexShrink:0}}>
-              <div id="loading-breadcrumb" className="loadingBreadcrumb" style={{fontSize:12,color:'rgba(255,255,255,0.28)',display:'flex',alignItems:'center',gap:7,fontFamily:'Inter,sans-serif'}}>
-                <span id="loading-breadcrumb-root" className="loadingBreadcrumbRoot">Percepta GEO</span>
-                <span id="loading-breadcrumb-sep" className="loadingBreadcrumbSep" style={{color:'rgba(255,255,255,0.12)'}}>/</span>
-                <span id="loading-breadcrumb-active" className="loadingBreadcrumbActive" style={{color:'rgba(255,255,255,0.92)',fontWeight:500}}>New Analysis</span>
-              </div>
-              <div id="loading-topbar-right" className="loadingTopbarRight" style={{marginLeft:'auto'}}>
-                <span id="loading-domain-badge" className="loadingDomainBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,color:'rgba(255,255,255,0.4)',background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',padding:'3px 10px'}}>{cleanDomain}</span>
-              </div>
-            </div>
-
-            {/* Report nav — greyed */}
-            <div id="loading-nav" className="loadingNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities'].map((t,i)=>(
-                <div id={`loading-nav-item-${i}`} className="loadingNavItem" key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
-              ))}
-            </div>
-
-            {/* White canvas */}
-            <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#f3f4f6',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
-              {/* Loading card */}
-              <div id="loading-panel" className="loadingPanel" style={{position:'relative',zIndex:1,width:'100%',maxWidth:560,boxShadow:'0 4px 32px rgba(0,0,0,0.10)'}}>
-
-                {/* Dark card header */}
-                <div id="loading-panel-header" className="loadingPanelHeader" style={{background:'#0F0F11',padding:'24px 28px 20px',display:'flex',flexDirection:'column',gap:14}}>
-                  <div id="loading-header-row" className="loadingHeaderRow" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
-                    <div id="loading-header-left" className="loadingHeaderLeft" style={{flex:1}}>
-                      <div id="loading-running-label" className="loadingRunningLabel" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:9,letterSpacing:'0.14em',textTransform:'uppercase' as const,color:'rgba(255,255,255,0.28)',marginBottom:5}}>Running analysis</div>
-                      <div id="loading-brand-name" className="loadingBrandName" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:18,fontWeight:500,color:'rgba(255,255,255,0.9)',letterSpacing:'-0.02em',lineHeight:1}}>{brandLabel}</div>
-                      <div id="loading-meta" className="loadingMeta" style={{fontSize:11,color:'rgba(255,255,255,0.3)',marginTop:5,fontFamily:'Inter,sans-serif'}}>{d3ScopeSelected} · {promptCount.toLocaleString()} prompts · GPT-4o</div>
-                    </div>
-                    <div id="loading-querying-badge" className="loadingQueryingBadge" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:500,padding:'4px 10px',whiteSpace:'nowrap' as const,flexShrink:0,display:'flex',alignItems:'center',gap:6,color:'#00D1C7',background:'rgba(0,209,199,0.10)',border:'1px solid rgba(0,209,199,0.20)'}}>
-                      <span id="loading-querying-dot" className="loadingQueryingDot" style={{width:5,height:5,borderRadius:'50%',background:'currentColor',display:'inline-block',animation:'d3live 2s ease-in-out infinite'}}/>
-                      Querying
-                    </div>
+                <div style={{ background: 'white', borderRadius: 12, border: '1px solid #E5E7EB', padding: 24 }}>
+                  <div style={{ fontSize: '1rem', fontWeight: 700, color: '#111827', marginBottom: 4 }}>Priority Actions</div>
+                  <div style={{ fontSize: '0.78rem', color: '#9CA3AF', marginBottom: 20 }}>Each action mapped to the relevant Accenture workstream deliverable.</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', borderBottom: '2px solid #E5E7EB', paddingBottom: 8, marginBottom: 4 }}>
+                    {['Priority', 'Action', 'Linked Deliverable'].map(h => <div key={h} style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 600 }}>{h}</div>)}
                   </div>
-                  <div id="loading-progress-row" className="loadingProgressRow" style={{display:'flex',flexDirection:'column' as const,gap:5}}>
-                    <div id="loading-progress-label-row" className="loadingProgressLabelRow" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                      <span id="loading-progress-label" className="loadingProgressLabel" style={{fontSize:11,color:'rgba(255,255,255,0.4)',fontFamily:'Inter,sans-serif'}}>{progressLabel}</span>
-                      <span id="loading-progress-pct" className="loadingProgressPct" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'rgb(189, 74, 255)'}}>{loadingProgress}%</span>
-                    </div>
-                    <div id="loading-progress-track" className="loadingProgressTrack" style={{height:2,background:'rgba(255,255,255,0.08)',overflow:'hidden',position:'relative' as const}}>
-                      <div id="loading-progress-fill" className="loadingProgressFill" style={{height:'100%',background:'rgb(161, 0, 255)',width:`${loadingProgress}%`,transition:'width 0.7s cubic-bezier(0.20,0,0.00,1)',position:'relative' as const}}>
-                        <div id="loading-shimmer" className="loadingShimmer" style={{position:'absolute' as const,top:0,right:-40,width:40,height:'100%',background:'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',animation:'d3shimmer 1.8s ease-in-out infinite'}}/>
+                  {(result.actions || []).map((a: any, i: number) => {
+                    const dm: Record<string, [string, string]> = { High: ['Workstream 01: ARD', 'AXO Baseline Report and Brand Ranking Index'], Medium: ['Workstream 02: AOP', 'LLM-Ready Content Package and Content Influence Blueprint'], Low: ['Workstream 03: DTI', 'Schema Optimization Guide and Metadata Remediation Plan'] };
+                    const priBg: Record<string, string> = { High: '#FEE2E2', Medium: '#FEF3C7', Low: '#DCFCE7' };
+                    const priTc: Record<string, string> = { High: '#991B1B', Medium: '#92400E', Low: '#166534' };
+                    const [pk, deliv] = dm[a.priority] || ['', ''];
+                    return (
+                      <div key={i} style={{ display: 'grid', gridTemplateColumns: '90px 1fr 1fr', gap: 0, borderBottom: '1px solid #F3F4F6', padding: '14px 0', alignItems: 'start' }}>
+                        <div><span style={{ background: priBg[a.priority], color: priTc[a.priority], borderRadius: 4, padding: '2px 10px', fontSize: '0.72rem', fontWeight: 700 }}>{a.priority}</span></div>
+                        <div style={{ fontSize: '0.84rem', color: '#374151', paddingRight: 16 }}>{a.action}</div>
+                        <div>
+                          <span style={{ background: '#EDE9FE', borderRadius: 6, padding: '3px 10px', fontSize: '0.78rem', color: '#7C3AED', fontWeight: 600 }}>{pk}</span>
+                          <div style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: 4 }}>{deliv}</div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-
-                {/* White card body */}
-                <div id="loading-steps-list" className="loadingStepsList" style={{background:'#FFFFFF',border:'1px solid #E4E4EC',borderTop:'none',padding:'20px 28px 24px',display:'flex',flexDirection:'column',gap:16}}>
-
-                  {/* Percepta GEO V1 info block — periwinkle, solid filled i icon */}
-                  <div id="loading-v1-note" className="loadingV1Note" style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'rgba(91,127,212,0.04)',border:'1px solid rgba(91,127,212,0.18)'}}>
-                    <svg id="loading-v1-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0,marginTop:1}}>
-                      <circle cx="8" cy="8" r="8" fill="#5B7FD4"/>
-                      <circle cx="8" cy="5" r="1.1" fill="white"/>
-                      <rect x="7.1" y="7.2" width="1.8" height="4.5" rx="0.9" fill="white"/>
-                    </svg>
-                    <div id="loading-v1-text" className="loadingV1Text">
-                      <div id="loading-v1-label" className="loadingV1Label" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#5B7FD4',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
-                      <div id="loading-v1-desc" className="loadingV1Desc" style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
-                        This analysis runs on <strong style={{color:'#0A0A0F'}}>OpenAI GPT-4o</strong> and models AI visibility patterns across major search engines. <strong style={{color:'#0A0A0F'}}>Multi-engine analysis</strong> — querying ChatGPT, Gemini, Perplexity, and Claude directly — is planned for v2.
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Elapsed */}
-                  <div id="loading-elapsed-row" className="loadingElapsedRow" style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                    <span id="loading-elapsed-label" className="loadingElapsedLabel" style={{fontSize:11,color:'#B8B8CC',fontFamily:'Inter,sans-serif'}}>Elapsed</span>
-                    <span id="loading-elapsed-value" className="loadingElapsedValue" style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:11,fontWeight:500,color:'#7A7A90'}}>{elapsed}</span>
-                  </div>
-
-                  {/* Nav warning — solid filled triangle */}
-                  <div id="loading-nav-warning" className="loadingNavWarning" style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
-                      <path d="M7.13 2.17 1.1 12.75A1.03 1.03 0 0 0 2 14.25h12a1.03 1.03 0 0 0 .9-1.5L8.87 2.17a1.03 1.03 0 0 0-1.74 0z" fill="#F5A623"/>
-                      <rect x="7.1" y="5.8" width="1.8" height="3.8" rx="0.9" fill="white"/>
-                      <circle cx="8" cy="11.3" r="1" fill="white"/>
-                    </svg>
-                    Leaving this page will cancel the analysis. Results are not saved until complete.
-                  </div>
-
-                </div>
-
-                {/* Cancel analysis bar */}
-                <button
-                  id="loading-cancel-btn"
-                  onClick={() => { setLoading(false); setAnalysisError(null); }}
-                  style={{display:'flex',alignItems:'center',justifyContent:'center',gap:7,width:'100%',padding:'13px 24px',background:'#FFF',border:'1px solid #E4E4EC',borderTop:'1px solid #EDEDF2',cursor:'pointer',fontSize:12,fontWeight:500,color:'#A04040',fontFamily:'Inter,sans-serif'}}
-                >
-                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8"><line x1="1.5" y1="1.5" x2="10.5" y2="10.5"/><line x1="10.5" y1="1.5" x2="1.5" y2="10.5"/></svg>
-                  Cancel analysis
-                </button>
-
               </div>
-            </div>
+            )}
+
+            {/* TAB 7: Live Prompt */}
+            {activeTab === 7 && (
+              <div>
+                <div style={{ background: '#7C3AED', borderRadius: 12, padding: '24px 28px', color: 'white', marginBottom: 20 }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'white', margin: '0 0 6px' }}>Live AI Prompt Lab</h3>
+                  <p style={{ fontSize: '0.88rem', color: 'rgba(255,255,255,0.85)', margin: 0 }}>Type any prompt and see exactly how GPT-4o responds in real time.</p>
+                </div>
+                <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
+                  <input type="text" value={promptInput} onChange={e => setPromptInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && runPrompt()} placeholder="e.g. What is the best travel credit card for high net worth individuals?"
+                    style={{ flex: 1, borderRadius: 12, border: '1.5px solid #DDD6FE', padding: '14px 18px', fontSize: '0.95rem', height: 52, background: '#FAFAFE', outline: 'none' }} />
+                  <button onClick={runPrompt} disabled={promptLoading} style={{ background: '#7C3AED', color: 'white', border: 'none', borderRadius: 12, fontWeight: 700, fontSize: '0.95rem', padding: '0 24px', height: 52, cursor: 'pointer' }}>
+                    {promptLoading ? '...' : 'Run'}
+                  </button>
+                </div>
+                {promptHistory.map((item, i) => (
+                  <div key={i}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '20px 0 10px' }}>
+                      <div style={{ background: '#F4F4F4', color: '#111827', borderRadius: '18px 18px 4px 18px', padding: '12px 18px', maxWidth: '60%', fontSize: '0.95rem' }}>{item.q}</div>
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{item.a}</div>
+                    <hr style={{ border: 'none', borderTop: '1px solid #F3F4F6', margin: '16px 0' }} />
+                  </div>
+                ))}
+                {promptHistory.length > 0 && (
+                  <button onClick={() => setPromptHistory([])} style={{ background: 'none', border: '1px solid #E5E7EB', borderRadius: 8, color: '#6B7280', fontSize: '0.78rem', padding: '6px 14px', cursor: 'pointer' }}>Clear history</button>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </>
-    );
-  }
-
-  const geo = result?.overall_geo_score ?? 0;
-  const gBadge = scoreBadge(geo);
-  // Single cap — all tabs show the same 10-competitor field.
-  // Every industry's comps array is 10; fin was trimmed from 20 to match.
-  const resultComps = (result?.competitors || []).slice(0, 10);
-
-  return (
-    <div id="percepta-shell" className="shell">
-
-      {/* ── Sidebar ── */}
-      <Sidebar
-        onNewAnalysis={()=>{setResult(null);setUrl('');try{sessionStorage.clear();}catch{}}}
-        breadcrumb={result?.brand_name ? {section:'Reports',label:result.brand_name} : undefined}
-      />
-
-      {/* ── Content column ── */}
-      <div id="percepta-content-col" className="contentCol">
-
-        {/* Topbar: breadcrumb + GEO pill */}
-        <div id="percepta-topbar" className="topbar">
-          <div className="topbarBreadcrumb">
-            Reports&nbsp;<span className="topbarSep">/</span>&nbsp;<span className="topbarBreadcrumbActive">{result?.brand_name||''}</span>
-          </div>
-          {result&&<span style={{fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,fontWeight:600,padding:'3px 10px',background:gBadge.bg,color:gBadge.color,border:`1px solid ${gBadge.color}22`}}>GEO {geo}</span>}
-        </div>
-
-        {/* Org strip */}
-        <div id="percepta-org-strip" className="orgStrip">
-          <div className="orgAvatar">
-            {(result?.brand_name||'?').split(' ').map((w:string)=>w[0]).join('').slice(0,2).toUpperCase()}
-          </div>
-          <div style={{flex:1,minWidth:0}}>
-            <div className="orgName">{result?.brand_name}</div>
-            <div className="orgMeta">
-              <span className="orgDomain">{(result?.domain||'').replace(/^https?:\/\//,'').replace(/^www\./,'')}</span>
-              {result?.brand_known_for?.length>0&&(
-                <>&nbsp;&nbsp;·&nbsp;&nbsp;<span className="orgKnownFor">Known for {(result.brand_known_for as string[]).length===1
-                  ? result.brand_known_for[0]
-                  : (result.brand_known_for as string[]).length===2
-                    ? `${result.brand_known_for[0]} and ${result.brand_known_for[1]}`
-                    : `${(result.brand_known_for as string[]).slice(0,-1).join(', ')}, and ${result.brand_known_for[result.brand_known_for.length-1]}`
-                }</span></>
-              )}
-            </div>
-          </div>
-          {(result?.ind_label||d3ScopeSelected)&&<div className="orgChip">
-            {(d3ScopeSelected&&d3ScopeSelected!=='+ Custom'
-              ? d3ScopeSelected
-              : (d3CustomScope.trim()||result?.ind_label||'')
-            ).split(' ').slice(0,3).join(' ')}
-          </div>}
-        </div>
-
-        {/* Top-level tab bar */}
-        <div id="percepta-tab-bar" className="tabBar"
-          onMouseLeave={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);setHoverParent(null);}}>
-          {TOP_TABS.map((tab,i)=>(
-            <button key={i}
-              id={`scan-nav-item-${i}`}
-              className={`tabBtn${activeParent===i?' tabBtn--active':''}`}
-              onClick={()=>{setActiveParent(i);setActiveSub(0);setHoverParent(null);}}
-              onMouseEnter={()=>{if(hoverTimer.current)clearTimeout(hoverTimer.current);hoverTimer.current=setTimeout(()=>setHoverParent(i),120);}}>
-              {tab.label}
-            </button>
-          ))}
-          {hoverParent!==null&&TOP_TABS[hoverParent].subs.length>0&&activeParent!==hoverParent&&(
-            <div className="tabDropdown">
-              {TOP_TABS[hoverParent].subs.map((sub,j)=>(
-                <button key={j}
-                  id={`tab-dropdown-item-${hoverParent}-${j}`}
-                  className="tabDropdownItem"
-                  onClick={()=>{const hp=hoverParent;setActiveParent(hp);setActiveSub(j);setHoverParent(null);}}>
-                  {sub}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Persistent sub-tab strip */}
-        {TOP_TABS[activeParent].subs.length>0&&(
-          <div id="percepta-subtab-bar" className="subtabBar">
-            {TOP_TABS[activeParent].subs.map((sub,j)=>(
-              <button key={j}
-                id={`subtab-btn-${activeParent}-${j}`}
-                className={`subtabBtn${activeSub===j?' subtabBtn--active':''}`}
-                onClick={()=>setActiveSub(j)}>
-                {sub}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Scrollable content canvas */}
-        <div id="percepta-canvas" className="canvas">
-          <div className="canvasInner">
-
-
-
-
-            {activeParent===0&&activeSub===0&&<GeoScoreTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions||[]}/>}
-            {activeParent===0&&activeSub===1&&<AiPresenceTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===0&&activeSub===2&&<ReachTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===0&&<CompetitorsTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===1&&activeSub===1&&<CompetitorsByTopicTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub}/>}
-            {activeParent===2&&activeSub===0&&<PromptsTestedTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} setLivePromptQuery={setLivePromptQuery}/>}
-            {activeParent===2&&activeSub===1&&<PromptsLiveTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} initialQuery={livePromptQuery} onQueryConsumed={()=>setLivePromptQuery('')} promptHistory={livePromptHistory} setPromptHistory={setLivePromptHistory}/>}
-            {activeParent===3&&<PrioritiesTab result={result} resultComps={resultComps} setActiveParent={setActiveParent} setActiveSub={setActiveSub} playbookActions={playbookActions}/>}
-
-
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    </main>
   );
 }
