@@ -20,69 +20,198 @@
   border-right: 1px solid var(--color-dark-border);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 12px 0 16px;
+  align-items: stretch;
+  padding: 14px 0 16px;
   flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 10;
+}
+
+.sidebar--expanded {
+  width: 188px;
+}
+
+/* Header row: logo + pin button */
+.sidebarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 14px;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .sidebarLogo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  min-width: 0;
+  flex: 1;
+}
+
+.sidebarLogoIcon {
   width: 24px;
   height: 24px;
   background: var(--color-brand);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--font-display);
-  font-size: 11px;
-  font-weight: 700;
-  color: white;
-  margin-bottom: 8px;
-  text-decoration: none;
+  flex-shrink: 0;
 }
 
-.sidebarNewBtn {
-  width: 32px;
-  height: 32px;
+.sidebarLogoName {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  width: 0;
+  transition: opacity 0.18s, width 0.18s;
+}
+
+.sidebar--expanded .sidebarLogoName {
+  opacity: 1;
+  width: auto;
+}
+
+/* Pin/collapse toggle button */
+.sidebarPinBtn {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.25);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 0;
+}
+
+.sidebar--expanded .sidebarPinBtn {
+  opacity: 1;
+}
+
+.sidebarPinBtn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* New Analysis button */
+.sidebarNewBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 10px 12px;
+  padding: 0 10px;
+  height: 32px;
   cursor: pointer;
   border: 1px solid rgba(161, 0, 255, 0.35);
   color: var(--color-brand);
   background: rgba(161, 0, 255, 0.10);
-  margin-bottom: 10px;
   flex-shrink: 0;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebarNewBtn:hover {
+  background: rgba(161, 0, 255, 0.18);
 }
 
 .sidebarDivider {
-  width: 28px;
   height: 1px;
   background: var(--color-dark-border);
-  margin-bottom: 8px;
+  margin: 0 10px 8px;
 }
 
-.sidebarIcon {
-  width: 36px;
-  height: 36px;
+/* Labels that appear/disappear on expand */
+.sidebarBtnLabel,
+.sidebarNavLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  width: 0;
+  transition: opacity 0.18s, width 0.18s;
+}
+
+.sidebar--expanded .sidebarBtnLabel,
+.sidebar--expanded .sidebarNavLabel {
+  opacity: 1;
+  width: auto;
+}
+
+/* Nav items */
+.sidebarNavItem {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: rgba(255, 255, 255, 0.25);
-  background: transparent;
+  gap: 9px;
+  padding: 0 14px;
+  height: 34px;
+  color: rgba(255, 255, 255, 0.40);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
   cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
-.sidebarIcon--active {
-  color: var(--color-brand);
-  background: rgba(161, 0, 255, 0.12);
+.sidebarNavItem:hover {
+  color: rgba(255, 255, 255, 0.80);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Log out — styled like the home-page sign-in pill */
+.sidebarLogoutBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 10px 0;
+  padding: 0 10px;
+  height: 32px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 160ms, border-color 160ms, color 160ms;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.sidebarLogoutBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .sidebarBottom {
   margin-top: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
 }
 
 /* ── Content column ────────────────────────────────────────── */
@@ -178,8 +307,10 @@
   padding: 3px 10px;
   background: var(--color-brand-chip-bg);
   border: 1px solid var(--color-brand-chip-border);
-  flex-shrink: 0;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: right;
+  width: min-content;
+  align-self: center;
 }
 
 /* ── Tab bar ───────────────────────────────────────────────── */
@@ -292,4 +423,180 @@
 
 .canvasInner {
   padding: 28px 40px 60px;
+}
+
+/* ── Mobile topbar ─────────────────────────────────────────── */
+.mobileTopbar {
+  display: none;
+}
+
+.mobileTopbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.mobileTopbarLogo {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.mobileTopbarPath {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mobileTopbarBrand {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+
+.mobileTopbarSep {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.mobileTopbarSection {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-body);
+  flex-shrink: 0;
+}
+
+.mobileTopbarLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  font-family: var(--font-display);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.mobileHamburger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ── Mobile drawer ─────────────────────────────────────────── */
+.mobileDrawerDim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobileDrawerDim--open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobileDrawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 260px;
+  bottom: 0;
+  background: #141416;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 0 16px;
+  z-index: 201;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mobileDrawer--open {
+  transform: translateX(0);
+}
+
+.mobileDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px 14px;
+}
+
+.mobileDrawerClose {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ── Mobile breakpoint ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .sidebar {
+    display: none;
+  }
+
+  .mobileTopbar {
+    display: flex;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: #0F0F11;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    z-index: 100;
+    flex-shrink: 0;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .contentCol,
+  .scanContentCol,
+  .loadingContentCol,
+  .errorContentCol {
+    padding-top: 48px;
+  }
+
+  .canvasInner {
+    padding: 20px 16px 40px;
+  }
+
+  /* ── Font-size overrides ─────────────────────────────────── */
+  .orgName      { font-size: 14px; }
+  .orgMeta      { font-size: 11px; }
+  .orgChip      { font-size: 11px; }
+  .tabBtn       { font-size: 12px; padding: 11px 10px; }
+  .subtabBtn    { font-size: 11px; padding: 4px 8px; }
 }
