@@ -5576,6 +5576,60 @@
   .pb-rail-actions .pb-avf-btn { width: 100%; }
 }
 
+/* ── Support strip ────────────────────────────────────────────── */
+.pb-support-strip {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 28px;
+  padding: 20px 24px;
+  background: #ffffff;
+  border: 1px solid #E5E5E5;
+  border-left: 3px solid #A100FF;
+  text-decoration: none;
+  transition: border-color 140ms, box-shadow 140ms;
+}
+.pb-support-strip:hover {
+  border-color: #A100FF;
+  box-shadow: 0 2px 12px 0 rgba(161,0,255,0.07);
+}
+.pb-support-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pb-support-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #A100FF;
+}
+.pb-support-heading {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0A0A0A;
+}
+.pb-support-sub {
+  font-size: 14px;
+  color: #6B6B6B;
+  line-height: 1.5;
+}
+.pb-support-arrow {
+  flex-shrink: 0;
+  color: #A100FF;
+  opacity: 0.7;
+  transition: opacity 140ms, transform 140ms;
+}
+.pb-support-strip:hover .pb-support-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
 /* ══════════════════════════════════════════════════════════════
    GEO EXPLAINER — "How the GEO Score is calculated" expandable
    Sits directly below the vcmp chart card.

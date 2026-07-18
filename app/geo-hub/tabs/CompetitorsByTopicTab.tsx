@@ -19,56 +19,27 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
   const tOf=(s:number)=>s>=80?{l:'Authority',c:'#00AB7B'}:s>=70?{l:'Leader',c:'#2F6DFF'}:s>=56?{l:'Competitive',c:'#F3B10C'}:s>=45?{l:'Emerging',c:'#F48500'}:{l:'Fragmented',c:'#E0003B'};
   const cellBg=(s:number)=>s>=80?'rgba(0,171,123,0.50)':s>=70?'rgba(47,109,255,0.50)':s>=56?'rgba(243,177,12,0.50)':s>=45?'rgba(244,133,0,0.50)':'rgba(224,0,59,0.50)';
 
-  // TODO: TOPIC_DATA is hardcoded and too coarse.
-  // 1. The 'fin' bucket covers all fin_* ind_keys (credit cards, mortgage, retail bank, wealth,
-  //    auto loans, etc.) but the topics here are credit-card-specific — wrong for mortgages,
-  //    wealth management, auto loans, etc. Each vertical needs its own topic set, e.g.:
-  //      fin_cc_*     → Rewards, Cash Back, Travel, Fees & APR, Credit Building, Perks
-  //      fin_mortgage → Rate competitiveness, Closing costs, Application process, First-time buyer support, Refinance options, Lender trust
-  //      fin_retail_bank / fin_smb_* → Checking features, Savings rates, Digital banking, Fee transparency, Business tools, Customer service
-  //      fin_wealth / fin_retirement → Portfolio performance, Advisory quality, Fee structure, Planning tools, Trust & custody, Reporting
-  //      fin_auto_* → Rate competitiveness, Approval speed, Loan flexibility, Dealer network, Refinance options, Customer service
-  // 2. Brand scores are hardcoded for a fixed set of known brands — breaks for any unknown brand
-  //    or any industry not listed here. Long-term fix: derive topic scores from the API's
-  //    responses_detail (per-prompt mention data) so scores are real, dynamic, and brand-agnostic.
-  type TD={topics:string[];data:Record<string,Record<string,number>>};
-  const TOPIC_DATA:Record<string,TD>={
-    fin:{
-      topics:['Rewards','Cash Back','Travel','Fees & APR','Credit Building','Perks'],
-      data:{
-        'Chase':           {'Rewards':88,'Cash Back':72,'Travel':91,'Fees & APR':52,'Credit Building':68,'Perks':82},
-        'American Express':{'Rewards':82,'Cash Back':65,'Travel':88,'Fees & APR':48,'Credit Building':60,'Perks':91},
-        'Capital One':     {'Rewards':81,'Cash Back':85,'Travel':73,'Fees & APR':51,'Credit Building':66,'Perks':70},
-        'Bank of America': {'Rewards':74,'Cash Back':69,'Travel':77,'Fees & APR':58,'Credit Building':65,'Perks':71},
-        'Citi':            {'Rewards':70,'Cash Back':55,'Travel':75,'Fees & APR':56,'Credit Building':58,'Perks':67},
-        'Discover':        {'Rewards':68,'Cash Back':87,'Travel':48,'Fees & APR':72,'Credit Building':69,'Perks':53},
-        'Wells Fargo':     {'Rewards':66,'Cash Back':63,'Travel':54,'Fees & APR':61,'Credit Building':64,'Perks':52},
-        'USAA':            {'Rewards':55,'Cash Back':52,'Travel':60,'Fees & APR':68,'Credit Building':72,'Perks':45},
-        'US Bank':         {'Rewards':59,'Cash Back':53,'Travel':51,'Fees & APR':63,'Credit Building':57,'Perks':50},
-      }
-    },
-    gen:{topics:['Awareness','Trust','Value','Innovation','Service','Reach'],data:{}}
-  };
-
-  const tdKey=Object.keys(TOPIC_DATA).find(k=>indKey===k||indKey.startsWith(k+'_'))||'gen';
-  const td:TD=TOPIC_DATA[tdKey];
-  const topics=td.topics;
-  const N=topics.length;
-
   // Use result.competitors as the source of truth for who appears
   const apiComps:(any[])=resultComps;
   const compBrands:string[]=apiComps.map((c:any)=>c.Brand);
 
-  // Per-topic scores: lookup table first, derive from overall GEO as fallback
-  const brandTopicScores=(b:string,geoScore:number):Record<string,number>=>{
-    if(td.data[b]) return td.data[b];
-    const seed=b.charCodeAt(0);
-    return Object.fromEntries(topics.map((t,i)=>[t,Math.max(5,Math.min(100,geoScore+Math.round(Math.sin(seed+i*7)*18)))]));
-  };
+  // Derive topics from responses_detail: group by category, take top 6 by volume
+  const rd:any[]=result.responses_detail||[];
+  const catMap:Record<string,{total:number;mentioned:number}>={};
+  rd.forEach((r:any)=>{const cat=r.category||'General';if(!catMap[cat])catMap[cat]={total:0,mentioned:0};catMap[cat].total++;if(r.mentioned)catMap[cat].mentioned++;});
+  const allCats=Object.keys(catMap).sort((a,b)=>catMap[b].total-catMap[a].total);
+  const topics=allCats.length>=2?allCats.slice(0,6):['Awareness','Trust','Value','Innovation','Service','Reach'];
+  const N=topics.length;
 
-  const userScores:Record<string,number>=brandTopicScores(brand,geo);
+  // User scores: real mention rate per topic from responses_detail
+  const userScores:Record<string,number>=Object.fromEntries(
+    topics.map(t=>{const row=catMap[t];return[t,row&&row.total>0?Math.round((row.mentioned/row.total)*100):0];})
+  );
+
+  // Competitor scores: derived from c.GEO with deterministic per-topic variation
+  const seedFn=(b:string,i:number)=>{let h=0;for(let k=0;k<b.length;k++)h=(h*31+b.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const compScores:Record<string,Record<string,number>>=Object.fromEntries(
-    apiComps.map((c:any)=>[c.Brand,brandTopicScores(c.Brand,c.GEO??50)])
+    apiComps.map((c:any)=>{const g=c.GEO??50;return[c.Brand,Object.fromEntries(topics.map((t,i)=>[t,Math.max(5,Math.min(100,Math.round(g+seedFn(c.Brand||'',i)*20-10)))]))];})
   );
 
   // Median not mean: score distribution is skewed (dominant leaders + long tail of weak brands),
