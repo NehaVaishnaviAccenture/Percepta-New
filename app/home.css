@@ -57,24 +57,75 @@
   letter-spacing: -0.02em;
 }
 
-.navLinks {
+.navAuthSlot {
   display: flex;
   align-items: center;
-  gap: 0;
 }
 
-.navLink {
+.navSignInBtn {
   font-family: 'Inter', sans-serif;
-  color: #6B6B6B;
-  font-weight: 500;
   font-size: 0.875rem;
-  padding: 8px 24px;
-  text-decoration: none;
-  transition: color 160ms;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 7px 18px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
 }
 
-.navLink:hover {
-  color: #FFF;
+.navSignInBtn:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.32);
+}
+
+.navUserPill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 4px 4px 4px 14px;
+  cursor: default;
+}
+
+.navUserEmail {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navUserAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #A100FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.navUserAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.navUserAvatarInitials {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
 }
 
 /* ── Hero ── */
@@ -359,7 +410,7 @@
 /* ── Score Bands ── */
 .scoreBands {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 64px;
 }
@@ -612,7 +663,13 @@
   }
 
   .scoreBands {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .scoreBandCard:nth-child(-n+3) {
+    grid-column: span 2;
+  }
+  .scoreBandCard:nth-child(n+4) {
+    grid-column: span 3;
   }
 
   .comparisonGrid {
@@ -682,7 +739,7 @@
   }
 
   .scoreBands {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 8px;
     margin-bottom: 40px;
   }

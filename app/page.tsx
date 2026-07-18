@@ -1,10 +1,6 @@
 import Link from 'next/link';
+import NavAuthPill from './NavAuthPill';
 import './home.css';
-
-const navItems = [
-  { label: 'GEO Hub', href: '/geo-hub' },
-  { label: 'Get Support', href: '/get-support' },
-];
 
 function TopNav() {
   return (
@@ -19,12 +15,8 @@ function TopNav() {
         </div>
         <span id="nav-brand-name" className="navBrandName">Percepta</span>
       </div>
-      <div id="nav-links" className="navLinks">
-        {navItems.map(({ label, href }) => (
-          <Link key={href} href={href} id={`nav-link-${label.toLowerCase().replace(/\s+/g, '-')}`} className="navLink">
-            {label}
-          </Link>
-        ))}
+      <div className="navAuthSlot">
+        <NavAuthPill />
       </div>
     </nav>
   );
@@ -50,10 +42,11 @@ const steps = [
 ];
 
 const bands = [
-  { bg: '#ECFDF5', border: '#6EE7B7', color: '#065F46', range: '80–100', label: 'Excellent', desc: 'Well optimized for AI citation' },
-  { bg: '#EFF6FF', border: '#93C5FD', color: '#1E40AF', range: '70–79', label: 'Good', desc: 'Minor improvements recommended' },
-  { bg: '#FFFBEB', border: '#FCD34D', color: '#92400E', range: '45–69', label: 'Needs Work', desc: 'Several issues to address' },
-  { bg: '#FFF1F2', border: '#FCA5A5', color: '#991B1B', range: '0–44', label: 'Poor', desc: 'Major optimization needed' },
+  { color: '#007653', fill: '#00AB7B', range: '80–100', label: 'Authority',    desc: 'AI consistently cites you as a category leader' },
+  { color: '#043BCC', fill: '#2F6DFF', range: '70–79',  label: 'Leader',       desc: 'Strong presence with minor gaps to close' },
+  { color: '#996E00', fill: '#F3B10C', range: '56–69',  label: 'Competitive',  desc: 'Holding your own but room to pull ahead' },
+  { color: '#B15F00', fill: '#F48500', range: '45–55',  label: 'Emerging',     desc: 'Visible in some areas, inconsistent overall' },
+  { color: '#B7002F', fill: '#E0003B', range: '0–44',   label: 'Fragmented',   desc: 'AI rarely surfaces your brand' },
 ];
 
 const competitors = [
@@ -146,7 +139,7 @@ export default function Overview() {
         {/* Score Bands */}
         <div id="score-bands" className="scoreBands">
           {bands.map((b, i) => (
-            <div key={i} id={`score-band-${i + 1}`} className="scoreBandCard" style={{ background: b.bg, border: `1.5px solid ${b.border}`, color: b.color }}>
+            <div key={i} id={`score-band-${i + 1}`} className="scoreBandCard" style={{ background: `${b.fill}14`, border: `1.5px solid ${b.fill}`, color: b.color }}>
               <div id={`score-band-${i + 1}-range`} className="scoreBandRange">{b.range}</div>
               <div id={`score-band-${i + 1}-label`} className="scoreBandLabel">{b.label}</div>
               <div id={`score-band-${i + 1}-desc`} className="scoreBandDesc">{b.desc}</div>
