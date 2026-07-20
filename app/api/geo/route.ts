@@ -812,16 +812,19 @@ function computeRaw(
   // VISIBILITY: organic / total
   const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  // PROMINENCE: rank1 organic / total
+  // PROMINENCE: rank1 / organicMentions × 100
+  // Reads as: when GPT mentions this brand, how often does it name it first?
+  // Quality signal — Chase leads 41% of its own mentions, CapOne leads 8%
+  // This makes prominence proportional and meaningful vs visibility
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
   const avgPos = organicPositions.length > 0
     ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
   const rank1Count = organicPositions.filter(p => p === 1).length;
-  // PROMINENCE: rank1 / total × 100
-  // How often this brand is named first across all queries run
-  const promRaw = Math.round((rank1Count / total) * 100);
+  const promRaw = organicMentioned.length > 0
+    ? Math.round((rank1Count / organicMentioned.length) * 100)
+    : 0;
 
   // CITATION: organic positions only — supplemental inflates this for low-visibility brands
   // Brands with zero organic mentions get citRaw=0 — no false high citations
@@ -840,18 +843,12 @@ function computeRaw(
   });
   const sentRaw = Math.round((posMentions / total) * 100);
 
-  // SOV = organicMentions / anyBrandResponses
-  // anyBrandResponses = responses where at least one brand in the set appears
-  // This gives SOV slightly higher than or equal to visibility — correct behavior
-  const anySet = new Set<number>();
-  answered.forEach((r: any, i: number) => {
-    const t = (r.a || '').toLowerCase();
-    if (hasAlias(t, als)) anySet.add(i);
-    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
-  });
+  // SOV raw = organic mention count
+  // Converted to true competitive share % in scoreAllBrands:
+  // brand / sum(all brand organic mentions) — very different from visibility
   const sovRaw = organicMentioned.length;
 
-  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: anySet.size };
+  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: 0 };
 }
 
 function scoreAllBrands(
@@ -876,8 +873,10 @@ function scoreAllBrands(
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
 
-  // SOV denominator = responses where at least one brand appears
-  const anyBrandCount = Math.max(...raws.map(r => r.anyBrandCount), 1);
+  // SOV denominator = total organic mentions across all brands
+  // Chase 220 + CapOne 210 + Amex 144 + ... = ~1100 total
+  // Chase SOV = 220/1100 = 20% — true competitive share, distinct from visibility
+  const anyBrandCount = Math.max(raws.reduce((s, r) => s + r.sovRaw, 0), 1);
 
   // floor: min 5 for brands with any mention data, never 0 unless truly invisible
   // cap: max 95, never 100
