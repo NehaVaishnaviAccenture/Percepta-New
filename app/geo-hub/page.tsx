@@ -532,13 +532,6 @@ export default function GeoHub() {
               </div>
             </div>
 
-            {/* Report nav — greyed */}
-            <div id="loading-nav" className="loadingNav" style={{height:40,background:'#141416',borderBottom:'1px solid rgba(255,255,255,0.07)',display:'flex',alignItems:'stretch',padding:'0 20px',flexShrink:0,opacity:0.3,pointerEvents:'none' as const,overflowX:'auto' as const}}>
-              {['GEO Score','Competitors','Visibility','Sentiment','Citations','Prompts','Priorities'].map((t,i)=>(
-                <div id={`loading-nav-item-${i}`} className="loadingNavItem" key={t} style={{fontSize:12,fontWeight:500,color:'rgba(255,255,255,0.28)',fontFamily:'Inter,sans-serif',padding:'0 14px',display:'flex',alignItems:'center',borderBottom:'2px solid transparent',whiteSpace:'nowrap' as const}}>{t}</div>
-              ))}
-            </div>
-
             {/* White canvas */}
             <div id="loading-canvas" className="loadingCanvas" style={{flex:1,background:'#f3f4f6',overflowY:'auto',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'40px 24px',position:'relative'}}>
               {/* Loading card */}
@@ -582,7 +575,7 @@ export default function GeoHub() {
                     </svg>
                     <div id="loading-v1-text" className="loadingV1Text">
                       <div id="loading-v1-label" className="loadingV1Label" style={{fontSize:9,fontWeight:600,letterSpacing:'0.12em',textTransform:'uppercase' as const,color:'#5B7FD4',marginBottom:4,fontFamily:'Inter,sans-serif'}}>Percepta GEO V1</div>
-                      <div id="loading-v1-desc" className="loadingV1Desc" style={{fontSize:11,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
+                      <div id="loading-v1-desc" className="loadingV1Desc" style={{fontSize:14,color:'#3D3D50',lineHeight:1.6,fontFamily:'Inter,sans-serif'}}>
                         This analysis runs on <strong style={{color:'#0A0A0F'}}>OpenAI GPT-4o</strong> and models AI visibility patterns across major search engines. <strong style={{color:'#0A0A0F'}}>Multi-engine analysis</strong> — querying ChatGPT, Gemini, Perplexity, and Claude directly — is planned for v2.
                       </div>
                     </div>
@@ -595,7 +588,7 @@ export default function GeoHub() {
                   </div>
 
                   {/* Nav warning — solid filled triangle */}
-                  <div id="loading-nav-warning" className="loadingNavWarning" style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:11,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
+                  <div id="loading-nav-warning" className="loadingNavWarning" style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'rgba(245,166,35,0.05)',border:'1px solid rgba(245,166,35,0.15)',fontSize:14,color:'#3D3D50',lineHeight:1.5,fontFamily:'Inter,sans-serif'}}>
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}>
                       <path d="M7.13 2.17 1.1 12.75A1.03 1.03 0 0 0 2 14.25h12a1.03 1.03 0 0 0 .9-1.5L8.87 2.17a1.03 1.03 0 0 0-1.74 0z" fill="#F5A623"/>
                       <rect x="7.1" y="5.8" width="1.8" height="3.8" rx="0.9" fill="white"/>
