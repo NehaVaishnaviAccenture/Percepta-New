@@ -151,7 +151,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nIdentify the industry and product for this URL. For brand homepages, use the broad industry category (e.g. credit cards, savings accounts, checking accounts) NOT a specific product niche.\n\nCRITICAL: For competitors, list THE TOP 10 most recommended brands in this ENTIRE industry category as ranked by AI models like ChatGPT — include the biggest national brands regardless of whether they are stronger or weaker than the primary brand. Do NOT find niche competitors. Find the dominant industry leaders.\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"the broad industry e.g. credit cards","industry_key":"snake_case e.g. credit_cards — must be savings if page is about savings accounts, credit_cards if about credit cards, retail_banking only if about checking or general banking","lob":"broad product category for homepage e.g. credit cards — only be specific if URL path shows a specific product page","competitors":["exactly 10 most recommended brands in this industry by AI models — always include Chase, American Express, Capital One, Citi, Discover for credit cards — include both online and traditional banks for savings/banking"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent questions for this industry"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nIdentify the industry and product for this URL. For brand homepages, use the broad industry category (e.g. credit cards, savings accounts, checking accounts) NOT a specific product niche.\n\nCRITICAL: For competitors, list THE TOP 10 most recommended brands in this ENTIRE industry category as ranked by AI models like ChatGPT — include the biggest national brands regardless of whether they are stronger or weaker than the primary brand. Do NOT find niche competitors. Find the dominant industry leaders.\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"the broad industry e.g. credit cards","industry_key":"snake_case e.g. credit_cards — must be savings if page is about savings accounts, credit_cards if about credit cards, retail_banking only if about checking or general banking","lob":"broad product category for homepage e.g. credit cards — only be specific if URL path shows a specific product page","competitors":["exactly 10 most recommended brands in this industry by AI models — include the biggest national brands that AI models most commonly recommend in this industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent questions for this industry"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     const knownBrands: Record<string, string> = {
@@ -837,18 +837,15 @@ function computeRaw(
       posMentions++;
     }
   });
-  const sentRaw = Math.round((posMentions / total) * 100);
+  const sentRaw = organicMentioned.length > 0
+    ? Math.round((posMentions / organicMentioned.length) * 100)
+    : 0;
 
-  // SOV: organic / anyBrandResponses (computed across all brands in scoreAllBrands)
-  const anySet = new Set<number>();
-  answered.forEach((r: any, i: number) => {
-    const t = (r.a || '').toLowerCase();
-    if (hasAlias(t, als)) anySet.add(i);
-    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
-  });
-  const sovRaw = organicMentioned.length; // raw count — divided by anyBrandCount in scoreAllBrands
+  // SOV raw = organic mention count — converted to share of ALL brand mentions in scoreAllBrands
+  // This gives true competitive share: Chase 23% of all mentions, not 80% which = visibility
+  const sovRaw = organicMentioned.length;
 
-  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: anySet.size };
+  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: 0 };
 }
 
 function scoreAllBrands(
@@ -873,8 +870,10 @@ function scoreAllBrands(
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
 
-  // anyBrandCount = max across all brands (responses where at least one brand appears)
-  const anyBrandCount = Math.max(...raws.map(r => r.anyBrandCount), 1);
+  // SOV denominator = total organic mentions across ALL brands combined
+  // e.g. Chase 218 + CapOne 201 + Amex 141 + ... = 1200 total
+  // Chase SOV = 218/1200 = 18% — true competitive share, very different from visibility
+  const totalAllMentions = Math.max(raws.reduce((s, r) => s + r.sovRaw, 0), 1);
 
   // floor: min 5 for brands with any mention data, never 0 unless truly invisible
   // cap: max 95, never 100
@@ -890,7 +889,7 @@ function scoreAllBrands(
     const prom = fc(r.promRaw);
     const cit  = fc(r.citRaw);
     const sent = fc(r.sentRaw);
-    const sovPct = Math.round((r.sovRaw / anyBrandCount) * 100);
+    const sovPct = Math.round((r.sovRaw / totalAllMentions) * 100);
     const sov  = fc(sovPct);
     // GEO formula: Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
     const geo  = Math.max(5, Math.min(95, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15)));
