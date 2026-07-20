@@ -812,18 +812,19 @@ function computeRaw(
   // VISIBILITY: organic / total
   const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  // PROMINENCE: rank1 / organicMentions × 100
-  // Reads as: when GPT mentions this brand, how often does it name it first?
-  // Quality signal — Chase leads 41% of its own mentions, CapOne leads 8%
-  // This makes prominence proportional and meaningful vs visibility
+  // PROMINENCE: 1/avgPosition × 100
+  // Measures average position quality across all organic mentions
+  // Chase avgPos=1.8 → prominence=56, CapOne avgPos=2.4 → prominence=42
+  // Proportionate to visibility — high visibility brands get fair prominence
+  // Much better than rank1-only which creates extreme single-digit values
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
   const avgPos = organicPositions.length > 0
     ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
   const rank1Count = organicPositions.filter(p => p === 1).length;
-  const promRaw = organicMentioned.length > 0
-    ? Math.round((rank1Count / organicMentioned.length) * 100)
+  const promRaw = avgPos > 0
+    ? Math.round((1 / avgPos) * 100)
     : 0;
 
   // CITATION: organic positions only — supplemental inflates this for low-visibility brands
