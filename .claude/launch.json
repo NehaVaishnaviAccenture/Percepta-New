@@ -1,0 +1,18 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Percepta Dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3001,
+      "autoPort": true
+    },
+    {
+      "name": "Mockups",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "4321", "mockups"],
+      "port": 4321
+    }
+  ]
+}

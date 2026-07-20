@@ -1,22 +1,168 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* ─────────────────────────────────────────────────────────────
+   GEO HUB STYLES
+   @import must be first in CSS — PostCSS processes these
+   through the same pipeline so CSS vars resolve correctly.
+   ───────────────────────────────────────────────────────────── */
+@import './geo-hub/geo-hub.css';
+@import './geo-hub/tabs/tabs.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  font-family: 'Inter', sans-serif;
+/* ─────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+   All colors, radii, and shared values live here.
+   Components reference these via var(--token-name).
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --color-brand:              #A100FF;
+  --color-brand-dark:         #6B00A8;
+  --color-brand-chip-bg:      #EDD9FF;
+  --color-brand-chip-border:  #D4A0FF;
+  --color-brand-link-under:   #D199FF;
+
+  /* Nav chrome — graduated light progression */
+  --color-crumb-bar:          #0F0F11;   /* breadcrumb / topbar */
+  --color-or6-strip:          #141416;   /* org identity strip  */
+  --color-tab-bar:            #DAD5E5;   /* top-level tabs      */
+  --color-tab-bar-border:     #C9C3D8;
+  --color-subtab-bar:         #EEEAF5;   /* sub-tabs            */
+  --color-subtab-bar-border:  #DDD7EC;
+
+  /* Tab text states */
+  --color-tab-text:           #4A4058;
+  --color-tab-text-active:    #160A28;
+  --color-tab-text-hover:     #2E2040;
+  --color-subtab-text:        #5C5270;
+  --color-subtab-text-active: #6B00A8;
+  --color-subtab-text-hover:  #3A2850;
+
+  /* Content surfaces */
+  --color-canvas:             #F3F4F6;
+  --color-card-bg:            #FFFFFF;
+  --color-card-border:        #E5E5E5;
+  --color-surface-alt:        #F7F7F9;
+  --color-surface-subtle:     #F0F0F4;
+  --color-surface-mid:        #F2F2F2;
+  --color-border-light:       #E4E4EC;
+  --color-border-mid:         #D0D0DC;
+
+  /* Text scale */
+  --color-ink:                #0A0A0A;
+  --color-ink-soft:           #0A0A0F;
+  --color-text-body:          #2B2B2B;
+  --color-text-secondary:     #4A4A4A;
+  --color-text-muted:         #6B6B6B;
+  --color-text-faint:         #8E8E8E;
+  --color-text-dim:           #B8B8CC;
+  --color-text-ghost:         #7A7A90;
+  --color-text-mid:           #3D3D50;
+
+  /* Dark UI (scan / loading / error shells) */
+  --color-dark-bg:            #0F0F11;
+  --color-dark-strip:         #141416;
+  --color-dark-border:        rgba(255, 255, 255, 0.07);
+  --color-dark-text-muted:    rgba(255, 255, 255, 0.28);
+  --color-dark-text-bright:   rgba(255, 255, 255, 0.88);
+
+  /* Accent */
+  --color-teal:               #00D1C7;
+  --color-teal-dark:          #00A89F;
+  --color-green:              #00C853;
+
+  /* GEO tier spectrum */
+  --color-tier-authority:     #00AB7B;
+  --color-tier-leader:        #2F6DFF;
+  --color-tier-competitive:   #F3B10C;
+  --color-tier-emerging:      #F48500;
+  --color-tier-fragmented:    #E0003B;
+
+  /* GEO tier spectrum TEXT */
+  --color-tier-authority-text:     #007653;
+  --color-tier-leader-text:        #043BCC;
+  --color-tier-competitive-text:   #996E00;
+  --color-tier-emerging-text:      #B15F00;
+  --color-tier-fragmented-text:    #B7002F;
+
+  /* Score badge states */
+  --color-badge-excellent:    #43A047;
+  --color-badge-good:         #F9A825;
+  --color-badge-needs-work:   #FF7043;
+  --color-badge-poor:         #F44336;
+
+  /* Error */
+  --color-error:              #E03131;
+
+  /* Typography */
+  --font-sans:   'Inter', sans-serif;
+  --font-display:'Space Grotesk', sans-serif;
+  --font-mono:   'JetBrains Mono', 'DM Mono', monospace;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   BASE RESET
+   ───────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   background: white;
+  font: 400 16px/1.5 var(--font-sans);
+  color: var(--color-text-body);
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f1f1; }
-::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #7C3AED; }
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-mono);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SCROLLBAR
+   ───────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; }
+::-webkit-scrollbar-track  { background: #f1f1f1; }
+::-webkit-scrollbar-thumb  { background: var(--color-brand-chip-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-brand-dark); }
+
+/* ─────────────────────────────────────────────────────────────
+   RESPONSIVE TYPOGRAPHY
+   Ensures legible font sizes across all screen sizes
+   ───────────────────────────────────────────────────────────── */
+
+/* Mobile: Slightly smaller base but never below 14px */
+@media (max-width: 640px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Tablet: Standard 16px base */
+@media (min-width: 641px) and (max-width: 1024px) {
+  html {
+    font-size: 15px;
+  }
+}
+
+/* Desktop: Standard 16px base (default) */
+@media (min-width: 1025px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* Large desktop: Slightly larger for readability */
+@media (min-width: 1440px) {
+  html {
+    font-size: 17px;
+  }
+}

@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Presence Tab — Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --brand:      #A100FF;
+  --dark:       #0F0F11;
+  --canvas:     #F3F4F6;
+  --surface:    #FFFFFF;
+  --border:     #E5E5E5;
+  --border-mid: #D0D0DC;
+  --ink:        #0A0A0A;
+  --body:       #2B2B2B;
+  --muted:      #6B6B6B;
+  --faint:      #8E8E8E;
+  --dim:        #B8B8CC;
+
+  --t-authority-c: #007653;
+  --t-authority-b: #D1FAE5;
+  --t-leader-c:    #043BCC;
+  --t-leader-b:    #DBEAFE;
+  --t-compet-c:    #996E00;
+  --t-compet-b:    #FEF3C7;
+  --t-emerging-c:  #B15F00;
+  --t-emerging-b:  #FFF0E0;
+  --t-fragment-c:  #B7002F;
+  --t-fragment-b:  #FFE4EC;
+}
+
+body {
+  background: var(--canvas);
+  font-family: 'Space Grotesk', sans-serif;
+  color: var(--body);
+  padding: 32px 24px 80px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.chip.fragment  { background: var(--t-fragment-b);  color: var(--t-fragment-c); }
+.chip.emerging  { background: var(--t-emerging-b);  color: var(--t-emerging-c); }
+.chip.compet    { background: var(--t-compet-b);    color: var(--t-compet-c); }
+.chip.leader    { background: var(--t-leader-b);    color: var(--t-leader-c); }
+.chip.authority { background: var(--t-authority-b); color: var(--t-authority-c); }
+
+/* ══════════════════════════════════════════
+   PRESENCE HEADER
+══════════════════════════════════════════ */
+
+.presence-header {
+  margin-bottom: 12px;
+}
+
+.presence-tagline {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+  max-width: 22ch;
+  margin-bottom: 20px;
+  color: var(--dark);
+}
+.presence-tagline .accent {
+  color: #A100FF;
+}
+
+.presence-headline {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.signal-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.signal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--border);
+  padding: 18px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.signal-card.s-vis  { border-top-color: var(--t-fragment-c); }
+.signal-card.s-sent { border-top-color: var(--t-compet-c); }
+.signal-card.s-prom { border-top-color: var(--t-emerging-c); }
+
+.signal-card-eyebrow {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.signal-card-eyebrow .wt {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.signal-card-question {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.35;
+  margin-bottom: 16px;
+  flex: 1;
+}
+
+.signal-card-score-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.signal-card-number {
+  font-size: 2.4rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.signal-card-number.fragment { color: var(--t-fragment-c); }
+.signal-card-number.compet   { color: var(--t-compet-c); }
+.signal-card-number.emerging { color: var(--t-emerging-c); }
+
+.signal-card-rank {
+  font-size: 0.64rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════
+   GEO ACCORDION STRIP
+══════════════════════════════════════════ */
+
+.geo-accordion {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.geo-accordion-trigger {
+  display: flex;
+  align-items: center;
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.geo-accordion-trigger:hover { background: #FAFAFA; }
+
+.geo-strip-text {
+  font-size: 0.7rem;
+  color: var(--faint);
+  flex: 1;
+}
+
+.geo-strip-text strong { color: var(--body); }
+
+.learn-more {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.chevron {
+  margin-left: 10px;
+  font-size: 0.7rem;
+  color: var(--dim);
+  transition: transform 0.18s;
+  display: inline-block;
+}
+.chevron.open { transform: rotate(180deg); }
+
+.geo-accordion-body {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 24px 24px 20px;
+}
+.geo-accordion-body.open { display: block; }
+
+.geo-body-section-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand);
+  margin-bottom: 10px;
+}
+
+.geo-formula-text {
+  font-size: 0.82rem;
+  color: var(--body);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.geo-formula-text strong { font-weight: 700; }
+
+.formula-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.formula-signal {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--body);
+  padding: 5px 10px;
+}
+.formula-signal .wt { color: var(--brand); font-weight: 700; margin-left: 4px; }
+.formula-signal.active-sig { border-color: var(--t-fragment-c); background: var(--t-fragment-b); color: var(--t-fragment-c); }
+.formula-signal.active-sig .wt { color: var(--t-fragment-c); }
+
+.formula-op  { font-size: 0.75rem; color: var(--dim); font-weight: 600; }
+.formula-eq  { font-size: 0.72rem; color: var(--dim); font-weight: 600; margin: 0 2px; }
+.formula-result { background: var(--dark); color: #fff; font-size: 0.72rem; font-weight: 700; padding: 5px 12px; }
+
+.geo-body-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+
+.signal-list { display: flex; flex-direction: column; }
+.signal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.signal-row:first-child { border-top: 1px solid var(--border); }
+.signal-row.highlight { background: var(--t-fragment-b); margin: 0 -8px; padding: 9px 8px; }
+.signal-name { font-size: 0.78rem; font-weight: 600; color: var(--ink); }
+.signal-name.highlight { color: var(--t-fragment-c); }
+.signal-desc { font-size: 0.68rem; color: var(--muted); margin-top: 1px; }
+.signal-wt { font-size: 0.68rem; font-weight: 700; color: var(--brand); background: #F5EAFF; padding: 2px 7px; white-space: nowrap; flex: none; }
+.signal-wt.highlight { color: var(--t-fragment-c); background: #ffd6e0; }
+
+.tier-list { display: flex; flex-direction: column; }
+.tier-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.tier-row:first-child { border-top: 1px solid var(--border); }
+.tier-dot-name { display: flex; align-items: center; gap: 8px; }
+.tier-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.tier-name { font-size: 0.78rem; font-weight: 700; }
+.tier-desc { font-size: 0.64rem; color: var(--muted); margin-top: 2px; }
+.tier-range { font-size: 0.65rem; color: var(--dim); white-space: nowrap; flex: none; }
+
+/* ══════════════════════════════════════════
+   CHART CARD
+══════════════════════════════════════════ */
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 20px 24px 24px;
+}
+
+.chart-title { font-size: 0.85rem; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+.chart-sub   { font-size: 0.7rem; color: var(--faint); margin-bottom: 16px; }
+
+@media (max-width: 620px) {
+  .signal-cards { grid-template-columns: 1fr; }
+
+  .signal-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 16px;
+    padding: 14px 16px;
+  }
+
+  .signal-card-eyebrow {
+    grid-column: 1; grid-row: 1;
+    align-self: center;
+    margin-bottom: 4px;
+  }
+
+  .signal-card-question {
+    grid-column: 1; grid-row: 2;
+    align-self: center;
+    margin-bottom: 0;
+    font-size: 0.88rem;
+    flex: unset;
+  }
+
+  .signal-card-score-row {
+    grid-column: 2; grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 0;
+    align-self: center;
+  }
+
+  .signal-card-number { font-size: 2rem; }
+
+  .signal-card-rank {
+    grid-column: 1 / -1; grid-row: 3;
+    margin-top: 8px;
+  }
+}
+
+.scatter-ph {
+  background: #F7F7F9;
+  border: 1.5px dashed #D0D0DC;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--faint);
+  font-size: 0.75rem;
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+}
+.trendline {
+  position: absolute;
+  bottom: 64px; left: 10%; width: 72%;
+  height: 1.5px; background: #A78BFA;
+  transform: rotate(-7deg); opacity: 0.5;
+}
+.sdots { display: flex; gap: 12px; align-items: center; justify-content: center; margin-bottom: 8px; flex-wrap: wrap; }
+.sdot  { border-radius: 50%; opacity: 0.55; }
+
+</style>
+</head>
+<body>
+
+<!-- ══ THREE SIGNAL CARDS ════════════════════════ -->
+<p class="presence-tagline">Understand where you stand — <span class="accent">and where to go next.</span></p>
+<div class="presence-header">
+  <div class="presence-headline">How does AI see you?</div>
+  <div class="signal-cards">
+
+    <div class="signal-card s-vis">
+      <div class="signal-card-eyebrow">Visibility <span class="wt">· 30%</span></div>
+      <div class="signal-card-question">Are you in the answer?</div>
+      <div class="signal-card-score-row">
+        <span class="signal-card-number fragment">39</span>
+        <span class="chip fragment">Fragmented</span>
+      </div>
+      <div class="signal-card-rank">#6 of 9 brands · avg 58</div>
+    </div>
+
+    <div class="signal-card s-sent">
+      <div class="signal-card-eyebrow">Sentiment <span class="wt">· 20%</span></div>
+      <div class="signal-card-question">Are you framed well?</div>
+      <div class="signal-card-score-row">
+        <span class="signal-card-number compet">61</span>
+        <span class="chip compet">Competitive</span>
+      </div>
+      <div class="signal-card-rank">#3 of 9 brands · avg 55</div>
+    </div>
+
+    <div class="signal-card s-prom">
+      <div class="signal-card-eyebrow">Prominence <span class="wt">· 20%</span></div>
+      <div class="signal-card-question">Are you front and center?</div>
+      <div class="signal-card-score-row">
+        <span class="signal-card-number emerging">44</span>
+        <span class="chip emerging">Emerging</span>
+      </div>
+      <div class="signal-card-rank">#5 of 9 brands · avg 51</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ GEO ACCORDION ═════════════════════════════ -->
+<div class="geo-accordion">
+  <div class="geo-accordion-trigger" onclick="toggleAccordion()">
+    <span class="geo-strip-text">
+      AI Presence signals carry <strong>70%</strong> of your overall GEO Score
+    </span>
+    <span class="learn-more">· learn more</span>
+    <span class="chevron" id="chevron">▾</span>
+  </div>
+  <div class="geo-accordion-body" id="geo-body">
+
+    <div class="geo-body-section-label">The Formula</div>
+    <div class="geo-formula-text">Your GEO Score is a <strong>weighted average of five AI-driven signals</strong>, each scored 0–100.</div>
+
+    <div class="formula-row">
+      <div class="formula-signal active-sig">Visibility <span class="wt">× 30%</span></div>
+      <span class="formula-op">+</span>
+      <div class="formula-signal" style="border-color:var(--t-compet-c);background:var(--t-compet-b);color:var(--t-compet-c)">Sentiment <span class="wt" style="color:var(--t-compet-c)">× 20%</span></div>
+      <span class="formula-op">+</span>
+      <div class="formula-signal" style="border-color:var(--t-emerging-c);background:var(--t-emerging-b);color:var(--t-emerging-c)">Prominence <span class="wt" style="color:var(--t-emerging-c)">× 20%</span></div>
+      <span class="formula-op">+</span>
+      <div class="formula-signal">Citation <span class="wt">× 15%</span></div>
+      <span class="formula-op">+</span>
+      <div class="formula-signal">Share of Voice <span class="wt">× 15%</span></div>
+      <span class="formula-eq">=</span>
+      <div class="formula-result">GEO Score</div>
+    </div>
+
+    <div class="geo-body-cols">
+      <div>
+        <div class="geo-body-section-label">The Five Signals</div>
+        <div class="signal-list">
+          <div class="signal-row highlight">
+            <div>
+              <div class="signal-name highlight">Visibility</div>
+              <div class="signal-desc">How often AI assistants mention you when answering questions in your category.</div>
+            </div>
+            <span class="signal-wt highlight">30%</span>
+          </div>
+          <div class="signal-row" style="background:var(--t-compet-b);margin:0 -8px;padding:9px 8px">
+            <div>
+              <div class="signal-name" style="color:var(--t-compet-c)">Sentiment</div>
+              <div class="signal-desc">Whether AI assistants describe you positively, neutrally, or negatively.</div>
+            </div>
+            <span class="signal-wt" style="color:var(--t-compet-c);background:#fef3c7">20%</span>
+          </div>
+          <div class="signal-row" style="background:var(--t-emerging-b);margin:0 -8px;padding:9px 8px">
+            <div>
+              <div class="signal-name" style="color:var(--t-emerging-c)">Prominence</div>
+              <div class="signal-desc">How central you are to an answer — featured up top, or a passing footnote.</div>
+            </div>
+            <span class="signal-wt" style="color:var(--t-emerging-c);background:#fff0e0">20%</span>
+          </div>
+          <div class="signal-row">
+            <div>
+              <div class="signal-name">Citation</div>
+              <div class="signal-desc">How often AI assistants link to or attribute your owned sources.</div>
+            </div>
+            <span class="signal-wt">15%</span>
+          </div>
+          <div class="signal-row">
+            <div>
+              <div class="signal-name">Share of Voice</div>
+              <div class="signal-desc">Your slice of all brand mentions in the category, versus competitors.</div>
+            </div>
+            <span class="signal-wt">15%</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="geo-body-section-label">Score Tiers</div>
+        <div class="tier-list">
+          <div class="tier-row">
+            <div>
+              <div class="tier-dot-name"><div class="tier-dot" style="background:#E0003B"></div><span class="tier-name" style="color:var(--t-fragment-c)">Fragmented</span></div>
+              <div class="tier-desc">AI assistants rarely surface you, and rivals dominate the answer when they do.</div>
+            </div>
+            <span class="tier-range">0–44</span>
+          </div>
+          <div class="tier-row">
+            <div>
+              <div class="tier-dot-name"><div class="tier-dot" style="background:#F48500"></div><span class="tier-name" style="color:var(--t-emerging-c)">Emerging</span></div>
+              <div class="tier-desc">You show up occasionally but inconsistently; competitors are cited more favourably.</div>
+            </div>
+            <span class="tier-range">45–55</span>
+          </div>
+          <div class="tier-row">
+            <div>
+              <div class="tier-dot-name"><div class="tier-dot" style="background:#F3B10C"></div><span class="tier-name" style="color:var(--t-compet-c)">Competitive</span></div>
+              <div class="tier-desc">You're a regular part of the AI conversation, holding your ground on most signals.</div>
+            </div>
+            <span class="tier-range">56–69</span>
+          </div>
+          <div class="tier-row">
+            <div>
+              <div class="tier-dot-name"><div class="tier-dot" style="background:#4F90FF"></div><span class="tier-name" style="color:var(--t-leader-c)">Leader</span></div>
+              <div class="tier-desc">AI assistants surface you often, with strong, favourable framing.</div>
+            </div>
+            <span class="tier-range">70–79</span>
+          </div>
+          <div class="tier-row">
+            <div>
+              <div class="tier-dot-name"><div class="tier-dot" style="background:#00AB7B"></div><span class="tier-name" style="color:var(--t-authority-c)">Authority</span></div>
+              <div class="tier-desc">You're the default reference — cited first, consistently, and on-message.</div>
+            </div>
+            <span class="tier-range">80–100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ CHART ══════════════════════════════════════ -->
+<div class="chart-card">
+  <div class="chart-title">AI Presence — market positioning</div>
+  <div class="chart-sub">Visibility (X) · Sentiment (Y) · Prominence (bubble size). Each dot = one brand.</div>
+  <div class="scatter-ph">
+    <div class="trendline"></div>
+    <div>
+      <div class="sdots">
+        <div class="sdot" style="background:#B7002F;width:17px;height:17px;opacity:1"></div>
+        <div class="sdot" style="background:#BFDBFE;width:22px;height:22px"></div>
+        <div class="sdot" style="background:#CBD5E1;width:10px;height:10px"></div>
+        <div class="sdot" style="background:#CBD5E1;width:14px;height:14px"></div>
+        <div class="sdot" style="background:#BFDBFE;width:19px;height:19px"></div>
+        <div class="sdot" style="background:#CBD5E1;width:9px;height:9px"></div>
+        <div class="sdot" style="background:#CBD5E1;width:13px;height:13px"></div>
+      </div>
+      scatter chart + trendline
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleAccordion() {
+  const body = document.getElementById('geo-body');
+  const chev = document.getElementById('chevron');
+  const open = body.classList.toggle('open');
+  chev.classList.toggle('open', open);
+}
+</script>
+</body>
+</html>

@@ -18,31 +18,23 @@ export async function POST(req: NextRequest) {
         'X-Title': 'Percepta',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5.4',
+        model: 'openai/gpt-4o',
         messages: [
           {
             role: 'system',
             content: isJsonRequest
               ? 'You are a GEO strategist. Return ONLY raw valid JSON with no markdown, no backticks, no explanation. Never wrap output in ```json``` blocks.'
-              : `You are a sharp, opinionated AI advisor who writes exactly like ChatGPT — rich, visual, and easy to scan.
+              : `You are a sharp, opinionated AI advisor. Write clearly and concisely — no emojis.
 
 ALWAYS follow this formatting style:
 - Start with a 1-2 sentence overview
-- Use ## for main section headings (e.g. ## 🏆 Top Picks, ## 📊 Detailed Breakdown, ## ✅ Final Recommendation)
+- Use ## for main section headings (e.g. ## Top Picks, ## Detailed Breakdown, ## Final Recommendation)
 - Use ### for sub-headings within sections
-- Use numbered lists (1. 2. 3.) for rankings — always lead the item title with a relevant emoji
-- Use bullet points with emoji indicators for features/details:
-  • ✅ for pros or positives
-  • ❌ for cons or negatives  
-  • 💰 for cost/fees
-  • 🎁 for rewards/bonuses
-  • ✈️ for travel perks
-  • 🔒 for security features
-  • ⭐ for standout features
+- Use numbered lists (1. 2. 3.) for rankings
+- Use bullet points for features and details
 - **Bold** all brand names, card names, and key terms on first mention
-- End every response with a ## ✅ Final Recommendation section that gives a direct answer
-- Be specific, name real products, give real numbers
-- Use emojis generously throughout to make responses visually rich and scannable`,
+- End every response with a ## Final Recommendation section that gives a direct answer
+- Be specific, name real products, give real numbers`,
           },
           { role: 'user', content: prompt },
         ],
@@ -52,7 +44,13 @@ ALWAYS follow this formatting style:
     });
 
     const data = await res.json();
-    return NextResponse.json({ response: data.choices[0].message.content });
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) {
+      // OpenRouter returned an error object (bad key, quota, etc.)
+      const errMsg = data?.error?.message ?? data?.message ?? 'No response from AI model.';
+      return NextResponse.json({ error: errMsg }, { status: 502 });
+    }
+    return NextResponse.json({ response: content });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

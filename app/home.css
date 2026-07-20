@@ -1,0 +1,773 @@
+/* ==========================================================================
+   HOME PAGE — Accenture-dupe brand system
+   Electric Violet #A100FF + black, sharp corners, Space Grotesk / Inter
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Main ── */
+.main {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  background: #FFFFFF;
+  color: #0A0A0A;
+}
+
+/* ── Nav ── */
+.topNav {
+  background: #000;
+  border-bottom: 1px solid #0A0A0A;
+  padding: 0 40px;
+  height: 52px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.main {
+  padding-top: 52px;
+}
+
+.navLogo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.navLogoIcon {
+  width: 28px;
+  height: 28px;
+  background: #A100FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.navBrandName {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.navAuthSlot {
+  display: flex;
+  align-items: center;
+}
+
+.navSignInBtn {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #fff;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 7px 18px;
+  cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+
+.navSignInBtn:hover {
+  background: rgba(255,255,255,0.14);
+  border-color: rgba(255,255,255,0.32);
+}
+
+.navUserPill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 4px 4px 4px 14px;
+  cursor: default;
+}
+
+.navUserEmail {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgba(255,255,255,0.85);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navUserAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #A100FF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.navUserAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.navUserAvatarInitials {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+/* ── Hero ── */
+.hero {
+  background: #000;
+  padding: 72px 40px 64px;
+  text-align: center;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #A100FF;
+  padding: 6px 18px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #A100FF;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+  background: transparent;
+}
+
+.heroHeadline {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(3rem, 6vw, 5.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: 24px;
+}
+
+.heroHeadlinePrefix,
+.heroHeadlineSuffix {
+  color: #FFF;
+}
+
+.heroHeadlineKeyword {
+  color: #A100FF;
+}
+
+.heroAccentMark {
+  color: #A100FF;
+  font-weight: 600;
+}
+
+.heroSubtext {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.125rem;
+  color: #6B6B6B;
+  max-width: 560px;
+  margin: 0 auto 40px;
+  line-height: 1.65;
+  font-weight: 400;
+}
+
+.heroCta {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.heroCtaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #A100FF;
+  color: #FFFFFF;
+  border: none;
+  padding: 16px 36px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms;
+}
+
+.heroCtaPrimary:hover {
+  background: #8600D4;
+}
+
+.heroCtaSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid #fff;
+  padding: 16px 36px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms;
+}
+
+.heroCtaSecondary:hover {
+  background: var(--color-dark-strip);
+}
+
+/* ── How It Works ── */
+.howSection {
+  padding: 80px 40px;
+}
+
+.howHeader {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.howBadge {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #A100FF;
+  margin-bottom: 14px;
+}
+
+.howTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-weight: 500;
+  color: #0A0A0A;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+}
+
+.howDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #6B6B6B;
+  max-width: 560px;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+.howSteps {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 40px;
+}
+
+.howStep {
+  border-top: 2px solid #E5E5E5;
+  padding-top: 28px;
+}
+
+.howStepNumber {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #D6D6D6;
+  line-height: 1;
+  margin-bottom: 20px;
+}
+
+.howStepTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0A0A0A;
+  margin-bottom: 10px;
+}
+
+.howStepDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  color: #6B6B6B;
+  line-height: 1.65;
+}
+
+/* ── GEO Score ── */
+.geoScoreSection {
+  background: #FFFFFF;
+  padding: 80px 40px;
+  border-bottom: 1px solid #E5E5E5;
+}
+
+.geoScoreGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 80px;
+  align-items: center;
+  margin-bottom: 56px;
+}
+
+.geoScoreEyebrow {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #A100FF;
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.geoScoreTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
+  font-weight: 500;
+  color: #0A0A0A;
+  margin: 0 0 16px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.geoScoreDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #6B6B6B;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.geoScoreCard {
+  background: #FFFFFF;
+  border: 1px solid #E5E5E5;
+  padding: 44px 40px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.06), 0 2px 4px rgba(0, 0, 0, 0.04);
+  text-align: center;
+}
+
+.geoScoreCardLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: #8E8E8E;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.geoScoreNumber {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 5.5rem;
+  font-weight: 700;
+  color: #A100FF;
+  line-height: 1;
+  margin-bottom: 20px;
+}
+
+.geoScoreBar {
+  background: #F2F2F2;
+  height: 4px;
+  width: 100%;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.geoScoreBarFill {
+  background: #A100FF;
+  height: 4px;
+  width: 78%;
+}
+
+.geoScoreOutOf {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  color: #8E8E8E;
+  margin-bottom: 20px;
+}
+
+.geoScoreBandChip {
+  display: inline-block;
+  background: #F5E6FF;
+  color: #A100FF;
+  border: 1px solid #A100FF;
+  padding: 5px 18px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+/* ── Score Bands ── */
+.scoreBands {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 64px;
+}
+
+.scoreBandCard {
+  padding: 28px 24px;
+  text-align: center;
+}
+
+.scoreBandRange {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.scoreBandLabel {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.scoreBandDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+}
+
+/* ── Comparison ── */
+.comparison {
+  padding-top: 56px;
+}
+
+.comparisonHeader {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.comparisonBadge {
+  display: inline-block;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #A100FF;
+  margin-bottom: 16px;
+}
+
+.comparisonTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-weight: 500;
+  color: #0A0A0A;
+  margin: 0 0 16px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.comparisonDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #6B6B6B;
+  max-width: 520px;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+.comparisonGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.comparisonCard--competitors {
+  background: #FAFAFA;
+  border: 1px solid #E5E5E5;
+  padding: 36px 32px;
+}
+
+.comparisonCard--percepta {
+  background: #FFFFFF;
+  border: 2px solid #A100FF;
+  padding: 36px 32px;
+  position: relative;
+}
+
+.comparisonPerceptaBadge {
+  position: absolute;
+  top: -13px;
+  left: 24px;
+  background: #A100FF;
+  color: #FFFFFF;
+  padding: 3px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparisonCardLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.comparisonCard--competitors .comparisonCardLabel {
+  color: #8E8E8E;
+}
+
+.comparisonCard--percepta .comparisonCardLabel {
+  color: #A100FF;
+  margin-top: 8px;
+}
+
+.comparisonList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comparisonCard--percepta .comparisonList {
+  gap: 14px;
+}
+
+.comparisonItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.comparisonCard--percepta .comparisonItem {
+  align-items: flex-start;
+}
+
+.comparisonItemIcon {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.comparisonCard--competitors .comparisonItemIcon {
+  color: #B8B8B8;
+}
+
+.comparisonCard--percepta .comparisonItemIcon {
+  color: #A100FF;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.comparisonItemText {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+}
+
+.comparisonCard--competitors .comparisonItemText {
+  color: #6B6B6B;
+}
+
+.comparisonCard--percepta .comparisonItemText {
+  color: #0A0A0A;
+  line-height: 1.5;
+}
+
+.comparisonItemText--bold {
+  font-weight: 700;
+}
+
+/* ── CTA ── */
+.ctaSection {
+  background: #0A0A0A;
+  padding: 80px 40px;
+}
+
+.ctaCard {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.ctaTitle {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.5rem, 4.5vw, 4rem);
+  font-weight: 500;
+  color: #FFFFFF;
+  margin: 0 0 4px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.ctaTitleAccent {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(2.5rem, 4.5vw, 4rem);
+  font-weight: 500;
+  color: #A100FF;
+  margin: 0 0 24px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.ctaDesc {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  color: #8E8E8E;
+  max-width: 480px;
+  margin: 0 auto;
+  line-height: 1.65;
+}
+
+.ctaActions {
+  margin-top: 36px;
+}
+
+.ctaPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #A100FF;
+  color: #FFFFFF;
+  border: none;
+  padding: 18px 44px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 160ms;
+}
+
+.ctaPrimary:hover {
+  background: #8600D4;
+}
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+  .howSteps {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+  }
+
+  .geoScoreGrid {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .scoreBands {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .scoreBandCard:nth-child(-n+3) {
+    grid-column: span 2;
+  }
+  .scoreBandCard:nth-child(n+4) {
+    grid-column: span 3;
+  }
+
+  .comparisonGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .topNav {
+    padding: 0 20px;
+  }
+
+  .navUserEmail { display: none; }
+  .navUserPill  { padding: 4px; gap: 0; }
+
+  .navLink {
+    padding: 8px 12px;
+    font-size: 0.8125rem;
+  }
+
+  .hero {
+    padding: 48px 20px 48px;
+  }
+
+  .heroBadge {
+    font-size: 0.75rem;
+    padding: 5px 14px;
+    margin-bottom: 28px;
+  }
+
+  .heroSubtext {
+    font-size: 1rem;
+  }
+
+  .heroCtaPrimary,
+  .heroCtaSecondary {
+    padding: 14px 24px;
+    font-size: 0.875rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .howSection {
+    padding: 56px 20px;
+  }
+
+  .howHeader {
+    margin-bottom: 40px;
+  }
+
+  .howSteps {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .geoScoreSection {
+    padding: 56px 20px;
+  }
+
+  .geoScoreGrid {
+    gap: 32px;
+    margin-bottom: 36px;
+  }
+
+  .geoScoreCard {
+    padding: 32px 24px;
+  }
+
+  .scoreBands {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 40px;
+  }
+
+  .scoreBandCard {
+    padding: 20px 16px;
+  }
+
+  .comparison {
+    padding-top: 40px;
+  }
+
+  .comparisonCard--competitors,
+  .comparisonCard--percepta {
+    padding: 28px 24px;
+  }
+
+  .ctaSection {
+    padding: 56px 20px;
+  }
+
+  .ctaActions {
+    margin-top: 28px;
+  }
+
+  .ctaPrimary {
+    padding: 16px 32px;
+    width: 100%;
+    justify-content: center;
+  }
+}
