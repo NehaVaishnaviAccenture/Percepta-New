@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const MODEL = 'openai/gpt-5.4';
+const MODEL = 'openai/gpt-4o';
 
 async function callAI(messages: { role: string; content: string }[], temperature = 0.2, max_tokens = 512) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
