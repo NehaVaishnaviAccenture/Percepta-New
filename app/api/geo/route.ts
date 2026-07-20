@@ -910,14 +910,15 @@ function scoreAllBrands(
       return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
     }
     const vis  = fc(r.visRaw);
-    // Prominence: no floor when brand has zero rank1 — 0 is honest
-    const prom = r.promRaw > 0 ? fc(r.promRaw) : 0;
-    // Citation: no floor when brand has zero organic positions — 0 is honest
-    const cit  = r.citRaw > 0 ? fc(r.citRaw) : 0;
+    const visWeight = Math.sqrt(r.visRaw / 100); // dampens low-visibility brands
+    // Prominence: weighted by visibility so low-vis brands can't outscore high-vis
+    const prom = r.promRaw > 0 ? fc(r.promRaw * visWeight) : 0;
+    // Citation: weighted by visibility so low-vis brands can't outscore high-vis
+    const cit  = r.citRaw > 0 ? fc(r.citRaw * visWeight) : 0;
     const sent = fc(r.sentRaw);
     const sov = r.sovRaw > 0 ? Math.max(5, Math.round(r.sovRaw * sovScale)) : 0;
     // GEO formula: Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
-    const geo  = Math.max(5, Math.min(95, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15)));
+    const geo  = Math.min(95, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15));
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
   }
 
