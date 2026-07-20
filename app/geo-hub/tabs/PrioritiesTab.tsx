@@ -323,19 +323,23 @@ function ActionCard({
       </div>
 
       <div className="pb-card-title" onClick={() => onToggle(index)}>
-        {action.title}
+        {action.title || (action as any).action || ''}
       </div>
-      <div className="pb-card-teaser">{action.teaser}</div>
-      <div className="pb-card-who" onClick={() => onToggle(index)}>
-        <WhoLine who={action.who} />
-      </div>
+      {(action.teaser || (action as any).action) && (
+        <div className="pb-card-teaser">{action.teaser || (action as any).action}</div>
+      )}
+      {action.who?.length > 0 && (
+        <div className="pb-card-who" onClick={() => onToggle(index)}>
+          <WhoLine who={action.who} />
+        </div>
+      )}
 
       <div className="pb-card-drawer">
         <div className="pb-card-drawer-pad">
           <div className="pb-evidence">
             <div className="pb-ev-label">Why {action.priority.toLowerCase()} priority</div>
-            <span className="pb-ev-stat"><StatLine ev={action.evidence} /></span>
-            <p className="pb-why" dangerouslySetInnerHTML={{ __html: action.why }} />
+            {action.evidence && <span className="pb-ev-stat"><StatLine ev={action.evidence} /></span>}
+            {action.why && <p className="pb-why" dangerouslySetInnerHTML={{ __html: action.why }} />}
           </div>
           <button className="pb-open-action" onClick={() => onOpen(index)}>
             Open the full action <span>→</span>
