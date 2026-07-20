@@ -812,19 +812,20 @@ function computeRaw(
   // VISIBILITY: organic / total
   const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  // PROMINENCE: 1/avgPosition × 100
-  // Measures average position quality across all organic mentions
-  // Chase avgPos=1.8 → prominence=56, CapOne avgPos=2.4 → prominence=42
-  // Proportionate to visibility — high visibility brands get fair prominence
-  // Much better than rank1-only which creates extreme single-digit values
+  // PROMINENCE: scaled position score
+  // Formula: ((maxPos - avgPos) / (maxPos - 1)) × 100
+  // Where maxPos = 4 (GPT names 4 brands per answer)
+  // avgPos=1.0 → 100, avgPos=1.8 → 73, avgPos=2.4 → 53, avgPos=3.0 → 33
+  // Intuitive: closer to position 1 = higher prominence
   const organicPositions = organicMentioned
     .map((r: any) => position(r.a || '', als, compAls))
     .filter(p => p > 0);
   const avgPos = organicPositions.length > 0
     ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
   const rank1Count = organicPositions.filter(p => p === 1).length;
+  const MAX_POS = 4;
   const promRaw = avgPos > 0
-    ? Math.round((1 / avgPos) * 100)
+    ? Math.round(((MAX_POS - avgPos) / (MAX_POS - 1)) * 100)
     : 0;
 
   // CITATION: organic positions only — supplemental inflates this for low-visibility brands
