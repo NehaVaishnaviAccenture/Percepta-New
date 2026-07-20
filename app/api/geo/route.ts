@@ -843,7 +843,15 @@ function computeRaw(
       posMentions++;
     }
   });
-  const sentRaw = Math.round((posMentions / total) * 100);
+  // SENTIMENT: geometric mean of positive tone rate and visibility
+  // toneRate = positiveMentions / organicMentions (pure tone quality)
+  // sqrt(toneRate × visRaw) prevents low-visibility brands from inflating sentiment
+  // Chase: sqrt(72 × 81) = 76, NavyFed: sqrt(57 × 5) = 17
+  const toneRate = organicMentioned.length > 0
+    ? (posMentions / organicMentioned.length) * 100 : 0;
+  const sentRaw = organicMentioned.length > 0
+    ? Math.round(Math.sqrt(toneRate * visRaw))
+    : 0;
 
   // SOV = geometric mean of visibility and category breadth, scaled to max 65
   // Visibility alone mirrors SOV when brands appear in all categories
