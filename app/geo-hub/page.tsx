@@ -181,7 +181,7 @@ export default function GeoHub() {
     const urlValid = isValidUrl(url);
     const scopeVisible = urlValid;
     const effectiveScope = d3ScopeSelected === '+ Custom' ? d3CustomScope.trim() : d3ScopeSelected;
-    const canRun = urlValid && effectiveScope !== '' && !loading;
+    const canRun = urlValid && effectiveScope !== '' && !loading && !scopeDetecting;
 
     const SCOPE_PILLS = isBankUrl(url) ? ['General', ...BANK_SCOPES] : ['General', ...detectedScopes];
 
