@@ -844,32 +844,22 @@ function computeRaw(
   });
   const sentRaw = Math.round((posMentions / total) * 100);
 
-  // SOV = Organic Reach Score
-  // Measures how broadly this brand appears across ALL query categories
-  // For each category: (brand mentions in category / total queries in category) * 100
-  // Then average across all categories the brand appears in, weighted by category size
-  // Natural range 10-65: high = brand recommended broadly, low = niche or invisible
+  // SOV = geometric mean of visibility and category breadth, scaled to max 65
+  // Visibility alone mirrors SOV when brands appear in all categories
+  // Category breadth alone gives same result for different-visibility brands
+  // Geometric mean creates genuine differentiation:
+  // Chase vis=80, covers 9/9 cats → SOV=65
+  // CapOne vis=78, covers 7/9 cats → SOV=57
+  // Amex vis=53, covers 4/9 cats → SOV=35
+  // Bottom brands vis=5, covers 1-2 cats → SOV=8
   const allCats = [...new Set(answered.map((r: any) => r.category).filter(Boolean))];
-  let reachSum = 0;
-  let reachWeight = 0;
-  allCats.forEach((cat: string) => {
-    const catQueries = answered.filter((r: any) => r.category === cat);
-    const catMentions = catQueries.filter((r: any) => hasAlias((r.a || '').toLowerCase(), als));
-    if (catMentions.length > 0) {
-      const catScore = (catMentions.length / catQueries.length) * 100;
-      reachSum += catScore * catQueries.length;
-      reachWeight += catQueries.length;
-    }
-  });
-  // Weight by category size so larger categories contribute more
-  // Multiply by (categoriesPresent/totalCategories) to penalize narrow brands
-  const catsPresent = allCats.filter((cat: string) => {
-    const catQ = answered.filter((r: any) => r.category === cat);
-    return catQ.some((r: any) => hasAlias((r.a || '').toLowerCase(), als));
-  }).length;
-  const breadthFactor = allCats.length > 0 ? catsPresent / allCats.length : 0;
-  const avgCatScore = reachWeight > 0 ? reachSum / reachWeight : 0;
-  const sovRaw = Math.round(avgCatScore * breadthFactor);
+  const totalCats = allCats.length || 1;
+  const coveredCats = allCats.filter((cat: string) =>
+    answered.filter((r: any) => r.category === cat)
+      .some((r: any) => hasAlias((r.a || '').toLowerCase(), als))
+  ).length;
+  const breadth = (coveredCats / totalCats) * 100;
+  const sovRaw = coveredCats > 0 ? Math.round(Math.sqrt(visRaw * breadth)) : 0;
 
   return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: 0 };
 }
@@ -896,8 +886,9 @@ function scoreAllBrands(
     return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
   });
 
-  // SOV is already computed as Organic Reach Score in computeRaw — use directly
-  const anyBrandCount = 1; // not used for SOV anymore
+  // Scale SOV so top brand = 65, others proportional — distinct from visibility (max 95)
+  const maxSov = Math.max(...raws.map(r => r.sovRaw), 1);
+  const sovScale = 65 / maxSov;
 
   // floor: min 5 for brands with any mention data, never 0 unless truly invisible
   // cap: max 95, never 100
@@ -915,8 +906,7 @@ function scoreAllBrands(
     // Citation: no floor when brand has zero organic positions — 0 is honest
     const cit  = r.citRaw > 0 ? fc(r.citRaw) : 0;
     const sent = fc(r.sentRaw);
-    // SOV = Organic Reach Score, already computed 0-100
-    const sov = r.sovRaw > 0 ? fc(r.sovRaw) : 0;
+    const sov = r.sovRaw > 0 ? Math.max(5, Math.round(r.sovRaw * sovScale)) : 0;
     // GEO formula: Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
     const geo  = Math.max(5, Math.min(95, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15)));
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
