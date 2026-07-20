@@ -132,7 +132,7 @@ export default function Overview() {
               <div id="geo-score-bar-fill" className="geoScoreBarFill" />
             </div>
             <div id="geo-score-out-of" className="geoScoreOutOf">out of 100</div>
-            <span id="geo-score-band-chip" className="geoScoreBandChip">Good</span>
+            <span id="geo-score-band-chip" className="geoScoreBandChip">Leader</span>
           </div>
         </div>
 

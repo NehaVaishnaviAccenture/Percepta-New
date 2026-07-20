@@ -23,11 +23,11 @@ function sigTier(s: number) {
 function SovChart({ brand, sovScore, competitors }: { brand: string; sovScore: number; competitors: any[] }) {
   const bars: { label: string; value: number; isYou: boolean }[] = [
     ...competitors.slice(0, 9).map((c: any) => ({
-      label: (c.Brand || '').split(' ')[0],
+      label: c.Brand || '',
       value: c.Sov ?? c.SoV ?? c.sov ?? 0,
       isYou: false,
     })),
-    { label: brand.split(' ')[0], value: sovScore, isYou: true },
+    { label: brand, value: sovScore, isYou: true },
   ].sort((a, b) => b.value - a.value);
 
   const maxVal = Math.max(...bars.map(b => b.value), 1);

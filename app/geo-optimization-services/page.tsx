@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { AppShell } from '../components/AppShell';
-import './get-support.css';
+import './geo-optimization-services.css';
 
 const deliver = [
   {
@@ -51,7 +51,7 @@ const options = [
 
 export default function GetSupport() {
   return (
-    <AppShell breadcrumb="Get Support">
+    <AppShell breadcrumb="GEO Optimization Services">
     <main id="gs-main" className="gsMain">
 
       {/* HERO */}

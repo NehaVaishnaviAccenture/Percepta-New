@@ -33,7 +33,7 @@
 }
 
 .ovScoreEyebrow {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -52,7 +52,7 @@
   border-bottom: 1px solid var(--color-brand-link-under);
   padding: 0 0 1px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-brand-dark);
 }
@@ -90,7 +90,7 @@
 
 .ovScoreRank {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-secondary);
 }
 
@@ -122,7 +122,7 @@
 }
 
 .ovChangeEyebrow {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -196,7 +196,7 @@
 }
 
 .ovActionChip {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -208,7 +208,7 @@
 }
 
 .ovActionTopic {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: #2B2B2B;
   border: 1px solid #D6D6D6;
@@ -228,7 +228,7 @@
 }
 
 .ovActionCardDesc {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--color-text-muted);
   line-height: 1.45;
 }
@@ -243,7 +243,7 @@
 }
 
 .ovActionSignalsLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -251,7 +251,7 @@
 }
 
 .ovActionSignalTag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-brand-dark, #6B00A8);
   background: var(--color-purple-50, #F5E6FF);
@@ -278,7 +278,7 @@
 }
 
 .ovTeaserFrom {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -319,7 +319,7 @@
   .ovTeaserHeadline        { font-size: 14px; }
   .ovActionsTitle          { font-size: 13px; }
   .ovActionCardTitle       { font-size: 14px; }
-  .ovActionCardDesc        { font-size: 12px; }
+  .ovActionCardDesc        { font-size: 14px; }
   .cbtStatValue,
   .cbtStatValueInk         { font-size: 18px; }
   .gsoInterpText           { font-size: 14px; }
@@ -416,7 +416,7 @@
 
 .gsoNextTierHint {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-muted, #6B6B6B);
   margin-top: 6px;
@@ -593,7 +593,7 @@
   background: var(--color-card-bg);
   padding: 2px 6px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-ink);
   white-space: nowrap;
@@ -635,14 +635,14 @@
 .gsoTierLabelCell {
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 12px;
   /* color and font-weight are dynamic (isCurrent) — applied inline */
   line-height: 1.2;
 }
 
 .gsoTierLabelRange {
   display: block;
-  font-size: 8px;
+  font-size: 12px;
   margin-top: 1px;
   color: var(--color-text-muted);
 }
@@ -665,7 +665,7 @@
 }
 
 .gsoCompEyebrow {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -701,14 +701,14 @@
   top: 8px;
   right: 10px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   opacity: 0.85;
 }
 
 .gsoSignalKeySpan {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: -0.01em;
   display: block;
   overflow: hidden;
@@ -733,7 +733,7 @@
 
 
 .gsoWeaknessLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -770,7 +770,7 @@
 }
 
 .gsoVcmpEyebrow {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -783,7 +783,7 @@
   border-bottom: 1px solid var(--color-brand-link-under);
   padding: 0 0 1px;
   cursor: pointer;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-brand-dark);
   white-space: nowrap;
@@ -796,7 +796,7 @@
   padding-bottom: 12px;
   border-bottom: 1px solid var(--color-card-border);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-secondary);
 }
 
@@ -832,7 +832,7 @@
   display: flex;
   flex-direction: column;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-muted);
   text-align: right;
 }
@@ -970,7 +970,7 @@
 .gsoVcmpColSub {
   display: block;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-faint);
   margin-top: 1px;
@@ -1007,7 +1007,7 @@
 }
 
 .visCardSub {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
 }
 
@@ -1046,7 +1046,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 
@@ -1062,7 +1062,7 @@
 }
 
 .visLegendHint {
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
   font-style: italic;
 }
@@ -1108,7 +1108,7 @@
 }
 
 .sentStatSub {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
   margin-top: 3px;
 }
@@ -1172,7 +1172,7 @@
 }
 
 .sentSankeyDesc {
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
   margin-top: 2px;
 }
@@ -1182,7 +1182,7 @@
   border-radius: 8px;
   border: 1px solid var(--color-card-border);
   padding: 8px 12px;
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted);
   line-height: 1.6;
   max-width: 210px;
@@ -1446,7 +1446,7 @@
   background: none;
   border: none;
   color: var(--color-brand);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -1465,7 +1465,7 @@
 .citTableHeaderCell {
   padding: 7px 10px;
   text-align: left;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1503,7 +1503,7 @@
   color: var(--color-brand);
   border-radius: 4px;
   padding: 1px 5px;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -1515,7 +1515,7 @@
 .citCatChip {
   border-radius: 6px;
   padding: 2px 7px;
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1552,7 +1552,7 @@
 
 .citSourceExpandCell {
   padding: 8px 10px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--color-text-faint);
   text-align: right;
 }
@@ -1574,7 +1574,7 @@
 }
 
 .citExpandedLabel {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-brand);
   margin-bottom: 6px;
@@ -1598,7 +1598,7 @@
   border-radius: 50%;
   background: #EDE9FE;
   color: var(--color-brand);
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -1607,7 +1607,7 @@
 }
 
 .citUrlLink {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #4F46E5;
   text-decoration: none;
 }
@@ -1663,7 +1663,7 @@
 }
 
 .cmpCardLabel {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1900,7 +1900,7 @@
 }
 
 .cmpChartColLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2016,7 +2016,7 @@
   position: absolute;
   top: 0;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--color-text-faint);
 }
@@ -2024,7 +2024,7 @@
 .cmpChartFooterLabel {
   text-align: center;
   margin-top: 14px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--color-text-muted);
   letter-spacing: 0.04em;
@@ -2034,7 +2034,7 @@
   color: var(--color-text-faint);
   font-family: var(--font-mono);
   margin-left: 4px;
-  font-size: 10px;
+  font-size: 12px;
 }
 
 /* Legend */
@@ -2044,7 +2044,7 @@
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--color-card-border);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
   flex-wrap: wrap;
 }
@@ -2089,7 +2089,7 @@
 }
 
 .cmpTableSectionLabel {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2114,7 +2114,7 @@
 
 /* Column header — color is dynamic (active sort col) */
 .cmpTableColHeader {
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2131,7 +2131,7 @@
   text-align: left;
   color: var(--color-text-faint);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .cmpTableBrandCell {
@@ -2145,7 +2145,7 @@
 
 .cmpTableBrandYouChip {
   display: inline-block;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2157,7 +2157,7 @@
 .cmpTableBrandUrl {
   display: block;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-faint);
   margin-top: 1px;
 }
@@ -2228,7 +2228,7 @@
 
 .cbtHeroMeta {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   color: var(--color-text-muted);
   letter-spacing: 0.02em;
 }
@@ -2248,7 +2248,7 @@
 
 /* ── Radar block ────────────────────────────────────────────── */
 .cbtRadarEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2304,7 +2304,7 @@
 
 .cbtTopicDelta {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--color-text-muted);
   min-width: 70px;
   text-align: right;
@@ -2314,7 +2314,7 @@
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
@@ -2341,7 +2341,7 @@
 
 .cbtLegendRange {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-faint);
   margin-left: 2px;
 }
@@ -2350,7 +2350,7 @@
   margin-top: 18px;
   padding-top: 14px;
   border-top: 1px solid var(--color-card-border);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
@@ -2372,7 +2372,7 @@
 }
 
 .cbtStatLabel {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -2405,13 +2405,13 @@
 
 .cbtStatSub {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   /* color is dynamic — set inline */
 }
 
 /* ── Heatmap block ──────────────────────────────────────────── */
 .cbtHeatmapEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2425,7 +2425,7 @@
 }
 
 .cbtHeatmapColHead {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -2499,7 +2499,7 @@
   padding-top: 14px;
   border-top: 1px solid var(--color-card-border);
   flex-wrap: wrap;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
@@ -2518,7 +2518,7 @@
 
 .cbtHeatmapLegendRange {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-faint);
   margin-left: 4px;
 }
@@ -2538,7 +2538,7 @@
 }
 
 .cbtFocusEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -2652,7 +2652,7 @@
 }
 
 .ptNetworkSubtitle {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: #64748B;
   margin-top: 1px;
 }
@@ -2686,7 +2686,7 @@
   border: 1px solid #334155;
   border-radius: 6px;
   padding: 4px 10px;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: #94A3B8;
   cursor: pointer;
 }
@@ -2714,7 +2714,7 @@
 }
 
 .ptQueryListMeta {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
   margin-left: 8px;
 }
@@ -2726,7 +2726,7 @@
 }
 
 .ptQueryListFilterLabel {
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
 }
 
@@ -2753,7 +2753,7 @@
 .ptTableHeadCell {
   padding: 8px 12px;
   text-align: left;
-  font-size: 0.63rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -2806,13 +2806,13 @@
 
 .ptQueryAppeared {
   color: #10B981;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
 .ptQueryMissed {
   color: #EF4444;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -2830,7 +2830,7 @@
   border: 1px solid #FCD34D;
   border-radius: 6px;
   padding: 2px 8px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #92400E;
 }
@@ -2843,13 +2843,13 @@
   border: 1px solid #6EE7B7;
   border-radius: 6px;
   padding: 2px 8px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #065F46;
 }
 
 .ptNoBeatLabel {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
 }
 
@@ -2887,7 +2887,7 @@
 }
 
 .ptTrendingSubtitle {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
   margin-bottom: 16px;
 }
@@ -2923,7 +2923,7 @@
 .ptTrendingTag {
   border-radius: 50px;
   padding: 2px 7px;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -2932,7 +2932,7 @@
   color: #7C3AED;
   border-radius: 50px;
   padding: 2px 7px;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -2967,7 +2967,7 @@
 
 .ptTrendingToggle {
   margin-left: auto;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   color: #6B7280;
 }
 
@@ -2992,7 +2992,7 @@
 }
 
 .ptTrendingStatLabel {
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   color: #9CA3AF;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -3006,7 +3006,7 @@
 }
 
 .ptTrendingInsight {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: #6B7280;
   line-height: 1.6;
   background: #F5F3FF;
@@ -3028,7 +3028,7 @@
 .ptHeroStat:first-child { padding-left:0; border-left:none; }
 .ptHeroStatValue { font-family:var(--font-display); font-weight:500; font-size:56px; line-height:1.05; letter-spacing:-0.02em; color:var(--color-ink); margin-bottom:4px; white-space:nowrap; }
 .ptHeroStatQual { font-size:22px; color:var(--color-text-faint); margin-left:8px; font-weight:400; letter-spacing:-0.01em; }
-.ptHeroStatLabel { font-family:var(--font-sans); font-size:12px; color:var(--color-text-muted); line-height:1.4; margin-top:8px; max-width:240px; }
+.ptHeroStatLabel { font-family:var(--font-sans); font-size:14px; color:var(--color-text-muted); line-height:1.4; margin-top:8px; max-width:240px; }
 
 /* Mobile (<700px) — single column, value left + label right */
 @media (max-width: 700px) {
@@ -3228,12 +3228,12 @@
 /* Desktop tag visible at ≥720px; mobile tag hidden at ≥720px */
 .ptPromptTopicTag--mobile { display:none; }
 .ptPromptText { color:var(--color-ink); font-weight:500; line-height:1.4; }
-.ptPromptQuote { color:var(--color-text-body); font-weight:400; font-style:italic; }
+.ptPromptQuote { color:var(--color-text-body); font-weight:400; font-style:italic; font-size:14px; }
 
 .ptRankBadge { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:12px; font-weight:600; padding:3px 8px; white-space:nowrap; flex-shrink:0; }
 .ptRankBadge--missed { background:var(--color-card-border); color:var(--color-text-secondary); border:1px dashed #B8B8B8; }
 .ptRankOut { font-family:var(--font-mono); font-size:10px; font-weight:500; opacity:0.7; }
-.ptBeaterText { font-family:var(--font-sans); font-size:12px; color:var(--color-text-body); line-height:1.45; }
+.ptBeaterText { font-family:var(--font-sans); font-size:14px; color:var(--color-text-body); line-height:1.45; }
 .ptBeaterWho { color:var(--color-ink); font-weight:500; }
 .ptBeaterNone { color:var(--color-text-faint); font-style:italic; }
 .ptRowArrow { font-family:var(--font-display); font-size:18px; font-weight:600; color:var(--color-brand); line-height:1; transition:color 80ms, transform 80ms; display:inline-block; }
@@ -3371,7 +3371,7 @@
 
 .lpMeta {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 14px;
   color: var(--color-text-muted);
   margin: 0 0 24px;
   line-height: 1.7;
@@ -3405,7 +3405,7 @@
 }
 
 .lpEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -3477,7 +3477,7 @@
 }
 
 .lpSuggestedEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -3511,7 +3511,7 @@
 
 .lpPillPrefix {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 13px;
   color: var(--color-text-faint);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -3654,7 +3654,7 @@
 .apSegmentStatusPill {
   border-radius: 50px;
   padding: 2px 10px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -3919,7 +3919,7 @@
 }
 .ov-lead-sub {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--color-text-muted);
   line-height: 1.7;
 }
@@ -3950,7 +3950,7 @@
 
 /* Score panel */
 .ov-hp-eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -3981,7 +3981,7 @@
   min-width: 0;
 }
 .ov-hp-signals-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4035,7 +4035,7 @@
 .ov-needs  .ov-hp-readout-head::after { background: var(--color-ink); }
 .ov-working .ov-hp-readout-head::after { background: var(--color-ink); }
 .ov-hp-readout-title {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4093,7 +4093,7 @@
   margin-top: 4px;
 }
 .ov-finding-meta {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -4104,7 +4104,7 @@
   flex-shrink: 0;
   display: none;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-faint);
@@ -4145,7 +4145,7 @@
 }
 .ov-rt-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-faint);
   background: #F2F2F2;
@@ -4177,7 +4177,7 @@
 }
 .ov-block-meta {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-faint);
   display: flex;
   align-items: center;
@@ -4215,7 +4215,7 @@
 }
 .ov-lt-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-faint);
   background: #F2F2F2;
@@ -4251,7 +4251,7 @@
 }
 .ov-col-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-muted);
   background: #F2F2F2;
@@ -4294,7 +4294,7 @@
 }
 .ov-card-cat {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -4330,17 +4330,17 @@
   user-select: none;
 }
 .ov-foot-leader {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 .ov-foot-win {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #0A0A0A;
 }
 .ov-foot-untested {
-  font-size: 11px;
+  font-size: 12px;
   color: #B8B8B8;
   font-style: italic;
 }
@@ -4383,7 +4383,7 @@
   margin: 0;
   padding: 14px 22px 18px;
   border-top: 1px solid #E5E5E5;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-faint);
   line-height: 1.6;
 }
@@ -4473,7 +4473,7 @@
 
 /* Lead */
 .cov-eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4510,7 +4510,7 @@
   flex-wrap: wrap;
 }
 .cov-filter-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -4583,7 +4583,7 @@
 }
 .cov-col-count {
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #6B6B6B;
   background: #F2F2F2;
@@ -4593,7 +4593,7 @@
 .cov-col-threshold {
   margin-left: auto;
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   color: #8E8E8E;
   letter-spacing: 0.02em;
 }
@@ -4682,7 +4682,7 @@
 .cov-card-foot-strip {
   padding: 5px 14px 7px;
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 10px;
+  font-size: 12px;
   color: #6B6B6B;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -4706,7 +4706,7 @@
   padding-top: 14px;
 }
 .cov-row-label {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -4750,7 +4750,7 @@
   left: 50%;
   transform: translateX(-50%);
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 9px;
+  font-size: 12px;
   color: #8E8E8E;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -4771,13 +4771,13 @@
 }
 .cov-delta {
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: #2B2B2B;
 }
 .cov-leader-name { font-weight: 600; }
 .cov-leader-pct {
   font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   color: #6B6B6B;
   margin-left: 5px;
 }
@@ -4797,7 +4797,7 @@
   border-top: 1px solid #E5E5E5;
 }
 .cov-queries-tested {
-  font-size: 11px;
+  font-size: 12px;
   color: #6B6B6B;
 }
 .cov-queries-tested b { color: #0A0A0A; font-weight: 600; }
@@ -4861,7 +4861,7 @@
 }
 .cov-lt-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text-faint);
   background: #F2F2F2;
@@ -4951,7 +4951,7 @@
 }
 .pb-block-meta {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: #8E8E8E;
 }
 
@@ -4963,7 +4963,7 @@
   flex-shrink: 0;
 }
 .pb-tf-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5048,7 +5048,7 @@
 
 .pb-col-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #6B6B6B;
   background: #F2F2F2;
@@ -5103,7 +5103,7 @@
   min-width: 0;
 }
 .pb-topic-chip {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: #2B2B2B;
   border: 1px solid #D6D6D6;
@@ -5215,7 +5215,7 @@
 .pb-board-note {
   margin: 0;
   padding: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: #8E8E8E;
   line-height: 1.6;
 }
@@ -5271,7 +5271,7 @@
 }
 .pb-lt-count {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: #8E8E8E;
   background: #F2F2F2;
@@ -5313,7 +5313,7 @@
   right: 24px;
 }
 .pb-av-eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -5348,7 +5348,7 @@
   color: #0A0A0A;
 }
 .pb-av-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -5437,7 +5437,7 @@
   flex-direction: column;
 }
 .pb-rail-head {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -5455,7 +5455,7 @@
 .pb-rail-row:first-child { border-top: 0; padding-top: 0; }
 .pb-rail-k {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5472,7 +5472,7 @@
 .pb-ai-hint {
   font-style: italic;
   color: #8E8E8E;
-  font-size: 11px;
+  font-size: 12px;
 }
 .pb-rail-prio {
   display: inline-flex;
@@ -5601,7 +5601,7 @@
 }
 .pb-support-eyebrow {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5722,7 +5722,7 @@
 
 /* Eyebrow */
 .geoExplainerEyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -5858,7 +5858,7 @@
 .aiPresAccent { color: #A100FF; }
 
 .aiPresHeadline {
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -5880,6 +5880,8 @@
   padding: 18px 20px 20px;
   display: flex;
   flex-direction: column;
+  cursor: default;
+  pointer-events: none;
 }
 
 .aiPresCardEyebrow {
@@ -5900,7 +5902,7 @@
   font-weight: 500;
   color: #6B7280;
   line-height: 1.35;
-  font-size: 12px;
+  font-size: 14px;
   margin-bottom: 16px;
   flex: 1;
   font-family: var(--font-sans);
@@ -5923,7 +5925,7 @@
 .aiPresChip {
   display: inline-block;
   padding: 3px 8px;
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -5943,7 +5945,7 @@
   padding: 20px 24px 24px;
 }
 .aiPresChartTitle { font-weight: 700; color: var(--color-text-primary, #0A0A0A); margin-bottom: 3px; }
-.aiPresChartSub   { font-size: 0.7rem; color: #8E8E8E; margin-bottom: 16px; }
+.aiPresChartSub   { font-size: 0.75rem; color: #8E8E8E; margin-bottom: 16px; }
 
 /* Mobile */
 @media (max-width: 640px) {
@@ -5976,55 +5978,61 @@
 .reachCardQ   { font-weight: 500; color: #6B7280; font-size: 12px; line-height: 1.35; font-family: var(--font-sans); }
 .reachCardScoreRow { display: flex; align-items: center; gap: 10px; }
 .reachCardNum { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
-.reachChip    { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 8px; border-radius: 0; }
+.reachChip    { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; padding: 3px 8px; border-radius: 0; }
 .reachCardRank { font-size: 12px; color: #9CA3AF; }
 
 .reachSection { margin-bottom: 16px; }
-.reachSectionLabel { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px; }
+.reachSectionLabel { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 10px; }
 
 /* SoV chart */
 .reachSovChart { display: flex; flex-direction: column; background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; margin-top: 12px; }
-.reachSovEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
-.reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; margin-bottom: 90px; }
+.reachSovEyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
+.reachSovChart .reachSovBars { display: flex; align-items: flex-end; gap: 10px; height: 180px; margin-bottom: 50px; }
 .reachSovBar { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; gap: 4px; height: 100%; position: relative; }
 .reachSovBarTrack { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; position: relative; min-height: 0; }
 .reachSovBarFill { width: 100%; border-radius: 2px 2px 0 0; transition: height 0.3s; }
-.reachSovBarPct { font-size: 0.7rem; font-weight: 700; text-align: center; line-height: 1.4; flex-shrink: 0; }
-.reachSovBarLabel { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%) rotate(180deg); writing-mode: vertical-rl; white-space: nowrap; font-size: 0.62rem; color: #6B7280; }
+.reachSovBarPct { font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 1.4; flex-shrink: 0; }
+.reachSovBarLabel { position: absolute; top: calc(100% + 16px); left: 50%; transform: translateX(-50%); font-size: 0.75rem; color: #6B7280; text-align: center; max-width: 100%; word-wrap: break-word; line-height: 1.2; }
 
 /* Citation sources */
 .reachSourcesCard { background: #fff; border: 1px solid #E5E7EB; padding: 20px 20px 0; }
-.reachSourcesEyebrow { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
-.reachSourcesSub  { font-size: 0.72rem; color: #6B7280; margin: 0; padding: 12px 14px 8px; border-bottom: 1px solid #F3F4F6; }
+.reachSourcesEyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #a100ff; margin-bottom: 14px; }
+.reachSourcesSub  { font-size: 0.75rem; color: #6B7280; margin: 0; padding: 12px 14px 8px; border-bottom: 1px solid #F3F4F6; }
 .reachChipFilters { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; border-bottom: 1px solid #E5E7EB; }
-.reachCF { font-size: 0.7rem; font-weight: 500; padding: 4px 12px; border: 1px solid #E5E7EB; background: #fff; color: #374151; cursor: pointer; font-family: inherit; transition: background 0.15s, border-color 0.15s, color 0.15s; }
+.reachCF { font-size: 0.75rem; font-weight: 500; padding: 4px 12px; border: 1px solid #E5E7EB; background: #fff; color: #374151; cursor: pointer; font-family: inherit; transition: background 0.15s, border-color 0.15s, color 0.15s; }
 .reachCF--active { background: #A100FF; border-color: #A100FF; color: #fff; }
 .reachSrcList { display: flex; flex-direction: column; }
 .reachSrcEmpty { padding: 20px 14px; font-size: 0.78rem; color: #9CA3AF; }
 .reachSrcRow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #F3F4F6; }
 .reachSrcRow:last-child { border-bottom: none; }
-.reachSrcRank { font-size: 0.72rem; color: #9CA3AF; min-width: 20px; text-align: right; flex-shrink: 0; }
+.reachSrcRank { font-size: 0.75rem; color: #9CA3AF; min-width: 20px; text-align: right; flex-shrink: 0; }
 .reachSrcInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .reachSrcName { font-size: 0.8rem; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.reachSrcBadge { font-size: 0.58rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; width: fit-content; }
+.reachSrcBadge { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; width: fit-content; }
 .reachSrcRight { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .reachSrcBarTrack { width: 80px; height: 4px; background: #F3F4F6; flex-shrink: 0; }
 .reachSrcBarFill  { height: 100%; }
-.reachSrcPct { font-size: 0.7rem; font-weight: 700; min-width: 34px; text-align: right; }
-.reachSrcTog { font-size: 0.62rem; color: #9CA3AF; display: inline-block; transition: transform 0.2s; }
+.reachSrcPct { font-size: 0.75rem; font-weight: 700; min-width: 34px; text-align: right; }
+.reachSrcTog { font-size: 0.75rem; color: #9CA3AF; display: inline-block; transition: transform 0.2s; }
 
 .reachSrcExpand { background: #FAFAFA; border-bottom: 1px solid #E5E7EB; border-left: 3px solid #E5E7EB; padding: 4px 14px 4px 44px; }
 .reachExpandRow { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #F3F4F6; text-decoration: none; }
 .reachExpandRow:last-child { border-bottom: none; }
-.reachExpandNum   { font-size: 0.62rem; color: #9CA3AF; min-width: 14px; text-align: right; flex-shrink: 0; }
+.reachExpandNum   { font-size: 0.75rem; color: #9CA3AF; min-width: 14px; text-align: right; flex-shrink: 0; }
 .reachExpandText  { flex: 1; min-width: 0; }
-.reachExpandTitle { font-size: 0.72rem; font-weight: 600; color: #111827; }
-.reachExpandUrl   { font-size: 0.62rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reachExpandTitle { font-size: 0.75rem; font-weight: 600; color: #111827; }
+.reachExpandUrl   { font-size: 0.75rem; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .reachExpandIcon  { font-size: 0.78rem; color: #9CA3AF; font-weight: 700; flex-shrink: 0; }
 
 @media (max-width: 640px) {
   .reachCards { grid-template-columns: 1fr; }
   .reachSrcBarTrack { width: 48px; }
+  .reachSovChart .reachSovBars { margin-bottom: 70px; }
+  .reachSovBarLabel {
+    transform: translateX(-50%) rotate(-90deg);
+    transform-origin: top center;
+    text-align: right;
+  }
 }
 
 /* ── AiPresenceTab chart additions ── */
@@ -6040,7 +6048,7 @@
 .aiPresChartLegend {
   display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
   padding: 10px 0px;
-  font-size: 0.7rem; color: #6B7280; font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.75rem; color: #6B7280; font-family: 'Space Grotesk', sans-serif;
 }
 .aiPresLegendItem { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .aiPresLegendDot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
@@ -6062,14 +6070,14 @@
 }
 .scatterListColBrand {
   grid-column: 2;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8E8E8E;
 }
 .scatterListColStat {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -6091,7 +6099,7 @@
   padding-left: 12px;
 }
 .scatterListRank {
-  font-size: 11px;
+  font-size: 12px;
   color: #B8B8B8;
   font-variant-numeric: tabular-nums;
 }
@@ -6109,7 +6117,7 @@
 }
 .scatterListRow--you .scatterListBrand { font-weight: 700; color: #0A0A0A; }
 .scatterListYouTag {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -6131,13 +6139,13 @@
 .compFilterWrap { position: relative; flex-shrink: 0; }
 .compFilterBtn {
   display: flex; align-items: center; gap: 6px;
-  font-size: 0.72rem; font-family: 'Space Grotesk', sans-serif; font-weight: 500;
+  font-size: 0.75rem; font-family: 'Space Grotesk', sans-serif; font-weight: 500;
   color: #374151; background: #fff; border: 1px solid #E5E7EB;
   padding: 6px 10px; cursor: pointer; white-space: nowrap;
   transition: border-color 0.15s, color 0.15s;
 }
 .compFilterBtn:hover, .compFilterBtn--open { border-color: #A100FF; color: #A100FF; }
-.compFilterChevron { font-size: 0.6rem; display: inline-block; transition: transform 0.2s; }
+.compFilterChevron { font-size: 0.75rem; display: inline-block; transition: transform 0.2s; }
 .compFilterDropdown {
   position: absolute; top: calc(100% + 4px); right: 0; z-index: 50;
   background: #fff; border: 1px solid #E5E7EB;
@@ -6147,7 +6155,7 @@
   display: flex; gap: 0; border-bottom: 1px solid #E5E7EB;
 }
 .compFilterAction {
-  flex: 1; padding: 7px 10px; font-size: 0.68rem; font-weight: 600;
+  flex: 1; padding: 7px 10px; font-size: 0.75rem; font-weight: 600;
   font-family: 'Space Grotesk', sans-serif; color: #A100FF; background: transparent;
   border: none; cursor: pointer; letter-spacing: 0.02em;
 }
@@ -6210,7 +6218,7 @@
     gap: 8px;
   }
   .cmpChartBrandName {
-    font-size: 11px;
+    font-size: 12px;
   }
   .cmpChartScore {
     font-size: 13px;

@@ -1450,6 +1450,45 @@ export async function POST(req: NextRequest) {
     const { brand, industry, industryKey, lob, personas, competitors, competitorUrls, categories } = d;
     const als = aliases(brand);
 
+    // Fire off calls that only need discover output — they'll run in parallel with Q&A batches
+    const knownForRawPromise = ai([{ role: 'user', content: `What are exactly 2 short noun phrases (3-5 words each) describing what "${brand}" is best known for in the ${lob||industry} space from a consumer perspective?\nReturn ONLY a JSON array of 2 strings. No markdown.\nExample: ["Rewards credit cards","High-yield savings"]` }], 0.1, 120);
+    const targetedClustersPromise: Promise<any[]> = (async (): Promise<any[]> => {
+      try {
+        const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob||industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
+        const fame = parseJSON(fRaw);
+        const knownFor: { product: string; queries: string[] }[] = fame?.knownFor || [];
+        if (!knownFor.length) return [];
+        const bl = brand.toLowerCase(), bw = bl.split(/\s+/).filter((w: string) => w.length > 4);
+        const ok = (q: string) => { const ql = q.toLowerCase(); return !ql.includes(bl) && !bw.some((w: string) => ql.includes(w)); };
+        const flat: { product: string; query: string }[] = [];
+        knownFor.forEach((k: { product: string; queries: string[] }) => k.queries.slice(0, 10).filter(ok).forEach(q => flat.push({ product: k.product, query: q })));
+        const tBatches = Array.from({ length: Math.ceil(flat.length / 10) }, (_, i) => flat.slice(i * 10, (i + 1) * 10));
+        const tQA: any[] = [];
+        await Promise.all(tBatches.map(async (batch: { product: string; query: string }[]) => {
+          const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
+          const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
+          const r2 = await ai([{ role: 'user', content: `Answer naming real brands. Be balanced.\n\n${ql}\n\nFormat:\n${lbs}` }], 0.3, 2000, 2);
+          const answers = parseAnswers(r2, batch.length);
+          batch.forEach((item, j) => {
+            const ans = answers[j] || '';
+            tQA.push({ product: item.product, query: item.query, ans, mentioned: hasAlias(ans.toLowerCase(), als), position: position(ans, als, competitors.map((c: string) => aliases(c))) });
+          });
+        }));
+        const pMap: Record<string, any[]> = {};
+        tQA.forEach((r: any) => { (pMap[r.product] = pMap[r.product] || []).push(r); });
+        return Object.entries(pMap).map(([product, rows]) => {
+          const total2 = rows.length, hits2 = rows.filter((r: any) => r.mentioned).length;
+          const posArr = rows.filter((r: any) => r.mentioned && r.position > 0).map((r: any) => r.position);
+          const avgP2 = posArr.length > 0 ? posArr.reduce((a: number, b: number) => a + b, 0) / posArr.length : 3;
+          const rank1c = posArr.filter((p: number) => p === 1).length;
+          const cc: Record<string, number> = {};
+          const bl2 = brand.toLowerCase();
+          rows.forEach((r: any) => { const t = (r.ans||'').toLowerCase(); competitors.forEach((c: string) => { if (hasAlias(t, aliases(c)) && c.toLowerCase() !== bl2) cc[c] = (cc[c]||0)+1; }); });
+          return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2/total2)*100) : 0, prominence: total2 > 0 ? Math.round((rank1c/total2)*100) : 0, avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'', responses: rows.map((r: any) => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
+        }).sort((a, b) => b.winRate - a.winRate);
+      } catch { return []; }
+    })();
+
     // Route to curated or AI-generated queries
     const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '');
     const [queries, citRaw, trendRaw] = await Promise.all([
@@ -1679,46 +1718,80 @@ export async function POST(req: NextRequest) {
     const bestStage  = [...stageWinRates].sort((a, b) => b.winRate - a.winRate)[0];
     const worstStage = [...stageWinRates].sort((a, b) => a.winRate - b.winRate)[0];
 
-    const [insightsRaw, targetedClusters] = await Promise.all([
-      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
-      (async (): Promise<any[]> => {
-        try {
-          const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob||industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
-          const fame = parseJSON(fRaw);
-          const knownFor: { product: string; queries: string[] }[] = fame?.knownFor || [];
-          if (!knownFor.length) return [];
-          const bl = brand.toLowerCase(), bw = bl.split(/\s+/).filter(w => w.length > 4);
-          const ok = (q: string) => { const ql = q.toLowerCase(); return !ql.includes(bl) && !bw.some(w => ql.includes(w)); };
-          const flat: { product: string; query: string }[] = [];
-          knownFor.forEach(k => k.queries.slice(0, 10).filter(ok).forEach(q => flat.push({ product: k.product, query: q })));
-          const tBatches = Array.from({ length: Math.ceil(flat.length / 10) }, (_, i) => flat.slice(i * 10, (i + 1) * 10));
-          const tQA: any[] = [];
-          await Promise.all(tBatches.map(async batch => {
-            const ql = batch.map((q, j) => `Q${j + 1}: ${q.query}`).join('\n\n');
-            const lbs = batch.map((_, j) => `A${j + 1}:`).join('\n');
-            const r2 = await ai([{ role: 'user', content: `Answer naming real brands. Be balanced.\n\n${ql}\n\nFormat:\n${lbs}` }], 0.3, 2000, 2);
-            const answers = parseAnswers(r2, batch.length);
-            batch.forEach((item, j) => {
-              const ans = answers[j] || '';
-              tQA.push({ product: item.product, query: item.query, ans, mentioned: hasAlias(ans.toLowerCase(), als), position: position(ans, als, competitors.map(c => aliases(c))) });
-            });
-          }));
-          const pMap: Record<string, any[]> = {};
-          tQA.forEach(r => { (pMap[r.product] = pMap[r.product] || []).push(r); });
-          return Object.entries(pMap).map(([product, rows]) => {
-            const total2 = rows.length, hits2 = rows.filter(r => r.mentioned).length;
-            const posArr = rows.filter(r => r.mentioned && r.position > 0).map(r => r.position);
-            const avgP2 = posArr.length > 0 ? posArr.reduce((a: number, b: number) => a + b, 0) / posArr.length : 3;
-            const rank1c = posArr.filter(p => p === 1).length;
-            const cc: Record<string, number> = {};
-            rows.forEach(r => { const t = (r.ans||'').toLowerCase(); competitors.forEach(c => { if (hasAlias(t, aliases(c)) && c.toLowerCase() !== bl) cc[c] = (cc[c]||0)+1; }); });
-            return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2/total2)*100) : 0, prominence: total2 > 0 ? Math.round((rank1c/total2)*100) : 0, avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'', responses: rows.map(r => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
-          }).sort((a, b) => b.winRate - a.winRate);
-        } catch { return []; }
-      })(),
+    const pbCompCtx = competitors && competitors.length > 0
+      ? `Competitors: ${competitors.slice(0, 10).join(', ')}.`
+      : '';
+
+    const pbPrompt = `You are a GEO strategist. Generate a JSON array of 5-7 specific, implementable priority actions.
+Brand: ${brand}, Industry: ${lob||industry}, GEO Score: ${scores.geo}. ${pbCompCtx}
+Do NOT suggest competitor comparison pages.
+Return ONLY a valid JSON array. Order: High first, then Medium, then Low. At least 2 High, 1-2 Medium, 1 Low.
+Each object must have exactly these fields:
+- "priority": "High" | "Medium" | "Low"
+- "topics": [{"name":"Topic"}] or [{"name":"Primary"},{"name":"Secondary","secondary":true}]
+- "title": punchy 5-10 word action title
+- "teaser": one-line 10-15 word opportunity summary
+- "who": array of 2-4 audience segment strings
+- "evidence": {"topic":string,"score":0-100,"delta":integer,"prompts":integer}
+- "why": 2-3 sentences. Use <b>bold</b> to highlight the key insight
+- "build": array of 3-5 strings, each starting with <b>verb phrase</b> then detail
+- "team": e.g. "Content / Marketing"
+- "type": one of "Content page"|"Owned content optimization"|"FAQ build"|"Structured content"|"Citation push"|"PR / Earned media"
+- "signals": 1-3 items from ["Visibility","Sentiment","Prominence","Citation","Share of Voice"]`;
+
+    // insightsRaw and pbRaw depend on scores; targetedClusters and knownForRaw were started early
+    const [insightsRaw, pbRaw, targetedClusters, knownForRaw] = await Promise.all([
+      ai([{ role: 'user', content: `You are a senior GEO analyst writing a brand health report. Return ONLY valid JSON — no markdown, no commentary.\n\nData for ${brand} (${lob||industry}):\n- GEO score: ${scores.geo}/100\n- Visibility: ${scores.visibility}% — mentioned in ${scores.mentionCount} of ${scores.totalCount} AI responses\n- Prominence: ${scores.prominence}/100 — average rank ${myAvgRank}\n- Sentiment: ${scores.sentiment}/100\n- Citation share: ${scores.citationShare}/100\n- Share of voice: ${scores.shareOfVoice}%\n- Best stage: ${bestStage?.stage||'n/a'} (${bestStage?.winRate||0}% win rate)\n- Worst stage: ${worstStage?.stage||'n/a'} (${worstStage?.winRate||0}% win rate)\n- Strong topic categories: ${topCats.join(', ')||'none identified'}\n- Missing from AI answers in: ${missCats.join(', ')||'none identified'}\n- Top competitor: ${topComp}\n- Other competitors: ${competitors.slice(0,5).join(', ')}\n\nWrite 3 strengths and 5 improvements. Each is an object with:\n- "bold": a sharp one-sentence headline that names the specific metric or behavior (e.g. "Citi leads in 4 of 5 awareness-stage queries")\n- "detail": 1-2 sentences that cite the actual numbers above and name specific topic categories or competitors where relevant (e.g. "The brand appears in ${scores.mentionCount} of ${scores.totalCount} total responses, with its strongest performance in ${topCats[0]||'core'} and ${topCats[1]||'adjacent'} topics where it consistently ranks ahead of ${topComp}.")\n- "signal": one of "Visibility" | "Prominence" | "Sentiment" | "Citation" | "Share of Voice"\n\nNEVER use vague language like "strong performance" or "room to improve" without citing a number. Every detail sentence must contain at least one specific figure from the data above.\n\nReturn exactly: {"strengths":[{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."}],"improvements":[{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."}]}` }], 0.3, 1800),
+      ai([{ role: 'user', content: pbPrompt }], 0.3, 3000),
+      targetedClustersPromise,
+      knownForRawPromise,
     ]);
 
-    const insights = parseJSON(insightsRaw) || { strengths: [], improvements: [], actions: [] };
+    const insights = parseJSON(insightsRaw) || { strengths: [], improvements: [] };
+
+    // Parse rich playbook actions; fall back gracefully if LLM truncates or misformats
+    let playbookActions: any[] = [];
+    try {
+      const pbClean = (pbRaw || '').replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+      const parsed = parseJSON(pbClean);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        playbookActions = parsed;
+      } else {
+        // bracket-balanced extraction in case of leading/trailing prose
+        let depth = 0, start = -1;
+        for (let i = 0; i < pbClean.length; i++) {
+          if (pbClean[i] === '[') { if (depth === 0) start = i; depth++; }
+          else if (pbClean[i] === ']') {
+            depth--;
+            if (depth === 0 && start !== -1) {
+              try { const p = parseJSON(pbClean.slice(start, i + 1)); if (Array.isArray(p) && p.length > 0) { playbookActions = p; break; } } catch {}
+              start = -1;
+            }
+          }
+        }
+      }
+    } catch { /* leave empty */ }
+
+    // Normalise each action so the component never gets undefined fields
+    playbookActions = playbookActions.map((a: any) => ({
+      priority: a.priority || 'Medium',
+      topics:   Array.isArray(a.topics) ? a.topics : (a.topic ? [{ name: a.topic }] : [{ name: 'General' }]),
+      title:    a.title   || a.action || '',
+      teaser:   a.teaser  || a.impact || '',
+      who:      Array.isArray(a.who) ? a.who : [],
+      evidence: a.evidence || { topic: '', score: 0, delta: 0, prompts: 0 },
+      why:      a.why    || '',
+      build:    Array.isArray(a.build) ? a.build : [],
+      team:     a.team   || '',
+      type:     a.type   || '',
+      signals:  Array.isArray(a.signals) ? a.signals : [],
+    }));
+
+    let brandKnownFor: string[] = [];
+    try {
+      const kf = parseJSON((knownForRaw || '').replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim());
+      if (Array.isArray(kf)) brandKnownFor = kf.slice(0, 2);
+    } catch { /* leave empty */ }
 
     return NextResponse.json({
       brand_name: brand, industry, ind_key: industryKey, lob, ind_label: industry,
@@ -1732,7 +1805,8 @@ export async function POST(req: NextRequest) {
       targeted_clusters: targetedClusters, competitors: competitorScores,
       citation_sources: citationSources, trending_queries: trendingQueries,
       strengths_list: insights.strengths||[], improvements_list: insights.improvements||[],
-      actions: insights.actions||[],
+      actions: playbookActions,
+      brand_known_for: brandKnownFor,
       internal_links: page.internalLinks||[], domain: page.domain||'', page_url: url,
     });
 

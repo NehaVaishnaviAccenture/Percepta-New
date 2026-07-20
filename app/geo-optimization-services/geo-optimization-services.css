@@ -12,7 +12,7 @@
 .gsEyebrow {
   display: block;
   font-family: Inter, sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -216,7 +216,7 @@
 }
 
 .gsDeliverWsLabel {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
   margin-bottom: 6px;
@@ -333,7 +333,7 @@
   background: #A100FF;
   color: white;
   padding: 3px 16px;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
   letter-spacing: 0.08em;
@@ -341,7 +341,7 @@
 }
 
 .gsPilotNum {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;

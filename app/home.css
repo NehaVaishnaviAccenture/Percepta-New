@@ -122,7 +122,7 @@
 
 .navUserAvatarInitials {
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   color: #fff;
   line-height: 1;
@@ -142,7 +142,7 @@
   border: 1px solid #A100FF;
   padding: 6px 18px;
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   color: #A100FF;
@@ -242,7 +242,7 @@
 .howBadge {
   display: inline-block;
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -322,7 +322,7 @@
 .geoScoreEyebrow {
   display: block;
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   color: #A100FF;
@@ -358,7 +358,7 @@
 
 .geoScoreCardLabel {
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   color: #8E8E8E;
@@ -452,7 +452,7 @@
 .comparisonBadge {
   display: inline-block;
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -508,7 +508,7 @@
   color: #FFFFFF;
   padding: 3px 16px;
   font-family: 'Inter', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -516,7 +516,7 @@
 
 .comparisonCardLabel {
   font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -695,7 +695,7 @@
   }
 
   .heroBadge {
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     padding: 5px 14px;
     margin-bottom: 28px;
   }

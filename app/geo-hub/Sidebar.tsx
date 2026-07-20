@@ -37,21 +37,27 @@ export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
         className={`sidebar${expanded ? ' sidebar--expanded' : ''}`}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onDoubleClick={() => setPinned(true)}
       >
         <div className="sidebarHeader">
-          <Link href="/" className="sidebarLogo">
+          <Link href="/" className="sidebarLogo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div className="sidebarLogoIcon"><LogoSvg/></div>
             <span className="sidebarLogoName">Percepta</span>
           </Link>
           <button
             className="sidebarPinBtn"
             onClick={() => setPinned(p => !p)}
-            title={pinned ? 'Collapse sidebar' : 'Pin sidebar open'}
+            title={pinned ? 'Unpin sidebar' : 'Pin sidebar open'}
           >
-            {pinned
-              ? <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="10,3 5,8 10,13"/></svg>
-              : <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8"><polyline points="6,3 11,8 6,13"/></svg>
-            }
+            {pinned ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="10 6 6 10 10 14"/>
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 6 10 10 6 14"/>
+              </svg>
+            )}
           </button>
         </div>
 
@@ -67,6 +73,11 @@ export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
         <Link href="/" className="sidebarNavItem">
           <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
           <span className="sidebarNavLabel">Home</span>
+        </Link>
+
+        <Link href="/geo-hub" className="sidebarNavItem">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><rect x="2" y="10" width="3" height="4"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="3" width="3" height="11"/></svg>
+          <span className="sidebarNavLabel">GEO Hub</span>
         </Link>
 
         <Link href="/geo-optimization-services" className="sidebarNavItem">
@@ -136,6 +147,11 @@ export default function Sidebar({ onNewAnalysis, breadcrumb }: SidebarProps) {
             <Link href="/" className="sidebarNavItem" style={{padding:'0 14px'}} onClick={() => setDrawerOpen(false)}>
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><path d="M2 6l6-4 6 4v8H2V6z"/></svg>
               Home
+            </Link>
+
+            <Link href="/geo-hub" className="sidebarNavItem" style={{padding:'0 14px'}} onClick={() => setDrawerOpen(false)}>
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" style={{flexShrink:0}}><rect x="2" y="10" width="3" height="4"/><rect x="6.5" y="6" width="3" height="8"/><rect x="11" y="3" width="3" height="11"/></svg>
+              GEO Hub
             </Link>
 
             <Link href="/geo-optimization-services" className="sidebarNavItem" style={{padding:'0 14px'}} onClick={() => setDrawerOpen(false)}>
