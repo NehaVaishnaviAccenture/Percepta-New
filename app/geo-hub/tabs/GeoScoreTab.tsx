@@ -165,11 +165,11 @@ export default function GeoScoreTab({ result, resultComps, setActiveParent, setA
   const allSov  = [sov,  ...comps.map((c: any) => c.Sov  ?? 0)];
 
   const signals = [
-    { key: 'vis',  label: 'Visibility',     q: 'How often your brand appears in AI answers.',                                              score: vis,  rankVal: rank(vis,  allVis),  avgVal: avg(allVis),  total: allVis.length - 1,  sub: 1 },
-    { key: 'sent', label: 'Sentiment',      q: 'Whether AI talks about your brand in a positive, neutral, or negative way.',              score: sent, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length - 1, sub: 1 },
-    { key: 'prom', label: 'Prominence',     q: 'Where your brand appears in the answer, the higher up the more prominent.',              score: prom, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length - 1, sub: 1 },
-    { key: 'cit',  label: 'Citation',       q: 'How often AI uses your website or content as a source.',                                  score: cit,  rankVal: rank(cit,  allCit),  avgVal: avg(allCit),  total: allCit.length - 1,  sub: 2 },
-    { key: 'sov',  label: 'Share of Voice', q: 'How much your brand is mentioned compared to competitors.',                               score: sov,  rankVal: rank(sov,  allSov),  avgVal: avg(allSov),  total: allSov.length - 1,  sub: 2 },
+    { key: 'vis',  label: 'Visibility',     q: 'How often your brand appears in AI answers.',                                              score: vis,  rankVal: rank(vis,  allVis),  avgVal: avg(allVis),  total: allVis.length,  sub: 1 },
+    { key: 'sent', label: 'Sentiment',      q: 'Whether AI talks about your brand in a positive, neutral, or negative way.',              score: sent, rankVal: rank(sent, allSent), avgVal: avg(allSent), total: allSent.length, sub: 1 },
+    { key: 'prom', label: 'Prominence',     q: 'Where your brand appears in the answer, the higher up the more prominent.',              score: prom, rankVal: rank(prom, allProm), avgVal: avg(allProm), total: allProm.length, sub: 1 },
+    { key: 'cit',  label: 'Citation',       q: 'How often AI uses your website or content as a source.',                                  score: cit,  rankVal: rank(cit,  allCit),  avgVal: avg(allCit),  total: allCit.length,  sub: 2 },
+    { key: 'sov',  label: 'Share of Voice', q: 'How much your brand is mentioned compared to competitors.',                               score: sov,  rankVal: rank(sov,  allSov),  avgVal: avg(allSov),  total: allSov.length,  sub: 2 },
   ];
 
   return (

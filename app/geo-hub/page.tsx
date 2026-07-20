@@ -21,6 +21,16 @@ function isBankUrl(u: string): boolean {
   } catch { return false; }
 }
 const BANK_SCOPES = ['Credit Cards', 'Savings Accounts'];
+
+function impliedScopeFromPath(urlStr: string): string | null {
+  try {
+    const path = new URL(urlStr).pathname.toLowerCase();
+    if (!path || path === '/') return null;
+    if (path.includes('credit-card') || path.includes('creditcard') || path.includes('credit_card')) return 'Credit Cards';
+    if (path.includes('savings') || path.includes('hysa') || path.includes('high-yield')) return 'Savings Accounts';
+    return null;
+  } catch { return null; }
+}
 import Link from 'next/link';
 import Sidebar from './Sidebar';
 import GeoScoreTab from './tabs/GeoScoreTab';
@@ -59,6 +69,7 @@ export default function GeoHub() {
   const [d3ShowCustomScope,setD3ShowCustomScope]=useState(false);
   const [d3CustomScope,setD3CustomScope]=useState('');
   const [detectedScopes,setDetectedScopes]=useState<string[]>([]);
+  const [detectedScopedUrls,setDetectedScopedUrls]=useState<Record<string,string>>({});
   const [scopeDetecting,setScopeDetecting]=useState(false);
   const scopeDebounceRef=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [elapsedSec,setElapsedSec]=useState(0);
@@ -75,6 +86,7 @@ export default function GeoHub() {
   useEffect(()=>{
     if(!isValidUrl(url)){
       setDetectedScopes([]);
+      setDetectedScopedUrls({});
       setD3ScopeSelected('');
       setD3ShowCustomScope(false);
       setD3CustomScope('');
@@ -82,17 +94,22 @@ export default function GeoHub() {
       if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
       return;
     }
+    // Auto-select implied scope immediately (synchronous, before debounce)
+    const implied=isBankUrl(url)?impliedScopeFromPath(url):null;
+    if(implied) setD3ScopeSelected(implied);
     setScopeDetecting(true);
     setDetectedScopes([]);
-    setD3ScopeSelected('');
+    setDetectedScopedUrls({});
     setD3ShowCustomScope(false);
     setD3CustomScope('');
+    if(!implied) setD3ScopeSelected('');
     if(scopeDebounceRef.current) clearTimeout(scopeDebounceRef.current);
     scopeDebounceRef.current=setTimeout(async()=>{
       try{
         const res=await fetch('/api/detect-scope',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});
         const data=await res.json();
         if(data.scopes&&Array.isArray(data.scopes)) setDetectedScopes(data.scopes);
+        if(data.scopedUrls&&typeof data.scopedUrls==='object') setDetectedScopedUrls(data.scopedUrls);
       }catch{}
       setScopeDetecting(false);
     },700);
@@ -104,6 +121,10 @@ export default function GeoHub() {
     const effectiveScope=d3ScopeSelected==='+ Custom'?d3CustomScope.trim():d3ScopeSelected;
     if(!isValidUrl(url)){setError('Please enter a valid URL (e.g. citi.com)');return;}
     if(!effectiveScope){setError('Please select a scope before running the analysis.');return;}
+    const scopedPath=detectedScopedUrls[d3ScopeSelected];
+    const urlIsRoot=(()=>{try{const p=new URL(url).pathname;return p==='/'||p===''}catch{return false}})();
+    const effectiveUrl=urlIsRoot&&scopedPath&&d3ScopeSelected!=='General'&&d3ScopeSelected!=='+ Custom'
+      ?url.replace(/\/$/,'')+scopedPath:url;
     setError('');setAnalysisError(null);setLoading(true);setLoadingStep(0);setLoadingProgress(0);
     const steps = [
       { step: 0, progress: 5, delay: 200 },
@@ -120,7 +141,7 @@ export default function GeoHub() {
       timers.push(setTimeout(()=>{setLoadingStep(step);setLoadingProgress(progress);},delay));
     });
     try{
-      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url, promptCount, scope: effectiveScope})});
+      const res=await fetch('/api/geo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url: effectiveUrl, promptCount, scope: effectiveScope})});
       const data=await res.json();
       timers.forEach(t=>clearTimeout(t));
       setLoadingProgress(100);
@@ -138,7 +159,7 @@ export default function GeoHub() {
       } else{
         // playbook_actions come back in the same response — no second fetch needed.
         setResult(data);setActiveParent(0);setActiveSub(0);setPlaybookActions(data.actions||[]);setLivePromptHistory([]);setLivePromptQuery('');
-        try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',url);}catch{}
+        try{sessionStorage.setItem('geo_result',JSON.stringify(data));sessionStorage.setItem('geo_url',effectiveUrl);}catch{}
       }
     }catch(e:any){
       timers.forEach(t=>clearTimeout(t));
@@ -163,6 +184,16 @@ export default function GeoHub() {
     const canRun = urlValid && effectiveScope !== '' && !loading;
 
     const SCOPE_PILLS = isBankUrl(url) ? ['General', ...BANK_SCOPES] : ['General', ...detectedScopes];
+
+    // Implied scope: derived from URL path for bank URLs — locks all other pills
+    const impliedScope = isBankUrl(url) ? impliedScopeFromPath(url) : null;
+
+    // Effective URL: transforms root domain to scope-specific page when scope is selected
+    const urlIsRootDomain = (()=>{try{const p=new URL(url).pathname;return p==='/'||p===''}catch{return false}})();
+    const scopedPath = detectedScopedUrls[d3ScopeSelected];
+    const previewEffectiveUrl = urlIsRootDomain && scopedPath && d3ScopeSelected !== 'General' && d3ScopeSelected !== '+ Custom'
+      ? url.replace(/\/$/, '') + scopedPath
+      : url;
 
     const sbIcon = (active=false): React.CSSProperties => ({
       width:36,height:36,display:'flex',alignItems:'center',justifyContent:'center',
@@ -263,13 +294,13 @@ export default function GeoHub() {
                   <div id="scan-scope-pills" className="scanScopePills" style={{display:'flex',flexWrap:'wrap' as const,gap:6}}>
                     {SCOPE_PILLS.map((pill,i)=>{
                       const sel=d3ScopeSelected===pill;
+                      const disabled=impliedScope!==null&&pill!==impliedScope;
                       return (
                         <div
                           id={`scan-scope-pill-${i}`}
-                          className={`scanScopePill${sel?' scanScopePillSelected':''}`}
+                          className={`scanScopePill${sel?' scanScopePillSelected':''}${disabled?' scanScopePillDisabled':''}`}
                           key={pill}
-                          onClick={()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}}
-                          style={{background:sel?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px solid ${sel?'#A100FF':'#D0D0DC'}`,color:sel?'#A100FF':'#3D3D50',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
+                          onClick={disabled?undefined:()=>{setD3ScopeSelected(pill);setD3ShowCustomScope(false);}}
                         >
                           {pill}
                         </div>
@@ -277,13 +308,19 @@ export default function GeoHub() {
                     })}
                     <div
                       id="scan-scope-custom"
-                      className={`scanScopeCustom${d3ScopeSelected==='+ Custom'?' scanScopeCustomSelected':''}`}
-                      onClick={()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}}
-                      style={{background:d3ScopeSelected==='+ Custom'?'rgba(161,0,255,0.08)':'#FFFFFF',border:`1px ${d3ScopeSelected==='+ Custom'?'solid':'dashed'} ${d3ScopeSelected==='+ Custom'?'#A100FF':'#D0D0DC'}`,color:d3ScopeSelected==='+ Custom'?'#A100FF':'#B8B8CC',fontFamily:'Inter,sans-serif',fontSize:12,fontWeight:500,padding:'5px 13px',cursor:'pointer',userSelect:'none' as const,transition:'background 0.15s, border-color 0.15s, color 0.15s'}}
+                      className={`scanScopeCustom${d3ScopeSelected==='+ Custom'?' scanScopeCustomSelected':''}${impliedScope?' scanScopeCustomDisabled':''}`}
+                      onClick={impliedScope?undefined:()=>{setD3ScopeSelected('+ Custom');setD3ShowCustomScope(true);}}
                     >
                       + Custom
                     </div>
                   </div>
+
+                  {/* Will-analyze hint — only shows when URL will be transformed */}
+                  {previewEffectiveUrl !== url && (
+                    <div style={{marginTop:6,fontFamily:"'DM Mono','JetBrains Mono',monospace",fontSize:10,color:'#7A7A90'}}>
+                      → Will analyze <span style={{color:'#A100FF'}}>{previewEffectiveUrl.replace(/^https?:\/\//,'')}</span>
+                    </div>
+                  )}
 
                   {/* Custom scope text input */}
                   {d3ShowCustomScope&&(

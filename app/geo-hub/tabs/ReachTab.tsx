@@ -139,8 +139,8 @@ export default function ReachTab({ result, resultComps }: TabProps) {
     : displaySources.filter(s => getCat(s) === activeCat);
 
   const signals = [
-    { key: 'cit', label: 'Citation', weight: 15, q: 'How often AI uses your website or content as a source.', score: cit, tier: citTier, rankVal: citRank, avgVal: avg(allCit), total: allCit.length - 1 },
-    { key: 'sov', label: 'Share of Voice', weight: 15, q: 'How much your brand is mentioned compared to competitors.', score: sov, tier: sovTier, rankVal: sovRank, avgVal: avg(allSov), total: allSov.length - 1 },
+    { key: 'cit', label: 'Citation', weight: 15, q: 'How often AI uses your website or content as a source.', score: cit, tier: citTier, rankVal: citRank, avgVal: avg(allCit), total: allCit.length },
+    { key: 'sov', label: 'Share of Voice', weight: 15, q: 'How much your brand is mentioned compared to competitors.', score: sov, tier: sovTier, rankVal: sovRank, avgVal: avg(allSov), total: allSov.length },
   ];
 
   return (
