@@ -823,12 +823,10 @@ function computeRaw(
   // How often this brand is named first across all queries run
   const promRaw = Math.round((rank1Count / total) * 100);
 
-  // CITATION: avg reciprocal rank across all mentions (organic + supplemental)
-  const allPositions = allMentioned
-    .map((r: any) => position(r.a || '', als, compAls))
-    .filter(p => p > 0);
-  const citRaw = allMentioned.length > 0
-    ? Math.round((allPositions.reduce((s, p) => s + 1 / p, 0) / allMentioned.length) * 100)
+  // CITATION: organic positions only — supplemental inflates this for low-visibility brands
+  // Brands with zero organic mentions get citRaw=0 — no false high citations
+  const citRaw = organicPositions.length > 0
+    ? Math.round((organicPositions.reduce((s, p) => s + 1 / p, 0) / organicPositions.length) * 100)
     : 0;
 
   // SENTIMENT: positive mentions / TOTAL QUERIES × 100 (not vs mentions)
@@ -892,8 +890,10 @@ function scoreAllBrands(
       return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
     }
     const vis  = fc(r.visRaw);
-    const prom = fc(r.promRaw);
-    const cit  = fc(r.citRaw);
+    // Prominence: no floor when brand has zero rank1 — 0 is honest
+    const prom = r.promRaw > 0 ? fc(r.promRaw) : 0;
+    // Citation: no floor when brand has zero organic positions — 0 is honest
+    const cit  = r.citRaw > 0 ? fc(r.citRaw) : 0;
     const sent = fc(r.sentRaw);
     const sovPct = Math.round((r.sovRaw / anyBrandCount) * 100);
     const sov  = fc(sovPct);
