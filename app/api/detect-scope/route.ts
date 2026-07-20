@@ -98,7 +98,10 @@ Example for "chase.com":
     }
 
     // Hardcoded URLs take priority over AI-generated ones
-    const scopedUrls: Record<string, string> = { ...aiScopedUrls, ...knownUrls };
+    const knownUrlsStrict: Record<string, string> = Object.fromEntries(
+      Object.entries(knownUrls).filter((e): e is [string, string] => e[1] !== undefined)
+    );
+    const scopedUrls: Record<string, string> = { ...aiScopedUrls, ...knownUrlsStrict };
 
     return NextResponse.json({ scopes, scopedUrls });
   } catch (err: any) {
