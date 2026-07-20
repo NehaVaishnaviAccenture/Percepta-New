@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
         'X-Title': 'Percepta',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-5.4',
+        model: 'openai/gpt-4o',
         messages: [
           {
             role: 'system',
