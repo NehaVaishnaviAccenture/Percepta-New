@@ -151,7 +151,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nYou are a brand intelligence analyst. Analyse this URL and identify what SPECIFIC financial product category this page represents.\n\nIf the URL is a brand homepage (e.g. americanexpress.com, chase.com), identify what the brand is MOST KNOWN FOR in credit cards or banking (e.g. American Express = premium travel cards, Chase = travel rewards, Citi = cash back, Discover = cash back, Capital One = travel rewards).\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"credit cards or banking or savings","industry_key":"snake_case e.g. credit_cards","lob":"the most specific product category e.g. premium travel credit cards OR cash back credit cards OR travel rewards credit cards","competitors":["exactly 10 brands that directly compete in THIS specific product category — brands AI recommends when asked about this specific product, not just the same broad industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas for this specific product"],"categories":["10 consumer intent questions specific to this product category"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nIdentify the industry and product for this URL. For brand homepages, use the broad industry category (e.g. credit cards, savings accounts, checking accounts) NOT a specific product niche.\n\nCRITICAL: For competitors, list THE TOP 10 most recommended brands in this ENTIRE industry category as ranked by AI models like ChatGPT — include the biggest national brands regardless of whether they are stronger or weaker than the primary brand. Do NOT find niche competitors. Find the dominant industry leaders.\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"the broad industry e.g. credit cards","industry_key":"snake_case e.g. credit_cards — must be savings if page is about savings accounts, credit_cards if about credit cards, retail_banking only if about checking or general banking","lob":"broad product category for homepage e.g. credit cards — only be specific if URL path shows a specific product page","competitors":["exactly 10 most recommended brands in this industry by AI models — always include Chase, American Express, Capital One, Citi, Discover for credit cards — include both online and traditional banks for savings/banking"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent questions for this industry"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     const knownBrands: Record<string, string> = {
@@ -661,20 +661,11 @@ function getCuratedQueries(
     checking: ['Checking Accounts'],
   };
 
-  // Detect product from URL OR from the AI-discovered lob description
-  // e.g. lob = "premium travel credit cards" → product = premium/travel
-  const lobLower = discoveredLob.toLowerCase();
-  let effectiveProduct = product;
-  if (effectiveProduct === 'general' && lobLower) {
-    if (lobLower.includes('cash back') || lobLower.includes('cashback') || lobLower.includes('rewards') && lobLower.includes('everyday')) effectiveProduct = 'cash_back';
-    else if (lobLower.includes('travel') || lobLower.includes('miles') || lobLower.includes('points') && lobLower.includes('travel')) effectiveProduct = 'travel';
-    else if (lobLower.includes('premium') || lobLower.includes('luxury') || lobLower.includes('platinum') || lobLower.includes('prestige')) effectiveProduct = 'premium';
-    else if (lobLower.includes('balance transfer') || lobLower.includes('0% apr') || lobLower.includes('debt')) effectiveProduct = 'balance_transfer';
-    else if (lobLower.includes('no annual fee') || lobLower.includes('no-fee') || lobLower.includes('free card')) effectiveProduct = 'no_annual_fee';
-    else if (lobLower.includes('business') || lobLower.includes('corporate')) effectiveProduct = 'business';
-    else if (lobLower.includes('student') || lobLower.includes('college')) effectiveProduct = 'student';
-    else if (lobLower.includes('secured') || lobLower.includes('credit build') || lobLower.includes('rebuild')) effectiveProduct = 'credit_building';
-  }
+  // Product detection: ONLY from URL path — never from brand name or discovered lob
+  // Homepage URLs always get general (all categories equal) so scores are comparable
+  // across all brands. Only specific product pages like /credit-cards/double-cash
+  // get product-specific queries.
+  const effectiveProduct = product; // product comes from URL path detection only
 
   const targetCats = PRODUCT_TO_CATEGORY[effectiveProduct] || [];
 
@@ -885,17 +876,24 @@ function scoreAllBrands(
   // anyBrandCount = max across all brands (responses where at least one brand appears)
   const anyBrandCount = Math.max(...raws.map(r => r.anyBrandCount), 1);
 
+  // floor: min 5 for brands with any mention data, never 0 unless truly invisible
+  // cap: max 95, never 100
+  const fc = (v: number) => Math.max(5, Math.min(95, Math.round(v)));
+
   function buildScore(i: number) {
     const r = raws[i];
     if (r.mentionCount === 0) {
+      // Truly invisible — zero everything
       return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
     }
-    const vis  = r.visRaw;
-    const prom = r.promRaw;
-    const cit  = r.citRaw;
-    const sent = r.sentRaw;
-    const sov  = Math.round((r.sovRaw / anyBrandCount) * 100);
-    const geo  = Math.round(vis*0.25 + sent*0.20 + prom*0.25 + cit*0.15 + sov*0.15);
+    const vis  = fc(r.visRaw);
+    const prom = fc(r.promRaw);
+    const cit  = fc(r.citRaw);
+    const sent = fc(r.sentRaw);
+    const sovPct = Math.round((r.sovRaw / anyBrandCount) * 100);
+    const sov  = fc(sovPct);
+    // GEO formula: Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
+    const geo  = Math.max(5, Math.min(95, Math.round(vis*0.30 + sent*0.20 + prom*0.20 + cit*0.15 + sov*0.15)));
     return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
   }
 
