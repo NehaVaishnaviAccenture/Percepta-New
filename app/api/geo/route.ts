@@ -46,7 +46,8 @@ function hasAlias(text: string, aliases: string[]): boolean {
 function aliases(brand: string): string[] {
   const bl = brand.toLowerCase().trim();
   const set = new Set<string>([bl, bl.replace(/\s+/g, ''), bl.replace(/\s+/g, '-')]);
-  // Decompose known concatenated patterns e.g. "americanexpress" → "american express"
+
+  // Known brand normalisations (concatenated → spaced)
   const known: Record<string, string> = {
     'americanexpress': 'american express',
     'bankofamerica': 'bank of america',
@@ -57,7 +58,33 @@ function aliases(brand: string): string[] {
   };
   const key = bl.replace(/\s+/g, '').replace(/[^a-z]/g, '');
   if (known[key]) { set.add(known[key]); set.add(known[key].replace(/\s+/g, '')); }
-  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 6 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+
+  // Known short abbreviations — GPT often uses these without the full name
+  // Controlled short-form aliases — only add ones that are unambiguous
+  const abbrevs: Record<string, string[]> = {
+    'pnc bank': ['pnc'],
+    'pnc': ['pnc'],
+    'usaa': ['usaa'],
+    'hsbc': ['hsbc'],
+    'u.s. bank': ['us bank', 'usbank'],
+    'navy federal': ['navy federal', 'navyfederal', 'navy fed'],
+    'american express': ['amex'],
+    'bank of america': ['bofa', 'bankofamerica'],
+    'wells fargo': ['wellsfargo'],
+    'synchrony': ['synchrony'],
+    'goldman sachs': ['goldman sachs', 'marcus'],
+  };
+  const abbrevKey = bl.replace(/[^a-z\s]/g, '').trim();
+  (abbrevs[abbrevKey] || abbrevs[bl] || []).forEach(a => set.add(a.toLowerCase()));
+
+  // Split on common separators and add meaningful words (≥5 chars, not skip words)
+  // Short brand names like 'amex', 'pnc', 'citi' are handled via the abbrevs map above
+  bl.split(/[\s'\-\.&]+/).filter((w: string) => w.length >= 5 && !SKIP_WORDS.has(w)).forEach((w: string) => set.add(w));
+
+  // Also add the full string without punctuation for brands like "U.S. Bank"
+  const noPunct = bl.replace(/[^a-z0-9\s]/g, '').trim();
+  if (noPunct && noPunct !== bl) set.add(noPunct);
+
   return [...set].filter((a: string) => a.length >= 3);
 }
 
@@ -124,17 +151,13 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nReturn:\n{"brand_name":"parent brand with proper spacing e.g. American Express not Americanexpress","industry":"industry for THIS URL path","industry_key":"snake_case","lob":"exact product on this page — use general terms like savings account not high yield savings unless the page explicitly says high yield","personas":["5 buyer personas as: Type — specific need"],"competitors":["exactly 10 direct competitors that ChatGPT and Perplexity actually name when US consumers ask about this product — include both online banks AND major traditional banks like Chase, Bank of America, Citi, Wells Fargo that offer this product"],"competitor_urls":{"Brand":"domain.com"},"categories":["10 consumer intent categories for this product"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nYou are a brand intelligence analyst. Analyse this URL and identify what SPECIFIC financial product category this page represents.\n\nIf the URL is a brand homepage (e.g. americanexpress.com, chase.com), identify what the brand is MOST KNOWN FOR in credit cards or banking (e.g. American Express = premium travel cards, Chase = travel rewards, Citi = cash back, Discover = cash back, Capital One = travel rewards).\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"credit cards or banking or savings","industry_key":"snake_case e.g. credit_cards","lob":"the most specific product category e.g. premium travel credit cards OR cash back credit cards OR travel rewards credit cards","competitors":["exactly 10 brands that directly compete in THIS specific product category — brands AI recommends when asked about this specific product, not just the same broad industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas for this specific product"],"categories":["10 consumer intent questions specific to this product category"]}` }], 0.1, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
-    // Normalize concatenated brand names from AI discovery
     const knownBrands: Record<string, string> = {
-      'americanexpress': 'American Express',
-      'bankofamerica': 'Bank of America',
-      'wellsfargo': 'Wells Fargo',
-      'capitalone': 'Capital One',
-      'usbank': 'U.S. Bank',
-      'usbancorp': 'U.S. Bank',
+      'americanexpress': 'American Express', 'bankofamerica': 'Bank of America',
+      'wellsfargo': 'Wells Fargo', 'capitalone': 'Capital One',
+      'usbank': 'U.S. Bank', 'usbancorp': 'U.S. Bank',
     };
     const rawBrand = p.brand_name as string;
     const brandKey = rawBrand.toLowerCase().replace(/\s+/g, '').replace(/[^a-z]/g, '');
@@ -153,13 +176,8 @@ async function discover(page: any, url: string) {
 }
 
 // ─── CURATED QUERY BANKS ──────────────────────────────────────────────────────
-// These are fixed, tested queries for our three core industries.
-// No brand names. Pure consumer intent. Consistent run-over-run scoring.
-// Curated = methodology. Scores still computed from real AI responses.
-
 const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] = [
-
-  // CASH BACK — 34 queries (17 short + 17 rich)
+  // CASH BACK — 34 queries
   { category:'Cash Back', query:'What is the best cash back credit card?', stage:'Awareness' },
   { category:'Cash Back', query:'Best credit card for groceries?', stage:'Decision' },
   { category:'Cash Back', query:'Which card gives 2% cash back on everything?', stage:'Decision' },
@@ -193,8 +211,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Cash Back', query:'Which cash back card is best for a freelancer who has unpredictable spending categories each month?', stage:'Decision' },
   { category:'Cash Back', query:'I am a family of four spending $1500 a month on groceries — which cash back card earns the most on supermarket spending specifically?', stage:'Decision' },
   { category:'Cash Back', query:'Best cash back card for someone who dines out frequently?', stage:'Decision' },
+  { category:'Cash Back', query:'Which cash back card gives the best combination of grocery and dining rewards?', stage:'Decision' },
 
-  // TRAVEL REWARDS — 34 queries (17 short + 17 rich)
+  // TRAVEL REWARDS — 34 queries
   { category:'Travel Rewards', query:'What is the best travel credit card?', stage:'Awareness' },
   { category:'Travel Rewards', query:'Best credit card for airline miles?', stage:'Decision' },
   { category:'Travel Rewards', query:'Which travel card has the best lounge access?', stage:'Decision' },
@@ -229,8 +248,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Travel Rewards', query:'I travel to London and Tokyo frequently — which travel card has the best benefits for international luxury travel?', stage:'Decision' },
   { category:'Travel Rewards', query:'Which travel card is most recommended by certified financial planners for maximizing lifestyle value?', stage:'Advocacy' },
   { category:'Travel Rewards', query:'What travel card consistently wins best travel credit card awards year after year?', stage:'Validation' },
+  { category:'Travel Rewards', query:'Which travel card has the best combination of points earning and transfer partners?', stage:'Decision' },
 
-  // BALANCE TRANSFER — 34 queries (17 short + 17 rich)
+  // BALANCE TRANSFER — 34 queries
   { category:'Balance Transfer', query:'Best balance transfer credit card?', stage:'Awareness' },
   { category:'Balance Transfer', query:'Which card has the longest 0% APR for balance transfers?', stage:'Decision' },
   { category:'Balance Transfer', query:'Best card for paying off credit card debt?', stage:'Decision' },
@@ -266,7 +286,7 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Balance Transfer', query:'Which balance transfer card consistently wins for longest 0% period with the lowest fees?', stage:'Advocacy' },
   { category:'Balance Transfer', query:'What balance transfer card would a financial planner recommend for someone serious about getting out of debt?', stage:'Advocacy' },
 
-  // NO ANNUAL FEE — 34 queries (17 short + 17 rich)
+  // NO ANNUAL FEE — 34 queries
   { category:'No Annual Fee', query:'Best credit card with no annual fee?', stage:'Awareness' },
   { category:'No Annual Fee', query:'Which no fee card gives the best rewards?', stage:'Consideration' },
   { category:'No Annual Fee', query:'Best free credit card?', stage:'Decision' },
@@ -300,8 +320,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'No Annual Fee', query:'Which free credit card is recommended most by personal finance experts who value long term value over signup bonuses?', stage:'Advocacy' },
   { category:'No Annual Fee', query:'Best no annual fee card for someone who spends $1000 a month and wants maximum simplicity?', stage:'Decision' },
   { category:'No Annual Fee', query:'Which no fee card has the most straightforward rewards with no rotating categories or activation required?', stage:'Decision' },
+  { category:'No Annual Fee', query:'What no annual fee card has the best long-term track record without devaluing rewards?', stage:'Validation' },
 
-  // PREMIUM CARDS — 34 queries (17 short + 17 rich)
+  // PREMIUM CARDS — 34 queries
   { category:'Premium Cards', query:'What is the best premium credit card?', stage:'Awareness' },
   { category:'Premium Cards', query:'Which luxury credit card is worth it?', stage:'Validation' },
   { category:'Premium Cards', query:'Best high end credit card for high earners?', stage:'Decision' },
@@ -337,7 +358,7 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Premium Cards', query:'What premium card would wealthy individuals recommend to a friend starting their high-earning career?', stage:'Advocacy' },
   { category:'Premium Cards', query:'Which premium travel card gives the single best lifestyle upgrade compared to having no premium card at all?', stage:'Validation' },
 
-  // BUSINESS CARDS — 34 queries (17 short + 17 rich)
+  // BUSINESS CARDS — 34 queries
   { category:'Business Cards', query:'What is the best business credit card?', stage:'Awareness' },
   { category:'Business Cards', query:'Best business card for small businesses?', stage:'Decision' },
   { category:'Business Cards', query:'Which business card gives the most rewards?', stage:'Consideration' },
@@ -371,8 +392,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Business Cards', query:'What business card gives the best welcome bonus for a new cardholder with high startup expenses in the first 3 months?', stage:'Decision' },
   { category:'Business Cards', query:'Which business card is best for a nonprofit that needs to track categorical spending carefully?', stage:'Decision' },
   { category:'Business Cards', query:'What business credit card do small business owners consistently recommend to other entrepreneurs?', stage:'Advocacy' },
+  { category:'Business Cards', query:'Which business card gives the best rewards for a service-based business with high payroll?', stage:'Decision' },
 
-  // STUDENT CARDS — 34 queries (17 short + 17 rich)
+  // STUDENT CARDS — 34 queries
   { category:'Student Cards', query:'Best credit card for college students?', stage:'Awareness' },
   { category:'Student Cards', query:'What is the best first credit card?', stage:'Awareness' },
   { category:'Student Cards', query:'Best student credit card with cash back?', stage:'Decision' },
@@ -406,8 +428,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Student Cards', query:'Which student credit card consistently helps students graduate from student to premium rewards cards?', stage:'Advocacy' },
   { category:'Student Cards', query:'What student credit card has helped the most students go from no credit to a 700 score within 18 months?', stage:'Advocacy' },
   { category:'Student Cards', query:'Which student card is recommended by the most financial aid offices and campus financial counselors?', stage:'Advocacy' },
+  { category:'Student Cards', query:'Which student card gives the best rewards on textbooks and school supplies?', stage:'Decision' },
 
-  // CREDIT BUILDING — 34 queries (17 short + 17 rich)
+  // CREDIT BUILDING — 34 queries
   { category:'Credit Building', query:'Best credit card to build credit?', stage:'Awareness' },
   { category:'Credit Building', query:'What is the best secured credit card?', stage:'Consideration' },
   { category:'Credit Building', query:'Best card for rebuilding bad credit?', stage:'Decision' },
@@ -441,8 +464,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'Credit Building', query:'Which secured card gives the highest starting credit limit to help my utilization ratio look better faster?', stage:'Consideration' },
   { category:'Credit Building', query:'I want a credit card that will help me go from fair to excellent credit in 24 months — what is the best approach and which card powers it?', stage:'Decision' },
   { category:'Credit Building', query:'Which credit building card has the best educational tools and spending insights to help me understand what is helping my score?', stage:'Awareness' },
+  { category:'Credit Building', query:'Which secured card has the fastest path to graduating to an unsecured card with a higher limit?', stage:'Decision' },
 
-  // GENERAL — 34 queries (17 short + 17 rich)
+  // GENERAL — 34 queries
   { category:'General', query:'What is the best credit card overall?', stage:'Awareness' },
   { category:'General', query:'Which credit card should I get?', stage:'Decision' },
   { category:'General', query:'Best credit card for everyday spending?', stage:'Decision' },
@@ -475,9 +499,9 @@ const CREDIT_CARD_QUERIES: { category: string; query: string; stage: string }[] 
   { category:'General', query:'Which credit card has the most consistent rewards program that has never been devalued since launch?', stage:'Validation' },
   { category:'General', query:'I am a minimalist who wants one perfect credit card that handles everything without complexity — which comes closest to perfect?', stage:'Decision' },
   { category:'General', query:'Which credit card consistently ranks at the top when independent experts compare all options side by side?', stage:'Validation' },
-
+  { category:'General', query:'Which credit card has the best combination of rewards, customer service, and long-term value?', stage:'Consideration' },
+  { category:'General', query:'What credit card would a certified financial planner put in their own wallet?', stage:'Advocacy' },
 ];
-
 
 const RETAIL_BANKING_QUERIES: { category: string; query: string; stage: string }[] = [
   { category: 'Checking Accounts', query: 'What is the best checking account right now?', stage: 'Awareness' },
@@ -489,37 +513,17 @@ const RETAIL_BANKING_QUERIES: { category: string; query: string; stage: string }
   { category: 'Checking Accounts', query: 'What bank has the most ATMs and best ATM fee reimbursement?', stage: 'Consideration' },
   { category: 'Checking Accounts', query: 'Which bank is best for someone who wants everything digital?', stage: 'Decision' },
   { category: 'Checking Accounts', query: 'What is the best bank account for a young professional?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which bank has the highest interest rate on checking?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What checking account is best for someone who travels internationally?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which bank is best for avoiding overdraft fees?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank do most Americans trust for their main checking account?', stage: 'Awareness' },
-  { category: 'Checking Accounts', query: 'Which bank has the best mobile check deposit experience?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank is best for someone who gets paid biweekly?', stage: 'Decision' },
   { category: 'Checking Accounts', query: 'Which bank gives you early access to your paycheck?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What checking account should a new immigrant open?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which bank has the best Zelle and payment integration?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank has the best customer service for checking accounts?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank do financial experts recommend for everyday banking?', stage: 'Advocacy' },
   { category: 'Savings Accounts', query: 'What bank has the best savings account?', stage: 'Awareness' },
   { category: 'Savings Accounts', query: 'Which bank gives the highest interest rate on savings?', stage: 'Consideration' },
   { category: 'Savings Accounts', query: 'What is the best high-yield savings account?', stage: 'Decision' },
   { category: 'Savings Accounts', query: 'Which bank is best for an emergency fund?', stage: 'Decision' },
   { category: 'Savings Accounts', query: 'What savings account has no minimum balance requirement?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank gives the best APY on savings right now?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What bank is best for someone saving for a house down payment?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account has the fewest restrictions?', stage: 'Consideration' },
-  { category: 'Savings Accounts', query: 'What bank offers the best savings account for kids?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank do financial advisors recommend for savings?', stage: 'Advocacy' },
   { category: 'Online Banking', query: 'What is the best online bank right now?', stage: 'Awareness' },
   { category: 'Online Banking', query: 'Which online-only bank is most trustworthy?', stage: 'Consideration' },
   { category: 'Online Banking', query: 'What online bank has the best interest rates?', stage: 'Decision' },
   { category: 'Online Banking', query: 'Which digital bank is best for someone who never visits branches?', stage: 'Decision' },
   { category: 'Online Banking', query: 'What online bank has the best mobile app?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which online bank has the best customer support?', stage: 'Consideration' },
-  { category: 'Online Banking', query: 'What bank is best for someone who wants no fees at all?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which online bank is FDIC insured and safe?', stage: 'Validation' },
-  { category: 'Online Banking', query: 'What online bank is best for international wire transfers?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which bank gives the best APY with no minimum deposit?', stage: 'Decision' },
   { category: 'General Banking', query: 'What is the best bank in America overall?', stage: 'Awareness' },
   { category: 'General Banking', query: 'Which bank has the most branches and ATMs?', stage: 'Consideration' },
   { category: 'General Banking', query: 'What bank is best for someone who wants everything in one place?', stage: 'Decision' },
@@ -530,257 +534,26 @@ const RETAIL_BANKING_QUERIES: { category: string; query: string; stage: string }
   { category: 'General Banking', query: 'Which bank has the best relationship banking perks?', stage: 'Consideration' },
   { category: 'General Banking', query: 'What bank is best for someone switching from another bank?', stage: 'Decision' },
   { category: 'General Banking', query: 'Which bank would a financial planner recommend?', stage: 'Advocacy' },
-  // Add more to reach 300...
   { category: 'Mortgages', query: 'What bank gives the best mortgage rates?', stage: 'Consideration' },
   { category: 'Mortgages', query: 'Which bank is best for first-time home buyers?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'What bank has the easiest mortgage approval process?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank gives the best mortgage rates for excellent credit?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'What bank is best for refinancing a mortgage?', stage: 'Decision' },
   { category: 'Personal Loans', query: 'What bank gives the best personal loan rates?', stage: 'Consideration' },
   { category: 'Personal Loans', query: 'Which bank is best for a debt consolidation loan?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank approves personal loans the fastest?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'Which bank gives personal loans with no origination fee?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank is best for a personal loan with fair credit?', stage: 'Decision' },
   { category: 'CD Accounts', query: 'What bank gives the best CD rates right now?', stage: 'Awareness' },
   { category: 'CD Accounts', query: 'Which bank has the highest yield on a 12-month CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank is best for a no-penalty CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank gives the best rates on a 5-year CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank is best for CD ladder investing?', stage: 'Consideration' },
   { category: 'Auto Loans', query: 'What bank gives the best auto loan rates?', stage: 'Consideration' },
   { category: 'Auto Loans', query: 'Which bank is best for financing a used car?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank pre-approves auto loans the fastest?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank is best for refinancing a car loan?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank gives the best auto loan with no down payment?', stage: 'Decision' },
   { category: 'Business Banking', query: 'What bank is best for a small business checking account?', stage: 'Decision' },
   { category: 'Business Banking', query: 'Which bank gives the best business loans?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank is best for a startup business?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'Which bank has the best business banking features?', stage: 'Consideration' },
-  { category: 'Business Banking', query: 'What bank gives the best SBA loans?', stage: 'Decision' },
   { category: 'Wealth Management', query: 'Which bank is best for wealth management services?', stage: 'Decision' },
   { category: 'Wealth Management', query: 'What bank gives the best private banking experience?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank has the best investment and banking combo?', stage: 'Consideration' },
-  { category: 'Wealth Management', query: 'What bank is best for high net worth individuals?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank is best for trust and estate services?', stage: 'Decision' },
   { category: 'International Banking', query: 'What bank is best for international wire transfers?', stage: 'Decision' },
   { category: 'International Banking', query: 'Which bank has no foreign transaction fees?', stage: 'Decision' },
-  { category: 'International Banking', query: 'What bank is best for someone who banks in multiple countries?', stage: 'Decision' },
-  { category: 'International Banking', query: 'Which bank is best for sending money abroad?', stage: 'Decision' },
-  { category: 'International Banking', query: 'What bank is best for an expat living abroad?', stage: 'Decision' },
   { category: 'General Banking', query: 'Which bank has the lowest fees overall?', stage: 'Consideration' },
   { category: 'General Banking', query: 'What bank is best for someone who wants human customer support?', stage: 'Decision' },
   { category: 'General Banking', query: 'Which bank has the best security and fraud protection?', stage: 'Consideration' },
   { category: 'General Banking', query: 'What bank is rated highest for customer satisfaction?', stage: 'Validation' },
   { category: 'General Banking', query: 'Which bank should I choose for my primary banking?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank is best for someone who wants local branches?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the best banking app in the USA?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What bank is best for a recent college graduate?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank is considered the most innovative?', stage: 'Awareness' },
-  { category: 'General Banking', query: 'What bank do most Americans recommend to friends and family?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'Which bank offers the best banking relationship long term?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank has improved the most in the past few years?', stage: 'Validation' },
-  { category: 'General Banking', query: 'Which bank is best for someone moving to the USA?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank is best for someone who wants premium service?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank gives the best rate on all deposit products?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What bank would you recommend to your own parents?', stage: 'Advocacy' },
-  { category: 'Checking Accounts', query: 'Which checking account has the best overdraft protection?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank gives a bonus for opening a checking account?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which bank waives monthly fees most easily?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank is best for getting paid 2 days early?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which checking account is best for gig economy workers?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What savings account should a beginner open?', stage: 'Awareness' },
-  { category: 'Savings Accounts', query: 'Which bank compounds interest daily on savings?', stage: 'Consideration' },
-  { category: 'Savings Accounts', query: 'What savings account is best for a 6-month emergency fund?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank gives the best savings account with no withdrawal limits?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What bank is best for automated savings goals?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which high-yield savings account is FDIC insured and easy to open?', stage: 'Validation' },
-  { category: 'Savings Accounts', query: 'What savings account is best for a short-term goal?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank makes it easiest to save money automatically?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What bank has the best savings account with no fees?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account do financial planners recommend most?', stage: 'Advocacy' },
-  // Additional queries to reach 300
-  { category: 'Checking Accounts', query: 'Which bank has the best checking account bonus right now?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank lets me open a checking account online instantly?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which checking account is best for someone with irregular income?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank has the fewest checking account fees?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank gives a debit card with the best rewards?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank is best for someone who uses cash frequently?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'Which checking account is best for a retired person?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank has the best overdraft protection without fees?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank makes it easiest to transfer money to family?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'What bank is best if I want to avoid all banking fees forever?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What savings account should I open today?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank is best for saving $1000 a month?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What savings account has the best rate for new customers?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account is best for a conservative investor?', stage: 'Consideration' },
-  { category: 'Savings Accounts', query: 'What bank gives the best savings rate for balances over $50,000?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'What online bank has the best sign-up bonus?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which digital bank is growing fastest and most trusted?', stage: 'Awareness' },
-  { category: 'Online Banking', query: 'What online bank is best for someone who moves states often?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which online bank has the best savings and checking combo?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'What digital bank has the best ATM network?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank has won the most customer satisfaction awards?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank is best for someone who banks both online and in-branch?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank is best for building a long-term banking relationship?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'What bank offers the best perks for loyal customers?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank has the most innovative banking features?', stage: 'Awareness' },
-  { category: 'General Banking', query: 'What bank is best for someone with a complex financial situation?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the strongest financial stability rating?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank do business owners use for personal banking?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'Which bank is best for managing finances as a couple?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank has the best joint account features?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank has the fastest mortgage approval process?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'What bank is best for a VA home loan?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank has the best FHA loan options?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'What bank is best for a jumbo mortgage?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank gives the best mortgage pre-approval experience?', stage: 'Consideration' },
-  { category: 'Personal Loans', query: 'What bank gives the best personal loan for home improvement?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'Which bank has the lowest personal loan APR?', stage: 'Consideration' },
-  { category: 'Personal Loans', query: 'What bank gives a personal loan with no prepayment penalty?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'Which bank is best for a personal loan with a cosigner?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank gives personal loans to self-employed people?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best rate on a 6-month CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best CD with automatic renewal?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'What bank is best for a brokered CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank gives the best rate for a $50,000 CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best CD rate for seniors?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank is best for financing a new electric vehicle?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank gives the lowest interest rate on a car loan?', stage: 'Consideration' },
-  { category: 'Auto Loans', query: 'What bank is best for buying a car from a private seller?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank gives the best auto loan for someone with good credit?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank has the best auto loan with same-day approval?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank is best for a freelancer or contractor?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'Which bank has the best business savings account?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank gives the best merchant services for small businesses?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'Which bank is best for a nonprofit organization?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank has the best online business banking tools?', stage: 'Consideration' },
-  { category: 'Wealth Management', query: 'What bank has the best robo-advisor integrated with banking?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank is best for someone transitioning to retirement?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'What bank offers the best combination of banking and investing?', stage: 'Consideration' },
-  { category: 'Wealth Management', query: 'Which bank is best for generational wealth planning?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'What bank do financial advisors recommend for their own money?', stage: 'Advocacy' },
-  { category: 'International Banking', query: 'What bank is best for receiving international payments?', stage: 'Decision' },
-  { category: 'International Banking', query: 'Which bank gives the best exchange rate on foreign currency?', stage: 'Decision' },
-  { category: 'International Banking', query: 'What bank is best for someone frequently traveling to Europe?', stage: 'Decision' },
-  { category: 'International Banking', query: 'Which bank has the best multi-currency account?', stage: 'Decision' },
-  { category: 'International Banking', query: 'What bank is easiest for international wire transfers?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank gives the best interest on checking balances?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank has the best app for budgeting and spending tracking?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank is best for someone who pays bills automatically?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank gives real-time spending notifications?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank is best for a high school student?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What savings account lets me earn the most with no lock-in period?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank has consistently offered top savings rates for years?', stage: 'Validation' },
-  { category: 'Savings Accounts', query: 'What savings account is best for someone who saves irregularly?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account is best for an older adult?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What bank gives the best savings rate with no strings attached?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the highest NPS and customer loyalty score?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank gives the most back to customers overall?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank has improved its products the most recently?', stage: 'Awareness' },
-  { category: 'General Banking', query: 'What bank is best for someone who has had banking problems before?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank would you trust with your life savings?', stage: 'Validation' },
-  { category: 'Online Banking', query: 'What online bank is best for round-up savings features?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which digital bank has the best spending insights and analytics?', stage: 'Consideration' },
-  { category: 'Online Banking', query: 'What online bank is best for couples managing money together?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which digital bank makes it easiest to pay friends back?', stage: 'Consideration' },
-  { category: 'Online Banking', query: 'What online bank gives the best savings and checking rate combo?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank has the best digital mortgage experience?', stage: 'Consideration' },
-  { category: 'Mortgages', query: 'What bank is best for a second home purchase?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank has the lowest closing costs on a mortgage?', stage: 'Consideration' },
-  { category: 'Mortgages', query: 'What bank has the most flexible mortgage underwriting?', stage: 'Consideration' },
-  { category: 'Mortgages', query: 'Which bank is most recommended by real estate agents?', stage: 'Advocacy' },
-  { category: 'Personal Loans', query: 'What bank gives a personal loan with same-day funding?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'Which bank has the best personal loan for medical expenses?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank gives a personal loan without affecting credit score initially?', stage: 'Consideration' },
-  { category: 'Personal Loans', query: 'Which bank is best for a personal loan to start a business?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank gives the best unsecured personal loan?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What is the safest bank for a large CD?', stage: 'Validation' },
-  { category: 'CD Accounts', query: 'Which bank gives the best rate for a CD with monthly interest payments?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank allows you to add money to a CD?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'Which bank gives the best CD rate for IRA accounts?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank has the best CD product for someone nearing retirement?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank gives the best rate if I have a 750 credit score?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank is best for financing a car over $50,000?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank has the fewest auto loan restrictions?', stage: 'Consideration' },
-  { category: 'Auto Loans', query: 'What bank is best for auto loan refinancing to a lower rate?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank has the easiest auto loan application process?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What bank is best for a complete financial fresh start?', stage: 'Awareness' },
-  { category: 'General Banking', query: 'Which bank has the strongest community banking presence?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What bank offers the best financial education resources?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank is best for someone just moving out on their own?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank consistently gets the best reviews from real customers?', stage: 'Validation' },
-  { category: 'General Banking', query: 'Which bank is best for someone who wants to simplify their finances?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank has the best financial planning tools built in?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank is most recommended by personal finance experts?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'What bank gives the best benefits for keeping a high balance?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the best combination of rates, fees, and service?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What is the single best bank to do all your banking with?', stage: 'Advocacy' },
-  { category: 'Checking Accounts', query: 'Which bank gives instant access to deposited checks?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank makes it easiest to dispute a charge?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank gives the best foreign ATM access for travelers?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank has no minimum balance for checking?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank is best for direct deposit of a large paycheck?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account makes the most sense for someone earning $100k?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What savings account is best for parking money short-term?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank gives the best savings rate for a $5,000 balance?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'What bank makes saving feel rewarding and motivating?', stage: 'Consideration' },
-  { category: 'Savings Accounts', query: 'Which savings account is the most recommended on personal finance forums?', stage: 'Advocacy' },
-  { category: 'Online Banking', query: 'What online bank is best for someone who never wants to visit a branch?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which digital bank has the fewest technical issues?', stage: 'Validation' },
-  { category: 'Online Banking', query: 'What online bank is best for passive income from savings?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'Which online bank has the best security features?', stage: 'Consideration' },
-  { category: 'Online Banking', query: 'What digital bank is most recommended by millennials?', stage: 'Advocacy' },
-  { category: 'Business Banking', query: 'Which bank gives the fastest business checking account approval?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank has the best business credit line for small companies?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'Which bank is best for an e-commerce business?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank gives the best cash management tools for businesses?', stage: 'Consideration' },
-  { category: 'Business Banking', query: 'Which bank is most recommended for a side hustle turned business?', stage: 'Advocacy' },
-  { category: 'Wealth Management', query: 'What bank has the best private wealth management team?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank is best for someone with over $1 million in assets?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'What bank gives the best relationship manager for wealth clients?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank offers the most comprehensive financial planning services?', stage: 'Consideration' },
-  { category: 'Wealth Management', query: 'What bank is best for managing inherited wealth?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the best branch experience when you need help?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'What bank gives the most value to customers with multiple products?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank has the best track record of not having outages?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank makes it easiest to set up automatic payments?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank is best for someone who wants premium treatment?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank would you recommend to someone starting their financial life?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'Which bank is growing the fastest in customer satisfaction?', stage: 'Awareness' },
-  { category: 'General Banking', query: 'What bank has the best relationship between fees and features?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank is the best long-term banking partner?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank gives the most to customers who bank exclusively with them?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank is best for someone who gets large irregular deposits?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank makes it easiest to freeze and unfreeze a debit card?', stage: 'Consideration' },
-  { category: 'Checking Accounts', query: 'Which bank has the best checking account for a military member?', stage: 'Decision' },
-  { category: 'Checking Accounts', query: 'What bank gives the best rewards just for using a debit card?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which bank is best for someone opening their first savings account?', stage: 'Awareness' },
-  { category: 'Savings Accounts', query: 'What bank gives the best savings rate for direct deposit customers?', stage: 'Decision' },
-  { category: 'Savings Accounts', query: 'Which savings account is best for building a 6-month emergency fund?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'What online bank has the most features for personal finance management?', stage: 'Consideration' },
-  { category: 'Online Banking', query: 'Which digital bank is best for someone who travels internationally?', stage: 'Decision' },
-  { category: 'Online Banking', query: 'What online bank gives the best rate on both checking and savings?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'Which bank gives the best rate for a 15-year fixed mortgage?', stage: 'Decision' },
-  { category: 'Mortgages', query: 'What bank is best for a mortgage if you are self-employed?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'Which bank gives the best personal loan for a vacation?', stage: 'Decision' },
-  { category: 'Personal Loans', query: 'What bank gives the lowest personal loan APR for excellent credit?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best rate on a CD with monthly interest payout?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best CD rate for a balance over $100,000?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'What bank gives the best auto loan for a hybrid or electric vehicle?', stage: 'Decision' },
-  { category: 'Auto Loans', query: 'Which bank has the best auto loan for someone with no credit history?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'What bank gives the best business checking for a high-volume business?', stage: 'Decision' },
-  { category: 'Business Banking', query: 'Which bank gives the best payroll services for small businesses?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'What bank is best for someone inheriting a large sum?', stage: 'Decision' },
-  { category: 'Wealth Management', query: 'Which bank gives the best financial planning advice alongside banking?', stage: 'Consideration' },
-  { category: 'International Banking', query: 'What bank is best for a foreign national banking in the USA?', stage: 'Decision' },
-  { category: 'International Banking', query: 'Which bank gives the lowest fees on international wire transfers?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank gives the best banking experience for young professionals?', stage: 'Decision' },
-  { category: 'General Banking', query: 'Which bank has the best reputation for keeping customer money safe?', stage: 'Validation' },
-  { category: 'General Banking', query: 'What bank is the easiest to switch to from another bank?', stage: 'Consideration' },
-  { category: 'General Banking', query: 'Which bank has the most consistent quality of service nationwide?', stage: 'Validation' },
   { category: 'General Banking', query: 'What bank is most recommended by financial advisors for everyday banking?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'Which bank gives the best banking package for someone who has everything?', stage: 'Decision' },
-  { category: 'General Banking', query: 'What bank would you switch to if you could only use one bank forever?', stage: 'Advocacy' },
-  { category: 'General Banking', query: 'Which bank has the single best overall banking product lineup in the USA?', stage: 'Consideration' },
 ];
 
 const SAVINGS_ACCOUNT_QUERIES: { category: string; query: string; stage: string }[] = [
@@ -791,315 +564,50 @@ const SAVINGS_ACCOUNT_QUERIES: { category: string; query: string; stage: string 
   { category: 'High Yield Savings', query: 'What savings account beats inflation right now?', stage: 'Decision' },
   { category: 'High Yield Savings', query: 'Which bank has the best high-yield savings with no fees?', stage: 'Decision' },
   { category: 'High Yield Savings', query: 'What HYSA is best for someone saving $50,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account is easiest to open?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What bank offers the highest savings rate guaranteed for a year?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which HYSA is best for someone switching from a traditional bank?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'What is the best savings account if I want to earn real interest?', stage: 'Awareness' },
-  { category: 'High Yield Savings', query: 'Which savings account has the best rate and the safest institution?', stage: 'Validation' },
   { category: 'High Yield Savings', query: 'What high-yield savings account do financial advisors recommend?', stage: 'Advocacy' },
-  { category: 'High Yield Savings', query: 'Which bank has been consistently top-rated for savings rates?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for a large sum like $100,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has daily compounding interest?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What savings account is best for someone who wants to withdraw freely?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which HYSA has the best mobile app and user experience?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What high-yield account is best for saving for a wedding?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which savings account gives the best return with no risk?', stage: 'Validation' },
   { category: 'No Fee Savings', query: 'What savings account has absolutely no fees?', stage: 'Awareness' },
   { category: 'No Fee Savings', query: 'Which bank offers a savings account with no monthly maintenance fee?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'What savings account has no minimum opening deposit?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which bank gives a free savings account with great rates?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account is completely free with no strings attached?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which bank waives all savings account fees for everyone?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'What no-fee savings account gives the best APY?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which bank is best for someone who wants simple free savings?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account has no withdrawal penalties?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which no-fee savings account is most recommended?', stage: 'Advocacy' },
   { category: 'Online Savings', query: 'What is the best online savings account?', stage: 'Awareness' },
   { category: 'Online Savings', query: 'Which online bank gives the best savings rate?', stage: 'Consideration' },
   { category: 'Online Savings', query: 'What online savings account is safest?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'Which online bank is FDIC insured with the best savings rate?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online savings account opens in minutes?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online bank has the best savings account with no minimum?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What is the most trusted online bank for savings?', stage: 'Consideration' },
-  { category: 'Online Savings', query: 'Which online savings account is best for a tech-savvy person?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online bank gives the best rate on savings over $10,000?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online savings account do most people recommend?', stage: 'Advocacy' },
   { category: 'Goal Based Savings', query: 'What savings account lets me set savings goals?', stage: 'Decision' },
   { category: 'Goal Based Savings', query: 'Which bank makes it easiest to automate saving money?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for saving for a house?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank is best for saving for a car purchase?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for a vacation fund?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank helps you save for multiple goals at once?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account automatically rounds up purchases?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank has the best savings buckets or sub-accounts?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for saving for a child\'s education?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank makes saving money feel easy and automatic?', stage: 'Consideration' },
   { category: 'Emergency Fund', query: 'What savings account is best for an emergency fund?', stage: 'Decision' },
   { category: 'Emergency Fund', query: 'Which bank is best for keeping 6 months of expenses saved?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account gives instant access to my money?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which high-yield savings account is best for liquidity?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What bank is best to keep an emergency fund earning interest?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which savings account lets me access money same day if needed?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'What account beats a traditional savings account for emergencies?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'Which bank gives both high rates and instant transfer to checking?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account is safest for a large emergency fund?', stage: 'Validation' },
-  { category: 'Emergency Fund', query: 'Which savings account do financial planners recommend for emergencies?', stage: 'Advocacy' },
   { category: 'CD Accounts', query: 'What is the best CD rate available right now?', stage: 'Awareness' },
   { category: 'CD Accounts', query: 'Which bank gives the highest 12-month CD rate?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What CD gives the best return for a 2-year term?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best no-penalty CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What is the best CD ladder strategy and which banks support it?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'Which bank gives the best rates on a jumbo CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank is best for a 5-year CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best CD with daily compounding?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'What is the difference between CD and high yield savings?', stage: 'Awareness' },
-  { category: 'CD Accounts', query: 'Which bank do financial advisors recommend for CDs?', stage: 'Advocacy' },
   { category: 'Money Market', query: 'What is the best money market account right now?', stage: 'Awareness' },
   { category: 'Money Market', query: 'Which bank has the highest money market rate?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'What money market account has the best APY with check writing?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which bank is best for a money market account?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account beats a high-yield savings account?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'Which bank gives the best money market rate for large balances?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account has no minimum balance?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account is safest for short-term savings?', stage: 'Validation' },
-  { category: 'Money Market', query: 'What bank gives the best money market account for a business?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account is most recommended right now?', stage: 'Advocacy' },
   { category: 'General Savings', query: 'What is the best savings account overall?', stage: 'Awareness' },
-  { category: 'General Savings', query: 'Which bank is best for saving money in 2025?', stage: 'Awareness' },
+  { category: 'General Savings', query: 'Which bank is best for saving money?', stage: 'Awareness' },
   { category: 'General Savings', query: 'What savings account gives the best interest?', stage: 'Consideration' },
   { category: 'General Savings', query: 'Which bank is best if I want to grow my savings?', stage: 'Decision' },
   { category: 'General Savings', query: 'What savings account should a beginner open?', stage: 'Awareness' },
   { category: 'General Savings', query: 'Which bank has the best savings account for long-term saving?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account is best for a large amount of money?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account is best for someone starting from zero?', stage: 'Awareness' },
-  { category: 'General Savings', query: 'What bank should I open a savings account with today?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account do most people regret not opening sooner?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What savings account is best for a 25-year-old?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank gives the most value for saving money?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is worth switching banks for?', stage: 'Validation' },
-  { category: 'General Savings', query: 'Which bank is consistently the best for savings rates?', stage: 'Validation' },
   { category: 'General Savings', query: 'What savings account would a personal finance expert recommend?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'Which bank makes it easiest to actually save money?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is best for someone earning $60k/year?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account has the best combination of rate and access?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What bank is best for someone who wants to maximize savings returns?', stage: 'Decision' },
+  { category: 'General Savings', query: 'Which bank consistently delivers the best savings rates year after year?', stage: 'Validation' },
+  { category: 'General Savings', query: 'What bank should I open a savings account with today?', stage: 'Decision' },
   { category: 'General Savings', query: 'Which savings account is the single best one to have?', stage: 'Advocacy' },
-  // Complete to 300
   { category: 'High Yield Savings', query: 'Which HYSA has the most consistent rate without drops?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What high-yield savings account is best for a $200,000 balance?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which bank gives the best HYSA rate with instant account opening?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for someone who moves money frequently?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has the best rate history?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for a couple saving for a house?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account is easiest to transfer from?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What savings account gives the best rate for a $1,000 minimum?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which HYSA has the best combination of rate and accessibility?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What high-yield savings account is most recommended on finance forums?', stage: 'Advocacy' },
-  { category: 'No Fee Savings', query: 'Which savings account has no fees and no minimum ever?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account lets you earn without any conditions?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which bank has the most genuinely transparent savings fees?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'What no-fee savings account has the best customer service?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'Which savings account has no hidden fees whatsoever?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online savings account has the best sign-up bonus?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online bank is most reliable for savings transfers?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online savings account works best with a traditional checking account?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online savings account is easiest to open for seniors?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online bank consistently pays the highest savings rate?', stage: 'Validation' },
-  { category: 'Goal Based Savings', query: 'Which bank is best for saving for retirement alongside a 401k?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for saving for a wedding in 2 years?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank lets you name savings buckets for different goals?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account has the best automatic transfer features?', stage: 'Consideration' },
-  { category: 'Goal Based Savings', query: 'Which bank is best for someone saving aggressively to retire early?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account has the fastest transfer to checking in an emergency?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which bank is best for keeping an emergency fund separate from spending?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What high-yield account is best for a 3-month emergency fund?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which savings account is best for someone who wants both safety and yield?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'What savings account gives peace of mind for emergency funds?', stage: 'Validation' },
-  { category: 'CD Accounts', query: 'What bank gives the best CD rate for new customers?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best 3-month CD rate?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best CD with flexible withdrawal options?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the best rate on a CD for a trust account?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank is best for staggering multiple CDs?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'Which money market account has the best check writing privileges?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account is best for a small business cash reserve?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which bank has the best money market account for a new customer?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account has the fewest restrictions?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'Which money market account is recommended by financial planners?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What savings account is best for someone earning a variable income?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank is best for someone moving their savings from a big bank?', stage: 'Decision' },
+  { category: 'High Yield Savings', query: 'What HYSA is best for a large sum like $100,000?', stage: 'Decision' },
+  { category: 'High Yield Savings', query: 'Which high-yield savings account has daily compounding interest?', stage: 'Consideration' },
+  { category: 'No Fee Savings', query: 'What no-fee savings account gives the best APY?', stage: 'Decision' },
+  { category: 'No Fee Savings', query: 'Which bank is best for someone who wants simple free savings?', stage: 'Decision' },
+  { category: 'Online Savings', query: 'What online savings account opens in minutes?', stage: 'Decision' },
+  { category: 'Online Savings', query: 'Which online bank has the best savings account with no minimum?', stage: 'Decision' },
+  { category: 'Emergency Fund', query: 'What savings account gives instant access to my money?', stage: 'Decision' },
+  { category: 'Emergency Fund', query: 'Which high-yield savings account is best for liquidity?', stage: 'Decision' },
+  { category: 'CD Accounts', query: 'What CD gives the best return for a 2-year term?', stage: 'Decision' },
+  { category: 'CD Accounts', query: 'Which bank has the best no-penalty CD?', stage: 'Decision' },
+  { category: 'Money Market', query: 'What money market account has the best APY with check writing?', stage: 'Decision' },
+  { category: 'Money Market', query: 'Which bank is best for a money market account?', stage: 'Decision' },
   { category: 'General Savings', query: 'What savings account is best for someone nearing retirement?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank is best for someone who wants to ladder savings products?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is best for a single parent saving for their kids?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank gives the best savings experience for beginners?', stage: 'Awareness' },
-  { category: 'General Savings', query: 'What savings account is best for someone who gets paid in cash?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank makes it easiest to grow savings automatically each month?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is best for a digital nomad?', stage: 'Decision' },
   { category: 'General Savings', query: 'Which bank is most trusted by personal finance experts for savings?', stage: 'Advocacy' },
-  { category: 'High Yield Savings', query: 'What HYSA gives the best rate with same-day ACH transfers?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has the best mobile experience?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What savings account gives the best return without tying up money?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which savings account has no minimum and no monthly fee ever?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online savings account has won the most awards?', stage: 'Validation' },
-  { category: 'Goal Based Savings', query: 'Which bank makes it easiest to automate savings for multiple goals?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account is best for a 12-month emergency fund?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank has the highest rate on a CD with no early withdrawal penalty?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account is best for parking a large sum temporarily?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account is best if you want the highest possible return with zero risk?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account would you recommend to someone who has never saved before?', stage: 'Advocacy' },
-  { category: 'High Yield Savings', query: 'Which HYSA is best for a couple with a joint savings goal?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account gives real earnings with absolutely zero fees?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online savings bank has the best reputation for security?', stage: 'Validation' },
-  { category: 'Goal Based Savings', query: 'What bank helps you build savings habits through smart features?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'Which bank is the safest place to keep an emergency fund?', stage: 'Validation' },
-  { category: 'CD Accounts', query: 'Which bank gives the best return on a CD for under $10,000?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account has the best rate for a balance over $25,000?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account consistently ranks #1 in independent reviews?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What savings account is best for someone who wants to set and forget?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank gives you the most for doing nothing but saving?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is the best kept secret in personal finance?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'Which savings account has the best combination of rate, safety, and access?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for someone moving from a 0.01% APY account?', stage: 'Awareness' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has no promo rate bait and switch?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA gives the best rate for balances under $1,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which savings account beats most money market funds in yield?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What high-yield savings account is best for a side hustle fund?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'Which savings account gives real yield with zero strings attached?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account has no fees and no fine print?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'Which bank is most transparent about savings account terms?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online bank has the best customer reviews for savings?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'Which online savings account is easiest to link to a checking account?', stage: 'Consideration' },
-  { category: 'Online Savings', query: 'What online bank has the most intuitive savings features?', stage: 'Consideration' },
-  { category: 'Goal Based Savings', query: 'Which bank lets you set up recurring transfers to savings automatically?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for someone saving $500 a month?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank makes it easiest to stay disciplined about saving?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'What is the best savings account to keep separate for emergencies only?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which bank gives the best yield on an emergency fund with no lock-in?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account is best if I might need the money at any moment?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'What bank has the best bump-up CD that lets you increase the rate?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank gives the best rate on a 9-month CD?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank is best for someone building a CD ladder for the first time?', stage: 'Awareness' },
-  { category: 'Money Market', query: 'What money market account is best for parking proceeds from a home sale?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account has no minimum balance to earn interest?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account earns the most with daily liquidity?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account is recommended most by first-time savers?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What savings account gives the most in a rising interest rate environment?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which bank has the best overall savings ecosystem?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is best for someone building wealth from scratch?', stage: 'Awareness' },
-  { category: 'General Savings', query: 'Which savings account is most recommended by certified financial planners?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What bank consistently delivers the best savings rates year after year?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA gives the best rate for a balance of $10,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has the fewest transfer restrictions?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What HYSA is most recommended by Reddit personal finance?', stage: 'Advocacy' },
-  { category: 'No Fee Savings', query: 'Which no-fee savings account has the best overall rating?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online savings account has the best ACH transfer speed?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank makes goal-based saving most rewarding and motivating?', stage: 'Consideration' },
-  { category: 'Emergency Fund', query: 'Which savings account has the fastest ACH transfer for emergencies?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best CD rate for a trust or estate account?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account is best for an older adult managing cash?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account would you recommend to your own family?', stage: 'Advocacy' },
-  { category: 'High Yield Savings', query: 'Which HYSA has the fewest technical issues and best uptime?', stage: 'Validation' },
-  { category: 'No Fee Savings', query: 'What savings account has no fees and still competitive rates?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online savings account has the best rate guarantee period?', stage: 'Validation' },
-  { category: 'Goal Based Savings', query: 'What bank has the best savings challenge or goal-tracking features?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which bank is safest for an emergency fund over $50,000?', stage: 'Validation' },
-  { category: 'CD Accounts', query: 'What bank has the best overall CD product lineup?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'Which money market account is best for a retiree managing income?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings product gives the best return for a 2-year horizon?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which savings account has the best combination of features and yield?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'What high-yield savings account do most personal finance experts have?', stage: 'Advocacy' },
-  { category: 'No Fee Savings', query: 'Which savings account gives the most value with literally zero cost?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online savings account is best for someone skeptical of online banks?', stage: 'Consideration' },
-  { category: 'Goal Based Savings', query: 'Which bank makes it hardest to accidentally spend your savings?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account gives both high yield and instant access?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank gives the best early withdrawal terms if you need to break a CD?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'What money market account is most recommended for cash management?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'Which savings account is the smartest financial decision for most people?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What bank makes saving money feel effortless and rewarding?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which savings account has the most five-star reviews from real customers?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What savings account is best to open before the next rate cut?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account gives you the most confidence your money is working?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for a balance between $5,000 and $25,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings has the best rate with no teaser period?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for someone switching from a traditional bank?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which high-yield savings account has the best long-term rate history?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'What HYSA is recommended by the most independent financial websites?', stage: 'Advocacy' },
-  { category: 'No Fee Savings', query: 'Which savings account has absolutely no conditions to earn the rate?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account is the most straightforward with no catches?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'Which bank offers savings with no fees and competitive APY combined?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online savings account is best for someone in a rural area?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online bank has won the most customer satisfaction awards?', stage: 'Validation' },
-  { category: 'Online Savings', query: 'What online savings account has the best ATM reimbursement policy?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which bank is best for saving toward multiple goals simultaneously?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'What savings account makes it easiest to stay on track with goals?', stage: 'Consideration' },
-  { category: 'Goal Based Savings', query: 'Which bank gives savings motivation features like progress tracking?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account is best if you might need the money within 24 hours?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which bank has the most reliable transfer speeds for emergency access?', stage: 'Validation' },
-  { category: 'Emergency Fund', query: 'What savings account do financial planners prefer for emergency funds?', stage: 'Advocacy' },
-  { category: 'CD Accounts', query: 'Which bank has the best CD for someone nearing retirement?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'What bank gives the best rate on a short-term CD under 6 months?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank has the most flexible CD terms?', stage: 'Consideration' },
-  { category: 'Money Market', query: 'What money market account is best for a corporate cash reserve?', stage: 'Decision' },
-  { category: 'Money Market', query: 'Which money market account earns the most without minimum balance?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account is most recommended by wealth advisors?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'Which savings account has the best track record of paying high rates?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What savings account is the most trusted in the USA?', stage: 'Validation' },
-  { category: 'General Savings', query: 'Which bank makes saving feel like the smartest thing you can do?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What savings account gives the best return relative to risk?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which savings account is the top choice of personal finance professionals?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'What savings account has the best combination of safety and yield?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which savings account is best for someone who checks rates obsessively?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'What savings account is most recommended after a windfall?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank has the best savings account for a tech-savvy saver?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account gives you the most peace of mind?', stage: 'Validation' },
-  { category: 'High Yield Savings', query: 'Which HYSA has the fastest account opening process?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'What online savings account has the best customer support?', stage: 'Consideration' },
-  { category: 'CD Accounts', query: 'Which bank gives the best CD for a 401k rollover?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market is best for parking a large inheritance temporarily?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account would a wealth manager use for their own cash?', stage: 'Advocacy' },
   { category: 'General Savings', query: 'What savings account gives the highest yield with daily compounding?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank is considered the gold standard for savings in the USA?', stage: 'Awareness' },
-  { category: 'General Savings', query: 'What savings account is best for someone who wants maximum simplicity?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account consistently gets 5-star reviews from customers?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What savings account is best for someone saving their first $10,000?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'Which HYSA is best for someone with a fluctuating balance?', stage: 'Decision' },
-  { category: 'No Fee Savings', query: 'What savings account has zero fees and top-quartile APY?', stage: 'Decision' },
-  { category: 'Goal Based Savings', query: 'Which savings account is best for someone following a 50/30/20 budget?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'What savings account is best for a first responder building an emergency fund?', stage: 'Decision' },
-  { category: 'CD Accounts', query: 'Which bank gives the best CD for college savings?', stage: 'Decision' },
-  { category: 'Money Market', query: 'What money market account is best if I need to write checks occasionally?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account is best for someone who prioritises simplicity over everything?', stage: 'Decision' },
-  { category: 'High Yield Savings', query: 'What HYSA is best for someone who checks rates every week?', stage: 'Consideration' },
-  { category: 'High Yield Savings', query: 'Which HYSA gives the best combination of yield and service?', stage: 'Consideration' },
-  { category: 'No Fee Savings', query: 'What savings account has no fees and earns real interest daily?', stage: 'Decision' },
-  { category: 'Online Savings', query: 'Which online savings bank has the most five-star reviews?', stage: 'Validation' },
-  { category: 'Goal Based Savings', query: 'What savings account is best for someone on a strict budget?', stage: 'Decision' },
-  { category: 'Emergency Fund', query: 'Which bank is best for someone who needs emergency fund peace of mind?', stage: 'Validation' },
-  { category: 'CD Accounts', query: 'What bank gives the best CD rate for a first-time CD buyer?', stage: 'Awareness' },
-  { category: 'Money Market', query: 'Which money market account gives daily liquidity and competitive yield?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account is best for maximising returns on idle cash?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which bank is best for someone who wants a set-and-forget savings strategy?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account is most recommended for building long-term wealth?', stage: 'Advocacy' },
-  { category: 'General Savings', query: 'Which savings account gives the best return on a $20,000 balance?', stage: 'Decision' },
-  { category: 'General Savings', query: 'What savings account is best for someone who moves money frequently?', stage: 'Consideration' },
-  { category: 'General Savings', query: 'Which savings account has earned the most loyalty from long-term customers?', stage: 'Validation' },
-  { category: 'General Savings', query: 'What savings account is the smartest place to park extra cash right now?', stage: 'Decision' },
-  { category: 'General Savings', query: 'Which savings account is the definitive best choice for most Americans?', stage: 'Advocacy' },
+  { category: 'General Savings', query: 'Which savings account is most recommended by certified financial planners?', stage: 'Advocacy' },
+  { category: 'General Savings', query: 'What savings account is best for someone building wealth from scratch?', stage: 'Awareness' },
+  { category: 'General Savings', query: 'Which savings account gives you the most confidence your money is working?', stage: 'Validation' },
 ];
-
-// ─── QUERY ROUTING ────────────────────────────────────────────────────────────
-// Core industries get curated queries — consistent, tested, comparable run-over-run.
-// All other industries get AI-generated queries — dynamic, specific to the URL.
-
-// ─── PRODUCT CATEGORY DETECTION ───────────────────────────────────────────────
-// Detects both the broad industry AND the specific product category within it.
-// This lets us weight queries toward what the brand actually competes on.
-//
-// Example:
-//   citi.com/credit-cards         → industry=credit_cards, product=general
-//   citi.com/credit-cards/double-cash → industry=credit_cards, product=cash_back
-//   amex.com/credit-cards/platinum   → industry=credit_cards, product=premium
-//   ally.com/bank/savings            → industry=savings, product=high_yield
-//   chase.com                        → industry=retail_banking, product=general
 
 type IndustryType = 'credit_cards' | 'retail_banking' | 'savings' | 'other';
 type ProductCategory = 'cash_back' | 'travel' | 'premium' | 'balance_transfer' | 'no_annual_fee' | 'business' | 'student' | 'credit_building' | 'high_yield' | 'checking' | 'cd' | 'money_market' | 'general';
@@ -1107,17 +615,18 @@ type ProductCategory = 'cash_back' | 'travel' | 'premium' | 'balance_transfer' |
 function detectIndustry(industryKey: string, lob: string, urlPath: string): { industry: IndustryType; product: ProductCategory } {
   const k = (industryKey + ' ' + lob + ' ' + urlPath).toLowerCase();
 
-  // Detect broad industry
   let industry: IndustryType = 'other';
   if (k.includes('credit_card') || k.includes('credit card') || k.includes('credit-card')) industry = 'credit_cards';
   else if (k.includes('savings') || k.includes('hysa') || k.includes('high-yield') || k.includes('high yield') || k.includes('money market') || k.includes('money-market') || k.includes('cd ') || k.includes('certificate')) industry = 'savings';
-  //else if (k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) 
-else if ((k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) && !k.includes('savings')) industry = 'retail_banking';
-  // Detect specific product category within credit cards
+  else if (k.includes('retail_bank') || k.includes('retail bank') || k.includes('checking') || k.includes('banking') || k.includes('current account')) industry = 'retail_banking';
+
+  // Product detection: ONLY from URL path and page content — never from brand name.
+  // Brand homepages always return 'general' so all brands compete on the same full query set.
+  // This is the only way scores are comparable across different brand runs.
   let product: ProductCategory = 'general';
   if (industry === 'credit_cards') {
     if (k.includes('cash back') || k.includes('cashback') || k.includes('cash-back') || k.includes('double cash') || k.includes('freedom')) product = 'cash_back';
-    else if (k.includes('travel') || k.includes('miles') || k.includes('airline') || k.includes('sapphire') || k.includes('venture') || k.includes('platinum') && k.includes('travel')) product = 'travel';
+    else if (k.includes('travel') || k.includes('miles') || k.includes('airline') || k.includes('sapphire') || k.includes('venture') || (k.includes('platinum') && k.includes('travel'))) product = 'travel';
     else if (k.includes('platinum') || k.includes('luxury') || k.includes('premium') || k.includes('centurion') || k.includes('reserve') || k.includes('infinite')) product = 'premium';
     else if (k.includes('balance transfer') || k.includes('0% apr') || k.includes('zero apr') || k.includes('0 apr')) product = 'balance_transfer';
     else if (k.includes('no annual fee') || k.includes('no-annual-fee') || k.includes('no fee')) product = 'no_annual_fee';
@@ -1131,107 +640,92 @@ else if ((k.includes('retail_bank') || k.includes('retail bank') || k.includes('
   } else if (industry === 'retail_banking') {
     if (k.includes('checking') || k.includes('current account')) product = 'checking';
   }
-
   return { industry, product };
 }
-
-// ─── PRODUCT-AWARE CURATED QUERY SELECTION ─────────────────────────────────────
-// When a specific product is detected, we weight queries toward that category.
-// This ensures Citi Double Cash is scored on cash back queries, not travel queries.
-//
-// WEIGHTING:
-//   Specific product detected → 60% product-specific + 40% general industry
-//   No specific product       → 100% from full curated bank (all categories)
-//
-// This is defensible to clients: "We scored you on the queries consumers actually
-// ask when researching your specific product, plus general brand awareness queries."
 
 function getCuratedQueries(
   industry: IndustryType,
   product: ProductCategory,
-  total: number
+  total: number,
+  discoveredLob: string = ''  // the AI-discovered product description
 ): { category: string; query: string; stage: string; persona: string }[] {
-
   const bank = industry === 'credit_cards' ? CREDIT_CARD_QUERIES
     : industry === 'retail_banking' ? RETAIL_BANKING_QUERIES
     : SAVINGS_ACCOUNT_QUERIES;
 
   const PRODUCT_TO_CATEGORY: Partial<Record<ProductCategory, string[]>> = {
-    cash_back        : ['Cash Back'],
-    travel           : ['Travel Rewards'],
-    premium          : ['Premium Cards'],
-    balance_transfer : ['Balance Transfer'],
-    no_annual_fee    : ['No Annual Fee'],
-    business         : ['Business Cards'],
-    student          : ['Student Cards'],
-    credit_building  : ['Credit Building'],
-    high_yield       : ['High Yield Savings'],
-    cd               : ['CD Accounts'],
-    money_market     : ['Money Market'],
-    checking         : ['Checking Accounts'],
+    cash_back: ['Cash Back'], travel: ['Travel Rewards'], premium: ['Premium Cards'],
+    balance_transfer: ['Balance Transfer'], no_annual_fee: ['No Annual Fee'],
+    business: ['Business Cards'], student: ['Student Cards'], credit_building: ['Credit Building'],
+    high_yield: ['High Yield Savings'], cd: ['CD Accounts'], money_market: ['Money Market'],
+    checking: ['Checking Accounts'],
   };
 
-  const targetCats = PRODUCT_TO_CATEGORY[product] || [];
-
-  // Enrich curated queries with pain point context based on journey stage
-  // This gives GPT context so it answers specifically, not generically
-  const STAGE_PAIN_POINTS: Record<string, string> = {
-    Awareness    : 'Consumer is just discovering options and does not know where to start',
-    Consideration: 'Consumer is comparing 2-4 options and struggling to identify the key differences',
-    Decision     : 'Consumer is ready to choose and wants one clear specific recommendation',
-    Validation   : 'Consumer has almost decided and wants confirmation they are making the right choice',
-    Advocacy     : 'Consumer wants to recommend the single best option to someone they care about',
-  };
-
-  if (product === 'general' || targetCats.length === 0) {
-    return bank.slice(0, total).map(q => ({
-      ...q,
-      persona: 'general consumer',
-      context: STAGE_PAIN_POINTS[q.stage] || '',
-    }));
+  // Detect product from URL OR from the AI-discovered lob description
+  // e.g. lob = "premium travel credit cards" → product = premium/travel
+  const lobLower = discoveredLob.toLowerCase();
+  let effectiveProduct = product;
+  if (effectiveProduct === 'general' && lobLower) {
+    if (lobLower.includes('cash back') || lobLower.includes('cashback') || lobLower.includes('rewards') && lobLower.includes('everyday')) effectiveProduct = 'cash_back';
+    else if (lobLower.includes('travel') || lobLower.includes('miles') || lobLower.includes('points') && lobLower.includes('travel')) effectiveProduct = 'travel';
+    else if (lobLower.includes('premium') || lobLower.includes('luxury') || lobLower.includes('platinum') || lobLower.includes('prestige')) effectiveProduct = 'premium';
+    else if (lobLower.includes('balance transfer') || lobLower.includes('0% apr') || lobLower.includes('debt')) effectiveProduct = 'balance_transfer';
+    else if (lobLower.includes('no annual fee') || lobLower.includes('no-fee') || lobLower.includes('free card')) effectiveProduct = 'no_annual_fee';
+    else if (lobLower.includes('business') || lobLower.includes('corporate')) effectiveProduct = 'business';
+    else if (lobLower.includes('student') || lobLower.includes('college')) effectiveProduct = 'student';
+    else if (lobLower.includes('secured') || lobLower.includes('credit build') || lobLower.includes('rebuild')) effectiveProduct = 'credit_building';
   }
 
-  const productQueries = bank.filter(q => targetCats.includes(q.category));
-  const out: typeof productQueries = [];
-  while (out.length < total && productQueries.length > 0) {
-    productQueries.forEach(q => { if (out.length < total) out.push(q); });
+  const targetCats = PRODUCT_TO_CATEGORY[effectiveProduct] || [];
+
+  if (effectiveProduct === 'general' || targetCats.length === 0) {
+    // True homepage with no detectable product: distribute equally across all categories
+    const cats = [...new Set(bank.map(q => q.category))];
+    const out: { category: string; query: string; stage: string; persona: string }[] = [];
+    let idx = 0;
+    while (out.length < total) {
+      const cat = cats[idx % cats.length];
+      const catQueries = bank.filter(q => q.category === cat);
+      const pick = catQueries[(Math.floor(idx / cats.length)) % catQueries.length];
+      if (pick) out.push({ ...pick, persona: 'general consumer' });
+      idx++;
+    }
+    return out.slice(0, total);
   }
 
-  return out.slice(0, total).map(q => ({
-    ...q,
-    persona: 'general consumer',
-    context: STAGE_PAIN_POINTS[q.stage] || '',
-  }));
+  // SPECIFIC PRODUCT DETECTED: run ALL queries from that product category
+  // This means amex.com/premium → 300 premium card queries
+  // Everyone in the competitor table is scored on the same premium card queries
+  // Making scores directly comparable within this product context
+  const productQ = bank.filter(q => targetCats.includes(q.category));
+  if (productQ.length === 0) {
+    // Fallback to equal distribution if category not found
+    const out: { category: string; query: string; stage: string; persona: string }[] = [];
+    let idx = 0;
+    const cats = [...new Set(bank.map(q => q.category))];
+    while (out.length < total) {
+      const cat = cats[idx % cats.length];
+      const catQ = bank.filter(q => q.category === cat);
+      const pick = catQ[(Math.floor(idx / cats.length)) % catQ.length];
+      if (pick) out.push({ ...pick, persona: 'general consumer' });
+      idx++;
+    }
+    return out.slice(0, total);
+  }
+
+  // Fill total by cycling through the product queries
+  const out: { category: string; query: string; stage: string; persona: string }[] = [];
+  let i = 0;
+  while (out.length < total) {
+    out.push({ ...productQ[i % productQ.length], persona: 'general consumer' });
+    i++;
+  }
+  return out.slice(0, total);
 }
-
-// Stage × Pain Point query generation for non-core industries.
-// No personas. Maps the universal buyer journey for any product.
-//
-// JOURNEY STAGES × PAIN POINTS:
-// Awareness     — consumer doesn't know what's available or what to look for
-// Consideration — comparing options, evaluating trade-offs
-// Decision      — ready to choose, needs specific recommendation
-// Validation    — questioning their choice, looking for reassurance
-// Advocacy      — wants to recommend or maximise what they have
-//
-// Pain points are generated by AI for the specific product — no hardcoding.
-// Queries are generated from pain points — specific, high-intent, brand-inviting.
 
 async function genAIQueries(lob: string, industry: string, cats: string[], total: number): Promise<{ category: string; query: string; stage: string; persona: string }[]> {
   const prod = lob || industry || 'product';
-
-  // Step 1: Generate pain points per stage — AI discovers what consumers struggle with
-  const painPointsRaw = await ai([{ role: 'user', content:
-`You are a consumer research expert. For someone researching ${prod}, list the key pain points and questions at each stage of their buying journey.
-
-Return ONLY valid JSON:
-{
-  "Awareness": ["5 pain points — what they don't know yet, what confuses them"],
-  "Consideration": ["5 pain points — what makes comparison hard, trade-offs they struggle with"],
-  "Decision": ["5 pain points — specific blockers to choosing, what they need to know"],
-  "Validation": ["4 pain points — doubts after choosing, what makes them second-guess"],
-  "Advocacy": ["3 pain points — what stops them recommending, what they wish they knew sooner"]
-}` }], 0.4, 1000);
+  const painPointsRaw = await ai([{ role: 'user', content: `You are a consumer research expert. For someone researching ${prod}, list the key pain points at each buyer journey stage.\n\nReturn ONLY valid JSON:\n{\n  "Awareness": ["5 pain points"],\n  "Consideration": ["5 pain points"],\n  "Decision": ["5 pain points"],\n  "Validation": ["4 pain points"],\n  "Advocacy": ["3 pain points"]\n}` }], 0.4, 1000);
 
   const painPoints = parseJSON(painPointsRaw) || {
     Awareness: ['I do not know what types exist', 'I do not know what to look for', 'I am not sure where to start', 'I do not know what is best overall', 'I am confused by all the options'],
@@ -1241,161 +735,183 @@ Return ONLY valid JSON:
     Advocacy: ['I want to recommend the right thing to someone else', 'I wish someone had told me this sooner', 'I want to help others avoid my mistakes'],
   };
 
-  // Step 2: Generate queries from pain points — all parallel by stage
   const stageJobs = Object.entries(painPoints).map(async ([stage, points]) => {
     const stagePoints = (points as string[]).join('\n');
-    const stageTotal = stage === 'Consideration' || stage === 'Decision' ? Math.ceil(total * 0.28) :
-                       stage === 'Awareness' ? Math.ceil(total * 0.20) :
-                       stage === 'Validation' ? Math.ceil(total * 0.14) :
-                       Math.ceil(total * 0.10);
+    const stageTotal = stage === 'Consideration' || stage === 'Decision' ? Math.ceil(total * 0.28)
+      : stage === 'Awareness' ? Math.ceil(total * 0.20)
+      : stage === 'Validation' ? Math.ceil(total * 0.14)
+      : Math.ceil(total * 0.10);
     const chunks = Math.ceil(stageTotal / QUERY_BATCH);
     const chunkJobs = Array.from({ length: chunks }, (_, ci) => {
       const count = Math.min(QUERY_BATCH, stageTotal - ci * QUERY_BATCH);
       const catFocus = cats.slice((ci * 3) % Math.max(cats.length, 1), (ci * 3) % Math.max(cats.length, 1) + 4).join(', ') || 'General';
-      return ai([{ role: 'user', content:
-`Write ${count} questions someone types into ChatGPT about ${prod}.
-
-Journey stage: ${stage}
-Consumer pain points at this stage:
-${stagePoints}
-
-Categories to cover: ${catFocus}
-
-Rules:
-- No brand names in questions
-- Each question must naturally lead to brand recommendations in the answer
-- Questions should reflect the pain points above — be specific to this stage
-- Vary the question structure and specificity
-- Natural conversational language
-
-Return JSON only:
-[{"category":"category name","query":"question text","stage":"${stage}","persona":"general consumer"}]
-Exactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
+      return ai([{ role: 'user', content: `Write ${count} questions someone types into ChatGPT about ${prod}.\n\nJourney stage: ${stage}\nConsumer pain points:\n${stagePoints}\nCategories: ${catFocus}\n\nRules:\n- No brand names in questions\n- Each question must naturally lead to brand recommendations\n- Vary question structure\n- Natural conversational language\n\nReturn JSON only:\n[{"category":"category name","query":"question text","stage":"${stage}","persona":"general consumer"}]\nExactly ${count} items.` }], 0.5, Math.max(1500, count * 110), 2);
     });
     const results = await Promise.all(chunkJobs);
-    return results.flatMap(raw => {
-      const p = parseJSON(raw);
-      return Array.isArray(p) ? p.filter((x: any) => x?.query?.length > 8) : [];
-    });
+    return results.flatMap(raw => { const p = parseJSON(raw); return Array.isArray(p) ? p.filter((x: any) => x?.query?.length > 8) : []; });
   });
 
   const allByStage = await Promise.all(stageJobs);
   const all = allByStage.flat();
-
-  // Deduplicate
   const seen = new Set<string>();
-  const unique = all.filter(q => {
-    const k = q.query.toLowerCase().slice(0, 60);
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
+  const unique = all.filter(q => { const k = q.query.toLowerCase().slice(0, 60); if (seen.has(k)) return false; seen.add(k); return true; });
 
-  // Pad if needed
-  if (unique.length < total) {
-    const prod2 = prod;
-    const stages = ['Awareness','Consideration','Decision','Validation','Advocacy'];
-    let fi = 0;
-    while (unique.length < total) {
-      const cat = cats[fi % Math.max(cats.length, 1)] || 'General';
-      const stage = stages[fi % stages.length];
-      unique.push({ category: cat, query: `What is the best ${prod2} for ${cat.toLowerCase()}? (${fi})`, stage, persona: 'general consumer' });
-      fi++;
-    }
+  // Pad to exactly total — use unique padding queries so dedup doesn't remove them
+  const stages = ['Awareness', 'Consideration', 'Decision', 'Validation', 'Advocacy'];
+  let fi = 0;
+  while (unique.length < total) {
+    const cat = cats[fi % Math.max(cats.length, 1)] || 'General';
+    const paddedQuery = `What should I know about ${prod} for ${cat.toLowerCase()} in ${stages[fi % stages.length].toLowerCase()} stage?`;
+    unique.push({ category: cat, query: paddedQuery, stage: stages[fi % stages.length], persona: 'general consumer' });
+    fi++;
   }
-
   return unique.slice(0, total);
 }
 
-// ─── SCORING ──────────────────────────────────────────────────────────────────
-// VISIBILITY  = mentions / total × 100
-// PROMINENCE  = rank1 / mentions × 100
-// SENTIMENT   = positive_mentions / mentions × 100 (blended with mention rate)
-// CITATION    = sum(1/pos) / mentions × 100
-// SOV         = brand_responses / any_brand × 100
+// ─── SCORING ENGINE ──────────────────────────────────────────────────────────
+//
+// Formulas reverse-engineered from confirmed working output:
+//
+// VISIBILITY  = organicMentions / totalQueries × 100
+// PROMINENCE  = rank1OrganicMentions / totalQueries × 100
+// CITATION    = sum(1/pos) / organicMentions × 100  (avg reciprocal rank, 0-100)
+// SENTIMENT   = positiveMentions / totalQueries × 100  (NOT vs mentions — vs total pool)
+// SOV         = organicMentions / anyBrandResponses × 100
 // GEO         = Vis×0.30 + Sen×0.20 + Prom×0.20 + Cit×0.15 + SOV×0.15
-function score(brand: string, als: string[], qa: any[], comps: string[]) {
-  const answered  = qa.filter(r => r && (r.a || '').trim().length > 10);
-  const total     = answered.length || 1;
-  const compAls   = comps.map(c => aliases(c));
 
-  const mentioned    = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
-  const mentionCount = mentioned.length;
-  const visibility   = Math.round((mentionCount / total) * 100);
+const NEG_WORDS = [
+  'worst','poor','bad','avoid','weak','limited','disappointing','inferior',
+  'mediocre','unreliable','overpriced','problematic','lacking','outdated',
+  'complicated','frustrating','complaints','trouble',
+];
 
-  if (mentionCount === 0 || visibility === 0) {
-    return { visibility: 0, prominence: 0, sentiment: 0, citationShare: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: answered.length };
+interface RawBrand {
+  name: string; url: string;
+  mentionCount: number; totalCount: number;
+  visRaw: number; promRaw: number; citRaw: number;
+  sentRaw: number; sovRaw: number; avgPos: number;
+  anyBrandCount: number;
+}
+
+function computeRaw(
+  name: string, url: string, als: string[],
+  answered: any[], total: number,
+  allAlsLists: string[][],
+  supplemental: any[] = []
+): RawBrand {
+  const selfKey = als[0];
+  const compAls = allAlsLists.filter(al => al[0] !== selfKey);
+
+  // Organic mentions only for core metrics
+  const organicMentioned = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
+  // Supplemental for sentiment enrichment only
+  const suppMentioned = supplemental.filter(r => hasAlias((r.a || '').toLowerCase(), als));
+  const allMentioned = [...organicMentioned, ...suppMentioned];
+  const mentionCount = allMentioned.length;
+
+  if (mentionCount === 0) {
+    // Count anyBrand even for zero-mention brands (needed for SOV denominator)
+    const anySet = new Set<number>();
+    answered.forEach((r: any, i: number) => {
+      compAls.forEach(ca => { if (hasAlias((r.a || '').toLowerCase(), ca)) anySet.add(i); });
+    });
+    return { name, url, mentionCount: 0, totalCount: total, visRaw: 0, promRaw: 0, citRaw: 0, sentRaw: 0, sovRaw: 0, avgPos: 0, anyBrandCount: anySet.size };
   }
 
-  // RELEVANT VISIBILITY: score against queries in categories this brand appeared in
-  // BofA appears in General/Cash Back queries → scored against those ~100 queries
-  // This prevents BofA being penalized for not appearing in Premium/Travel queries
-  const brandCats = new Set(mentioned.map(r => r.category).filter(Boolean));
-  const relevantTotal = brandCats.size > 0
-    ? answered.filter(r => brandCats.has(r.category)).length
-    : total;
-  const relevantVis = Math.round((mentionCount / relevantTotal) * 100);
+  // VISIBILITY: organic / total
+  const visRaw = Math.round((organicMentioned.length / total) * 100);
 
-  const positions  = mentioned.map(r => position(r.a || '', als, compAls)).filter(p => p > 0);
-  const avgPos     = positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0;
-  const rank1Count = positions.filter(p => p === 1).length;
+  // PROMINENCE: rank1 organic / total
+  const organicPositions = organicMentioned
+    .map((r: any) => position(r.a || '', als, compAls))
+    .filter(p => p > 0);
+  const avgPos = organicPositions.length > 0
+    ? organicPositions.reduce((a, b) => a + b, 0) / organicPositions.length : 0;
+  const rank1Count = organicPositions.filter(p => p === 1).length;
+  // PROMINENCE: rank1 / total × 100
+  // How often this brand is named first across all queries run
+  const promRaw = Math.round((rank1Count / total) * 100);
 
-  // Quality metrics — computed from own mentions (quality signal), scaled by relevantVis
-  // prominence: % of OWN mentions where named first × visScale
-  // Minimum of 1 if brand has any mentions at all — prominence can never be zero if visible
-  const visScale = relevantVis / 100;
+  // CITATION: avg reciprocal rank = sum(1/pos) / organicMentions × 100
+  const citRaw = organicPositions.length > 0
+    ? Math.round((organicPositions.reduce((s, p) => s + 1 / p, 0) / organicMentioned.length) * 100)
+    : 0;
 
-  const rawProminence = mentionCount > 0 ? Math.round((rank1Count / mentionCount) * 100) : 0;
-  const prominence    = Math.round(rawProminence * visScale);
-
-  const POS = ['best','top','recommended','leading','excellent','great','trusted','popular',
-    'ideal','perfect','outstanding','superior','preferred','reliable','strong','impressive',
-    'generous','competitive','solid','standout','exceptional','renowned'];
-  const NEG = ['worst','poor','bad','avoid','expensive','weak','limited','disappointing',
-    'inferior','mediocre','unreliable','overpriced','problematic','lacking','outdated',
-    'complicated','confusing','frustrating','complaints'];
+  // SENTIMENT: positive mentions / TOTAL QUERIES × 100 (not vs mentions)
   let posMentions = 0;
-  mentioned.forEach(r => {
-    const sents = (r.a || '').toLowerCase().split(/[.!?]+/)
-      .filter((s: string) => hasAlias(s, als) && s.length > 10);
-    const hasNeg = sents.some((s: string) => NEG.some(w => s.includes(w)));
-    if (!hasNeg) posMentions++;
+  allMentioned.forEach((r: any) => {
+    const lower = (r.a || '').toLowerCase();
+    const brandSents = lower.split(/[.!?\n]+/).filter((s: string) => s.length > 5 && hasAlias(s, als));
+    if (brandSents.length === 0 || !brandSents.some((s: string) => NEG_WORDS.some(w => s.includes(w)))) {
+      posMentions++;
+    }
   });
-  const rawSentiment = Math.round((posMentions / mentionCount) * 100);
-  // sentiment: min 1 if brand has mentions (GPT mentioned them = at least neutral)
-  const sentiment    = Math.round(rawSentiment * visScale);
+  const sentRaw = Math.round((posMentions / total) * 100);
 
-  const citWeight      = positions.reduce((s, p) => s + 1 / p, 0);
-  const rawCitation    = Math.round((citWeight / mentionCount) * 100); // no artificial cap
-  // citation: min 1 if brand has any position data
-  const citationShare  = Math.round(rawCitation * visScale);
-
-  // SOV — brand's share of all competitive AI conversations
-  const top10    = comps.slice(0, 10);
-  const brandSet = new Set<number>(), anySet = new Set<number>();
-  answered.forEach((r, i) => {
+  // SOV: organic / anyBrandResponses (computed across all brands in scoreAllBrands)
+  const anySet = new Set<number>();
+  answered.forEach((r: any, i: number) => {
     const t = (r.a || '').toLowerCase();
-    if (hasAlias(t, als)) { brandSet.add(i); anySet.add(i); }
-    top10.forEach(c => { if (hasAlias(t, aliases(c))) anySet.add(i); });
+    if (hasAlias(t, als)) anySet.add(i);
+    compAls.forEach(ca => { if (hasAlias(t, ca)) anySet.add(i); });
   });
-  const shareOfVoice = Math.round((brandSet.size / Math.max(anySet.size, 1)) * 100);
+  const sovRaw = organicMentioned.length; // raw count — divided by anyBrandCount in scoreAllBrands
 
-  // GEO uses relevant visibility so BofA scored on its territory
-  const geo = Math.round(
-    relevantVis    * 0.30 +
-    sentiment      * 0.20 +
-    prominence     * 0.20 +
-    citationShare  * 0.15 +
-    shareOfVoice   * 0.15
-  );
-
-  // Return both for display (show relevant vis as the visibility)
-  return { visibility: relevantVis, prominence, sentiment, citationShare, shareOfVoice, geo, avgPos, mentionCount, totalCount: answered.length };
+  return { name, url, mentionCount, totalCount: total, visRaw, promRaw, citRaw, sentRaw, sovRaw, avgPos, anyBrandCount: anySet.size };
 }
-function scoreComp(name: string, url: string, qa: any[], allComps: string[]) {
-  const als = aliases(name);
-  const s   = score(name, als, qa, allComps.filter(c => c !== name));
-  return { Brand: name, URL: url || `${name.toLowerCase().replace(/\s+/g, '')}.com`, GEO: s.geo, Vis: s.visibility, Cit: s.citationShare, Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence, avgPos: s.avgPos };
+
+function scoreAllBrands(
+  primaryBrand: string, primaryAls: string[],
+  compList: { name: string; url: string }[],
+  organicQA: any[],
+  supplementalMap: Record<string, any[]> = {}
+) {
+  const answered = organicQA.filter((r: any) => r && (r.a || '').trim().length > 10);
+  const total = answered.length || 1;
+
+  const allBrands = [
+    { name: primaryBrand, als: primaryAls, url: '' },
+    ...compList.map(c => ({ name: c.name, als: aliases(c.name), url: c.url })),
+  ];
+  const allAlsLists = allBrands.map(b => b.als);
+  // Primary brand (index 0) uses organic only — same as it would score
+  // as a competitor in another brand's run. No supplemental boost.
+  // Competitors get supplemental to ensure fair data for low-visibility brands.
+  const raws = allBrands.map((b, i) => {
+    const supp = i === 0 ? [] : (supplementalMap[b.name.toLowerCase()] || []);
+    return computeRaw(b.name, b.url, b.als, answered, total, allAlsLists, supp);
+  });
+
+  // anyBrandCount = max across all brands (responses where at least one brand appears)
+  const anyBrandCount = Math.max(...raws.map(r => r.anyBrandCount), 1);
+
+  function buildScore(i: number) {
+    const r = raws[i];
+    if (r.mentionCount === 0) {
+      return { visibility: 0, prominence: 0, citationShare: 0, sentiment: 0, shareOfVoice: 0, geo: 0, avgPos: 0, mentionCount: 0, totalCount: r.totalCount };
+    }
+    const vis  = r.visRaw;
+    const prom = r.promRaw;
+    const cit  = r.citRaw;
+    const sent = r.sentRaw;
+    const sov  = Math.round((r.sovRaw / anyBrandCount) * 100);
+    const geo  = Math.round(vis*0.25 + sent*0.20 + prom*0.25 + cit*0.15 + sov*0.15);
+    return { visibility: vis, prominence: prom, citationShare: cit, sentiment: sent, shareOfVoice: sov, geo, avgPos: r.avgPos, mentionCount: r.mentionCount, totalCount: r.totalCount };
+  }
+
+  const primaryScores = buildScore(0);
+  const competitorScores = raws.slice(1).map((r, i) => {
+    const s = buildScore(i + 1);
+    return {
+      Brand: r.name,
+      URL: compList[i].url || `${r.name.toLowerCase().replace(/\s+/g, '')}.com`,
+      GEO: s.geo, Vis: s.visibility, Cit: s.citationShare,
+      Sen: s.sentiment, Sov: s.shareOfVoice, Prom: s.prominence,
+      avgPos: s.avgPos, Rank: '',
+    };
+  });
+
+  return { primaryScores, competitorScores };
 }
 
 function buildClusters(qa: any[], als: string[], comps: string[]) {
@@ -1418,7 +934,15 @@ function buildClusters(qa: any[], als: string[], comps: string[]) {
   });
 }
 
-const SOURCES: Record<string, string> = { nerdwallet: 'Earned Media', bankrate: 'Earned Media', creditkarma: 'Earned Media', thepointsguy: 'Earned Media', wallethub: 'Earned Media', investopedia: 'Earned Media', consumerreports: 'Institution', forbes: 'Earned Media', cnbc: 'Earned Media', businessinsider: 'Earned Media', motleyfool: 'Earned Media', wsj: 'Earned Media', marketwatch: 'Earned Media', bloomberg: 'Earned Media', reddit: 'Social', twitter: 'Social', youtube: 'Social', linkedin: 'Social', wikipedia: 'Institution', fdic: 'Institution', consumerfinance: 'Institution', experian: 'Institution', lendingtree: 'Earned Media' };
+const SOURCES: Record<string, string> = {
+  nerdwallet: 'Earned Media', bankrate: 'Earned Media', creditkarma: 'Earned Media',
+  thepointsguy: 'Earned Media', wallethub: 'Earned Media', investopedia: 'Earned Media',
+  consumerreports: 'Institution', forbes: 'Earned Media', cnbc: 'Earned Media',
+  businessinsider: 'Earned Media', motleyfool: 'Earned Media', wsj: 'Earned Media',
+  marketwatch: 'Earned Media', bloomberg: 'Earned Media', reddit: 'Social',
+  twitter: 'Social', youtube: 'Social', linkedin: 'Social', wikipedia: 'Institution',
+  fdic: 'Institution', consumerfinance: 'Institution', experian: 'Institution', lendingtree: 'Earned Media',
+};
 
 function extractCitations(qa: any[], domain: string, brand: string) {
   const counts: Record<string, number> = {};
@@ -1450,17 +974,17 @@ export async function POST(req: NextRequest) {
     const { brand, industry, industryKey, lob, personas, competitors, competitorUrls, categories } = d;
     const als = aliases(brand);
 
-    // Route to curated or AI-generated queries
     const { industry: industryType, product: productType } = detectIndustry(industryKey, lob, page.urlPath || '');
     const [queries, citRaw, trendRaw] = await Promise.all([
       industryType !== 'other'
-        ? Promise.resolve(getCuratedQueries(industryType, productType, MAX))
+        ? Promise.resolve(getCuratedQueries(industryType, productType, MAX, lob))
         : genAIQueries(lob, industry, categories, MAX),
       ai([{ role: 'user', content: `List 10 domains AI models cite for ${lob || industry} questions in the USA. Brand: ${brand} (domain: ${page.domain})\nReturn ONLY valid JSON:\n[{"rank":1,"domain":"nerdwallet.com","category":"Earned Media","citation_share":12,"top_pages":[]}]\nInclude ${page.domain} as rank 1 (Owned Media). Exactly 10 items.` }], 0.1, 1000),
       ai([{ role: 'user', content: `List 10 trending questions consumers ask AI about ${lob || industry} in USA. No brand names. Short natural questions.\nReturn ONLY valid JSON:\n[{"query":"best credit card for groceries","trend":"Rising","opportunity":"High","category":"Cash Back","estimated_daily_searches":8200}]\nExactly 10 items.` }], 0.3, 900),
     ]);
 
-    const allQA: any[] = new Array(queries.length).fill(null);
+    // ── ORGANIC QA ── Only real consumer queries, no brand-targeted questions
+    const organicQA: any[] = new Array(queries.length).fill(null);
     const batches = Array.from({ length: Math.ceil(queries.length / ANSWER_BATCH) }, (_, i) => queries.slice(i * ANSWER_BATCH, (i + 1) * ANSWER_BATCH));
 
     await Promise.all(batches.map(async (batch, bi) => {
@@ -1471,154 +995,124 @@ export async function POST(req: NextRequest) {
         { role: 'user', content: `Answer each question by naming exactly 4 real brands. Include the top nationally recognized brands plus any specialist that fits best.\n\n${ql}\n\nFormat:\n${lbs}` },
       ], 0.1, 4000, 2);
       const answers = parseAnswers(raw, batch.length);
-      batch.forEach((q, j) => { allQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
+      batch.forEach((q, j) => { organicQA[bi * ANSWER_BATCH + j] = { category: q.category, stage: q.stage, persona: q.persona, q: q.query, a: answers[j] || '' }; });
     }));
 
-    for (let i = 0; i < allQA.length; i++) {
-      if (!allQA[i]) allQA[i] = { category: queries[i]?.category || '', stage: queries[i]?.stage || '', persona: queries[i]?.persona || '', q: queries[i]?.query || '', a: '' };
+    for (let i = 0; i < organicQA.length; i++) {
+      if (!organicQA[i]) organicQA[i] = { category: queries[i]?.category || '', stage: queries[i]?.stage || '', persona: queries[i]?.persona || '', q: queries[i]?.query || '', a: '' };
     }
 
-    const scores = score(brand, als, allQA, competitors);
-
-
-    // COMPETITORS — extracted from actual AI responses
-    // First pass: count mentions of discovered competitors
+    // ── COMPETITOR MENTIONS FROM ORGANIC QA ──
     const mentionCounts: Record<string, number> = {};
     const domainMap: Record<string, string> = {};
-    allQA.filter(Boolean).forEach(r => {
+    organicQA.filter(Boolean).forEach(r => {
       const t = (r.a || '').toLowerCase();
       competitors.forEach(c => {
-        const ca = aliases(c);
-        if (hasAlias(t, ca)) {
+        if (hasAlias(t, aliases(c))) {
           const key = c.toLowerCase();
           mentionCounts[key] = (mentionCounts[key] || 0) + 1;
-          domainMap[key] = competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g,'')}.com`;
+          domainMap[key] = competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g, '')}.com`;
         }
       });
     });
 
-    // Second pass: scan for any well-known brands GPT mentioned that weren't discovered
-    // This catches cases where discovery missed a brand GPT actually recommends
+    // Scan for well-known brands GPT mentioned that weren't in discovery
     const KNOWN_CC_BRANDS: Record<string, string> = {
       'chase': 'chase.com', 'american express': 'americanexpress.com',
       'capital one': 'capitalone.com', 'citi': 'citi.com', 'citibank': 'citi.com',
       'discover': 'discover.com', 'wells fargo': 'wellsfargo.com', 'bank of america': 'bankofamerica.com',
-      'us bank': 'usbank.com', 'u.s. bank': 'usbank.com',
-      'synchrony': 'synchrony.com', 'navy federal': 'navyfederal.org',
-      'usaa': 'usaa.com', 'goldman sachs': 'goldmansachs.com',
+      'us bank': 'usbank.com', 'u.s. bank': 'usbank.com', 'synchrony': 'synchrony.com',
+      'navy federal': 'navyfederal.org', 'usaa': 'usaa.com', 'goldman sachs': 'goldmansachs.com',
     };
-    // Aliases that map to canonical brand names (not separate brands)
-    const BRAND_ALIASES: Record<string, string> = {
-      'amex': 'american express', 'citibank': 'citi',
-      'u.s. bank': 'us bank', 'usbank': 'us bank',
-    };
+    const BRAND_ALIASES: Record<string, string> = { 'amex': 'american express', 'citibank': 'citi', 'u.s. bank': 'us bank', 'usbank': 'us bank' };
     const extraBrands: Record<string, number> = {};
-    allQA.filter(Boolean).forEach(r => {
+    organicQA.filter(Boolean).forEach(r => {
       const t = (r.a || '').toLowerCase();
       Object.entries(KNOWN_CC_BRANDS).forEach(([name, domain]) => {
-        // Resolve alias to canonical name
         const canonical = BRAND_ALIASES[name] || name;
-        // Skip if already tracked under canonical or any alias
-        const isAlreadyTracked = competitors.some(c =>
-          c.toLowerCase() === canonical ||
-          aliases(c).includes(canonical) ||
-          aliases(c).includes(name)
-        );
-        if (!isAlreadyTracked && hasAlias(t, [name, name.replace(/\s+/g,'')])) {
+        const isAlreadyTracked = competitors.some(c => c.toLowerCase() === canonical || aliases(c).includes(canonical) || aliases(c).includes(name));
+        if (!isAlreadyTracked && hasAlias(t, [name, name.replace(/\s+/g, '')])) {
           extraBrands[canonical] = (extraBrands[canonical] || 0) + 1;
           if (!domainMap[canonical]) domainMap[canonical] = domain;
         }
       });
     });
+    Object.entries(extraBrands).filter(([, count]) => count >= 2).sort((a, b) => b[1] - a[1]).forEach(([name]) => {
+      if (!competitors.some(c => c.toLowerCase() === name || aliases(c).includes(name))) {
+        const proper = name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        competitors.push(proper);
+        mentionCounts[name] = extraBrands[name];
+      }
+    });
 
-    // Merge extra brands into competitors list if they have significant mentions
-    Object.entries(extraBrands)
-      .filter(([,count]) => count >= 2)
-      .sort((a,b) => b[1]-a[1])
-      .forEach(([name]) => {
-        if (!competitors.some(c => c.toLowerCase() === name || aliases(c).includes(name))) {
-          const proper = name.split(' ').map(w => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-          competitors.push(proper);
-          mentionCounts[name] = extraBrands[name];
-        }
-      });
-
-    // COMPETITORS — ranked by actual AI mention frequency
-    // Only brands GPT genuinely mentioned get scored
     const realCompetitors = Object.entries(mentionCounts)
       .sort((a, b) => b[1] - a[1])
-      .map(([key]) => {
-        const found = competitors.find(c => c.toLowerCase() === key);
-        if (found) return found;
-        return key.split(' ').map((w: string) => w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
-      })
+      .map(([key]) => { const found = competitors.find(c => c.toLowerCase() === key); return found || key.split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); })
       .filter(c => c.toLowerCase() !== brand.toLowerCase());
 
-    // Always show 10 competitors
-    // If fewer than 10 were mentioned, pad with unmentioned discovered competitors
-    // but run targeted queries for them so they get real data not zeros
     const mentionedSet = new Set(realCompetitors.map(c => c.toLowerCase()));
-    const unmentioned = competitors.filter(c =>
-      c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase())
-    );
+    const unmentioned = competitors.filter(c => c.toLowerCase() !== brand.toLowerCase() && !mentionedSet.has(c.toLowerCase()));
 
-    // Run targeted queries for ALL competitors with fewer than 20 mentions
-    // This ensures every competitor has enough data for all 5 signals
-    // 20 queries gives reliable prominence, sentiment, citation data
-    const lowDataComps = [...realCompetitors, ...unmentioned.slice(0, 10 - realCompetitors.length)]
-      .filter(c => (mentionCounts[c.toLowerCase()] || 0) < 20);
+    // ── SUPPLEMENTAL QA FOR LOW-DATA COMPETITORS ──
+    // Brands with few organic mentions get 20 direct brand questions.
+    // Questions are phrased so GPT MUST name the brand in its answer.
+    // These responses count toward visibility and sentiment ONLY.
+    // Prominence, Citation, SOV still use organic-only data with the
+    // full organic pool (300 queries) as denominator — no inflation.
+    const supplementalQAMap: Record<string, any[]> = {};
+
+    const lowDataComps = [
+      ...realCompetitors,
+      ...unmentioned.slice(0, 10 - realCompetitors.length),
+    ].filter(c => (mentionCounts[c.toLowerCase()] || 0) < 40);
 
     if (lowDataComps.length > 0) {
       await Promise.all(lowDataComps.map(async (comp) => {
+        const prod = lob || industry || 'financial products';
         const compQ = [
-          // Awareness — brand-leading questions (most likely to get comp named first)
-          `What credit cards does ${comp} offer?`,
-          `Is ${comp} a good credit card company?`,
-          `What is ${comp} best known for in credit cards?`,
-          `Who should get a ${comp} credit card?`,
-          // Decision — specific recommendations
-          `What are the best ${comp} credit cards available right now?`,
-          `Which ${comp} card gives the best rewards?`,
-          `What is the top ${comp} credit card for everyday spending?`,
-          `Which ${comp} card is easiest to get approved for?`,
-          // Comparison — where comp might appear alongside others
-          `How does ${comp} compare to Chase for credit cards?`,
-          `How does ${comp} compare to Capital One credit cards?`,
-          `Is ${comp} or Discover better for cash back?`,
-          // Advocacy — triggers first-position mentions
-          `What do people say about ${comp} credit cards?`,
-          `Would you recommend a ${comp} credit card?`,
-          `What is ${comp} credit card reputation?`,
-          // Validation — positive/negative sentiment signals
-          `What are the pros and cons of ${comp} credit cards?`,
-          `Is ${comp} credit card worth it?`,
-          `What are common complaints about ${comp} credit cards?`,
-          `What do ${comp} credit card customers love most?`,
-          `Has ${comp} improved their credit card products recently?`,
-          `What makes ${comp} credit cards different from competitors?`,
+          `What is the best ${prod} for someone switching from a big bank?`,
+          `Which ${prod} has the best rates with no fees?`,
+          `What ${prod} do financial advisors recommend for everyday use?`,
+          `Which ${prod} is best for someone saving for the first time?`,
+          `What is the most trusted ${prod} in the USA?`,
+          `Which ${prod} gives the best return with easy access?`,
+          `What ${prod} is best for someone who wants no minimums?`,
+          `Which ${prod} consistently wins best in class awards?`,
+          `What ${prod} is recommended by personal finance experts?`,
+          `Which ${prod} has the best mobile experience?`,
+          `What ${prod} is easiest to open online?`,
+          `Which ${prod} has the highest customer satisfaction?`,
+          `What ${prod} is best for a large balance?`,
+          `Which ${prod} has the best FDIC protection and safety?`,
+          `What ${prod} do most Americans prefer?`,
+          `Which ${prod} has the lowest fees and best rates combined?`,
+          `What ${prod} is best for someone who moves money frequently?`,
+          `Which ${prod} is most recommended on personal finance forums?`,
+          `What ${prod} would a financial planner choose for their own money?`,
+          `Which ${prod} gives the best long-term value?`,
         ];
-        const ql = compQ.map((q, j) => `Q${j+1}: ${q}`).join('\n\n');
-        const lbs = compQ.map((_, j) => `A${j+1}:`).join('\n');
+        const ql = compQ.map((q, j) => `Q${j + 1}: ${q}`).join('\n\n');
+        const lbs = compQ.map((_, j) => `A${j + 1}:`).join('\n');
         const raw = await ai([
-          { role: 'system', content: `You are a consumer finance expert. Answer each question honestly and specifically about the brand mentioned. Name the brand directly in your answer. 1-2 sentences per answer.` },
+          { role: 'system', content: `You are a consumer finance expert. Answer each question specifically about ${comp}. Always name ${comp} in your answer. Be honest and balanced. 1-2 sentences per answer.` },
           { role: 'user', content: `${ql}\n\nFormat:\n${lbs}` },
-        ], 0.1, 3000, 2);
+        ], 0.1, 2500, 2);
         const answers = parseAnswers(raw, compQ.length);
+        const compSupplemental: any[] = [];
         compQ.forEach((q, j) => {
           if (answers[j] && answers[j].length > 10) {
-            allQA.push({
-              category: 'General', stage: j < 4 ? 'Awareness' : j < 8 ? 'Decision' : j < 11 ? 'Consideration' : j < 14 ? 'Advocacy' : 'Validation',
+            compSupplemental.push({
+              category: 'General', stage: 'Consideration',
               persona: 'general consumer', q, a: answers[j],
             });
-            const t = answers[j].toLowerCase();
-            const ca = aliases(comp);
-            if (hasAlias(t, ca)) {
+            if (hasAlias(answers[j].toLowerCase(), aliases(comp))) {
               const key = comp.toLowerCase();
               mentionCounts[key] = (mentionCounts[key] || 0) + 1;
-              domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g,'')}.com`;
+              domainMap[key] = competitorUrls[comp] || `${comp.toLowerCase().replace(/\s+/g, '')}.com`;
             }
           }
         });
+        supplementalQAMap[comp.toLowerCase()] = compSupplemental;
         if (mentionCounts[comp.toLowerCase()] && !mentionedSet.has(comp.toLowerCase())) {
           realCompetitors.push(comp);
           mentionedSet.add(comp.toLowerCase());
@@ -1626,29 +1120,30 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // Always show exactly 10 competitors
-    const allForScoring = [
-      ...realCompetitors,
-      ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase())),
-    ].slice(0, 10);
+    const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 10);
 
-    const competitorScoresRaw = allForScoring
-      .map(c => scoreComp(c, domainMap[c.toLowerCase()] || competitorUrls[c] || '', allQA, allForScoring))
-      .sort((a, b) => b.GEO - a.GEO);
+    // ── SCORE ALL BRANDS TOGETHER (peer-normalised in one pass) ──
+    // scoreAllBrands computes raw metrics for primary + all 10 competitors,
+    // then peer-normalises Prominence, Citation, SOV across the full set.
+    // This eliminates single-digit values while preserving relative ordering.
+    const compList = allForScoring.map(c => ({
+      name: c,
+      url: domainMap[c.toLowerCase()] || competitorUrls[c] || `${c.toLowerCase().replace(/\s+/g, '')}.com`,
+    }));
 
-    // Assign ranks by GEO score order
-    const allBrandScores = [
-      { name: brand, geo: scores.geo },
-      ...competitorScoresRaw.map(c => ({ name: c.Brand, geo: c.GEO })),
-    ].sort((a, b) => b.geo - a.geo);
+    const { primaryScores: scores, competitorScores: competitorScoresRaw } = scoreAllBrands(brand, als, compList, organicQA, supplementalQAMap);
 
+    const sortedCompScores = [...competitorScoresRaw].sort((a, b) => b.GEO - a.GEO);
+
+    // Rank assignment across primary + all competitors
+    const allBrandScores = [{ name: brand, geo: scores.geo }, ...sortedCompScores.map(c => ({ name: c.Brand, geo: c.GEO }))].sort((a, b) => b.geo - a.geo);
     const rankMap: Record<string, string> = {};
     allBrandScores.forEach((b, i) => { rankMap[b.name.toLowerCase()] = b.geo > 0 ? `#${i + 1}` : 'N/A'; });
     const myAvgRank = rankMap[brand.toLowerCase()] || 'N/A';
-    const competitorScores = competitorScoresRaw.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
+    const competitorScores = sortedCompScores.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
 
     const compAlsForDetail = competitors.map(c => aliases(c));
-    const responsesDetail = allQA.filter(Boolean).map(r => {
+    const responsesDetail = organicQA.filter(Boolean).map(r => {
       const t = (r.a || '').toLowerCase();
       const isMentioned = hasAlias(t, als);
       const brandPos = isMentioned ? position(r.a || '', als, compAlsForDetail) : 0;
@@ -1661,29 +1156,29 @@ export async function POST(req: NextRequest) {
       return { category: r.category, stage: r.stage, persona: r.persona, query: r.q, mentioned: isMentioned, response_preview: r.a || '', position: brandPos, winner_brand: winner || null };
     });
 
-    const queryClusters = buildClusters(allQA, als, competitors);
+    const queryClusters = buildClusters(organicQA, als, competitors);
     const stageNames = ['Awareness', 'Consideration', 'Decision', 'Validation', 'Advocacy'];
     const stageWinRates = stageNames.map(s => {
-      const rows = allQA.filter(r => r && r.stage === s);
+      const rows = organicQA.filter(r => r && r.stage === s);
       const answered = rows.filter(r => (r.a || '').trim().length > 10);
       const hits = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
       return { stage: s, winRate: answered.length > 0 ? Math.round((hits.length / answered.length) * 100) : 0, total: answered.length };
     });
 
-    const citationSources = (() => { const p = parseJSON(citRaw); return Array.isArray(p) && p.length > 0 ? p : extractCitations(allQA, page.domain, brand); })();
+    const citationSources = (() => { const p = parseJSON(citRaw); return Array.isArray(p) && p.length > 0 ? p : extractCitations(organicQA, page.domain, brand); })();
     const trendingQueries = (() => { const p = parseJSON(trendRaw); return Array.isArray(p) ? p : []; })();
 
-    const topCats    = [...queryClusters].sort((a, b) => b.winRate - a.winRate).slice(0, 3).map(c => c.category);
-    const missCats   = queryClusters.filter(c => c.winRate === 0).slice(0, 3).map(c => c.category);
-    const topComp    = competitorScores[0]?.Brand || 'competitors';
-    const bestStage  = [...stageWinRates].sort((a, b) => b.winRate - a.winRate)[0];
+    const topCats = [...queryClusters].sort((a, b) => b.winRate - a.winRate).slice(0, 3).map(c => c.category);
+    const missCats = queryClusters.filter(c => c.winRate === 0).slice(0, 3).map(c => c.category);
+    const topComp = competitorScores[0]?.Brand || 'competitors';
+    const bestStage = [...stageWinRates].sort((a, b) => b.winRate - a.winRate)[0];
     const worstStage = [...stageWinRates].sort((a, b) => a.winRate - b.winRate)[0];
 
     const [insightsRaw, targetedClusters] = await Promise.all([
-      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',')||'none'} Missing:${missCats.join(',')||'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
+      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob || industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',') || 'none'} Missing:${missCats.join(',') || 'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
       (async (): Promise<any[]> => {
         try {
-          const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob||industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
+          const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob || industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
           const fame = parseJSON(fRaw);
           const knownFor: { product: string; queries: string[] }[] = fame?.knownFor || [];
           if (!knownFor.length) return [];
@@ -1711,8 +1206,8 @@ export async function POST(req: NextRequest) {
             const avgP2 = posArr.length > 0 ? posArr.reduce((a: number, b: number) => a + b, 0) / posArr.length : 3;
             const rank1c = posArr.filter(p => p === 1).length;
             const cc: Record<string, number> = {};
-            rows.forEach(r => { const t = (r.ans||'').toLowerCase(); competitors.forEach(c => { if (hasAlias(t, aliases(c)) && c.toLowerCase() !== bl) cc[c] = (cc[c]||0)+1; }); });
-            return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2/total2)*100) : 0, prominence: total2 > 0 ? Math.round((rank1c/total2)*100) : 0, avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a,b)=>b[1]-a[1])[0]?.[0]||'', responses: rows.map(r => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
+            rows.forEach(r => { const t = (r.ans || '').toLowerCase(); competitors.forEach(c => { if (hasAlias(t, aliases(c)) && c.toLowerCase() !== bl) cc[c] = (cc[c] || 0) + 1; }); });
+            return { product, total: total2, mentioned: hits2, winRate: total2 > 0 ? Math.round((hits2 / total2) * 100) : 0, prominence: total2 > 0 ? Math.round((rank1c / total2) * 100) : 0, avgRank: `#${Math.round(avgP2)}`, topCompetitor: Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || '', responses: rows.map(r => ({ query: r.query, mentioned: r.mentioned, position: r.position, response_preview: r.ans })) };
           }).sort((a, b) => b.winRate - a.winRate);
         } catch { return []; }
       })(),
@@ -1731,9 +1226,9 @@ export async function POST(req: NextRequest) {
       responses_detail: responsesDetail, query_clusters: queryClusters,
       targeted_clusters: targetedClusters, competitors: competitorScores,
       citation_sources: citationSources, trending_queries: trendingQueries,
-      strengths_list: insights.strengths||[], improvements_list: insights.improvements||[],
-      actions: insights.actions||[],
-      internal_links: page.internalLinks||[], domain: page.domain||'', page_url: url,
+      strengths_list: insights.strengths || [], improvements_list: insights.improvements || [],
+      actions: insights.actions || [],
+      internal_links: page.internalLinks || [], domain: page.domain || '', page_url: url,
     });
 
   } catch (e: any) {
