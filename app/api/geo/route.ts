@@ -1086,7 +1086,7 @@ export async function POST(req: NextRequest) {
 
     const lowDataComps = [
       ...realCompetitors,
-      ...unmentioned.slice(0, 10 - realCompetitors.length),
+      ...unmentioned.slice(0, 9 - realCompetitors.length),
     ].filter(c => (mentionCounts[c.toLowerCase()] || 0) < 40);
 
     if (lowDataComps.length > 0) {
@@ -1143,7 +1143,8 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 10);
+    // 9 competitors + 1 primary brand = 10 total
+    const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 9);
 
     // ── SCORE ALL BRANDS TOGETHER (peer-normalised in one pass) ──
     // scoreAllBrands computes raw metrics for primary + all 10 competitors,
@@ -1244,7 +1245,7 @@ export async function POST(req: NextRequest) {
       visibility: scores.visibility, sentiment: scores.sentiment, prominence: scores.prominence,
       citation_share: scores.citationShare, share_of_voice: scores.shareOfVoice,
       overall_geo_score: scores.geo, avg_rank: myAvgRank,
-      responses_with_brand: scores.mentionCount, total_responses: scores.totalCount,
+      responses_with_brand: scores.mentionCount, total_responses: queries.length,
       personas, stage_win_rates: stageWinRates,
       responses_detail: responsesDetail, query_clusters: queryClusters,
       targeted_clusters: targetedClusters, competitors: competitorScores,

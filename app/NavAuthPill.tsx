@@ -1,9 +1,10 @@
 'use client';
-import { useUser } from '@clerk/nextjs';
-import { SignInButton } from '@clerk/nextjs';
+import { useRef } from 'react';
+import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 export default function NavAuthPill() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const avatarRef = useRef<HTMLDivElement>(null);
 
   if (!isLoaded) return null;
 
@@ -16,17 +17,18 @@ export default function NavAuthPill() {
   }
 
   const email = user.primaryEmailAddress?.emailAddress ?? user.username ?? '';
-  const imageUrl = user.imageUrl;
-  const initials = (user.firstName?.[0] ?? user.username?.[0] ?? email[0] ?? '?').toUpperCase();
+
+  function triggerUserButton() {
+    avatarRef.current?.querySelector('button')?.click();
+  }
 
   return (
     <div className="navUserPill">
-      <span className="navUserEmail">{email}</span>
-      <div className="navUserAvatar">
-        {imageUrl
-          ? <img src={imageUrl} alt={initials} className="navUserAvatarImg" />
-          : <span className="navUserAvatarInitials">{initials}</span>
-        }
+      <span className="navUserEmail" onClick={triggerUserButton} style={{ cursor: 'pointer' }}>
+        {email}
+      </span>
+      <div className="navUserAvatar" ref={avatarRef}>
+        <UserButton afterSignOutUrl="/" />
       </div>
     </div>
   );

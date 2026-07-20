@@ -602,3 +602,33 @@
   .tabBtn       { font-size: 12px; padding: 11px 10px; }
   .subtabBtn    { font-size: 12px; padding: 4px 8px; }
 }
+
+/* ── Scope pills ─────────────────────────────────────────── */
+.scanScopePill,
+.scanScopeCustom {
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  background: #FFFFFF;
+  color: #3D3D50;
+  border: 1px solid #D0D0DC;
+}
+.scanScopeCustom {
+  color: #B8B8CC;
+  border-style: dashed;
+}
+.scanScopePill.scanScopePillSelected,
+.scanScopeCustom.scanScopeCustomSelected {
+  background: rgba(161, 0, 255, 0.08);
+  border: 1px solid #A100FF;
+  color: #A100FF;
+}
+.scanScopePill.scanScopePillDisabled,
+.scanScopeCustom.scanScopeCustomDisabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

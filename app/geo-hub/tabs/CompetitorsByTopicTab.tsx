@@ -31,9 +31,14 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
   const topics=allCats.length>=2?allCats.slice(0,6):['Awareness','Trust','Value','Innovation','Service','Reach'];
   const N=topics.length;
 
-  // User scores: real mention rate per topic from responses_detail
-  const userScores:Record<string,number>=Object.fromEntries(
+  // Raw mention rates per topic — used as relative weights to derive GEO-scaled per-topic scores
+  const rawRates:Record<string,number>=Object.fromEntries(
     topics.map(t=>{const row=catMap[t];return[t,row&&row.total>0?Math.round((row.mentioned/row.total)*100):0];})
+  );
+  // Scale to overall GEO: topics with above-avg mention rate score above GEO, below-avg score below
+  const avgRate=topics.reduce((s,t)=>s+(rawRates[t]??0),0)/(topics.length||1)||1;
+  const userScores:Record<string,number>=Object.fromEntries(
+    topics.map(t=>{const rate=rawRates[t]??0;return[t,Math.max(0,Math.min(100,Math.round(geo*(rate/avgRate))))];})
   );
 
   // Competitor scores: derived from c.GEO with deterministic per-topic variation
@@ -212,8 +217,8 @@ export default function CompetitorsByTopicTab({ result, resultComps, setActivePa
         </div>
         <div id="cbt-bridge-your-score" className="cbtBridgeStat">
           <div className="cbt-stat-label cbtStatLabel">Your score</div>
-          <div id="cbt-bridge-your-score-value" className="cbt-stat-value cbtStatValueInk">{userScores[gapTopic]??0}</div>
-          <div id="cbt-bridge-your-score-tier" className="cbt-stat-sub cbtStatSub"><span style={{fontWeight:600,color:tOf(userScores[gapTopic]??0).c}}>{tOf(userScores[gapTopic]??0).l}</span> tier</div>
+          <div id="cbt-bridge-your-score-value" className="cbt-stat-value cbtStatValueInk">{geo}</div>
+          <div id="cbt-bridge-your-score-tier" className="cbt-stat-sub cbtStatSub"><span style={{fontWeight:600,color:tOf(geo).c}}>{tOf(geo).l}</span> tier</div>
         </div>
       </div>
 
