@@ -42,11 +42,11 @@ const steps = [
 ];
 
 const bands = [
-  { color: '#007653', fill: '#00AB7B', range: '80–100', label: 'Authority',    desc: 'AI consistently cites you as a category leader' },
-  { color: '#043BCC', fill: '#2F6DFF', range: '70–79',  label: 'Leader',       desc: 'Strong presence with minor gaps to close' },
-  { color: '#996E00', fill: '#F3B10C', range: '56–69',  label: 'Competitive',  desc: 'Holding your own but room to pull ahead' },
-  { color: '#B15F00', fill: '#F48500', range: '45–55',  label: 'Emerging',     desc: 'Visible in some areas, inconsistent overall' },
-  { color: '#B7002F', fill: '#E0003B', range: '0–44',   label: 'Fragmented',   desc: 'AI rarely surfaces your brand' },
+  { color: '#007653', fill: '#00AB7B', range: '80–100', label: 'Authority',    desc: 'You\'re the default reference — cited first, consistently, and on-message across signals.' },
+  { color: '#043BCC', fill: '#2F6DFF', range: '70–79',  label: 'Leader',       desc: 'AI assistants surface you often, with strong, favourable framing. You set the category pace.' },
+  { color: '#996E00', fill: '#F3B10C', range: '56–69',  label: 'Competitive',  desc: 'You\'re a regular part of the AI conversation, holding your ground on most signals.' },
+  { color: '#B15F00', fill: '#F48500', range: '45–55',  label: 'Emerging',     desc: 'You show up occasionally but inconsistently; competitors are cited more and more favourably.' },
+  { color: '#B7002F', fill: '#E0003B', range: '0–44',   label: 'Fragmented',   desc: 'AI assistants rarely surface you, and rivals dominate the answer when they do.' },
 ];
 
 const competitors = [
