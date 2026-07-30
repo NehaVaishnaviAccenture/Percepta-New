@@ -151,7 +151,7 @@ async function fetchPage(url: string) {
 
 async function discover(page: any, url: string) {
   const ctx = [`URL: ${url}`, `Path: ${page.urlPath || '/'}`, `Title: ${page.title || ''}`, `Meta: ${page.metaDesc || ''}`, ...(page.headings || []).slice(0, 10), (page.bodyText || '').slice(0, 2000)].join('\n');
-  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nIdentify the industry and product for this URL. For brand homepages, use the broad industry category (e.g. credit cards, savings accounts, checking accounts) NOT a specific product niche.\n\nCRITICAL: For competitors, list THE TOP 10 most recommended brands in this ENTIRE industry category as ranked by AI models like ChatGPT — include the biggest national brands regardless of whether they are stronger or weaker than the primary brand. Do NOT find niche competitors. Find the dominant industry leaders.\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"the broad industry e.g. credit cards","industry_key":"snake_case e.g. credit_cards — must be savings if page is about savings accounts, credit_cards if about credit cards, retail_banking only if about checking or general banking","lob":"broad product category for homepage e.g. credit cards — only be specific if URL path shows a specific product page","competitors":["exactly 10 most recommended brands in this industry by AI models — include the biggest national brands that AI models most commonly recommend in this industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent questions for this industry"]}` }], 0.1, 1400);
+  const raw = await ai([{ role: 'user', content: `Brand analyst. Return ONLY valid JSON, no markdown.\n\n${ctx}\n\nIdentify the industry and product for this URL. For brand homepages, use the broad industry category (e.g. credit cards, savings accounts, checking accounts) NOT a specific product niche.\n\nCRITICAL: For competitors, list THE TOP 10 most recommended brands in this ENTIRE industry category as ranked by AI models like ChatGPT — include the biggest national brands regardless of whether they are stronger or weaker than the primary brand. Do NOT find niche competitors. Find the dominant industry leaders.\n\nReturn ONLY valid JSON:\n{"brand_name":"parent brand with proper spacing e.g. American Express","industry":"the broad industry e.g. credit cards","industry_key":"snake_case e.g. credit_cards — must be savings if page is about savings accounts, credit_cards if about credit cards, retail_banking only if about checking or general banking","lob":"broad product category for homepage e.g. credit cards — only be specific if URL path shows a specific product page","competitors":["exactly 10 most recommended brands in this industry by AI models — include the biggest national brands that AI models most commonly recommend in this industry"],"competitor_urls":{"Brand":"domain.com"},"personas":["5 buyer personas"],"categories":["10 consumer intent questions for this industry"]}` }], 0, 1400);
   const p = parseJSON(raw);
   if (p?.brand_name) {
     const knownBrands: Record<string, string> = {
@@ -939,11 +939,31 @@ function scoreAllBrands(
 
 function buildClusters(qa: any[], als: string[], comps: string[]) {
   const cats = [...new Set(qa.filter(Boolean).map(r => r.category).filter(Boolean))] as string[];
+  const compAlsAll = comps.map(c => aliases(c));
   return cats.map(cat => {
     const rows = qa.filter(r => r && r.category === cat);
     const answered = rows.filter(r => (r.a || '').trim().length > 10);
     const hits = answered.filter(r => hasAlias((r.a || '').toLowerCase(), als));
-    const winRate = answered.length > 0 ? Math.round((hits.length / answered.length) * 100) : 0;
+
+    // POSITION-WEIGHTED score: appearance rate × position quality
+    // This prevents a brand appearing at #3 in 94% of queries from
+    // scoring the same as a brand appearing at #1 in 94% of queries
+    const visRate = answered.length > 0 ? hits.length / answered.length : 0;
+    const positions = hits
+      .map(r => position(r.a || '', als, compAlsAll))
+      .filter(p => p > 0);
+    const avgPos = positions.length > 0
+      ? positions.reduce((a, b) => a + b, 0) / positions.length
+      : 4; // default to worst position if no position data
+    const MAX_POS = 4;
+    const posQuality = ((MAX_POS - avgPos) / (MAX_POS - 1)); // 0-1 scale
+    // Combined: visibility × position quality × 100
+    // Brand at #1 in 80% of queries: 0.80 × 1.0 × 100 = 80
+    // Brand at #3 in 94% of queries: 0.94 × 0.33 × 100 = 31
+    const winRate = hits.length > 0
+      ? Math.round(visRate * posQuality * 100)
+      : 0;
+
     const cc: Record<string, number> = {};
     answered.forEach(r => { const t = (r.a || '').toLowerCase(); comps.forEach(c => { if (hasAlias(t, aliases(c))) cc[c] = (cc[c] || 0) + 1; }); });
     const stageBreakdown: Record<string, { total: number; mentioned: number }> = {};
@@ -953,7 +973,7 @@ function buildClusters(qa: any[], als: string[], comps: string[]) {
       stageBreakdown[s].total++;
       if (hasAlias((r.a || '').toLowerCase(), als)) stageBreakdown[s].mentioned++;
     });
-    return { category: cat, total: answered.length, mentioned: hits.length, winRate, topCompetitor: Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || '', dailySearches: 0, related: [], stageBreakdown };
+    return { category: cat, total: answered.length, mentioned: hits.length, winRate, avgRank: avgPos > 0 ? Math.round(avgPos) : 0, topCompetitor: Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || '', dailySearches: 0, related: [], stageBreakdown };
   });
 }
 
@@ -1086,7 +1106,7 @@ export async function POST(req: NextRequest) {
 
     const lowDataComps = [
       ...realCompetitors,
-      ...unmentioned.slice(0, 9 - realCompetitors.length),
+      ...unmentioned.slice(0, 10 - realCompetitors.length),
     ].filter(c => (mentionCounts[c.toLowerCase()] || 0) < 40);
 
     if (lowDataComps.length > 0) {
@@ -1143,8 +1163,7 @@ export async function POST(req: NextRequest) {
       }));
     }
 
-    // 9 competitors + 1 primary brand = 10 total
-    const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 9);
+    const allForScoring = [...realCompetitors, ...unmentioned.filter(c => !mentionedSet.has(c.toLowerCase()))].slice(0, 10);
 
     // ── SCORE ALL BRANDS TOGETHER (peer-normalised in one pass) ──
     // scoreAllBrands computes raw metrics for primary + all 10 competitors,
@@ -1166,16 +1185,18 @@ export async function POST(req: NextRequest) {
     const myAvgRank = rankMap[brand.toLowerCase()] || 'N/A';
     const competitorScores = sortedCompScores.map(c => ({ ...c, Rank: rankMap[c.Brand.toLowerCase()] || 'N/A' }));
 
-    const compAlsForDetail = competitors.map(c => aliases(c));
+    // Use ALL scored competitors for position calculation — not just discovered ones
+    // This ensures category scores are consistent regardless of which competitors were discovered
+    const allScoredCompAls = compList.map(c => aliases(c.name));
     const responsesDetail = organicQA.filter(Boolean).map(r => {
       const t = (r.a || '').toLowerCase();
       const isMentioned = hasAlias(t, als);
-      const brandPos = isMentioned ? position(r.a || '', als, compAlsForDetail) : 0;
+      const brandPos = isMentioned ? position(r.a || '', als, allScoredCompAls) : 0;
       let winner = '', winPos = Infinity;
-      competitors.slice(0, 12).forEach(c => {
-        const ca = aliases(c);
-        const pos = position(r.a || '', ca, compAlsForDetail.filter(x => x !== ca));
-        if (pos > 0 && pos < winPos && (brandPos === 0 || pos < brandPos)) { winPos = pos; winner = c; }
+      compList.forEach(c => {
+        const ca = aliases(c.name);
+        const pos = position(r.a || '', ca, allScoredCompAls.filter(x => x !== ca));
+        if (pos > 0 && pos < winPos && (brandPos === 0 || pos < brandPos)) { winPos = pos; winner = c.name; }
       });
       return { category: r.category, stage: r.stage, persona: r.persona, query: r.q, mentioned: isMentioned, response_preview: r.a || '', position: brandPos, winner_brand: winner || null };
     });
@@ -1199,7 +1220,7 @@ export async function POST(req: NextRequest) {
     const worstStage = [...stageWinRates].sort((a, b) => a.winRate - b.winRate)[0];
 
     const [insightsRaw, targetedClusters] = await Promise.all([
-      ai([{ role: 'user', content: `You are a GEO strategist. Return ONLY valid JSON — no markdown.\nBrand:${brand} Product:${lob||industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(avg rank ${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage||'n/a'} ${bestStage?.winRate||0}% WorstStage:${worstStage?.stage||'n/a'} ${worstStage?.winRate||0}%\nTopCats:${topCats.join(',')||'none'} MissingCats:${missCats.join(',')||'none'} TopComp:${topComp}\n\nReturn exactly this shape:\n{"strengths":[{"bold":"One sharp sentence naming a specific metric or behaviour","detail":"1-2 sentences citing actual numbers above","signal":"Visibility|Sentiment|Prominence|Citation|Share of Voice"},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."}],"improvements":[{"bold":"One sharp sentence naming the specific gap","detail":"1-2 sentences citing actual numbers and naming competitors or categories","signal":"Visibility|Sentiment|Prominence|Citation|Share of Voice"},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."},{"bold":"...","detail":"...","signal":"..."}],"actions":[{"priority":"High","title":"Short imperative action title","teaser":"One sentence describing the expected outcome","who":["Content team"],"why":"2-3 sentences explaining why this matters given the data above","topics":[{"name":"${topCats[0]||'General'}"}]},{"priority":"High","title":"...","teaser":"...","who":["SEO team"],"why":"...","topics":[{"name":"${topCats[1]||'General'}"}]},{"priority":"Medium","title":"...","teaser":"...","who":["Content team","SEO team"],"why":"...","topics":[{"name":"${missCats[0]||'General'}"}]},{"priority":"Medium","title":"...","teaser":"...","who":["Brand team"],"why":"...","topics":[{"name":"${missCats[1]||'General'}"}]},{"priority":"Low","title":"...","teaser":"...","who":["Content team"],"why":"...","topics":[{"name":"General"}]}]}` }], 0.2, 2400),
+      ai([{ role: 'user', content: `GEO strategist. Return ONLY valid JSON.\nBrand:${brand} Product:${lob || industry} GEO:${scores.geo} Vis:${scores.visibility}%(${scores.mentionCount}/${scores.totalCount}) Prom:${scores.prominence}(${myAvgRank}) Sen:${scores.sentiment} Cit:${scores.citationShare} SOV:${scores.shareOfVoice}%\nBestStage:${bestStage?.stage} ${bestStage?.winRate}% WorstStage:${worstStage?.stage} ${worstStage?.winRate}%\nTopCats:${topCats.join(',') || 'none'} Missing:${missCats.join(',') || 'none'} TopComp:${topComp}\nReturn:{"strengths":["3 specific data-backed strengths"],"improvements":["5 specific gaps"],"actions":[{"priority":"High","action":"action"},{"priority":"High","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Medium","action":"action"},{"priority":"Low","action":"action"}]}` }], 0.2, 1200),
       (async (): Promise<any[]> => {
         try {
           const fRaw = await ai([{ role: 'user', content: `What specific products/features is "${brand}" genuinely known for in ${lob || industry}? Only real established reputation.\nReturn ONLY valid JSON:\n{"knownFor":[{"product":"name","queries":["10 short brand-inviting questions, NO brand names"]}]}\nMax 3 products.` }], 0.2, 1200);
@@ -1245,7 +1266,7 @@ export async function POST(req: NextRequest) {
       visibility: scores.visibility, sentiment: scores.sentiment, prominence: scores.prominence,
       citation_share: scores.citationShare, share_of_voice: scores.shareOfVoice,
       overall_geo_score: scores.geo, avg_rank: myAvgRank,
-      responses_with_brand: scores.mentionCount, total_responses: queries.length,
+      responses_with_brand: scores.mentionCount, total_responses: scores.totalCount,
       personas, stage_win_rates: stageWinRates,
       responses_detail: responsesDetail, query_clusters: queryClusters,
       targeted_clusters: targetedClusters, competitors: competitorScores,
