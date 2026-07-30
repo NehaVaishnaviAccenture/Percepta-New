@@ -75,7 +75,6 @@ export const REC_CATEGORIES: Record<string,{label:string;color:string;bg:string}
   'API Presence':      {label:'API Presence',      color:'#1D4ED8', bg:'#EFF6FF'},
 };
 
-// CHANGE: Good band is now yellow #FDD835 everywhere
 export function scoreBadge(s: number) {
   if (s >= 80) return { label: 'Excellent', color: '#43A047', bg: '#E8F5E9' };
   if (s >= 70) return { label: 'Good', color: '#F9A825', bg: '#FFFDE7' };
@@ -84,8 +83,6 @@ export function scoreBadge(s: number) {
 }
 
 export function geoTier(s:number){
-  // Thresholds must match GeoScoreTab tierOf() and PromptsTestedTab winRateToTier()
-  // text = on-white color for tier label; fill = fill color for tier swatch
   if(s>=80) return {label:'Authority',  tier:5, text:'#007653', fill:'#00AB7B'};
   if(s>=70) return {label:'Leader',     tier:4, text:'#043BCC', fill:'#2F6DFF'};
   if(s>=56) return {label:'Competitive',tier:3, text:'#996E00', fill:'#F3B10C'};
@@ -112,7 +109,6 @@ export function classifyDomain(d: string) {
   return {label:'Other',color:'#6B7280',bg:'#F3F4F6'};
 }
 
-
 export function Tooltip({ text }: { text: string }) {
   const [show, setShow] = useState(false);
   return (
@@ -136,24 +132,20 @@ export function MetricCard({ label, val, sub, color='#111827', note }: { label:s
   );
 }
 
-// CHANGE: Removed brand name from gauge (score number and label only); GEO score number color → black
 export function GeoGauge({ score }: { score:number }) {
   const badge = scoreBadge(score);
   const cx=160,cy=155,Ro=130,Ri=88;
   const a=(s:number)=>Math.PI-(s/100)*Math.PI;
   const ox=(s:number,r:number)=>cx+r*Math.cos(a(s));
   const oy=(s:number,r:number)=>cy-r*Math.sin(a(s));
-  // CHANGE: Good band uses yellow #FDD835
   const seg=(s0:number,s1:number,fill:string)=>{const lg=s1-s0>50?1:0;return <path d={`M ${ox(s0,Ro)} ${oy(s0,Ro)} A ${Ro} ${Ro} 0 ${lg} 1 ${ox(s1,Ro)} ${oy(s1,Ro)} L ${ox(s1,Ri)} ${oy(s1,Ri)} A ${Ri} ${Ri} 0 ${lg} 0 ${ox(s0,Ri)} ${oy(s0,Ri)} Z`} fill={fill} stroke="white" strokeWidth="2"/>;};
   const mi=Ri-8,mo=Ro+8;
   return (
     <div style={{background:'white',borderRadius:16,border:'1px solid #E5E7EB',padding:'16px 16px 14px',textAlign:'center'}}>
       <svg viewBox="0 0 320 175" style={{width:'100%',display:'block',overflow:'visible'}}>
-        {/* CHANGE: Good band (70-79) = #FDD835 yellow */}
         {seg(0,44,'#F44336')}{seg(44,69,'#FF7043')}{seg(69,79,'#FDD835')}{seg(79,100,'#43A047')}
         <line x1={ox(score,mi)} y1={oy(score,mi)} x2={ox(score,mo)} y2={oy(score,mo)} stroke="#6D28D9" strokeWidth="4" strokeLinecap="round"/>
         {[0,20,40,60,80,100].map(t=><text key={t} x={ox(t,Ro+18)} y={oy(t,Ro+18)} textAnchor="middle" dominantBaseline="middle" style={{fontSize:10,fill:'#9CA3AF',fontFamily:'Inter,sans-serif'}}>{t}</text>)}
-        {/* CHANGE: Score number is now black (#111827) not purple */}
         <text x={cx} y={cy-18} textAnchor="middle" style={{fontSize:46,fontWeight:900,fill:'#111827',fontFamily:'Inter,sans-serif'}}>{score}</text>
       </svg>
       <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
@@ -271,14 +263,29 @@ export function RadarChart({ dims }: { dims: {label:string;val:number}[] }) {
   );
 }
 
-export function SentimentHeatmap({ brandName, dims, competitors }: { brandName:string; dims:{label:string;val:number}[]; competitors:any[] }) {
+// FIXED: SentimentHeatmap now accepts real per-category competitor scores from the route.
+// compCategoryScores shape: { [brandName]: { [category]: number } }
+// Falls back to seed-based estimate only if real data is missing for a cell.
+export function SentimentHeatmap({ brandName, dims, competitors, compCategoryScores }: {
+  brandName: string;
+  dims: {label:string;val:number}[];
+  competitors: any[];
+  compCategoryScores?: Record<string, Record<string, number>>;
+}) {
   const [hovCell,setHovCell]=useState<string|null>(null);
   const seed=(str:string,i:number)=>{let h=0;for(let k=0;k<str.length;k++)h=(h*31+str.charCodeAt(k))>>>0;return((h+i*6271)%40)/100;};
   const rows=[
     {name:brandName,isYou:true,scores:dims.map(d=>d.val)},
     ...(competitors||[]).slice(0,8).map((c:any)=>{
       const g=c.GEO??c.geo??50;
-      return{name:c.Brand||'',isYou:false,scores:dims.map((_,i)=>Math.min(100,Math.max(5,Math.round(g+seed(c.Brand||'',i)*20-10))))};
+      const brandKey=c.Brand||'';
+      return{name:brandKey,isYou:false,scores:dims.map((d,i)=>{
+        // Use real per-category score from route if available
+        const realScore=compCategoryScores?.[brandKey]?.[d.label];
+        if(realScore!==undefined) return realScore;
+        // Fallback to seed estimate only if real data missing
+        return Math.min(100,Math.max(5,Math.round(g+seed(brandKey,i)*20-10)));
+      })};
     })
   ];
   const labels = dims.map(d => d.label);
